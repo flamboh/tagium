@@ -101,3 +101,4 @@ This project uses Svelte 5, which introduces **runes** - explicit reactivity pri
 - This enables runes like `$state` outside of `.svelte` components
 
 - Keep commit messages brief. One sentence titles. Bullet points in the body, if necessary.
+- Use shadcn-svelte for any generic components
