@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Input } from '$lib/components/ui/input';
+	import FileUpload from '$lib/components/FileUpload.svelte';
 </script>
 
 <header
@@ -12,6 +12,6 @@
 	class="font-inter flex min-h-screen flex-col items-center justify-center bg-zinc-950 text-white"
 >
 	<div class="flex h-full flex-col items-center justify-center gap-y-4">
-		<Input type="file" accept="audio/mpeg" class="w-full max-w-md bg-zinc-800" />
+		<FileUpload />
 	</div>
 </main>
