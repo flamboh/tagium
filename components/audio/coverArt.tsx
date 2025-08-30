@@ -61,6 +61,7 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
           type="file"
           accept="image/*"
           onChange={handleCoverUpload}
+          className="file:text-xs file:truncate w-64"
         />
       </div>
     </div>
