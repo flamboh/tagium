@@ -4,6 +4,7 @@ import { useState } from "react";
 import { parseBlob } from "music-metadata";
 import AudioUpload from "./audioUpload";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 
 interface AudioMetadata {
   title?: string;
@@ -84,61 +85,66 @@ export default function AudioTagger() {
                 </div>
               )}
             </div>
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+            <div className="flex-1 grid grid-cols-1 gap-3">
               <div>
-                <span className="font-medium">Title:</span>{" "}
-                {metadata.title || ""}
+                <label className="block text-sm font-medium mb-1">Title:</label>
+                <Input defaultValue={metadata.title || ""} />
               </div>
               <div>
-                <span className="font-medium">Artist:</span>{" "}
-                {metadata.artist || ""}
+                <label className="block text-sm font-medium mb-1">Artist:</label>
+                <Input defaultValue={metadata.artist || ""} />
               </div>
               <div>
-                <span className="font-medium">Album:</span>{" "}
-                {metadata.album || ""}
+                <label className="block text-sm font-medium mb-1">Album:</label>
+                <Input defaultValue={metadata.album || ""} />
               </div>
               <div>
-                <span className="font-medium">Year:</span> {metadata.year || ""}
+                <label className="block text-sm font-medium mb-1">Year:</label>
+                <Input defaultValue={metadata.year?.toString() || ""} type="number" />
               </div>
               <div>
-                <span className="font-medium">Genre:</span>{" "}
-                {metadata.genre && metadata.genre.length > 0
-                  ? metadata.genre.join(", ")
-                  : ""}
+                <label className="block text-sm font-medium mb-1">Genre:</label>
+                <Input defaultValue={metadata.genre && metadata.genre.length > 0 ? metadata.genre.join(", ") : ""} />
               </div>
-              <div>
-                <span className="font-medium">Duration:</span>{" "}
-                {metadata.duration
-                  ? `${Math.floor(metadata.duration / 60)}:${(
-                      metadata.duration % 60
-                    )
-                      .toFixed(0)
-                      .padStart(2, "0")}`
-                  : ""}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Track:</label>
+                  <Input defaultValue={metadata.trackNumber?.toString() || ""} type="number" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">of</label>
+                  <Input defaultValue={metadata.trackTotal?.toString() || ""} type="number" />
+                </div>
               </div>
-              <div>
-                <span className="font-medium">Bitrate:</span>{" "}
-                {metadata.bitrate ? `${Math.round(metadata.bitrate)} kbps` : ""}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Disc:</label>
+                  <Input defaultValue={metadata.discNumber?.toString() || ""} type="number" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">of</label>
+                  <Input defaultValue={metadata.discTotal?.toString() || ""} type="number" />
+                </div>
               </div>
-              <div>
-                <span className="font-medium">Sample Rate:</span>{" "}
-                {metadata.sampleRate ? `${metadata.sampleRate} Hz` : ""}
-              </div>
-              <div>
-                <span className="font-medium">Track Number:</span>{" "}
-                {metadata.trackNumber ? `${metadata.trackNumber}` : ""}
-              </div>
-              <div>
-                <span className="font-medium">Track Total:</span>{" "}
-                {metadata.trackTotal ? `${metadata.trackTotal}` : ""}
-              </div>
-              <div>
-                <span className="font-medium">Disc Number:</span>{" "}
-                {metadata.discNumber ? `${metadata.discNumber}` : ""}
-              </div>
-              <div>
-                <span className="font-medium">Disc Total:</span>{" "}
-                {metadata.discTotal ? `${metadata.discTotal}` : ""}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm pt-2 border-t">
+                <div>
+                  <span className="font-medium">Duration:</span>{" "}
+                  {metadata.duration
+                    ? `${Math.floor(metadata.duration / 60)}:${(
+                        metadata.duration % 60
+                      )
+                        .toFixed(0)
+                        .padStart(2, "0")}`
+                    : ""}
+                </div>
+                <div>
+                  <span className="font-medium">Bitrate:</span>{" "}
+                  {metadata.bitrate ? `${Math.round(metadata.bitrate)} kbps` : ""}
+                </div>
+                <div>
+                  <span className="font-medium">Sample Rate:</span>{" "}
+                  {metadata.sampleRate ? `${metadata.sampleRate} Hz` : ""}
+                </div>
               </div>
             </div>
           </div>
