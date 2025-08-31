@@ -82,14 +82,14 @@ export default function AudioTagger() {
       )}
 
       {metadata && (
-        <Card className="bg-gray-50 p-4 rounded-lg space-y-2">
+        <Card className="">
           <CardHeader>
             <CardTitle>audio metadata</CardTitle>
             <CardAction>
-              <Button variant="secondary">upload new file</Button>
+              <Button variant="outline">upload new file</Button>
             </CardAction>
           </CardHeader>
-          <CardContent>
+          <CardContent className="border-t py-4">
             <div className="flex gap-4">
               <CoverArt
                 picture={metadata.picture}
@@ -195,7 +195,7 @@ export default function AudioTagger() {
                 </div>
               </div>
             </div>
-            <CardFooter className="flex justify-center mt-4">
+            <CardFooter className="flex justify-center mt-8 border-t py-2">
               <Button disabled={!audio} className="w-full">
                 update tags
               </Button>
