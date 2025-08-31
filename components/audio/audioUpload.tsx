@@ -27,6 +27,7 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
         className="w-full max-w-md"
         accept="audio/*"
         onChange={handleAudioUpload}
+        multiple
       />
     </div>
   );

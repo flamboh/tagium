@@ -20,7 +20,9 @@ interface CoverArtProps {
 
 export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
   const [uploadedCover, setUploadedCover] = useState<File | null>(null);
-  const [tempImageForCropping, setTempImageForCropping] = useState<string | null>(null);
+  const [tempImageForCropping, setTempImageForCropping] = useState<
+    string | null
+  >(null);
   const [showCropper, setShowCropper] = useState(false);
 
   const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -28,15 +30,15 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
     if (file && file.type.startsWith("image/")) {
       setUploadedCover(file);
       onCoverUpload?.(file);
-      
+
       // Reset the input value to allow uploading the same file again
-      e.target.value = '';
+      e.target.value = "";
     }
   };
 
   const handleCropComplete = (croppedBlob: Blob) => {
-    const croppedFile = new File([croppedBlob], 'cropped-cover.jpg', {
-      type: 'image/jpeg'
+    const croppedFile = new File([croppedBlob], "cropped-cover.jpg", {
+      type: "image/jpeg",
     });
     setUploadedCover(croppedFile);
     onCoverUpload?.(croppedFile);
@@ -75,7 +77,7 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
         {coverSrc ? (
           <Image
             src={coverSrc}
-            alt="Album cover"
+            alt="album cover"
             width={256}
             height={256}
             className="w-64 h-64 object-cover rounded-lg border"
@@ -83,7 +85,7 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
           />
         ) : (
           <div className="w-64 h-64 bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs">
-            No cover
+            no cover
           </div>
         )}
         {coverSrc && (
@@ -98,7 +100,7 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
                     URL.revokeObjectURL(tempImageForCropping);
                   }
                   // Use uploaded cover first, then fall back to original picture
-                  const imageUrl = uploadedCover 
+                  const imageUrl = uploadedCover
                     ? URL.createObjectURL(uploadedCover)
                     : coverSrc;
                   setTempImageForCropping(imageUrl);
@@ -120,7 +122,7 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
         )}
       </div>
       <div className="flex flex-col gap-2">
-        <Label>Upload Cover</Label>
+        <Label>upload cover</Label>
         <Input
           type="file"
           accept="image/*"

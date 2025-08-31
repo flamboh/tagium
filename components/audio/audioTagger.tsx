@@ -6,6 +6,15 @@ import AudioUpload from "./audioUpload";
 import CoverArt from "./coverArt";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 interface AudioMetadata {
   title?: string;
@@ -73,109 +82,127 @@ export default function AudioTagger() {
       )}
 
       {metadata && (
-        <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-          <h3 className="font-semibold text-lg mb-3">Audio Metadata</h3>
-          <div className="flex gap-4">
-            <CoverArt
-              picture={metadata.picture}
-              onCoverUpload={handleCoverUpload}
-            />
-            <div className="flex-1 grid grid-cols-1 gap-3">
-              <div>
-                <label className="block text-sm font-medium mb-1">Title:</label>
-                <Input defaultValue={metadata.title || ""} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Artist:
-                </label>
-                <Input defaultValue={metadata.artist || ""} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Album:</label>
-                <Input defaultValue={metadata.album || ""} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Year:</label>
-                <Input
-                  defaultValue={metadata.year?.toString() || ""}
-                  type="number"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Genre:</label>
-                <Input
-                  defaultValue={
-                    metadata.genre && metadata.genre.length > 0
-                      ? metadata.genre.join(", ")
-                      : ""
-                  }
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
+        <Card className="bg-gray-50 p-4 rounded-lg space-y-2">
+          <CardHeader>
+            <CardTitle>audio metadata</CardTitle>
+            <CardAction>
+              <Button variant="secondary">upload new file</Button>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4">
+              <CoverArt
+                picture={metadata.picture}
+                onCoverUpload={handleCoverUpload}
+              />
+              <div className="flex-1 grid grid-cols-1 gap-3">
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Track:
+                    title:
                   </label>
-                  <Input
-                    defaultValue={metadata.trackNumber?.toString() || ""}
-                    type="number"
-                  />
+                  <Input defaultValue={metadata.title || ""} />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">of</label>
-                  <Input
-                    defaultValue={metadata.trackTotal?.toString() || ""}
-                    type="number"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Disc:
+                    artist:
+                  </label>
+                  <Input defaultValue={metadata.artist || ""} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    album:
+                  </label>
+                  <Input defaultValue={metadata.album || ""} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    year:
                   </label>
                   <Input
-                    defaultValue={metadata.discNumber?.toString() || ""}
+                    defaultValue={metadata.year?.toString() || ""}
                     type="number"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">of</label>
+                  <label className="block text-sm font-medium mb-1">
+                    genre:
+                  </label>
                   <Input
-                    defaultValue={metadata.discTotal?.toString() || ""}
-                    type="number"
+                    defaultValue={
+                      metadata.genre && metadata.genre.length > 0
+                        ? metadata.genre.join(", ")
+                        : ""
+                    }
                   />
                 </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm pt-2 border-t">
-                <div>
-                  <span className="font-medium">Duration:</span>{" "}
-                  {metadata.duration
-                    ? `${Math.floor(metadata.duration / 60)}:${(
-                        metadata.duration % 60
-                      )
-                        .toFixed(0)
-                        .padStart(2, "0")}`
-                    : ""}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      track:
+                    </label>
+                    <Input
+                      defaultValue={metadata.trackNumber?.toString() || ""}
+                      type="number"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">of</label>
+                    <Input
+                      defaultValue={metadata.trackTotal?.toString() || ""}
+                      type="number"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <span className="font-medium">Bitrate:</span>{" "}
-                  {metadata.bitrate
-                    ? `${Math.round(metadata.bitrate)} kbps`
-                    : ""}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      disc:
+                    </label>
+                    <Input
+                      defaultValue={metadata.discNumber?.toString() || ""}
+                      type="number"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">of</label>
+                    <Input
+                      defaultValue={metadata.discTotal?.toString() || ""}
+                      type="number"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <span className="font-medium">Sample Rate:</span>{" "}
-                  {metadata.sampleRate ? `${metadata.sampleRate} Hz` : ""}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm pt-2 border-t">
+                  <div>
+                    <span className="font-medium">duration:</span>{" "}
+                    {metadata.duration
+                      ? `${Math.floor(metadata.duration / 60)}:${(
+                          metadata.duration % 60
+                        )
+                          .toFixed(0)
+                          .padStart(2, "0")}`
+                      : ""}
+                  </div>
+                  <div>
+                    <span className="font-medium">bitrate:</span>{" "}
+                    {metadata.bitrate
+                      ? `${Math.round(metadata.bitrate)} kbps`
+                      : ""}
+                  </div>
+                  <div>
+                    <span className="font-medium">sample rate:</span>{" "}
+                    {metadata.sampleRate ? `${metadata.sampleRate} Hz` : ""}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+            <CardFooter className="flex justify-center mt-4">
+              <Button disabled={!audio} className="w-full">
+                update tags
+              </Button>
+            </CardFooter>
+          </CardContent>
+        </Card>
       )}
-
-      <Button disabled={!audio}>update tags</Button>
     </div>
   );
 }

@@ -86,6 +86,7 @@ The project uses shadcn/ui components. Available components include:
 
 ## Development Notes
 
+- The app style is all lowercase
 - The app focuses on local file metadata editing
 - Keep commit messages concise and descriptive
 - Follow existing code patterns and conventions
