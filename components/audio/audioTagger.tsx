@@ -15,6 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Label } from "../ui/label";
 
 interface AudioMetadata {
   title?: string;
@@ -74,22 +75,30 @@ export default function AudioTagger() {
   };
 
   return (
-    <div className="w-full max-w-2xl space-y-6">
-      <AudioUpload onAudioUpload={handleAudioUpload} />
-
-      {loading && (
-        <div className="text-center text-gray-600">Loading metadata...</div>
+    <div className="w-full max-w-2xl space-y-6 flex flex-col items-center">
+      {!audio && (
+        <div className="flex flex-col gap-2">
+          <Label>upload file</Label>
+          <AudioUpload onAudioUpload={handleAudioUpload} />
+        </div>
       )}
+      {/* {loading && (
+        <div className="text-center text-gray-600">Loading metadata...</div>
+      )} */}
 
       {metadata && (
         <Card>
           <CardHeader>
             <CardTitle>audio metadata</CardTitle>
-            <CardAction>
-              <Button variant="outline">upload new file</Button>
+            <CardDescription>edit tags/metadata</CardDescription>
+            <CardAction className="flex  flex-col gap-2">
+              <Label>upload new file</Label>
+              <Button variant="outline" asChild>
+                <AudioUpload onAudioUpload={handleAudioUpload} />
+              </Button>
             </CardAction>
           </CardHeader>
-          <CardContent className="border-t mt-8 pt-6">
+          <CardContent className="border-t pt-6">
             <div className="flex gap-4">
               <CoverArt
                 picture={metadata.picture}

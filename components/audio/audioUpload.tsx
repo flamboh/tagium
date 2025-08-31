@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { useState } from "react";
 
@@ -21,14 +22,16 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
 
   return (
     <div>
-      <Input
-        type="file"
-        id="audio"
-        className="w-full max-w-md"
-        accept="audio/*"
-        onChange={handleAudioUpload}
-        multiple
-      />
+      <Button asChild variant="outline" className="file:truncate w-64">
+        <Input
+          type="file"
+          id="audio"
+          className=""
+          accept="audio/*"
+          onChange={handleAudioUpload}
+          multiple
+        />
+      </Button>
     </div>
   );
 }

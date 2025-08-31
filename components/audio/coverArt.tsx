@@ -123,12 +123,14 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
       </div>
       <div className="flex flex-col gap-2">
         <Label>upload cover</Label>
-        <Input
-          type="file"
-          accept="image/*"
-          onChange={handleCoverUpload}
-          className="file:text-xs file:truncate w-64"
-        />
+        <Button variant="outline" asChild>
+          <Input
+            type="file"
+            accept="image/*"
+            onChange={handleCoverUpload}
+            className="file:truncate w-64"
+          />
+        </Button>
       </div>
     </div>
   );
