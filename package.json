@@ -13,6 +13,7 @@
     "@radix-ui/react-slot": "^1.2.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "lint": "^0.8.19",
     "lucide-react": "^0.542.0",
     "mp3tag.js": "^3.14.1",
     "music-metadata": "^11.8.3",
@@ -23,6 +24,7 @@
     "react-hook-form": "^7.62.0",
     "react-image-crop": "^11.0.10",
     "tailwind-merge": "^3.3.1",
+    "typecheck": "^0.1.2",
     "zod": "^4.1.5",
     "zod-validation-error": "^4.0.1"
   },

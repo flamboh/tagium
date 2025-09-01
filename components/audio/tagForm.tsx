@@ -32,7 +32,7 @@ export default function TagForm({ metadata }: { metadata: AudioMetadata }) {
         <div>
           <label className="block text-sm font-medium mb-1">year:</label>
           <Input
-            defaultValue={metadata.year}
+            defaultValue={metadata.year ?? ""}
             type="number"
             {...register("year")}
           />
@@ -54,7 +54,7 @@ export default function TagForm({ metadata }: { metadata: AudioMetadata }) {
           <div>
             <label className="block text-sm font-medium mb-1">track:</label>
             <Input
-              defaultValue={metadata.trackNumber}
+              defaultValue={metadata.trackNumber ?? ""}
               type="number"
               {...register("trackNumber")}
             />
@@ -62,7 +62,7 @@ export default function TagForm({ metadata }: { metadata: AudioMetadata }) {
           <div>
             <label className="block text-sm font-medium mb-1">of</label>
             <Input
-              defaultValue={metadata.trackTotal}
+              defaultValue={metadata.trackTotal ?? ""}
               type="number"
               {...register("trackTotal")}
             />
@@ -72,7 +72,7 @@ export default function TagForm({ metadata }: { metadata: AudioMetadata }) {
           <div>
             <label className="block text-sm font-medium mb-1">disc:</label>
             <Input
-              defaultValue={metadata.discNumber}
+              defaultValue={metadata.discNumber ?? ""}
               type="number"
               {...register("discNumber")}
             />
@@ -80,7 +80,7 @@ export default function TagForm({ metadata }: { metadata: AudioMetadata }) {
           <div>
             <label className="block text-sm font-medium mb-1">of</label>
             <Input
-              defaultValue={metadata.discTotal}
+              defaultValue={metadata.discTotal ?? ""}
               type="number"
               {...register("discTotal")}
             />

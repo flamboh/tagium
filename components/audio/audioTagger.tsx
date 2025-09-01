@@ -24,16 +24,16 @@ const audioMetadataSchema = z.object({
   title: z.string(),
   artist: z.string(),
   album: z.string(),
-  year: z.number(),
+  year: z.number().nullish(),
   genre: z.string().or(z.array(z.string())),
   duration: z.number(),
   bitrate: z.number(),
   sampleRate: z.number(),
   picture: z.array(z.custom<IPicture>()),
-  trackNumber: z.number(),
-  trackTotal: z.number(),
-  discNumber: z.number(),
-  discTotal: z.number(),
+  trackNumber: z.number().nullish(),
+  trackTotal: z.number().nullish(),
+  discNumber: z.number().nullish(),
+  discTotal: z.number().nullish(),
 });
 
 export type AudioMetadata = z.infer<typeof audioMetadataSchema>;
@@ -59,16 +59,16 @@ export default function AudioTagger() {
         title: audioMetadata.common.title || "",
         artist: audioMetadata.common.artist || "",
         album: audioMetadata.common.album || "",
-        year: audioMetadata.common.year || 0,
+        year: audioMetadata.common.year || undefined,
         genre: audioMetadata.common.genre || "",
         duration: audioMetadata.format.duration || 0,
         bitrate: audioMetadata.format.bitrate || 0,
         sampleRate: audioMetadata.format.sampleRate || 0,
         picture: audioMetadata.common.picture || [],
-        trackNumber: audioMetadata.common.track.no || 0,
-        trackTotal: audioMetadata.common.track.of || 0,
-        discNumber: audioMetadata.common.disk.no || 0,
-        discTotal: audioMetadata.common.disk.of || 0,
+        trackNumber: audioMetadata.common.track.no || undefined,
+        trackTotal: audioMetadata.common.track.of || undefined,
+        discNumber: audioMetadata.common.disk.no || undefined,
+        discTotal: audioMetadata.common.disk.of || undefined,
       });
     } catch (error) {
       console.error("Error parsing metadata:", error);
@@ -165,7 +165,7 @@ export default function AudioTagger() {
                     <label className="block text-sm font-medium mb-1">
                       year:
                     </label>
-                    <Input defaultValue={metadata.year} {...register("year")} />
+                    <Input defaultValue={metadata.year ?? ""} {...register("year")} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">
@@ -188,7 +188,7 @@ export default function AudioTagger() {
                         track:
                       </label>
                       <Input
-                        defaultValue={metadata.trackNumber}
+                        defaultValue={metadata.trackNumber ?? ""}
                         {...register("trackNumber")}
                       />
                     </div>
@@ -197,7 +197,7 @@ export default function AudioTagger() {
                         of:
                       </label>
                       <Input
-                        defaultValue={metadata.trackTotal}
+                        defaultValue={metadata.trackTotal ?? ""}
                         {...register("trackTotal")}
                       />
                     </div>
@@ -208,7 +208,7 @@ export default function AudioTagger() {
                         disc:
                       </label>
                       <Input
-                        defaultValue={metadata.discNumber}
+                        defaultValue={metadata.discNumber ?? ""}
                         {...register("discNumber")}
                       />
                     </div>
@@ -217,7 +217,7 @@ export default function AudioTagger() {
                         of:
                       </label>
                       <Input
-                        defaultValue={metadata.discTotal}
+                        defaultValue={metadata.discTotal ?? ""}
                         {...register("discTotal")}
                       />
                     </div>
