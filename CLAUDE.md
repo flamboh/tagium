@@ -62,11 +62,23 @@ npm run type-check  # TypeScript type checking (if available)
 - **Language**: TypeScript
 - **UI Components**: shadcn/ui (React-based)
 - **Package Manager**: pnpm
+- **Audio Processing**: music-metadata library for parsing audio file metadata
+- **Form Management**: react-hook-form with Zod schema validation
+- **Image Processing**: react-image-crop for cover art cropping functionality
 
 ## Project Structure
 
 - `app/` - Next.js App Router pages and layouts
-- `components/ui/` - shadcn/ui components
+  - `page.tsx` - Main application page with AudioTagger component
+  - `layout.tsx` - Global layout and metadata
+- `components/ui/` - shadcn/ui components and custom UI components
+  - Core shadcn components: button, input, label, popover, card
+  - `image-cropper.tsx` - Custom cropping component using react-image-crop
+- `components/audio/` - Audio metadata editing components
+  - `audioTagger.tsx` - Main component with form handling and validation (Zod + react-hook-form)
+  - `audioUpload.tsx` - File upload interface
+  - `coverArt.tsx` - Album cover display and cropping functionality
+  - `tagForm.tsx` - Form component for metadata editing
 - `lib/` - Shared utilities and helpers
 - `public/` - Static assets
 
@@ -74,8 +86,14 @@ npm run type-check  # TypeScript type checking (if available)
 
 The project uses shadcn/ui components. Available components include:
 
-- button, input (already added)
-- Use `pnpm dlx shadcn@latest add <component>` to add more components
+- **Core UI**: button, input, label, popover, card
+- **Custom Components**: 
+  - `image-cropper` - React Image Crop integration with popover
+  - `coverArt` - Album cover display with crop functionality
+  - `audioUpload` - File upload component for audio files
+  - `audioTagger` - Main metadata editor with form validation
+
+Use `pnpm dlx shadcn@latest add <component>` to add more shadcn components
 
 ## Key Files
 
@@ -87,6 +105,19 @@ The project uses shadcn/ui components. Available components include:
 ## Development Notes
 
 - The app style is all lowercase
-- The app focuses on local file metadata editing
+- The app focuses on local file metadata editing with a clean, minimal UI
+- Uses card-based layout for the main metadata editing interface
+- Implements consistent 320px/384px sizing for image croppers and covers
+- Form validation using Zod schemas with TypeScript inference
+- Follows React Hook Form patterns for controlled components
 - Keep commit messages concise and descriptive
 - Follow existing code patterns and conventions
+
+## Current Features
+
+- **Audio File Upload**: Drag-and-drop or browse for audio files
+- **Metadata Parsing**: Automatic extraction of title, artist, album, year, genre, track/disc numbers
+- **Cover Art Management**: Display existing cover art or upload new images
+- **Image Cropping**: Square aspect ratio cropping with react-image-crop in popovers
+- **Form-Based Editing**: Structured form inputs with validation for all metadata fields
+- **Technical Info Display**: Read-only display of duration, bitrate, sample rate

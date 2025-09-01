@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/card";
 import { Label } from "../ui/label";
 import TagForm from "./tagForm";
-import { SubmitHandler, useForm } from "react-hook-form";
+import { SubmitHandler, useForm, Controller } from "react-hook-form";
 import { Input } from "../ui/input";
 
 const audioMetadataSchema = z.object({
@@ -44,7 +44,7 @@ export default function AudioTagger() {
   const [metadata, setMetadata] = useState<AudioMetadata | null>(null);
   const [loading, setLoading] = useState(false);
   const [cover, setCover] = useState<File | null>(null);
-  const { register, handleSubmit } = useForm<AudioMetadata>();
+  const { register, handleSubmit, control, setValue } = useForm<AudioMetadata>();
 
   const onSubmit: SubmitHandler<AudioMetadata> = (data) => {
     console.log(data);
@@ -79,6 +79,18 @@ export default function AudioTagger() {
 
   const handleCoverUpload = (file: File) => {
     setCover(file);
+    // Convert File to IPicture format for form
+    const reader = new FileReader();
+    reader.onload = () => {
+      const arrayBuffer = reader.result as ArrayBuffer;
+      const uint8Array = new Uint8Array(arrayBuffer);
+      setValue("picture", [{
+        format: file.type,
+        data: uint8Array,
+        description: "Uploaded cover"
+      }]);
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   return (
@@ -108,9 +120,16 @@ export default function AudioTagger() {
             </CardHeader>
             <CardContent className="border-t pt-6">
               <div className="flex gap-4">
-                <CoverArt
-                  picture={metadata.picture}
-                  onCoverUpload={handleCoverUpload}
+                <Controller
+                  name="picture"
+                  control={control}
+                  defaultValue={metadata.picture}
+                  render={({ field }) => (
+                    <CoverArt
+                      picture={metadata.picture}
+                      onCoverUpload={handleCoverUpload}
+                    />
+                  )}
                 />
                 <div className="flex-1 grid grid-cols-1 gap-3">
                   <div>

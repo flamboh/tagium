@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import AudioTagger from "@/components/audio/audioTagger";
 
 export default function Home() {
