@@ -46,8 +46,14 @@ export default function AudioTagger() {
   const { register, handleSubmit, control, setValue } =
     useForm<AudioMetadata>();
 
-  const onSubmit: SubmitHandler<AudioMetadata> = (data) => {
+  const onSubmit: SubmitHandler<AudioMetadata> = async (data) => {
     console.log(data);
+    try {
+      await handleTagUpdate(data);
+      console.log("Tags updated successfully");
+    } catch (error) {
+      console.error("Failed to update tags:", error);
+    }
   };
 
   const handleAudioUpload = async (file: File) => {
@@ -77,6 +83,74 @@ export default function AudioTagger() {
     }
   };
 
+  const handleTagUpdate = async (newTags: AudioMetadata) => {
+    try {
+      const MP3Tag = (await import("mp3tag.js")).default;
+      const arrayBuffer = await audio?.arrayBuffer();
+      if (!arrayBuffer) {
+        throw new Error("Audio file not found");
+      }
+      const mp3tag = new MP3Tag(arrayBuffer, true);
+
+      mp3tag.read();
+
+      if (mp3tag.error) {
+        throw new Error(mp3tag.error);
+      }
+
+      // Update tag properties
+      mp3tag.tags.title = newTags.title || "";
+      mp3tag.tags.artist = newTags.artist || "";
+      mp3tag.tags.album = newTags.album || "";
+      if (newTags.year !== null && newTags.year !== undefined) {
+        mp3tag.tags.year = newTags.year.toString();
+      }
+      if (Array.isArray(newTags.genre)) {
+        mp3tag.tags.genre = newTags.genre.join(", ");
+      } else {
+        mp3tag.tags.genre = newTags.genre || "";
+      }
+      if (newTags.trackNumber !== null && newTags.trackNumber !== undefined) {
+        mp3tag.tags.track = newTags.trackNumber.toString();
+      }
+      if (newTags.trackTotal !== null && newTags.trackTotal !== undefined) {
+        mp3tag.tags.totaltracks = newTags.trackTotal.toString();
+      }
+      if (newTags.discNumber !== null && newTags.discNumber !== undefined) {
+        mp3tag.tags.disk = newTags.discNumber.toString();
+      }
+      if (newTags.discTotal !== null && newTags.discTotal !== undefined) {
+        mp3tag.tags.totaldisks = newTags.discTotal.toString();
+      }
+
+      mp3tag.save();
+
+      if (mp3tag.error) {
+        throw new Error(mp3tag.error);
+      }
+
+      const updatedAudio = new File(
+        [new Uint8Array(mp3tag.buffer)],
+        audio?.name || "",
+        {
+          type: audio?.type,
+        }
+      );
+
+      setAudio(updatedAudio);
+      setMetadata(prevMetadata => ({
+        ...newTags,
+        duration: prevMetadata?.duration || 0,
+        bitrate: prevMetadata?.bitrate || 0,
+        sampleRate: prevMetadata?.sampleRate || 0,
+        picture: prevMetadata?.picture || []
+      }));
+    } catch (error) {
+      console.error("Error updating tags:", error);
+      throw error;
+    }
+  };
+
   const handleCoverUpload = (file: File) => {
     setCover(file);
     // Convert File to IPicture format for form
@@ -93,6 +167,18 @@ export default function AudioTagger() {
       ]);
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  const handleDownloadUpdatedFile = () => {
+    if (!audio) {
+      return;
+    }
+    const url = URL.createObjectURL(audio);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = audio.name;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -243,9 +329,21 @@ export default function AudioTagger() {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-center mt-6 border-t">
-              <Button disabled={!audio} className="w-full" type="submit">
+            <CardFooter className="flex justify-center mt-6 border-t flex-col gap-2">
+              <Button
+                disabled={!audio}
+                className="w-full"
+                type="submit"
+              >
                 update tags
+              </Button>
+              <Button
+                disabled={!audio}
+                className="w-full"
+                variant="outline"
+                onClick={() => handleDownloadUpdatedFile()}
+              >
+                download updated file
               </Button>
             </CardFooter>
           </form>
