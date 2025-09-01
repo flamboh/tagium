@@ -103,9 +103,6 @@ export default function AudioTagger() {
           <AudioUpload onAudioUpload={handleAudioUpload} />
         </div>
       )}
-      {/* {loading && (
-        <div className="text-center text-gray-600">Loading metadata...</div>
-      )} */}
 
       {metadata && (
         <Card>
@@ -165,7 +162,10 @@ export default function AudioTagger() {
                     <label className="block text-sm font-medium mb-1">
                       year:
                     </label>
-                    <Input defaultValue={metadata.year ?? ""} {...register("year")} />
+                    <Input
+                      defaultValue={metadata.year ?? ""}
+                      {...register("year")}
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">
