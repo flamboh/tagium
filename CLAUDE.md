@@ -87,7 +87,7 @@ npm run type-check  # TypeScript type checking (if available)
 The project uses shadcn/ui components. Available components include:
 
 - **Core UI**: button, input, label, popover, card
-- **Custom Components**: 
+- **Custom Components**:
   - `image-cropper` - React Image Crop integration with popover
   - `coverArt` - Album cover display with crop functionality
   - `audioUpload` - File upload component for audio files
