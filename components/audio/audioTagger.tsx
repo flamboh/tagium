@@ -17,7 +17,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "../ui/label";
-import TagForm from "./tagForm";
 import { SubmitHandler, useForm, Controller } from "react-hook-form";
 import { Input } from "../ui/input";
 
@@ -44,7 +43,8 @@ export default function AudioTagger() {
   const [metadata, setMetadata] = useState<AudioMetadata | null>(null);
   const [loading, setLoading] = useState(false);
   const [cover, setCover] = useState<File | null>(null);
-  const { register, handleSubmit, control, setValue } = useForm<AudioMetadata>();
+  const { register, handleSubmit, control, setValue } =
+    useForm<AudioMetadata>();
 
   const onSubmit: SubmitHandler<AudioMetadata> = (data) => {
     console.log(data);
@@ -84,11 +84,13 @@ export default function AudioTagger() {
     reader.onload = () => {
       const arrayBuffer = reader.result as ArrayBuffer;
       const uint8Array = new Uint8Array(arrayBuffer);
-      setValue("picture", [{
-        format: file.type,
-        data: uint8Array,
-        description: "Uploaded cover"
-      }]);
+      setValue("picture", [
+        {
+          format: file.type,
+          data: uint8Array,
+          description: "Uploaded cover",
+        },
+      ]);
     };
     reader.readAsArrayBuffer(file);
   };
@@ -163,11 +165,7 @@ export default function AudioTagger() {
                     <label className="block text-sm font-medium mb-1">
                       year:
                     </label>
-                    <Input
-                      defaultValue={metadata.year}
-                      type="number"
-                      {...register("year")}
-                    />
+                    <Input defaultValue={metadata.year} {...register("year")} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">
@@ -191,17 +189,15 @@ export default function AudioTagger() {
                       </label>
                       <Input
                         defaultValue={metadata.trackNumber}
-                        type="number"
                         {...register("trackNumber")}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">
-                        of
+                        of:
                       </label>
                       <Input
                         defaultValue={metadata.trackTotal}
-                        type="number"
                         {...register("trackTotal")}
                       />
                     </div>
@@ -213,17 +209,15 @@ export default function AudioTagger() {
                       </label>
                       <Input
                         defaultValue={metadata.discNumber}
-                        type="number"
                         {...register("discNumber")}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">
-                        of
+                        of:
                       </label>
                       <Input
                         defaultValue={metadata.discTotal}
-                        type="number"
                         {...register("discTotal")}
                       />
                     </div>
