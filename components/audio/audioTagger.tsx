@@ -109,14 +109,15 @@ export default function AudioTagger() {
       if (newTags.trackNumber !== null && newTags.trackNumber !== undefined) {
         mp3tag.tags.track = newTags.trackNumber.toString();
       }
-      if (newTags.trackTotal !== null && newTags.trackTotal !== undefined) {
-        mp3tag.tags.totaltracks = newTags.trackTotal.toString();
-      }
-      if (newTags.discNumber !== null && newTags.discNumber !== undefined) {
-        mp3tag.tags.disk = newTags.discNumber.toString();
-      }
-      if (newTags.discTotal !== null && newTags.discTotal !== undefined) {
-        mp3tag.tags.totaldisks = newTags.discTotal.toString();
+
+      // Handle picture/album art
+      if (newTags.picture && newTags.picture.length > 0 && mp3tag.tags.v2) {
+        mp3tag.tags.v2.APIC = newTags.picture.map((pic) => ({
+          format: (pic.format as string) || "image/jpeg",
+          type: typeof pic.type === 'number' ? pic.type : 3, // Front cover
+          description: (pic.description as string) || "",
+          data: Array.from(pic.data),
+        }));
       }
 
       mp3tag.save();
