@@ -21,6 +21,7 @@ import { SubmitHandler, useForm, Controller } from "react-hook-form";
 import { Input } from "../ui/input";
 
 const audioMetadataSchema = z.object({
+  filename: z.string(),
   title: z.string(),
   artist: z.string(),
   album: z.string(),
@@ -31,9 +32,6 @@ const audioMetadataSchema = z.object({
   sampleRate: z.number(),
   picture: z.array(z.custom<IPicture>()),
   trackNumber: z.number().nullish(),
-  trackTotal: z.number().nullish(),
-  discNumber: z.number().nullish(),
-  discTotal: z.number().nullish(),
 });
 
 export type AudioMetadata = z.infer<typeof audioMetadataSchema>;
@@ -62,6 +60,7 @@ export default function AudioTagger() {
     try {
       const audioMetadata = await parseBlob(file);
       setMetadata({
+        filename: file.name.split(".").slice(0, -1).join("."),
         title: audioMetadata.common.title || "",
         artist: audioMetadata.common.artist || "",
         album: audioMetadata.common.album || "",
@@ -72,9 +71,6 @@ export default function AudioTagger() {
         sampleRate: audioMetadata.format.sampleRate || 0,
         picture: audioMetadata.common.picture || [],
         trackNumber: audioMetadata.common.track.no || undefined,
-        trackTotal: audioMetadata.common.track.of || undefined,
-        discNumber: audioMetadata.common.disk.no || undefined,
-        discTotal: audioMetadata.common.disk.of || undefined,
       });
     } catch (error) {
       console.error("Error parsing metadata:", error);
@@ -131,19 +127,19 @@ export default function AudioTagger() {
 
       const updatedAudio = new File(
         [new Uint8Array(mp3tag.buffer)],
-        audio?.name || "",
+        newTags.filename || audio?.name || "",
         {
           type: audio?.type,
         }
       );
 
       setAudio(updatedAudio);
-      setMetadata(prevMetadata => ({
+      setMetadata((prevMetadata) => ({
         ...newTags,
         duration: prevMetadata?.duration || 0,
         bitrate: prevMetadata?.bitrate || 0,
         sampleRate: prevMetadata?.sampleRate || 0,
-        picture: prevMetadata?.picture || []
+        picture: prevMetadata?.picture || [],
       }));
     } catch (error) {
       console.error("Error updating tags:", error);
@@ -219,6 +215,15 @@ export default function AudioTagger() {
                 <div className="flex-1 grid grid-cols-1 gap-3">
                   <div>
                     <label className="block text-sm font-medium mb-1">
+                      filename:
+                    </label>
+                    <Input
+                      defaultValue={metadata.filename}
+                      {...register("filename")}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
                       title:
                     </label>
                     <Input
@@ -278,35 +283,6 @@ export default function AudioTagger() {
                         {...register("trackNumber")}
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        of:
-                      </label>
-                      <Input
-                        defaultValue={metadata.trackTotal ?? ""}
-                        {...register("trackTotal")}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        disc:
-                      </label>
-                      <Input
-                        defaultValue={metadata.discNumber ?? ""}
-                        {...register("discNumber")}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        of:
-                      </label>
-                      <Input
-                        defaultValue={metadata.discTotal ?? ""}
-                        {...register("discTotal")}
-                      />
-                    </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm pt-2 border-t">
                     <div>
@@ -330,11 +306,7 @@ export default function AudioTagger() {
               </div>
             </CardContent>
             <CardFooter className="flex justify-center mt-6 border-t flex-col gap-2">
-              <Button
-                disabled={!audio}
-                className="w-full"
-                type="submit"
-              >
+              <Button disabled={!audio} className="w-full" type="submit">
                 update tags
               </Button>
               <Button
