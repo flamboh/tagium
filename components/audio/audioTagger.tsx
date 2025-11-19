@@ -20,7 +20,7 @@ import {
 import { SubmitHandler, useForm, Controller } from "react-hook-form";
 import { Input } from "../ui/input";
 
-const audioMetadataSchema = z.object({
+export const audioMetadataSchema = z.object({
   filename: z.string(),
   title: z.string(),
   artist: z.string(),
@@ -30,7 +30,14 @@ const audioMetadataSchema = z.object({
   duration: z.number(),
   bitrate: z.number(),
   sampleRate: z.number(),
-  picture: z.array(z.custom<{ format: string; type: number; description: string; data: Uint8Array }>()), 
+  picture: z.array(
+    z.object({
+      format: z.string(),
+      type: z.number(),
+      description: z.string(),
+      data: z.instanceof(Uint8Array),
+    })
+  ),
   trackNumber: z.number().nullish(),
 });
 
@@ -40,6 +47,13 @@ interface TagiumFile extends FileStatus {
   metadata?: AudioMetadata;
   originalFile: File;
   buffer?: ArrayBuffer;
+}
+
+interface MP3TagPicture {
+  format: string;
+  type: number;
+  description: string;
+  data: number[];
 }
 
 export default function AudioTagger() {
@@ -115,12 +129,11 @@ export default function AudioTagger() {
         
         let pictureData: { format: string; type: number; description: string; data: Uint8Array }[] = [];
         if (tags.v2 && tags.v2.APIC) {
-             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-             pictureData = tags.v2.APIC.map((pic: any) => ({
+             pictureData = tags.v2.APIC.map((pic: MP3TagPicture) => ({
                  format: pic.format,
                  type: pic.type,
                  description: pic.description,
-                 data: new Uint8Array(pic.data),
+                 data: new Uint8Array(pic.data) as Uint8Array,
              }));
         }
 
@@ -140,7 +153,7 @@ export default function AudioTagger() {
           duration: duration,
           bitrate: 0,
           sampleRate: 0,
-          picture: pictureData,
+          picture: pictureData as AudioMetadata['picture'],
           trackNumber: safeParseInt(tags.track),
         };
 
@@ -199,6 +212,8 @@ export default function AudioTagger() {
       mp3tag.tags.album = newTags.album || "";
       if (newTags.year !== null && newTags.year !== undefined && !isNaN(newTags.year)) {
         mp3tag.tags.year = newTags.year.toString();
+      } else {
+        mp3tag.tags.year = "";
       }
       if (Array.isArray(newTags.genre)) {
         mp3tag.tags.genre = newTags.genre.join(", ");
@@ -207,6 +222,8 @@ export default function AudioTagger() {
       }
       if (newTags.trackNumber !== null && newTags.trackNumber !== undefined && !isNaN(newTags.trackNumber)) {
         mp3tag.tags.track = newTags.trackNumber.toString();
+      } else {
+        mp3tag.tags.track = "";
       }
 
       // Handle picture/album art
@@ -247,7 +264,7 @@ export default function AudioTagger() {
                   duration: f.metadata?.duration || 0,
                   bitrate: f.metadata?.bitrate || 0,
                   sampleRate: f.metadata?.sampleRate || 0,
-                  picture: f.metadata?.picture || [],
+                  picture: newTags.picture || [],
                 },
                 status: "saved",
               }

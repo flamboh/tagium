@@ -28,7 +28,6 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
 
   const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    console.log("Cover upload triggered", file);
     if (file && file.type.startsWith("image/")) {
       setUploadedCover(file);
       onCoverUpload?.(file);
@@ -62,7 +61,6 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
   const [coverSrc, setCoverSrc] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log("CoverArt useEffect", { uploadedCover, pictureLength: picture?.length });
     if (uploadedCover) {
       const url = URL.createObjectURL(uploadedCover);
       setCoverSrc(url);
@@ -70,8 +68,7 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
     }
     
     if (picture && picture.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const blob = new Blob([picture[0].data as any], { type: picture[0].format });
+      const blob = new Blob([picture[0].data as unknown as BlobPart], { type: picture[0].format });
       const url = URL.createObjectURL(blob);
       setCoverSrc(url);
       return () => URL.revokeObjectURL(url);
