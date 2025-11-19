@@ -70,6 +70,7 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
     }
     
     if (picture && picture.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const blob = new Blob([picture[0].data as any], { type: picture[0].format });
       const url = URL.createObjectURL(blob);
       setCoverSrc(url);
