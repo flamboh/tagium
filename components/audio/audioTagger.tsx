@@ -315,6 +315,29 @@ export default function AudioTagger() {
     URL.revokeObjectURL(url);
   };
 
+  const handleRemoveFile = (idToRemove: string) => {
+    setFiles((prev) => {
+      const newFiles = prev.filter((f) => f.id !== idToRemove);
+      
+      // If we removed the selected file, select another one if available
+      if (selectedFileId === idToRemove) {
+        // Find the index of the removed file to select the next one
+        const index = prev.findIndex(f => f.id === idToRemove);
+        // Try to select the next file, or the previous one if it was the last
+        if (newFiles.length > 0) {
+            // If index is within new bounds, it means the next file shifted into this index
+            // If index was the last one, we pick the new last one (index - 1)
+            const newIndex = Math.min(index, newFiles.length - 1);
+            setSelectedFileId(newFiles[newIndex].id);
+        } else {
+            setSelectedFileId(null);
+        }
+      }
+      
+      return newFiles;
+    });
+  };
+
   return (
     <div className="w-full max-w-6xl flex gap-4 min-h-[85vh]">
       {/* Sidebar */}
@@ -327,6 +350,7 @@ export default function AudioTagger() {
              files={files} 
              selectedFileId={selectedFileId} 
              onSelectFile={setSelectedFileId} 
+             onRemoveFile={handleRemoveFile}
            />
            <div className="p-6 border-t mt-auto">
              <Button 
