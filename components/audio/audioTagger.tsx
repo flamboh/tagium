@@ -1,11 +1,13 @@
 "use client";
 
 import { z } from "zod";
-import { IPicture } from "music-metadata";
-import { useState } from "react";
-import { parseBlob } from "music-metadata";
+// import { IPicture } from "music-metadata";
+import { useState, useEffect, useCallback } from "react";
+// import { parseBuffer } from "music-metadata"; // Removed client-side import
+// import { parseAudioFile } from "@/app/actions";
 import AudioUpload from "./audioUpload";
 import CoverArt from "./coverArt";
+import FileList, { FileStatus } from "./FileList";
 import { Button } from "../ui/button";
 import {
   Card,
@@ -30,59 +32,151 @@ const audioMetadataSchema = z.object({
   duration: z.number(),
   bitrate: z.number(),
   sampleRate: z.number(),
-  picture: z.array(z.custom<IPicture>()),
+  picture: z.array(z.any()), // z.custom<IPicture>() removed to avoid import
   trackNumber: z.number().nullish(),
 });
 
 export type AudioMetadata = z.infer<typeof audioMetadataSchema>;
 
+interface TagiumFile extends FileStatus {
+  metadata?: AudioMetadata;
+  originalFile: File;
+  buffer?: ArrayBuffer;
+}
+
 export default function AudioTagger() {
-  const [audio, setAudio] = useState<File | null>(null);
-  const [metadata, setMetadata] = useState<AudioMetadata | null>(null);
+  const [files, setFiles] = useState<TagiumFile[]>([]);
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [cover, setCover] = useState<File | null>(null);
-  const { register, handleSubmit, control, setValue } =
+  
+  const { register, handleSubmit, control, setValue, reset, watch } =
     useForm<AudioMetadata>();
 
+  const selectedFile = files.find((f) => f.id === selectedFileId);
+
+  // Update form when selected file changes
+  useEffect(() => {
+    if (selectedFile?.metadata) {
+      reset(selectedFile.metadata);
+    } else {
+      // Optional: reset to empty or keep previous? Better to reset.
+      // reset({}); 
+    }
+  }, [selectedFileId, selectedFile, reset]);
+
   const onSubmit: SubmitHandler<AudioMetadata> = async (data) => {
-    console.log(data);
+    if (!selectedFile) return;
+
     try {
-      await handleTagUpdate(data);
+      await handleTagUpdate(selectedFile, data);
       console.log("Tags updated successfully");
     } catch (error) {
       console.error("Failed to update tags:", error);
     }
   };
 
-  const handleAudioUpload = async (file: File) => {
-    setAudio(file);
+  const handleAudioUpload = async (uploadedFiles: File[]) => {
     setLoading(true);
-    try {
-      const audioMetadata = await parseBlob(file);
-      setMetadata({
-        filename: file.name.split(".").slice(0, -1).join("."),
-        title: audioMetadata.common.title || "",
-        artist: audioMetadata.common.artist || "",
-        album: audioMetadata.common.album || "",
-        year: audioMetadata.common.year || undefined,
-        genre: audioMetadata.common.genre || "",
-        duration: audioMetadata.format.duration || 0,
-        bitrate: audioMetadata.format.bitrate || 0,
-        sampleRate: audioMetadata.format.sampleRate || 0,
-        picture: audioMetadata.common.picture || [],
-        trackNumber: audioMetadata.common.track.no || undefined,
-      });
-    } catch (error) {
-      console.error("Error parsing metadata:", error);
-    } finally {
-      setLoading(false);
+    const newFiles: TagiumFile[] = [];
+
+    const MP3Tag = (await import("mp3tag.js")).default;
+
+    for (const file of uploadedFiles) {
+      const id = crypto.randomUUID();
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const mp3tag = new MP3Tag(arrayBuffer, false); // false for read-only/not saving immediately
+        mp3tag.read();
+
+        if (mp3tag.error) {
+            throw new Error(mp3tag.error);
+        }
+
+        // Get duration using Audio API
+        const getDuration = (): Promise<number> => {
+            return new Promise((resolve) => {
+                const audio = new Audio(URL.createObjectURL(file));
+                audio.onloadedmetadata = () => {
+                    URL.revokeObjectURL(audio.src);
+                    resolve(audio.duration);
+                };
+                audio.onerror = () => {
+                     URL.revokeObjectURL(audio.src);
+                     resolve(0);
+                }
+            });
+        };
+
+        const duration = await getDuration();
+
+        // Map mp3tag tags to our schema
+        // Note: mp3tag.js tags object structure depends on the version but usually has title, artist, etc.
+        // v2 tags are in mp3tag.tags.v2
+        
+        const tags = mp3tag.tags;
+        
+        let pictureData: any[] = [];
+        if (tags.v2 && tags.v2.APIC) {
+             pictureData = tags.v2.APIC.map((pic: any) => ({
+                 format: pic.format,
+                 type: pic.type,
+                 description: pic.description,
+                 data: new Uint8Array(pic.data),
+             }));
+        }
+
+        const metadata: AudioMetadata = {
+          filename: file.name.split(".").slice(0, -1).join("."),
+          title: tags.title || "",
+          artist: tags.artist || "",
+          album: tags.album || "",
+          year: tags.year ? parseInt(tags.year) : undefined,
+          genre: tags.genre || "",
+          duration: duration,
+          bitrate: 0, // mp3tag.js might not provide bitrate easily without parsing frames, set to 0 for now or calculate if possible
+          sampleRate: 0, // same for sampleRate
+          picture: pictureData,
+          trackNumber: tags.track ? parseInt(tags.track) : undefined,
+        };
+
+        newFiles.push({
+          id,
+          file,
+          originalFile: file,
+          filename: file.name,
+          status: "pending",
+          metadata,
+        });
+      } catch (error) {
+        console.error(`Error parsing metadata for ${file.name}:`, error);
+        newFiles.push({
+          id,
+          file,
+          originalFile: file,
+          filename: file.name,
+          status: "error",
+        });
+      }
     }
+
+    setFiles((prev) => [...prev, ...newFiles]);
+    
+    // Select the first new file if none selected
+    if (!selectedFileId && newFiles.length > 0) {
+      setSelectedFileId(newFiles[0].id);
+    }
+    
+    setLoading(false);
   };
 
-  const handleTagUpdate = async (newTags: AudioMetadata) => {
+  const handleTagUpdate = async (fileToUpdate: TagiumFile, newTags: AudioMetadata) => {
     try {
       const MP3Tag = (await import("mp3tag.js")).default;
-      const arrayBuffer = await audio?.arrayBuffer();
+      
+      // Use the original file or the already modified buffer if we had one?
+      // For now, always read from the current file object in state
+      const arrayBuffer = await fileToUpdate.file.arrayBuffer();
+      
       if (!arrayBuffer) {
         throw new Error("Audio file not found");
       }
@@ -126,30 +220,68 @@ export default function AudioTagger() {
         throw new Error(mp3tag.error);
       }
 
-      const updatedAudio = new File(
+      const updatedFile = new File(
         [new Uint8Array(mp3tag.buffer)],
-        newTags.filename || audio?.name || "",
+        newTags.filename ? `${newTags.filename}.mp3` : fileToUpdate.filename,
         {
-          type: audio?.type,
+          type: fileToUpdate.file.type,
         }
       );
 
-      setAudio(updatedAudio);
-      setMetadata((prevMetadata) => ({
-        ...newTags,
-        duration: prevMetadata?.duration || 0,
-        bitrate: prevMetadata?.bitrate || 0,
-        sampleRate: prevMetadata?.sampleRate || 0,
-        picture: prevMetadata?.picture || [],
-      }));
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileToUpdate.id
+            ? {
+                ...f,
+                file: updatedFile,
+                filename: updatedFile.name,
+                metadata: {
+                  ...newTags,
+                  duration: f.metadata?.duration || 0,
+                  bitrate: f.metadata?.bitrate || 0,
+                  sampleRate: f.metadata?.sampleRate || 0,
+                  picture: f.metadata?.picture || [],
+                },
+                status: "saved",
+              }
+            : f
+        )
+      );
     } catch (error) {
       console.error("Error updating tags:", error);
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileToUpdate.id ? { ...f, status: "error" } : f
+        )
+      );
       throw error;
     }
   };
 
+  const handleSaveAll = async () => {
+    if (files.length === 0) return;
+    
+    setLoading(true);
+    try {
+      // Save files sequentially to avoid memory issues or race conditions
+      for (const file of files) {
+        // Only save if it has metadata (it should)
+        if (file.metadata) {
+           // We need to call handleTagUpdate but it updates state, which might be tricky in a loop
+           // if we rely on 'files' state.
+           // However, handleTagUpdate uses functional state update, so it should be fine.
+           // But it's async.
+           await handleTagUpdate(file, file.metadata);
+        }
+      }
+    } catch (error) {
+      console.error("Error saving all files:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCoverUpload = (file: File) => {
-    setCover(file);
     // Convert File to IPicture format for form
     const reader = new FileReader();
     reader.onload = () => {
@@ -166,162 +298,168 @@ export default function AudioTagger() {
     reader.readAsArrayBuffer(file);
   };
 
-  const handleDownloadUpdatedFile = () => {
-    if (!audio) {
-      return;
-    }
-    const url = URL.createObjectURL(audio);
+  const handleDownloadUpdatedFile = (file: TagiumFile) => {
+    const url = URL.createObjectURL(file.file);
     const a = document.createElement("a");
     a.href = url;
-    a.download = audio.name;
+    a.download = file.filename;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="w-full max-w-2xl space-y-6 flex flex-col items-center">
-      {!audio && (
-        <div className="flex flex-col gap-2">
-          <Label>upload file</Label>
-          <AudioUpload onAudioUpload={handleAudioUpload} />
-        </div>
-      )}
+    <div className="w-full max-w-6xl flex gap-6 h-[800px]">
+      {/* Sidebar */}
+      <div className="w-64 flex-shrink-0 flex flex-col gap-4">
+        <Card className="h-full flex flex-col overflow-hidden py-0">
+           <div className="p-6 border-b">
+             <AudioUpload onAudioUpload={handleAudioUpload} />
+           </div>
+           <FileList 
+             files={files} 
+             selectedFileId={selectedFileId} 
+             onSelectFile={setSelectedFileId} 
+           />
+           <div className="p-6 border-t mt-auto">
+             <Button 
+               className="w-full" 
+               onClick={handleSaveAll}
+               disabled={files.length === 0 || loading}
+             >
+               {loading ? "Saving..." : "Save All"}
+             </Button>
+           </div>
+        </Card>
+      </div>
 
-      {metadata && (
-        <Card>
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <CardHeader>
-              <CardTitle>audio metadata</CardTitle>
-              <CardDescription>edit tags/metadata</CardDescription>
-              <CardAction className="flex pb-4 flex-col gap-2">
-                <Label>upload new file</Label>
-                <Button variant="outline" asChild>
-                  <AudioUpload onAudioUpload={handleAudioUpload} />
-                </Button>
-              </CardAction>
-            </CardHeader>
-            <CardContent className="border-t pt-6">
-              <div className="flex gap-4">
-                <Controller
-                  name="picture"
-                  control={control}
-                  defaultValue={metadata.picture}
-                  render={({ field }) => (
-                    <CoverArt
-                      picture={metadata.picture}
-                      onCoverUpload={handleCoverUpload}
-                    />
-                  )}
-                />
-                <div className="flex-1 grid grid-cols-1 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      filename:
-                    </label>
-                    <Input
-                      defaultValue={metadata.filename}
-                      {...register("filename")}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      title:
-                    </label>
-                    <Input
-                      defaultValue={metadata.title}
-                      {...register("title")}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      artist:
-                    </label>
-                    <Input
-                      defaultValue={metadata.artist}
-                      {...register("artist")}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      album:
-                    </label>
-                    <Input
-                      defaultValue={metadata.album}
-                      {...register("album")}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      year:
-                    </label>
-                    <Input
-                      defaultValue={metadata.year ?? ""}
-                      {...register("year")}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      genre:
-                    </label>
-                    <Input
-                      defaultValue={
-                        metadata.genre
-                          ? Array.isArray(metadata.genre)
-                            ? metadata.genre.join(", ")
-                            : metadata.genre
-                          : ""
-                      }
-                      {...register("genre")}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {selectedFile && selectedFile.metadata ? (
+          <Card className="flex-1 overflow-auto">
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <CardHeader>
+                <CardTitle>Edit Metadata</CardTitle>
+                <CardDescription>{selectedFile.filename}</CardDescription>
+              </CardHeader>
+              <CardContent className="border-t pt-6">
+                <div className="flex gap-4 flex-col md:flex-row">
+                  <Controller
+                    name="picture"
+                    control={control}
+                    render={({ field }) => (
+                      <CoverArt
+                        key={selectedFileId}
+                        picture={field.value}
+                        onCoverUpload={handleCoverUpload}
+                      />
+                    )}
+                  />
+                  <div className="flex-1 grid grid-cols-1 gap-3">
                     <div>
                       <label className="block text-sm font-medium mb-1">
-                        track:
+                        filename:
                       </label>
                       <Input
-                        defaultValue={metadata.trackNumber ?? ""}
-                        {...register("trackNumber")}
+                        {...register("filename")}
                       />
                     </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm pt-2 border-t">
                     <div>
-                      <span className="font-medium">duration: </span>
-                      {`${Math.floor(metadata.duration / 60)}:${(
-                        metadata.duration % 60
-                      )
-                        .toFixed(0)
-                        .padStart(2, "0")}`}
+                      <label className="block text-sm font-medium mb-1">
+                        title:
+                      </label>
+                      <Input
+                        {...register("title")}
+                      />
                     </div>
                     <div>
-                      <span className="font-medium">bitrate: </span>
-                      {`${Math.round(metadata.bitrate)} kbps`}
+                      <label className="block text-sm font-medium mb-1">
+                        artist:
+                      </label>
+                      <Input
+                        {...register("artist")}
+                      />
                     </div>
                     <div>
-                      <span className="font-medium">sample rate: </span>
-                      {`${metadata.sampleRate} Hz`}
+                      <label className="block text-sm font-medium mb-1">
+                        album:
+                      </label>
+                      <Input
+                        {...register("album")}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        year:
+                      </label>
+                      <Input
+                        {...register("year", { valueAsNumber: true })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        genre:
+                      </label>
+                      <Input
+                        {...register("genre")}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">
+                          track:
+                        </label>
+                        <Input
+                          {...register("trackNumber", { valueAsNumber: true })}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm pt-2 border-t">
+                      <div>
+                        <span className="font-medium">duration: </span>
+                        {`${Math.floor(selectedFile.metadata.duration / 60)}:${(
+                          selectedFile.metadata.duration % 60
+                        )
+                          .toFixed(0)
+                          .padStart(2, "0")}`}
+                      </div>
+                      <div>
+                        <span className="font-medium">bitrate: </span>
+                        {`${Math.round(selectedFile.metadata.bitrate)} kbps`}
+                      </div>
+                      <div>
+                        <span className="font-medium">sample rate: </span>
+                        {`${selectedFile.metadata.sampleRate} Hz`}
+                      </div>
                     </div>
                   </div>
                 </div>
+              </CardContent>
+              <CardFooter className="flex justify-end mt-6 border-t gap-2">
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => handleDownloadUpdatedFile(selectedFile)}
+                >
+                  Download
+                </Button>
+                <Button type="submit">
+                  Save Changes
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
+        ) : (
+          <div className="flex-1 flex items-center justify-center border rounded-lg bg-muted/10">
+            <div className="text-center">
+              <h3 className="text-lg font-medium">No file selected</h3>
+              <p className="text-muted-foreground">Upload files to get started</p>
+              <div className="mt-4">
+                 <AudioUpload onAudioUpload={handleAudioUpload} />
               </div>
-            </CardContent>
-            <CardFooter className="flex justify-center mt-6 border-t flex-col gap-2">
-              <Button disabled={!audio} className="w-full" type="submit">
-                update tags
-              </Button>
-              <Button
-                disabled={!audio}
-                className="w-full"
-                variant="outline"
-                onClick={() => handleDownloadUpdatedFile()}
-              >
-                download updated file
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
-      )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
