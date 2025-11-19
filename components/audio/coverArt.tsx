@@ -1,19 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import ImageCropper from "../ui/image-cropper";
-import { Crop } from "lucide-react";
+import { Crop, Upload } from "lucide-react";
 
 interface CoverArtProps {
   picture?: {
     format: string;
     data: Uint8Array;
     description?: string;
+    type?: string;
   }[];
   onCoverUpload?: (file: File) => void;
 }
@@ -24,9 +25,11 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
     string | null
   >(null);
   const [showCropper, setShowCropper] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    console.log("Cover upload triggered", file);
     if (file && file.type.startsWith("image/")) {
       setUploadedCover(file);
       onCoverUpload?.(file);
@@ -57,19 +60,27 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
     }
   };
 
-  const getCoverSrc = () => {
-    if (uploadedCover) {
-      return URL.createObjectURL(uploadedCover);
-    }
-    if (picture && picture.length > 0) {
-      return `data:${picture[0].format};base64,${btoa(
-        String.fromCharCode(...picture[0].data)
-      )}`;
-    }
-    return null;
-  };
+  const [coverSrc, setCoverSrc] = useState<string | null>(null);
 
-  const coverSrc = getCoverSrc();
+  useEffect(() => {
+    console.log("CoverArt useEffect", { uploadedCover, pictureLength: picture?.length });
+    if (uploadedCover) {
+      const url = URL.createObjectURL(uploadedCover);
+      setCoverSrc(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    
+    if (picture && picture.length > 0) {
+      const blob = new Blob([picture[0].data as any], { type: picture[0].format });
+      const url = URL.createObjectURL(blob);
+      setCoverSrc(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    
+    setCoverSrc(null);
+  }, [uploadedCover, picture]);
+
+
 
   return (
     <div className="flex-shrink-0 grid grid-rows-2 gap-2">
@@ -122,14 +133,20 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
         )}
       </div>
       <div className="flex flex-col gap-2">
-        <Label>upload cover</Label>
-        <Button variant="outline" asChild>
-          <Input
-            type="file"
-            accept="image/*"
-            onChange={handleCoverUpload}
-            className="file:truncate w-64"
-          />
+        <Input
+          type="file"
+          accept="image/*"
+          onChange={handleCoverUpload}
+          className="hidden"
+          ref={fileInputRef}
+        />
+        <Button
+          variant="outline"
+          className="w-64 h-24 border-dashed border-2 flex flex-col gap-2 hover:bg-accent/50 cursor-pointer"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload className="h-6 w-6 text-muted-foreground" />
+          <span className="text-muted-foreground text-xs">Click to upload cover</span>
         </Button>
       </div>
     </div>
