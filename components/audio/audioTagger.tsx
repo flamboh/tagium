@@ -363,6 +363,7 @@ export default function AudioTagger() {
                         <input
                           {...register("filename")}
                           className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground min-w-0"
+                          placeholder="bangarang"
                         />
                         <span className="text-muted-foreground select-none">.mp3</span>
                       </div>
@@ -373,6 +374,7 @@ export default function AudioTagger() {
                       </label>
                       <Input
                         {...register("title")}
+                        placeholder="Bangarang"
                       />
                     </div>
                     <div>
@@ -381,6 +383,7 @@ export default function AudioTagger() {
                       </label>
                       <Input
                         {...register("artist")}
+                        placeholder="Skrillex"
                       />
                     </div>
                     <div>
@@ -389,6 +392,7 @@ export default function AudioTagger() {
                       </label>
                       <Input
                         {...register("album")}
+                        placeholder="Bangarang EP"
                       />
                     </div>
                     <div>
@@ -397,6 +401,7 @@ export default function AudioTagger() {
                       </label>
                       <Input
                         {...register("year", { valueAsNumber: true })}
+                        placeholder="2011"
                       />
                     </div>
                     <div>
@@ -405,6 +410,7 @@ export default function AudioTagger() {
                       </label>
                       <Input
                         {...register("genre")}
+                        placeholder="Dubstep"
                       />
                     </div>
                     <div>
@@ -413,6 +419,7 @@ export default function AudioTagger() {
                       </label>
                       <Input
                         {...register("trackNumber", { valueAsNumber: true })}
+                        placeholder="2"
                       />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm pt-2 border-t">
@@ -423,6 +430,10 @@ export default function AudioTagger() {
                         )
                           .toFixed(0)
                           .padStart(2, "0")}`}
+                      </div>
+                      <div>
+                        <span className="font-medium">size: </span>
+                        {(selectedFile.file.size / (1024 * 1024)).toFixed(2)} MB
                       </div>
                     </div>
                   </div>
