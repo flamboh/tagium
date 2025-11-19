@@ -13,7 +13,7 @@ interface CoverArtProps {
     format: string;
     data: Uint8Array;
     description?: string;
-    type?: string;
+    type?: number;
   }[];
   onCoverUpload?: (file: File) => void;
 }

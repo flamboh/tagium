@@ -299,6 +299,7 @@ export default function AudioTagger() {
       setValue("picture", [
         {
           format: file.type,
+          type: 3, // Front cover
           data: uint8Array,
           description: "Uploaded cover",
         },
