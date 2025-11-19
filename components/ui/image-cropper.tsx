@@ -121,6 +121,7 @@ export default function ImageCropper({
           aspect={1}
           keepSelection
         >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             ref={imgRef}
             alt="Crop preview"

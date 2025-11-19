@@ -2,5 +2,4 @@
 
 ## TODO
 
-- [ ] Retag file
-- [ ] Allow redownloading
+- [ ] allow batch editing
