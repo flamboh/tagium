@@ -44,11 +44,10 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
       />
       <Button 
         variant="outline" 
-        className="w-full cursor-pointer border-dashed border-2 h-24 hover:bg-accent/50 flex flex-col gap-2"
+        className="w-full cursor-pointer border-dashed border-2 h-12 hover:bg-accent/50 flex flex-col gap-2"
         onClick={handleButtonClick}
       >
         <Upload className="h-6 w-6 text-muted-foreground" />
-        <span className="text-muted-foreground">Click to upload audio files</span>
       </Button>
     </div>
   );

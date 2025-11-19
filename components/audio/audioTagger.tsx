@@ -125,18 +125,24 @@ export default function AudioTagger() {
              }));
         }
 
+        const safeParseInt = (val: string | undefined) => {
+            if (!val) return undefined;
+            const parsed = parseInt(val);
+            return isNaN(parsed) ? undefined : parsed;
+        };
+
         const metadata: AudioMetadata = {
           filename: file.name.split(".").slice(0, -1).join("."),
           title: tags.title || "",
           artist: tags.artist || "",
           album: tags.album || "",
-          year: tags.year ? parseInt(tags.year) : undefined,
+          year: safeParseInt(tags.year),
           genre: tags.genre || "",
           duration: duration,
-          bitrate: 0, // mp3tag.js might not provide bitrate easily without parsing frames, set to 0 for now or calculate if possible
-          sampleRate: 0, // same for sampleRate
+          bitrate: 0,
+          sampleRate: 0,
           picture: pictureData,
-          trackNumber: tags.track ? parseInt(tags.track) : undefined,
+          trackNumber: safeParseInt(tags.track),
         };
 
         newFiles.push({
@@ -161,8 +167,8 @@ export default function AudioTagger() {
 
     setFiles((prev) => [...prev, ...newFiles]);
     
-    // Select the first new file if none selected
-    if (!selectedFileId && newFiles.length > 0) {
+    // Select the first new file
+    if (newFiles.length > 0) {
       setSelectedFileId(newFiles[0].id);
     }
     
@@ -192,7 +198,7 @@ export default function AudioTagger() {
       mp3tag.tags.title = newTags.title || "";
       mp3tag.tags.artist = newTags.artist || "";
       mp3tag.tags.album = newTags.album || "";
-      if (newTags.year !== null && newTags.year !== undefined) {
+      if (newTags.year !== null && newTags.year !== undefined && !isNaN(newTags.year)) {
         mp3tag.tags.year = newTags.year.toString();
       }
       if (Array.isArray(newTags.genre)) {
@@ -200,7 +206,7 @@ export default function AudioTagger() {
       } else {
         mp3tag.tags.genre = newTags.genre || "";
       }
-      if (newTags.trackNumber !== null && newTags.trackNumber !== undefined) {
+      if (newTags.trackNumber !== null && newTags.trackNumber !== undefined && !isNaN(newTags.trackNumber)) {
         mp3tag.tags.track = newTags.trackNumber.toString();
       }
 
@@ -237,6 +243,8 @@ export default function AudioTagger() {
                 filename: updatedFile.name,
                 metadata: {
                   ...newTags,
+                  year: isNaN(newTags.year as number) ? undefined : newTags.year,
+                  trackNumber: isNaN(newTags.trackNumber as number) ? undefined : newTags.trackNumber,
                   duration: f.metadata?.duration || 0,
                   bitrate: f.metadata?.bitrate || 0,
                   sampleRate: f.metadata?.sampleRate || 0,
@@ -308,13 +316,13 @@ export default function AudioTagger() {
   };
 
   return (
-    <div className="w-full max-w-6xl flex gap-6 h-[800px]">
+    <div className="w-full max-w-6xl flex gap-4 min-h-[85vh]">
       {/* Sidebar */}
       <div className="w-64 flex-shrink-0 flex flex-col gap-4">
-        <Card className="h-full flex flex-col overflow-hidden py-0">
-           <div className="p-6 border-b">
+        <Card className="h-full flex flex-col overflow-hidden py-0 gap-2">
+           <CardHeader className="p-6 border-b h-[104px]">
              <AudioUpload onAudioUpload={handleAudioUpload} />
-           </div>
+          </CardHeader>
            <FileList 
              files={files} 
              selectedFileId={selectedFileId} 
@@ -335,13 +343,13 @@ export default function AudioTagger() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {selectedFile && selectedFile.metadata ? (
-          <Card className="flex-1 overflow-hidden py-0">
+          <Card className="flex-1 overflow-none py-0">
             <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full">
-              <CardHeader className="p-6 space-y-2">
-                <CardTitle>Edit Metadata</CardTitle>
+              <CardHeader className="p-6 space-y-2 h-[104px] border-b">
+                <CardTitle>edit metadata</CardTitle>
                 <CardDescription>{selectedFile.filename}</CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 overflow-y-auto border-t p-6">
+              <CardContent className="flex-1 overflow-y-auto p-6">
                 <div className="flex gap-4 flex-col md:flex-row">
                   <Controller
                     name="picture"
@@ -400,8 +408,10 @@ export default function AudioTagger() {
                         year:
                       </label>
                       <Input
+                        type="number"
                         {...register("year", { valueAsNumber: true })}
                         placeholder="2011"
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
                     <div>
@@ -418,8 +428,10 @@ export default function AudioTagger() {
                         track:
                       </label>
                       <Input
+                        type="number"
                         {...register("trackNumber", { valueAsNumber: true })}
                         placeholder="2"
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm pt-2 border-t">

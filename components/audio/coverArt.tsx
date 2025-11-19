@@ -146,7 +146,7 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
           onClick={() => fileInputRef.current?.click()}
         >
           <Upload className="h-6 w-6 text-muted-foreground" />
-          <span className="text-muted-foreground text-xs">Click to upload cover</span>
+          <span className="text-muted-foreground text-xs">upload cover</span>
         </Button>
       </div>
     </div>

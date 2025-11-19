@@ -27,9 +27,9 @@ export default function FileList({
   }
 
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col bg-muted/10 border-r">
-      <div className="p-6 border-b font-semibold text-sm text-muted-foreground">
-        Files ({files.length})
+    <div className="w-full flex-1 min-h-0 flex flex-col">
+      <div className="pb-2 pl-6 border-b font-semibold text-sm text-muted-foreground">
+        files ({files.length})
       </div>
       <div className="flex-1 overflow-y-auto">
         <div className="flex flex-col p-2 gap-1">
