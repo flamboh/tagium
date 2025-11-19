@@ -2,7 +2,7 @@
 
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { useState, useRef } from "react";
+import { useRef } from "react";
 import { Upload } from "lucide-react";
 
 interface AudioUploadProps {
@@ -10,8 +10,7 @@ interface AudioUploadProps {
 }
 
 export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
-  const [audio, setAudio] = useState<File[] | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);

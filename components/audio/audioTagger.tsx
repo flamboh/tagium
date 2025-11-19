@@ -32,7 +32,7 @@ const audioMetadataSchema = z.object({
   duration: z.number(),
   bitrate: z.number(),
   sampleRate: z.number(),
-  picture: z.array(z.any()), // z.custom<IPicture>() removed to avoid import
+  picture: z.array(z.custom<{ format: string; type: number; description: string; data: Uint8Array }>()), 
   trackNumber: z.number().nullish(),
 });
 
@@ -49,7 +49,7 @@ export default function AudioTagger() {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
-  const { register, handleSubmit, control, setValue, reset, watch } =
+  const { register, handleSubmit, control, setValue, reset } =
     useForm<AudioMetadata>();
 
   const selectedFile = files.find((f) => f.id === selectedFileId);
@@ -115,8 +115,9 @@ export default function AudioTagger() {
         
         const tags = mp3tag.tags;
         
-        let pictureData: any[] = [];
+        let pictureData: { format: string; type: number; description: string; data: Uint8Array }[] = [];
         if (tags.v2 && tags.v2.APIC) {
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
              pictureData = tags.v2.APIC.map((pic: any) => ({
                  format: pic.format,
                  type: pic.type,
