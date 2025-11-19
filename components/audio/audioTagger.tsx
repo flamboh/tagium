@@ -335,13 +335,13 @@ export default function AudioTagger() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {selectedFile && selectedFile.metadata ? (
-          <Card className="flex-1 overflow-auto">
-            <form onSubmit={handleSubmit(onSubmit)}>
-              <CardHeader>
+          <Card className="flex-1 overflow-hidden py-0">
+            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full">
+              <CardHeader className="p-6 space-y-2">
                 <CardTitle>Edit Metadata</CardTitle>
                 <CardDescription>{selectedFile.filename}</CardDescription>
               </CardHeader>
-              <CardContent className="border-t pt-6">
+              <CardContent className="flex-1 overflow-y-auto border-t p-6">
                 <div className="flex gap-4 flex-col md:flex-row">
                   <Controller
                     name="picture"
@@ -359,9 +359,13 @@ export default function AudioTagger() {
                       <label className="block text-sm font-medium mb-1">
                         filename:
                       </label>
-                      <Input
-                        {...register("filename")}
-                      />
+                      <div className="flex items-center h-9 w-full rounded-md border border-input bg-transparent dark:bg-input/30 px-3 py-1 text-base shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm">
+                        <input
+                          {...register("filename")}
+                          className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground min-w-0"
+                        />
+                        <span className="text-muted-foreground select-none">.mp3</span>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">
@@ -403,15 +407,13 @@ export default function AudioTagger() {
                         {...register("genre")}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">
-                          track:
-                        </label>
-                        <Input
-                          {...register("trackNumber", { valueAsNumber: true })}
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        track:
+                      </label>
+                      <Input
+                        {...register("trackNumber", { valueAsNumber: true })}
+                      />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm pt-2 border-t">
                       <div>
@@ -422,19 +424,11 @@ export default function AudioTagger() {
                           .toFixed(0)
                           .padStart(2, "0")}`}
                       </div>
-                      <div>
-                        <span className="font-medium">bitrate: </span>
-                        {`${Math.round(selectedFile.metadata.bitrate)} kbps`}
-                      </div>
-                      <div>
-                        <span className="font-medium">sample rate: </span>
-                        {`${selectedFile.metadata.sampleRate} Hz`}
-                      </div>
                     </div>
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-end mt-6 border-t gap-2">
+              <CardFooter className="p-6 border-t mt-auto flex justify-end gap-2">
                 <Button
                   variant="outline"
                   type="button"
