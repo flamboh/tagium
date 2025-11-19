@@ -14,24 +14,24 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
 
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const audioFiles = files.filter((file) => file.type.startsWith("audio/"));
+    // The accept="audio/*" attribute on the Input component already filters for audio files.
+    // No need for explicit filtering here unless more specific audio types are required.
 
-    if (audioFiles.length > 0) {
-      setAudio(audioFiles);
-      onAudioUpload(audioFiles);
+    if (files.length > 0) {
+      onAudioUpload(files);
     }
     // Reset input value so the same file can be selected again if needed
-    if (inputRef.current) {
-      inputRef.current.value = "";
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
   const handleButtonClick = () => {
-    inputRef.current?.click();
+    fileInputRef.current?.click();
   };
 
   return (
-    <div>
+    <div className="w-full">
       <Input
         type="file"
         id="audio"
@@ -39,10 +39,10 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
         accept="audio/*"
         onChange={handleAudioUpload}
         multiple
-        ref={inputRef}
+        ref={fileInputRef}
       />
-      <Button 
-        variant="outline" 
+      <Button
+        variant="outline"
         className="w-full cursor-pointer border-dashed border-2 h-12 hover:bg-accent/50 flex flex-col gap-2"
         onClick={handleButtonClick}
       >
