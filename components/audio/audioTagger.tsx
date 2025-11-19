@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 // import { IPicture } from "music-metadata";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 // import { parseBuffer } from "music-metadata"; // Removed client-side import
 // import { parseAudioFile } from "@/app/actions";
 import AudioUpload from "./audioUpload";
@@ -11,14 +11,12 @@ import FileList, { FileStatus } from "./FileList";
 import { Button } from "../ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Label } from "../ui/label";
 import { SubmitHandler, useForm, Controller } from "react-hook-form";
 import { Input } from "../ui/input";
 
