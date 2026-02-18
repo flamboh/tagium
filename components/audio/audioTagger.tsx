@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
 import AlbumMetadataDialog, { AlbumMetadataDraft } from "./AlbumMetadataDialog";
@@ -22,7 +21,6 @@ import {
   writeMetadataToFile,
 } from "./mp3Utils";
 import { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
-
 const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
   title: "",
   artist: "",
@@ -30,9 +28,7 @@ const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
   cover: undefined,
   syncTrackNumbers: false,
 };
-
 const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
-
 export default function AudioTagger() {
   const [files, setFiles] = useState<TagiumFile[]>([]);
   const [albums, setAlbums] = useState<AlbumGroup[]>([]);
@@ -40,7 +36,6 @@ export default function AudioTagger() {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [albumDialogMode, setAlbumDialogMode] = useState<"create" | "edit">(
     "create"
@@ -50,57 +45,59 @@ export default function AudioTagger() {
   );
   const [editingAlbumId, setEditingAlbumId] = useState<string | null>(null);
   const [createSeedTrackIds, setCreateSeedTrackIds] = useState<string[]>([]);
-
   const { register, handleSubmit, control, setValue, reset } =
     useForm<AudioMetadata>();
-
   const selectedFile = useMemo(
     () => files.find((file) => file.id === selectedFileId) ?? null,
     [files, selectedFileId]
   );
-
   useLayoutEffect(() => {
     if (selectedFile?.metadata) {
       reset(selectedFile.metadata);
     }
   }, [selectedFile, reset]);
-
   useEffect(() => {
     const fileIdSet = new Set(files.map((file) => file.id));
     setLooseTrackIds((prevLooseTrackIds) =>
       prevLooseTrackIds.filter((trackId) => fileIdSet.has(trackId))
     );
   }, [files]);
-
   useEffect(() => {
-    if (selectedFileId && files.some((file) => file.id === selectedFileId)) {
+    const hasSelectedAlbum =
+      !!selectedAlbumId && albums.some((album) => album.id === selectedAlbumId);
+    const hasSelectedFile =
+      !!selectedFileId && files.some((file) => file.id === selectedFileId);
+    const isManuallyDeselected =
+      selectedAlbumId === null && selectedFileId === null;
+    if (isManuallyDeselected) {
       return;
     }
-
-    if (looseTrackIds.length > 0) {
+    if (hasSelectedFile) {
+      return;
+    }
+    if (!selectedFileId && hasSelectedAlbum) {
+      return;
+    }
+    if (looseTrackIds.length > 0 && !hasSelectedAlbum) {
       setSelectedAlbumId(null);
       setSelectedFileId(looseTrackIds[0]);
       return;
     }
-
     const firstAlbumWithTrack = albums.find((album) => album.trackIds.length > 0);
     if (firstAlbumWithTrack) {
       setSelectedAlbumId(firstAlbumWithTrack.id);
       setSelectedFileId(firstAlbumWithTrack.trackIds[0]);
       return;
     }
-
     setSelectedFileId(null);
     setSelectedAlbumId(null);
-  }, [albums, files, looseTrackIds, selectedFileId]);
-
+  }, [albums, files, looseTrackIds, selectedAlbumId, selectedFileId]);
   const handleTagUpdate = async (
     fileToUpdate: TagiumFile,
     newTags: AudioMetadata
   ) => {
     try {
       const updatedFile = await writeMetadataToFile(fileToUpdate, newTags);
-
       setFiles((prevFiles) =>
         prevFiles.map((file) =>
           file.id === fileToUpdate.id
@@ -135,62 +132,79 @@ export default function AudioTagger() {
       throw error;
     }
   };
-
   const onSubmit: SubmitHandler<AudioMetadata> = async (data) => {
     if (!selectedFile) return;
-
     try {
       await handleTagUpdate(selectedFile, data);
     } catch (error) {
       console.error("Failed to update tags:", error);
     }
   };
-
-  const handleAudioUpload = async (uploadedFiles: File[]) => {
+  const handleAudioUpload = async (
+    uploadedFiles: File[],
+    targetAlbumId?: string
+  ) => {
     setLoading(true);
-
     try {
       const parsedUploads = await parseUploadedTracks(uploadedFiles);
       if (parsedUploads.length === 0) return;
-
       setFiles((prevFiles) => [
         ...prevFiles,
         ...parsedUploads.map((upload) => upload.file),
       ]);
-
-      const forceSingleAlbum = parsedUploads.length > 1;
+      const hasTargetAlbum = Boolean(
+        targetAlbumId && albums.some((album) => album.id === targetAlbumId)
+      );
+      const forceSingleAlbum = !hasTargetAlbum && parsedUploads.length > 1;
       let firstSelectedAlbumId: string | null = null;
-
-      setAlbums((prevAlbums) => {
-        const merged = mergeUploadedTracksIntoAlbums(prevAlbums, parsedUploads, {
-          forceSingleAlbum,
+      if (hasTargetAlbum && targetAlbumId) {
+        const uploadedTrackIds = parsedUploads.map((upload) => upload.file.id);
+        let nextAlbums: AlbumGroup[] = [];
+        setAlbums((prevAlbums) => {
+          nextAlbums = prevAlbums.map((album) =>
+            album.id === targetAlbumId
+              ? { ...album, trackIds: [...album.trackIds, ...uploadedTrackIds] }
+              : album
+          );
+          return nextAlbums;
         });
-        firstSelectedAlbumId = merged.firstSelectedAlbumId;
-
-        if (!forceSingleAlbum && merged.unassignedTrackIds.length > 0) {
-          setLooseTrackIds((prevLooseTrackIds) => [
-            ...prevLooseTrackIds,
-            ...merged.unassignedTrackIds,
-          ]);
+        const targetAlbum = nextAlbums.find((album) => album.id === targetAlbumId);
+        if (targetAlbum) {
+          setFiles((prevFiles) => applyAlbumSharedTagsToFiles(prevFiles, targetAlbum));
+          if (targetAlbum.syncTrackNumbers) {
+            setFiles((prevFiles) =>
+              applyTrackOrderNumbersToFiles(prevFiles, nextAlbums, [targetAlbumId])
+            );
+          }
         }
-
-        return merged.albums;
-      });
-
-      const firstUploadedTrack = parsedUploads[0];
-      const firstTrackIsLoose =
-        !forceSingleAlbum && !firstUploadedTrack.albumSeed.title.trim();
-
-      setSelectedFileId(firstUploadedTrack.file.id);
-      setSelectedAlbumId(firstTrackIsLoose ? null : firstSelectedAlbumId);
+        setSelectedFileId(parsedUploads[0].file.id);
+        setSelectedAlbumId(targetAlbumId);
+      } else {
+        setAlbums((prevAlbums) => {
+          const merged = mergeUploadedTracksIntoAlbums(prevAlbums, parsedUploads, {
+            forceSingleAlbum,
+          });
+          firstSelectedAlbumId = merged.firstSelectedAlbumId;
+          if (!forceSingleAlbum && merged.unassignedTrackIds.length > 0) {
+            setLooseTrackIds((prevLooseTrackIds) => [
+              ...prevLooseTrackIds,
+              ...merged.unassignedTrackIds,
+            ]);
+          }
+          return merged.albums;
+        });
+        const firstUploadedTrack = parsedUploads[0];
+        const firstTrackIsLoose =
+          !forceSingleAlbum && !firstUploadedTrack.albumSeed.title.trim();
+        setSelectedFileId(firstUploadedTrack.file.id);
+        setSelectedAlbumId(firstTrackIsLoose ? null : firstSelectedAlbumId);
+      }
     } finally {
       setLoading(false);
     }
   };
-
   const handleSaveAll = async () => {
     if (files.length === 0) return;
-
     setLoading(true);
     try {
       for (const file of files) {
@@ -204,7 +218,6 @@ export default function AudioTagger() {
       setLoading(false);
     }
   };
-
   const handleTrackCoverUpload = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -221,7 +234,6 @@ export default function AudioTagger() {
     };
     reader.readAsArrayBuffer(file);
   };
-
   const handleDownloadUpdatedFile = (file: TagiumFile) => {
     const url = URL.createObjectURL(file.file);
     const anchor = document.createElement("a");
@@ -230,7 +242,6 @@ export default function AudioTagger() {
     anchor.click();
     URL.revokeObjectURL(url);
   };
-
   const handleRemoveFile = (idToRemove: string) => {
     setFiles((prevFiles) => prevFiles.filter((file) => file.id !== idToRemove));
     setAlbums((prevAlbums) => removeTrackFromAlbums(prevAlbums, idToRemove));
@@ -238,97 +249,80 @@ export default function AudioTagger() {
       prevLooseTrackIds.filter((trackId) => trackId !== idToRemove)
     );
   };
-
   const handleRemoveAlbum = (albumId: string) => {
     const albumToRemove = albums.find((album) => album.id === albumId);
     if (!albumToRemove) return;
-
     const trackIdSet = new Set(albumToRemove.trackIds);
     setFiles((prevFiles) => prevFiles.filter((file) => !trackIdSet.has(file.id)));
     setAlbums((prevAlbums) => prevAlbums.filter((album) => album.id !== albumId));
     setLooseTrackIds((prevLooseTrackIds) =>
       prevLooseTrackIds.filter((trackId) => !trackIdSet.has(trackId))
     );
-
     if (editingAlbumId === albumId) {
       closeAlbumDialog();
     }
   };
-
   const handleSelectAlbum = (albumId: string) => {
     setSelectedAlbumId(albumId);
     const album = albums.find((entry) => entry.id === albumId);
     setSelectedFileId(album?.trackIds[0] ?? null);
   };
-
   const handleSelectFile = (albumId: string, fileId: string) => {
     setSelectedAlbumId(albumId);
     setSelectedFileId(fileId);
   };
-
   const handleSelectLooseTrack = (fileId: string) => {
     setSelectedAlbumId(null);
     setSelectedFileId(fileId);
   };
-
+  const handleClearSelection = () => {
+    setSelectedAlbumId(null);
+    setSelectedFileId(null);
+  };
   const openCreateAlbumDialog = (seedTrackIds: string[]) => {
     const uniqueSeedTrackIds = asUniqueTrackIds(seedTrackIds);
-    if (uniqueSeedTrackIds.length === 0) {
-      console.warn("Create album requested with no available tracks.");
-      return;
-    }
-
     const seedTrack = files.find((file) => file.id === uniqueSeedTrackIds[0]);
     const albumCount = albums.filter((album) => /^Album\s\d+$/i.test(album.title)).length;
-
     setAlbumDialogMode("create");
     setEditingAlbumId(null);
     setCreateSeedTrackIds(uniqueSeedTrackIds);
     setAlbumDraft({
-      title: seedTrack?.metadata?.album?.trim() || `Album ${albumCount + 1}`,
-      artist: seedTrack?.metadata?.artist || "",
-      genre: toGenreString(seedTrack?.metadata?.genre),
+      title:
+        uniqueSeedTrackIds.length > 0
+          ? seedTrack?.metadata?.album?.trim() || `Album ${albumCount + 1}`
+          : `Album ${albumCount + 1}`,
+      artist: uniqueSeedTrackIds.length > 0 ? seedTrack?.metadata?.artist || "" : "",
+      genre: uniqueSeedTrackIds.length > 0 ? toGenreString(seedTrack?.metadata?.genre) : "",
       cover:
-        seedTrack?.metadata?.picture && seedTrack.metadata.picture.length > 0
+        uniqueSeedTrackIds.length > 0 &&
+        seedTrack?.metadata?.picture &&
+        seedTrack.metadata.picture.length > 0
           ? seedTrack.metadata.picture
           : undefined,
       syncTrackNumbers: false,
     });
     setAlbumDialogOpen(true);
   };
-
   const handleOpenCreateAlbumDialog = () => {
-    const seedTrackId = selectedFileId ?? files[0]?.id ?? null;
-    if (!seedTrackId) {
-      console.warn("Create album requested with no available tracks.");
-      return;
-    }
-
-    openCreateAlbumDialog([seedTrackId]);
+    openCreateAlbumDialog([]);
   };
-
   const handlePromptCreateAlbumFromLooseTracks = (
     sourceTrackId: string,
     targetTrackId: string
   ) => {
     if (sourceTrackId === targetTrackId) return;
-
     const shouldCreate = window.confirm(
       "Create a new album containing these tracks?"
     );
     if (!shouldCreate) return;
-
     const idSet = new Set([sourceTrackId, targetTrackId]);
     const orderedIds = looseTrackIds.filter((trackId) => idSet.has(trackId));
     if (orderedIds.length < 2) return;
-
     openCreateAlbumDialog(orderedIds);
   };
-
   const handleOpenEditAlbumDialog = (albumId: string) => {
     const album = albums.find((entry) => entry.id === albumId);
     if (!album) return;
-
     setAlbumDialogMode("edit");
     setEditingAlbumId(albumId);
     setCreateSeedTrackIds([]);
@@ -341,11 +335,9 @@ export default function AudioTagger() {
     });
     setAlbumDialogOpen(true);
   };
-
   const closeAlbumDialog = () => {
     setAlbumDialogOpen(false);
   };
-
   const saveAlbumDialog = () => {
     const title = albumDraft.title.trim() || "Untitled Album";
     const artist = albumDraft.artist.trim();
@@ -357,22 +349,18 @@ export default function AudioTagger() {
       cover: albumDraft.cover,
       syncTrackNumbers: albumDraft.syncTrackNumbers,
     };
-
     if (albumDialogMode === "edit" && editingAlbumId) {
       const updatedAlbums = updateAlbumMetadata(albums, editingAlbumId, metadata);
       setAlbums(updatedAlbums);
-
       const updatedAlbum =
         updatedAlbums.find((album) => album.id === editingAlbumId) ?? null;
       if (updatedAlbum) {
         setFiles((prevFiles) => applyAlbumSharedTagsToFiles(prevFiles, updatedAlbum));
       }
-
       closeAlbumDialog();
       return;
     }
-
-    if (albumDialogMode === "create" && createSeedTrackIds.length > 0) {
+    if (albumDialogMode === "create") {
       const created = createAlbumFromTracks(
         albums,
         looseTrackIds,
@@ -381,17 +369,14 @@ export default function AudioTagger() {
       );
       setAlbums(created.albums);
       setLooseTrackIds(created.looseTrackIds);
-
       if (created.syncAlbums.length > 0) {
         setFiles((prevFiles) =>
           applyTrackOrderNumbersToFiles(prevFiles, created.albums, created.syncAlbums)
         );
       }
-
       if (created.newAlbumId) {
         setSelectedAlbumId(created.newAlbumId);
         setSelectedFileId(createSeedTrackIds[0] ?? null);
-
         const createdAlbum = created.albums.find(
           (album) => album.id === created.newAlbumId
         );
@@ -400,10 +385,8 @@ export default function AudioTagger() {
         }
       }
     }
-
     closeAlbumDialog();
   };
-
   const handleMoveTrackToAlbum = (
     trackId: string,
     targetAlbumId: string,
@@ -414,37 +397,31 @@ export default function AudioTagger() {
       albumId: targetAlbumId,
       index: targetIndex,
     });
-
     setAlbums(moved.albums);
     setLooseTrackIds(moved.looseTrackIds);
     setSelectedAlbumId(targetAlbumId);
     setSelectedFileId(trackId);
-
     if (moved.albumsToSync.length > 0) {
       setFiles((prevFiles) =>
         applyTrackOrderNumbersToFiles(prevFiles, moved.albums, moved.albumsToSync)
       );
     }
   };
-
   const handleMoveTrackToLoose = (trackId: string, targetIndex: number) => {
     const moved = moveTrackInSidebar(albums, looseTrackIds, trackId, {
       type: "loose",
       index: targetIndex,
     });
-
     setAlbums(moved.albums);
     setLooseTrackIds(moved.looseTrackIds);
     setSelectedAlbumId(null);
     setSelectedFileId(trackId);
-
     if (moved.albumsToSync.length > 0) {
       setFiles((prevFiles) =>
         applyTrackOrderNumbersToFiles(prevFiles, moved.albums, moved.albumsToSync)
       );
     }
   };
-
   return (
     <>
       <AlbumMetadataDialog
@@ -455,7 +432,6 @@ export default function AudioTagger() {
         onClose={closeAlbumDialog}
         onSave={saveAlbumDialog}
       />
-
       <div className="w-full max-w-7xl flex gap-4 min-h-[85vh]">
         <TagSidebarPanel
           loading={loading}
@@ -468,10 +444,14 @@ export default function AudioTagger() {
           onSelectAlbum={handleSelectAlbum}
           onSelectFile={handleSelectFile}
           onSelectLooseTrack={handleSelectLooseTrack}
+          onClearSelection={handleClearSelection}
           onRemoveFile={handleRemoveFile}
           onRemoveAlbum={handleRemoveAlbum}
           onAddAlbum={handleOpenCreateAlbumDialog}
           onEditAlbum={handleOpenEditAlbumDialog}
+          onUploadToAlbum={(albumId, filesToUpload) =>
+            handleAudioUpload(filesToUpload, albumId)
+          }
           onMoveTrackToAlbum={handleMoveTrackToAlbum}
           onMoveTrackToLoose={handleMoveTrackToLoose}
           onPromptCreateAlbumFromLooseTracks={
@@ -479,7 +459,6 @@ export default function AudioTagger() {
           }
           onSaveAll={handleSaveAll}
         />
-
         <div className="flex-1 flex flex-col">
           <TrackMetadataEditor
             selectedFile={selectedFile}

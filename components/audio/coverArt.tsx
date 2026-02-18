@@ -135,6 +135,7 @@ export default function CoverArt({
           <Popover open={showCropper} onOpenChange={setShowCropper}>
             <PopoverTrigger asChild>
               <Button
+                type="button"
                 size="sm"
                 variant="secondary"
                 className="absolute top-2 right-2"
@@ -173,6 +174,7 @@ export default function CoverArt({
           ref={fileInputRef}
         />
         <Button
+          type="button"
           variant="outline"
           className={
             isCompact
