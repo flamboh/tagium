@@ -26,7 +26,7 @@ const cloneAlbum = (album: AlbumGroup) => ({
 });
 
 export const pruneEmptyAlbums = (albums: AlbumGroup[]) =>
-  albums.filter((album) => album.trackIds.length > 0);
+  albums;
 
 export function mergeUploadedTracksIntoAlbums(
   prevAlbums: AlbumGroup[],
@@ -237,15 +237,6 @@ export function createAlbumFromTracks(
   metadata: AlbumMetadataInput
 ) {
   const uniqueTrackIds = [...new Set(trackIds)];
-  if (uniqueTrackIds.length === 0) {
-    return {
-      albums: prevAlbums,
-      looseTrackIds: prevLooseTrackIds,
-      newAlbumId: null as string | null,
-      syncAlbums: [] as string[],
-    };
-  }
-
   const albums = prevAlbums.map(cloneAlbum);
   let looseTrackIds = [...prevLooseTrackIds];
   const sourceAlbumIds: string[] = [];
@@ -259,7 +250,6 @@ export function createAlbumFromTracks(
     looseTrackIds = looseTrackIds.filter((id) => id !== trackId);
   }
 
-  const prunedAlbums = pruneEmptyAlbums(albums);
   const newAlbumId = crypto.randomUUID();
   const createdAlbum: AlbumGroup = {
     id: newAlbumId,
@@ -271,10 +261,10 @@ export function createAlbumFromTracks(
     trackIds: uniqueTrackIds,
   };
 
-  const mergedAlbums = [...prunedAlbums, createdAlbum];
+  const mergedAlbums = [...albums, createdAlbum];
   const syncAlbums = [...new Set(sourceAlbumIds)]
     .filter((albumId) => {
-      const album = prunedAlbums.find((entry) => entry.id === albumId);
+      const album = albums.find((entry) => entry.id === albumId);
       return Boolean(album?.syncTrackNumbers);
     });
 

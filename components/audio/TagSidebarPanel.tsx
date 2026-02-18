@@ -17,10 +17,12 @@ interface TagSidebarPanelProps {
   onSelectAlbum: (albumId: string) => void;
   onSelectFile: (albumId: string, fileId: string) => void;
   onSelectLooseTrack: (fileId: string) => void;
+  onClearSelection: () => void;
   onRemoveFile: (fileId: string) => void;
   onRemoveAlbum: (albumId: string) => void;
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
+  onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
     trackId: string,
     targetAlbumId: string,
@@ -45,10 +47,12 @@ export default function TagSidebarPanel({
   onSelectAlbum,
   onSelectFile,
   onSelectLooseTrack,
+  onClearSelection,
   onRemoveFile,
   onRemoveAlbum,
   onAddAlbum,
   onEditAlbum,
+  onUploadToAlbum,
   onMoveTrackToAlbum,
   onMoveTrackToLoose,
   onPromptCreateAlbumFromLooseTracks,
@@ -69,10 +73,12 @@ export default function TagSidebarPanel({
           onSelectAlbum={onSelectAlbum}
           onSelectFile={onSelectFile}
           onSelectLooseTrack={onSelectLooseTrack}
+          onClearSelection={onClearSelection}
           onRemoveFile={onRemoveFile}
           onRemoveAlbum={onRemoveAlbum}
           onAddAlbum={onAddAlbum}
           onEditAlbum={onEditAlbum}
+          onUploadToAlbum={onUploadToAlbum}
           onMoveTrackToAlbum={onMoveTrackToAlbum}
           onMoveTrackToLoose={onMoveTrackToLoose}
           onPromptCreateAlbumFromLooseTracks={onPromptCreateAlbumFromLooseTracks}

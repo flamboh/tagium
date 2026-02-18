@@ -1,8 +1,10 @@
 "use client";
 
-import type { DragEvent } from "react";
-import { AlertCircle, Check, FileMusic, Folder, Pencil, Plus, X } from "lucide-react";
+import type { ChangeEvent, DragEvent } from "react";
+import { useRef, useState } from "react";
+import { AlertCircle, Check, FileMusic, Folder, Pencil, Plus, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { AlbumGroup, TagiumFile } from "./types";
 
@@ -17,10 +19,12 @@ interface AlbumSidebarProps {
   onSelectAlbum: (albumId: string) => void;
   onSelectFile: (albumId: string, fileId: string) => void;
   onSelectLooseTrack: (fileId: string) => void;
+  onClearSelection: () => void;
   onRemoveFile: (fileId: string) => void;
   onRemoveAlbum: (albumId: string) => void;
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
+  onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
     trackId: string,
     targetAlbumId: string,
@@ -71,32 +75,43 @@ export default function AlbumSidebar({
   onSelectAlbum,
   onSelectFile,
   onSelectLooseTrack,
+  onClearSelection,
   onRemoveFile,
   onRemoveAlbum,
   onAddAlbum,
   onEditAlbum,
+  onUploadToAlbum,
   onMoveTrackToAlbum,
   onMoveTrackToLoose,
   onPromptCreateAlbumFromLooseTracks,
 }: AlbumSidebarProps) {
+  const albumUploadInputRef = useRef<HTMLInputElement>(null);
+  const [uploadTargetAlbumId, setUploadTargetAlbumId] = useState<string | null>(null);
   const filesById = new Map(files.map((file) => [file.id, file]));
   const looseTracks = looseTrackIds
     .map((trackId) => filesById.get(trackId))
     .filter((track): track is TagiumFile => Boolean(track));
 
+  const triggerAlbumUpload = (albumId: string) => {
+    setUploadTargetAlbumId(albumId);
+    albumUploadInputRef.current?.click();
+  };
+
+  const handleAlbumUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const uploadedFiles = Array.from(event.target.files || []);
+    if (uploadedFiles.length > 0 && uploadTargetAlbumId) {
+      onUploadToAlbum(uploadTargetAlbumId, uploadedFiles);
+    }
+    event.currentTarget.value = "";
+    setUploadTargetAlbumId(null);
+  };
+
   if (albums.length === 0 && looseTracks.length === 0) {
     return (
       <div className="w-full flex-1 min-h-0 flex flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground px-4">
         <p>no tracks yet</p>
-        <p className="text-xs">upload tracks first</p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onAddAlbum}
-          disabled
-          title="Upload tracks before creating an album"
-        >
+        <p className="text-xs">create an empty album or upload tracks</p>
+        <Button type="button" variant="outline" size="sm" onClick={onAddAlbum}>
           <Plus className="h-4 w-4" />
           add album
         </Button>
@@ -106,6 +121,14 @@ export default function AlbumSidebar({
 
   return (
     <div className="w-full flex-1 min-h-0 flex flex-col">
+      <Input
+        type="file"
+        className="hidden"
+        accept="audio/*"
+        multiple
+        ref={albumUploadInputRef}
+        onChange={handleAlbumUpload}
+      />
       <div className="pb-2 pl-6 border-b flex items-center justify-between pr-3">
         <span className="font-semibold text-sm text-muted-foreground">
           library ({files.length})
@@ -117,6 +140,11 @@ export default function AlbumSidebar({
 
       <div
         className="flex-1 overflow-y-auto p-2 flex flex-col gap-2"
+        onClick={(event) => {
+          if (event.target === event.currentTarget) {
+            onClearSelection();
+          }
+        }}
         onDragOver={(event) => {
           event.preventDefault();
         }}
@@ -221,6 +249,16 @@ export default function AlbumSidebar({
                 <span className="text-sm font-medium truncate">{album.title}</span>
               </button>
               <span className="text-xs text-muted-foreground">{album.trackIds.length}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => triggerAlbumUpload(album.id)}
+                aria-label={`Upload tracks to ${album.title}`}
+              >
+                <Upload className="h-3.5 w-3.5" />
+              </Button>
               <Button
                 type="button"
                 variant="ghost"
