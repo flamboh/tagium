@@ -1,0 +1,336 @@
+"use client";
+
+import type { DragEvent } from "react";
+import { AlertCircle, Check, FileMusic, Folder, Pencil, Plus, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { AlbumGroup, TagiumFile } from "./types";
+
+const TRACK_DRAG_TYPE = "application/x-tagium-track";
+
+interface AlbumSidebarProps {
+  albums: AlbumGroup[];
+  looseTrackIds: string[];
+  files: TagiumFile[];
+  selectedAlbumId: string | null;
+  selectedFileId: string | null;
+  onSelectAlbum: (albumId: string) => void;
+  onSelectFile: (albumId: string, fileId: string) => void;
+  onSelectLooseTrack: (fileId: string) => void;
+  onRemoveFile: (fileId: string) => void;
+  onRemoveAlbum: (albumId: string) => void;
+  onAddAlbum: () => void;
+  onEditAlbum: (albumId: string) => void;
+  onMoveTrackToAlbum: (
+    trackId: string,
+    targetAlbumId: string,
+    targetIndex: number
+  ) => void;
+  onMoveTrackToLoose: (trackId: string, targetIndex: number) => void;
+  onPromptCreateAlbumFromLooseTracks: (
+    sourceTrackId: string,
+    targetTrackId: string
+  ) => void;
+}
+
+interface DragPayload {
+  trackId: string;
+  container: "album" | "loose";
+  albumId?: string;
+}
+
+function parseDragPayload(event: DragEvent) {
+  const rawPayload = event.dataTransfer.getData(TRACK_DRAG_TYPE);
+  if (!rawPayload) return null;
+
+  try {
+    return JSON.parse(rawPayload) as DragPayload;
+  } catch {
+    return null;
+  }
+}
+
+function isCenteredDrop(event: DragEvent<HTMLElement>) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const position = (event.clientY - rect.top) / rect.height;
+  return position > 0.3 && position < 0.7;
+}
+
+function dropIndexForRow(event: DragEvent<HTMLElement>, rowIndex: number) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const dropAfter = event.clientY > rect.top + rect.height / 2;
+  return rowIndex + (dropAfter ? 1 : 0);
+}
+
+export default function AlbumSidebar({
+  albums,
+  looseTrackIds,
+  files,
+  selectedAlbumId,
+  selectedFileId,
+  onSelectAlbum,
+  onSelectFile,
+  onSelectLooseTrack,
+  onRemoveFile,
+  onRemoveAlbum,
+  onAddAlbum,
+  onEditAlbum,
+  onMoveTrackToAlbum,
+  onMoveTrackToLoose,
+  onPromptCreateAlbumFromLooseTracks,
+}: AlbumSidebarProps) {
+  const filesById = new Map(files.map((file) => [file.id, file]));
+  const looseTracks = looseTrackIds
+    .map((trackId) => filesById.get(trackId))
+    .filter((track): track is TagiumFile => Boolean(track));
+
+  if (albums.length === 0 && looseTracks.length === 0) {
+    return (
+      <div className="w-full flex-1 min-h-0 flex flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground px-4">
+        <p>no tracks yet</p>
+        <p className="text-xs">upload tracks first</p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onAddAlbum}
+          disabled
+          title="Upload tracks before creating an album"
+        >
+          <Plus className="h-4 w-4" />
+          add album
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full flex-1 min-h-0 flex flex-col">
+      <div className="pb-2 pl-6 border-b flex items-center justify-between pr-3">
+        <span className="font-semibold text-sm text-muted-foreground">
+          library ({files.length})
+        </span>
+        <Button type="button" variant="ghost" size="sm" onClick={onAddAlbum}>
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div
+        className="flex-1 overflow-y-auto p-2 flex flex-col gap-2"
+        onDragOver={(event) => {
+          event.preventDefault();
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const payload = parseDragPayload(event);
+          if (!payload) return;
+          onMoveTrackToLoose(payload.trackId, looseTracks.length);
+        }}
+      >
+        {looseTracks.map((track, index) => (
+          <div
+            key={track.id}
+            className="relative group"
+            onDragOver={(event) => {
+              event.preventDefault();
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              const payload = parseDragPayload(event);
+              if (!payload || payload.trackId === track.id) return;
+
+              if (payload.container === "loose" && isCenteredDrop(event)) {
+                onPromptCreateAlbumFromLooseTracks(payload.trackId, track.id);
+                return;
+              }
+
+              onMoveTrackToLoose(payload.trackId, dropIndexForRow(event, index));
+            }}
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              draggable
+              onDragStart={(event) => {
+                const payload: DragPayload = {
+                  trackId: track.id,
+                  container: "loose",
+                };
+                event.dataTransfer.setData(TRACK_DRAG_TYPE, JSON.stringify(payload));
+                event.dataTransfer.effectAllowed = "move";
+              }}
+              className={cn(
+                "justify-start h-auto py-2 px-2.5 w-full text-left font-normal pr-8 rounded-lg border bg-card/70",
+                selectedFileId === track.id ? "bg-accent text-accent-foreground" : ""
+              )}
+              onClick={() => onSelectLooseTrack(track.id)}
+            >
+              <div className="flex items-center gap-2 w-full overflow-hidden">
+                <span className="w-5 text-[11px] text-muted-foreground">{index + 1}</span>
+                <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                <span className="truncate text-sm flex-1">{track.filename}</span>
+                {track.status === "saved" && (
+                  <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+                )}
+                {track.status === "error" && (
+                  <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+                )}
+              </div>
+            </Button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemoveFile(track.id);
+              }}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
+              title="Remove track"
+            >
+              <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+            </button>
+          </div>
+        ))}
+
+        {albums.map((album) => (
+          <div
+            key={album.id}
+            className={cn(
+              "rounded-lg border bg-card/70",
+              selectedAlbumId === album.id ? "border-primary/40 shadow-sm" : ""
+            )}
+            onDragOver={(event) => {
+              event.preventDefault();
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              const payload = parseDragPayload(event);
+              if (!payload) return;
+              onMoveTrackToAlbum(payload.trackId, album.id, album.trackIds.length);
+            }}
+          >
+            <div className="w-full flex items-center justify-between gap-1 px-2 py-1 border-b">
+              <button
+                type="button"
+                className="min-w-0 flex-1 flex items-center gap-2 px-1 py-1 text-left hover:bg-accent/30 rounded cursor-pointer"
+                onClick={() => onSelectAlbum(album.id)}
+              >
+                <Folder className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <span className="text-sm font-medium truncate">{album.title}</span>
+              </button>
+              <span className="text-xs text-muted-foreground">{album.trackIds.length}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => onEditAlbum(album.id)}
+                aria-label={`Edit ${album.title}`}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 hover:bg-destructive/10"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRemoveAlbum(album.id);
+                }}
+                aria-label={`Remove ${album.title}`}
+              >
+                <X className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+              </Button>
+            </div>
+            <div className="p-1 flex flex-col gap-1">
+              {album.trackIds.length === 0 ? (
+                <div className="text-xs text-muted-foreground px-2 py-3 text-center border border-dashed rounded-md">
+                  drag tracks here
+                </div>
+              ) : (
+                album.trackIds.map((trackId, index) => {
+                  const track = filesById.get(trackId);
+                  if (!track) return null;
+
+                  return (
+                    <div
+                      key={track.id}
+                      className="relative group"
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const payload = parseDragPayload(event);
+                        if (!payload) return;
+                        onMoveTrackToAlbum(
+                          payload.trackId,
+                          album.id,
+                          dropIndexForRow(event, index)
+                        );
+                      }}
+                    >
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        draggable
+                        onDragStart={(event) => {
+                          const payload: DragPayload = {
+                            trackId: track.id,
+                            container: "album",
+                            albumId: album.id,
+                          };
+                          event.dataTransfer.setData(
+                            TRACK_DRAG_TYPE,
+                            JSON.stringify(payload)
+                          );
+                          event.dataTransfer.effectAllowed = "move";
+                        }}
+                        className={cn(
+                          "justify-start h-auto py-2 px-2.5 w-full text-left font-normal pr-8",
+                          selectedFileId === track.id
+                            ? "bg-accent text-accent-foreground"
+                            : ""
+                        )}
+                        onClick={() => onSelectFile(album.id, track.id)}
+                      >
+                        <div className="flex items-center gap-2 w-full overflow-hidden">
+                          <span className="w-5 text-[11px] text-muted-foreground">
+                            {index + 1}
+                          </span>
+                          <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                          <span className="truncate text-sm flex-1">{track.filename}</span>
+                          {track.status === "saved" && (
+                            <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+                          )}
+                          {track.status === "error" && (
+                            <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+                          )}
+                        </div>
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onRemoveFile(track.id);
+                        }}
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
+                        title="Remove track"
+                      >
+                        <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
