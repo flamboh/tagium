@@ -1,301 +1,215 @@
 "use client";
-
-import { z } from "zod";
-// import { IPicture } from "music-metadata";
-import { useState, useEffect } from "react";
-// import { parseBuffer } from "music-metadata"; // Removed client-side import
-// import { parseAudioFile } from "@/app/actions";
-import AudioUpload from "./audioUpload";
-import CoverArt from "./coverArt";
-import FileList, { FileStatus } from "./FileList";
-import { Button } from "../ui/button";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { SubmitHandler, useForm } from "react-hook-form";
+import AlbumMetadataDialog, { AlbumMetadataDraft } from "./AlbumMetadataDialog";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { SubmitHandler, useForm, Controller } from "react-hook-form";
-import { Input } from "../ui/input";
-
-export const audioMetadataSchema = z.object({
-  filename: z.string(),
-  title: z.string(),
-  artist: z.string(),
-  album: z.string(),
-  year: z.number().nullish(),
-  genre: z.string().or(z.array(z.string())),
-  duration: z.number(),
-  bitrate: z.number(),
-  sampleRate: z.number(),
-  picture: z.array(
-    z.object({
-      format: z.string(),
-      type: z.number(),
-      description: z.string(),
-      data: z.instanceof(Uint8Array),
-    })
-  ),
-  trackNumber: z.number().nullish(),
-});
-
-export type AudioMetadata = z.infer<typeof audioMetadataSchema>;
-
-interface TagiumFile extends FileStatus {
-  metadata?: AudioMetadata;
-  originalFile: File;
-  buffer?: ArrayBuffer;
-}
-
-interface MP3TagPicture {
-  format: string;
-  type: number;
-  description: string;
-  data: number[];
-}
-
+  createAlbumFromTracks,
+  mergeUploadedTracksIntoAlbums,
+  moveTrackInSidebar,
+  removeTrackFromAlbums,
+  updateAlbumMetadata,
+} from "./albumOps";
+import {
+  applyAlbumSharedTagsToFiles,
+  applyTrackOrderNumbersToFiles,
+} from "./fileMetadataOps";
+import TagSidebarPanel from "./TagSidebarPanel";
+import TrackMetadataEditor from "./TrackMetadataEditor";
+import {
+  parseUploadedTracks,
+  toGenreString,
+  writeMetadataToFile,
+} from "./mp3Utils";
+import { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
+const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
+  title: "",
+  artist: "",
+  genre: "",
+  cover: undefined,
+  syncTrackNumbers: false,
+};
+const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
 export default function AudioTagger() {
   const [files, setFiles] = useState<TagiumFile[]>([]);
+  const [albums, setAlbums] = useState<AlbumGroup[]>([]);
+  const [looseTrackIds, setLooseTrackIds] = useState<string[]>([]);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+  const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  
+  const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
+  const [albumDialogMode, setAlbumDialogMode] = useState<"create" | "edit">(
+    "create"
+  );
+  const [albumDraft, setAlbumDraft] = useState<AlbumMetadataDraft>(
+    EMPTY_ALBUM_DRAFT
+  );
+  const [editingAlbumId, setEditingAlbumId] = useState<string | null>(null);
+  const [createSeedTrackIds, setCreateSeedTrackIds] = useState<string[]>([]);
   const { register, handleSubmit, control, setValue, reset } =
     useForm<AudioMetadata>();
-
-  const selectedFile = files.find((f) => f.id === selectedFileId);
-
-  // Update form when selected file changes
-  useEffect(() => {
+  const selectedFile = useMemo(
+    () => files.find((file) => file.id === selectedFileId) ?? null,
+    [files, selectedFileId]
+  );
+  useLayoutEffect(() => {
     if (selectedFile?.metadata) {
       reset(selectedFile.metadata);
-    } else {
-      // Optional: reset to empty or keep previous? Better to reset.
-      // reset({}); 
     }
-  }, [selectedFileId, selectedFile, reset]);
-
-  const onSubmit: SubmitHandler<AudioMetadata> = async (data) => {
-    if (!selectedFile) return;
-
+  }, [selectedFile, reset]);
+  useEffect(() => {
+    const fileIdSet = new Set(files.map((file) => file.id));
+    setLooseTrackIds((prevLooseTrackIds) =>
+      prevLooseTrackIds.filter((trackId) => fileIdSet.has(trackId))
+    );
+  }, [files]);
+  useEffect(() => {
+    const hasSelectedAlbum =
+      !!selectedAlbumId && albums.some((album) => album.id === selectedAlbumId);
+    const hasSelectedFile =
+      !!selectedFileId && files.some((file) => file.id === selectedFileId);
+    const isManuallyDeselected =
+      selectedAlbumId === null && selectedFileId === null;
+    if (isManuallyDeselected) {
+      return;
+    }
+    if (hasSelectedFile) {
+      return;
+    }
+    if (!selectedFileId && hasSelectedAlbum) {
+      return;
+    }
+    if (looseTrackIds.length > 0 && !hasSelectedAlbum) {
+      setSelectedAlbumId(null);
+      setSelectedFileId(looseTrackIds[0]);
+      return;
+    }
+    const firstAlbumWithTrack = albums.find((album) => album.trackIds.length > 0);
+    if (firstAlbumWithTrack) {
+      setSelectedAlbumId(firstAlbumWithTrack.id);
+      setSelectedFileId(firstAlbumWithTrack.trackIds[0]);
+      return;
+    }
+    setSelectedFileId(null);
+    setSelectedAlbumId(null);
+  }, [albums, files, looseTrackIds, selectedAlbumId, selectedFileId]);
+  const handleTagUpdate = async (
+    fileToUpdate: TagiumFile,
+    newTags: AudioMetadata
+  ) => {
     try {
-      await handleTagUpdate(selectedFile, data);
-      console.log("Tags updated successfully");
-    } catch (error) {
-      console.error("Failed to update tags:", error);
-    }
-  };
-
-  const handleAudioUpload = async (uploadedFiles: File[]) => {
-    setLoading(true);
-    const newFiles: TagiumFile[] = [];
-
-    const MP3Tag = (await import("mp3tag.js")).default;
-
-    for (const file of uploadedFiles) {
-      const id = crypto.randomUUID();
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const mp3tag = new MP3Tag(arrayBuffer, false); // false for read-only/not saving immediately
-        mp3tag.read();
-
-        if (mp3tag.error) {
-            throw new Error(mp3tag.error);
-        }
-
-        // Get duration using Audio API
-        const getDuration = (): Promise<number> => {
-            return new Promise((resolve) => {
-                const audio = new Audio(URL.createObjectURL(file));
-                audio.onloadedmetadata = () => {
-                    URL.revokeObjectURL(audio.src);
-                    resolve(audio.duration);
-                };
-                audio.onerror = () => {
-                     URL.revokeObjectURL(audio.src);
-                     resolve(0);
-                }
-            });
-        };
-
-        const duration = await getDuration();
-
-        // Map mp3tag tags to our schema
-        // Note: mp3tag.js tags object structure depends on the version but usually has title, artist, etc.
-        // v2 tags are in mp3tag.tags.v2
-        
-        const tags = mp3tag.tags;
-        
-        let pictureData: { format: string; type: number; description: string; data: Uint8Array }[] = [];
-        if (tags.v2 && tags.v2.APIC) {
-             pictureData = tags.v2.APIC.map((pic: MP3TagPicture) => ({
-                 format: pic.format,
-                 type: pic.type,
-                 description: pic.description,
-                 data: new Uint8Array(pic.data) as Uint8Array,
-             }));
-        }
-
-        const safeParseInt = (val: string | undefined) => {
-            if (!val) return undefined;
-            const parsed = parseInt(val);
-            return isNaN(parsed) ? undefined : parsed;
-        };
-
-        const metadata: AudioMetadata = {
-          filename: file.name.split(".").slice(0, -1).join("."),
-          title: tags.title || "",
-          artist: tags.artist || "",
-          album: tags.album || "",
-          year: safeParseInt(tags.year),
-          genre: tags.genre || "",
-          duration: duration,
-          bitrate: 0,
-          sampleRate: 0,
-          picture: pictureData as AudioMetadata['picture'],
-          trackNumber: safeParseInt(tags.track),
-        };
-
-        newFiles.push({
-          id,
-          file,
-          originalFile: file,
-          filename: file.name,
-          status: "pending",
-          metadata,
-        });
-      } catch (error) {
-        console.error(`Error parsing metadata for ${file.name}:`, error);
-        newFiles.push({
-          id,
-          file,
-          originalFile: file,
-          filename: file.name,
-          status: "error",
-        });
-      }
-    }
-
-    setFiles((prev) => [...prev, ...newFiles]);
-    
-    // Select the first new file
-    if (newFiles.length > 0) {
-      setSelectedFileId(newFiles[0].id);
-    }
-    
-    setLoading(false);
-  };
-
-  const handleTagUpdate = async (fileToUpdate: TagiumFile, newTags: AudioMetadata) => {
-    try {
-      const MP3Tag = (await import("mp3tag.js")).default;
-      
-      // Use the original file or the already modified buffer if we had one?
-      // For now, always read from the current file object in state
-      const arrayBuffer = await fileToUpdate.file.arrayBuffer();
-      
-      if (!arrayBuffer) {
-        throw new Error("Audio file not found");
-      }
-      const mp3tag = new MP3Tag(arrayBuffer, true);
-
-      mp3tag.read();
-
-      if (mp3tag.error) {
-        throw new Error(mp3tag.error);
-      }
-
-      // Update tag properties
-      mp3tag.tags.title = newTags.title || "";
-      mp3tag.tags.artist = newTags.artist || "";
-      mp3tag.tags.album = newTags.album || "";
-      if (newTags.year !== null && newTags.year !== undefined && !isNaN(newTags.year)) {
-        mp3tag.tags.year = newTags.year.toString();
-      } else {
-        mp3tag.tags.year = "";
-      }
-      if (Array.isArray(newTags.genre)) {
-        mp3tag.tags.genre = newTags.genre.join(", ");
-      } else {
-        mp3tag.tags.genre = newTags.genre || "";
-      }
-      if (newTags.trackNumber !== null && newTags.trackNumber !== undefined && !isNaN(newTags.trackNumber)) {
-        mp3tag.tags.track = newTags.trackNumber.toString();
-      } else {
-        mp3tag.tags.track = "";
-      }
-
-      // Handle picture/album art
-      if (newTags.picture && newTags.picture.length > 0 && mp3tag.tags.v2) {
-        mp3tag.tags.v2.APIC = newTags.picture.map((pic) => ({
-          format: (pic.format as string) || "image/jpeg",
-          type: typeof pic.type === 'number' ? pic.type : 3, // Front cover
-          description: (pic.description as string) || "",
-          data: Array.from(pic.data),
-        }));
-      }
-
-      mp3tag.save();
-
-      if (mp3tag.error) {
-        throw new Error(mp3tag.error);
-      }
-
-      const updatedFile = new File(
-        [new Uint8Array(mp3tag.buffer)],
-        newTags.filename ? `${newTags.filename}.mp3` : fileToUpdate.filename,
-        {
-          type: fileToUpdate.file.type,
-        }
-      );
-
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === fileToUpdate.id
+      const updatedFile = await writeMetadataToFile(fileToUpdate, newTags);
+      setFiles((prevFiles) =>
+        prevFiles.map((file) =>
+          file.id === fileToUpdate.id
             ? {
-                ...f,
+                ...file,
                 file: updatedFile,
                 filename: updatedFile.name,
                 metadata: {
                   ...newTags,
-                  year: isNaN(newTags.year as number) ? undefined : newTags.year,
-                  trackNumber: isNaN(newTags.trackNumber as number) ? undefined : newTags.trackNumber,
-                  duration: f.metadata?.duration || 0,
-                  bitrate: f.metadata?.bitrate || 0,
-                  sampleRate: f.metadata?.sampleRate || 0,
+                  year: Number.isNaN(newTags.year as number)
+                    ? undefined
+                    : newTags.year,
+                  trackNumber: Number.isNaN(newTags.trackNumber as number)
+                    ? undefined
+                    : newTags.trackNumber,
+                  duration: file.metadata?.duration || 0,
+                  bitrate: file.metadata?.bitrate || 0,
+                  sampleRate: file.metadata?.sampleRate || 0,
                   picture: newTags.picture || [],
                 },
                 status: "saved",
               }
-            : f
+            : file
         )
       );
     } catch (error) {
-      console.error("Error updating tags:", error);
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === fileToUpdate.id ? { ...f, status: "error" } : f
+      setFiles((prevFiles) =>
+        prevFiles.map((file) =>
+          file.id === fileToUpdate.id ? { ...file, status: "error" } : file
         )
       );
       throw error;
     }
   };
-
-  const handleSaveAll = async () => {
-    if (files.length === 0) return;
-    
+  const onSubmit: SubmitHandler<AudioMetadata> = async (data) => {
+    if (!selectedFile) return;
+    try {
+      await handleTagUpdate(selectedFile, data);
+    } catch (error) {
+      console.error("Failed to update tags:", error);
+    }
+  };
+  const handleAudioUpload = async (
+    uploadedFiles: File[],
+    targetAlbumId?: string
+  ) => {
     setLoading(true);
     try {
-      // Save files sequentially to avoid memory issues or race conditions
+      const parsedUploads = await parseUploadedTracks(uploadedFiles);
+      if (parsedUploads.length === 0) return;
+      setFiles((prevFiles) => [
+        ...prevFiles,
+        ...parsedUploads.map((upload) => upload.file),
+      ]);
+      const hasTargetAlbum = Boolean(
+        targetAlbumId && albums.some((album) => album.id === targetAlbumId)
+      );
+      const forceSingleAlbum = !hasTargetAlbum && parsedUploads.length > 1;
+      let firstSelectedAlbumId: string | null = null;
+      if (hasTargetAlbum && targetAlbumId) {
+        const uploadedTrackIds = parsedUploads.map((upload) => upload.file.id);
+        let nextAlbums: AlbumGroup[] = [];
+        setAlbums((prevAlbums) => {
+          nextAlbums = prevAlbums.map((album) =>
+            album.id === targetAlbumId
+              ? { ...album, trackIds: [...album.trackIds, ...uploadedTrackIds] }
+              : album
+          );
+          return nextAlbums;
+        });
+        const targetAlbum = nextAlbums.find((album) => album.id === targetAlbumId);
+        if (targetAlbum) {
+          setFiles((prevFiles) => applyAlbumSharedTagsToFiles(prevFiles, targetAlbum));
+          if (targetAlbum.syncTrackNumbers) {
+            setFiles((prevFiles) =>
+              applyTrackOrderNumbersToFiles(prevFiles, nextAlbums, [targetAlbumId])
+            );
+          }
+        }
+        setSelectedFileId(parsedUploads[0].file.id);
+        setSelectedAlbumId(targetAlbumId);
+      } else {
+        setAlbums((prevAlbums) => {
+          const merged = mergeUploadedTracksIntoAlbums(prevAlbums, parsedUploads, {
+            forceSingleAlbum,
+          });
+          firstSelectedAlbumId = merged.firstSelectedAlbumId;
+          if (!forceSingleAlbum && merged.unassignedTrackIds.length > 0) {
+            setLooseTrackIds((prevLooseTrackIds) => [
+              ...prevLooseTrackIds,
+              ...merged.unassignedTrackIds,
+            ]);
+          }
+          return merged.albums;
+        });
+        const firstUploadedTrack = parsedUploads[0];
+        const firstTrackIsLoose =
+          !forceSingleAlbum && !firstUploadedTrack.albumSeed.title.trim();
+        setSelectedFileId(firstUploadedTrack.file.id);
+        setSelectedAlbumId(firstTrackIsLoose ? null : firstSelectedAlbumId);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleSaveAll = async () => {
+    if (files.length === 0) return;
+    setLoading(true);
+    try {
       for (const file of files) {
-        // Only save if it has metadata (it should)
         if (file.metadata) {
-           // We need to call handleTagUpdate but it updates state, which might be tricky in a loop
-           // if we rely on 'files' state.
-           // However, handleTagUpdate uses functional state update, so it should be fine.
-           // But it's async.
-           await handleTagUpdate(file, file.metadata);
+          await handleTagUpdate(file, file.metadata);
         }
       }
     } catch (error) {
@@ -304,9 +218,7 @@ export default function AudioTagger() {
       setLoading(false);
     }
   };
-
-  const handleCoverUpload = (file: File) => {
-    // Convert File to IPicture format for form
+  const handleTrackCoverUpload = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
       const arrayBuffer = reader.result as ArrayBuffer;
@@ -314,7 +226,7 @@ export default function AudioTagger() {
       setValue("picture", [
         {
           format: file.type,
-          type: 3, // Front cover
+          type: 3,
           data: uint8Array,
           description: "Uploaded cover",
         },
@@ -322,202 +234,269 @@ export default function AudioTagger() {
     };
     reader.readAsArrayBuffer(file);
   };
-
   const handleDownloadUpdatedFile = (file: TagiumFile) => {
     const url = URL.createObjectURL(file.file);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = file.filename;
-    a.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = file.filename;
+    anchor.click();
     URL.revokeObjectURL(url);
   };
-
   const handleRemoveFile = (idToRemove: string) => {
-    setFiles((prev) => {
-      const newFiles = prev.filter((f) => f.id !== idToRemove);
-      
-      // If we removed the selected file, select another one if available
-      if (selectedFileId === idToRemove) {
-        // Find the index of the removed file to select the next one
-        const index = prev.findIndex(f => f.id === idToRemove);
-        // Try to select the next file, or the previous one if it was the last
-        if (newFiles.length > 0) {
-            // If index is within new bounds, it means the next file shifted into this index
-            // If index was the last one, we pick the new last one (index - 1)
-            const newIndex = Math.min(index, newFiles.length - 1);
-            setSelectedFileId(newFiles[newIndex].id);
-        } else {
-            setSelectedFileId(null);
+    setFiles((prevFiles) => prevFiles.filter((file) => file.id !== idToRemove));
+    setAlbums((prevAlbums) => removeTrackFromAlbums(prevAlbums, idToRemove));
+    setLooseTrackIds((prevLooseTrackIds) =>
+      prevLooseTrackIds.filter((trackId) => trackId !== idToRemove)
+    );
+  };
+  const handleRemoveAlbum = (albumId: string) => {
+    const albumToRemove = albums.find((album) => album.id === albumId);
+    if (!albumToRemove) return;
+    const trackIdSet = new Set(albumToRemove.trackIds);
+    setFiles((prevFiles) => prevFiles.filter((file) => !trackIdSet.has(file.id)));
+    setAlbums((prevAlbums) => prevAlbums.filter((album) => album.id !== albumId));
+    setLooseTrackIds((prevLooseTrackIds) =>
+      prevLooseTrackIds.filter((trackId) => !trackIdSet.has(trackId))
+    );
+    if (editingAlbumId === albumId) {
+      closeAlbumDialog();
+    }
+  };
+  const handleSelectAlbum = (albumId: string) => {
+    setSelectedAlbumId(albumId);
+    const album = albums.find((entry) => entry.id === albumId);
+    setSelectedFileId(album?.trackIds[0] ?? null);
+  };
+  const handleSelectFile = (albumId: string, fileId: string) => {
+    setSelectedAlbumId(albumId);
+    setSelectedFileId(fileId);
+  };
+  const handleSelectLooseTrack = (fileId: string) => {
+    setSelectedAlbumId(null);
+    setSelectedFileId(fileId);
+  };
+  const handleClearSelection = () => {
+    setSelectedAlbumId(null);
+    setSelectedFileId(null);
+  };
+  const openCreateAlbumDialog = (seedTrackIds: string[]) => {
+    const uniqueSeedTrackIds = asUniqueTrackIds(seedTrackIds);
+    const seedTrack = files.find((file) => file.id === uniqueSeedTrackIds[0]);
+    const albumCount = albums.filter((album) => /^Album\s\d+$/i.test(album.title)).length;
+    setAlbumDialogMode("create");
+    setEditingAlbumId(null);
+    setCreateSeedTrackIds(uniqueSeedTrackIds);
+    setAlbumDraft({
+      title:
+        uniqueSeedTrackIds.length > 0
+          ? seedTrack?.metadata?.album?.trim() || `Album ${albumCount + 1}`
+          : `Album ${albumCount + 1}`,
+      artist: uniqueSeedTrackIds.length > 0 ? seedTrack?.metadata?.artist || "" : "",
+      genre: uniqueSeedTrackIds.length > 0 ? toGenreString(seedTrack?.metadata?.genre) : "",
+      cover:
+        uniqueSeedTrackIds.length > 0 &&
+        seedTrack?.metadata?.picture &&
+        seedTrack.metadata.picture.length > 0
+          ? seedTrack.metadata.picture
+          : undefined,
+      syncTrackNumbers: false,
+    });
+    setAlbumDialogOpen(true);
+  };
+  const handleOpenCreateAlbumDialog = () => {
+    openCreateAlbumDialog([]);
+  };
+  const handlePromptCreateAlbumFromLooseTracks = (
+    sourceTrackId: string,
+    targetTrackId: string
+  ) => {
+    if (sourceTrackId === targetTrackId) return;
+    const idSet = new Set([sourceTrackId, targetTrackId]);
+    const orderedIds = looseTrackIds.filter((trackId) => idSet.has(trackId));
+    if (orderedIds.length < 2) return;
+    openCreateAlbumDialog(orderedIds);
+  };
+  const handleOpenEditAlbumDialog = (albumId: string) => {
+    const album = albums.find((entry) => entry.id === albumId);
+    if (!album) return;
+    setAlbumDialogMode("edit");
+    setEditingAlbumId(albumId);
+    setCreateSeedTrackIds([]);
+    setAlbumDraft({
+      title: album.title,
+      artist: album.artist,
+      genre: album.genre,
+      cover: album.cover,
+      syncTrackNumbers: album.syncTrackNumbers,
+    });
+    setAlbumDialogOpen(true);
+  };
+  const closeAlbumDialog = () => {
+    setAlbumDialogOpen(false);
+  };
+  const saveAlbumDialog = () => {
+    const title = albumDraft.title.trim() || "Untitled Album";
+    const artist = albumDraft.artist.trim();
+    const genre = albumDraft.genre.trim();
+    const metadata = {
+      title,
+      artist,
+      genre,
+      cover: albumDraft.cover,
+      syncTrackNumbers: albumDraft.syncTrackNumbers,
+    };
+    if (albumDialogMode === "edit" && editingAlbumId) {
+      const updatedAlbums = updateAlbumMetadata(albums, editingAlbumId, metadata);
+      setAlbums(updatedAlbums);
+      const updatedAlbum =
+        updatedAlbums.find((album) => album.id === editingAlbumId) ?? null;
+      if (updatedAlbum) {
+        setFiles((prevFiles) => applyAlbumSharedTagsToFiles(prevFiles, updatedAlbum));
+      }
+      closeAlbumDialog();
+      return;
+    }
+    if (albumDialogMode === "create") {
+      const created = createAlbumFromTracks(
+        albums,
+        looseTrackIds,
+        createSeedTrackIds,
+        metadata
+      );
+      setAlbums(created.albums);
+      setLooseTrackIds(created.looseTrackIds);
+      if (created.syncAlbums.length > 0) {
+        setFiles((prevFiles) =>
+          applyTrackOrderNumbersToFiles(prevFiles, created.albums, created.syncAlbums)
+        );
+      }
+      if (created.newAlbumId) {
+        setSelectedAlbumId(created.newAlbumId);
+        setSelectedFileId(createSeedTrackIds[0] ?? null);
+        const createdAlbum = created.albums.find(
+          (album) => album.id === created.newAlbumId
+        );
+        if (createdAlbum) {
+          setFiles((prevFiles) => applyAlbumSharedTagsToFiles(prevFiles, createdAlbum));
         }
       }
-      
-      return newFiles;
-    });
+    }
+    closeAlbumDialog();
   };
-
+  const handleMoveTrackToAlbum = (
+    trackId: string,
+    targetAlbumId: string,
+    placement: "before" | "after" | "append",
+    referenceTrackId?: string
+  ) => {
+    const moved = moveTrackInSidebar(
+      albums,
+      looseTrackIds,
+      trackId,
+      placement === "append" || !referenceTrackId
+        ? {
+            type: "album",
+            albumId: targetAlbumId,
+            placement: "append",
+          }
+        : {
+            type: "album",
+            albumId: targetAlbumId,
+            placement,
+            referenceTrackId,
+          }
+    );
+    setAlbums(moved.albums);
+    setLooseTrackIds(moved.looseTrackIds);
+    setSelectedAlbumId(targetAlbumId);
+    setSelectedFileId(trackId);
+    if (moved.albumsToSync.length > 0) {
+      setFiles((prevFiles) =>
+        applyTrackOrderNumbersToFiles(prevFiles, moved.albums, moved.albumsToSync)
+      );
+    }
+  };
+  const handleMoveTrackToLoose = (
+    trackId: string,
+    placement: "before" | "after" | "append",
+    referenceTrackId?: string
+  ) => {
+    const moved = moveTrackInSidebar(
+      albums,
+      looseTrackIds,
+      trackId,
+      placement === "append" || !referenceTrackId
+        ? {
+            type: "loose",
+            placement: "append",
+          }
+        : {
+            type: "loose",
+            placement,
+            referenceTrackId,
+          }
+    );
+    setAlbums(moved.albums);
+    setLooseTrackIds(moved.looseTrackIds);
+    setSelectedAlbumId(null);
+    setSelectedFileId(trackId);
+    if (moved.albumsToSync.length > 0) {
+      setFiles((prevFiles) =>
+        applyTrackOrderNumbersToFiles(prevFiles, moved.albums, moved.albumsToSync)
+      );
+    }
+  };
   return (
-    <div className="w-full max-w-6xl flex gap-4 min-h-[85vh]">
-      {/* Sidebar */}
-      <div className="w-64 flex-shrink-0 flex flex-col gap-4">
-        <Card className="h-full flex flex-col overflow-hidden py-0 gap-2">
-           <CardHeader className="p-6 border-b h-[104px]">
-             <AudioUpload onAudioUpload={handleAudioUpload} />
-          </CardHeader>
-           <FileList 
-             files={files} 
-             selectedFileId={selectedFileId} 
-             onSelectFile={setSelectedFileId} 
-             onRemoveFile={handleRemoveFile}
-           />
-           <div className="p-6 border-t mt-auto">
-             <Button 
-               className="w-full" 
-               onClick={handleSaveAll}
-               disabled={files.length === 0 || loading}
-             >
-               {loading ? "Saving..." : "Save All"}
-             </Button>
-           </div>
-        </Card>
+    <>
+      <AlbumMetadataDialog
+        open={albumDialogOpen}
+        mode={albumDialogMode}
+        draft={albumDraft}
+        onChange={setAlbumDraft}
+        onClose={closeAlbumDialog}
+        onSave={saveAlbumDialog}
+      />
+      <div className="w-full max-w-7xl flex gap-4 min-h-[85vh]">
+        <TagSidebarPanel
+          loading={loading}
+          files={files}
+          albums={albums}
+          looseTrackIds={looseTrackIds}
+          selectedAlbumId={selectedAlbumId}
+          selectedFileId={selectedFileId}
+          onAudioUpload={handleAudioUpload}
+          onSelectAlbum={handleSelectAlbum}
+          onSelectFile={handleSelectFile}
+          onSelectLooseTrack={handleSelectLooseTrack}
+          onClearSelection={handleClearSelection}
+          onRemoveFile={handleRemoveFile}
+          onRemoveAlbum={handleRemoveAlbum}
+          onAddAlbum={handleOpenCreateAlbumDialog}
+          onEditAlbum={handleOpenEditAlbumDialog}
+          onUploadToAlbum={(albumId, filesToUpload) =>
+            handleAudioUpload(filesToUpload, albumId)
+          }
+          onMoveTrackToAlbum={handleMoveTrackToAlbum}
+          onMoveTrackToLoose={handleMoveTrackToLoose}
+          onPromptCreateAlbumFromLooseTracks={
+            handlePromptCreateAlbumFromLooseTracks
+          }
+          onSaveAll={handleSaveAll}
+        />
+        <div className="flex-1 flex flex-col">
+          <TrackMetadataEditor
+            selectedFile={selectedFile}
+            selectedFileId={selectedFileId}
+            register={register}
+            control={control}
+            handleSubmit={handleSubmit}
+            onSubmit={onSubmit}
+            onTrackCoverUpload={handleTrackCoverUpload}
+            onDownloadUpdatedFile={handleDownloadUpdatedFile}
+            onAudioUpload={handleAudioUpload}
+          />
+        </div>
       </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {selectedFile && selectedFile.metadata ? (
-          <Card className="flex-1 overflow-none py-0">
-            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full">
-              <CardHeader className="p-6 space-y-2 h-[104px] border-b">
-                <CardTitle>edit metadata</CardTitle>
-                <CardDescription>{selectedFile.filename}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-1 overflow-y-auto p-6">
-                <div className="flex gap-4 flex-col md:flex-row">
-                  <Controller
-                    name="picture"
-                    control={control}
-                    render={({ field }) => (
-                      <CoverArt
-                        key={selectedFileId}
-                        picture={field.value}
-                        onCoverUpload={handleCoverUpload}
-                      />
-                    )}
-                  />
-                  <div className="flex-1 grid grid-cols-1 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        filename:
-                      </label>
-                      <div className="flex items-center h-9 w-full rounded-md border border-input bg-transparent dark:bg-input/30 px-3 py-1 text-base shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm">
-                        <input
-                          {...register("filename")}
-                          className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground min-w-0"
-                          placeholder="bangarang"
-                        />
-                        <span className="text-muted-foreground select-none">.mp3</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        title:
-                      </label>
-                      <Input
-                        {...register("title")}
-                        placeholder="Bangarang"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        artist:
-                      </label>
-                      <Input
-                        {...register("artist")}
-                        placeholder="Skrillex"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        album:
-                      </label>
-                      <Input
-                        {...register("album")}
-                        placeholder="Bangarang EP"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        year:
-                      </label>
-                      <Input
-                        type="number"
-                        {...register("year", { valueAsNumber: true })}
-                        placeholder="2011"
-                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        genre:
-                      </label>
-                      <Input
-                        {...register("genre")}
-                        placeholder="Dubstep"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        track:
-                      </label>
-                      <Input
-                        type="number"
-                        {...register("trackNumber", { valueAsNumber: true })}
-                        placeholder="2"
-                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm pt-2 border-t">
-                      <div>
-                        <span className="font-medium">duration: </span>
-                        {`${Math.floor(selectedFile.metadata.duration / 60)}:${(
-                          selectedFile.metadata.duration % 60
-                        )
-                          .toFixed(0)
-                          .padStart(2, "0")}`}
-                      </div>
-                      <div>
-                        <span className="font-medium">size: </span>
-                        {(selectedFile.file.size / (1024 * 1024)).toFixed(2)} MB
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="p-6 border-t mt-auto flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={() => handleDownloadUpdatedFile(selectedFile)}
-                >
-                  Download
-                </Button>
-                <Button type="submit">
-                  Save Changes
-                </Button>
-              </CardFooter>
-            </form>
-          </Card>
-        ) : (
-          <div className="flex-1 flex items-center justify-center border rounded-lg bg-muted/10">
-            <div className="text-center">
-              <h3 className="text-lg font-medium">No file selected</h3>
-              <p className="text-muted-foreground">Upload files to get started</p>
-              <div className="mt-4">
-                 <AudioUpload onAudioUpload={handleAudioUpload} />
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+    </>
   );
 }
