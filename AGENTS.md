@@ -18,4 +18,8 @@
 - All MP3 processing happens client-side via `mp3tag.js`; no server-side logic exists.
 - The `pnpm-workspace.yaml` restricts build scripts via `onlyBuiltDependencies`. If `pnpm install` warns about ignored build scripts, this is expected and does not affect development.
 - No `.env` file or secrets are required.
-- To manually test the app, create an MP3 file (e.g. `ffmpeg -f lavfi -i "sine=frequency=440:duration=3" -metadata title="Test" -y /tmp/test.mp3`) and upload it through the UI.
+- Test MP3 files are pre-generated at `/tmp/test-mp3s/` by the update script (via ffmpeg). They include:
+  - **Album "Ocean Dreams"** by The Waves: `morning_light.mp3`, `tidal_flow.mp3`, `coral_reef.mp3` (tracks 1-3, Ambient, 2024)
+  - **Album "Synthwave Nights"** by Pixel Runner: `neon_city.mp3`, `retrograde.mp3` (tracks 1-2, Electronic, 2023)
+  - **Loose track** (no album): `lonely_road.mp3` by Solo Drifter (Folk, 2025)
+- Upload multiple files from the same album to test album grouping, track reordering, and batch metadata logic.
