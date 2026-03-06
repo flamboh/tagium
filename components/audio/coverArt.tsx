@@ -16,9 +16,16 @@ interface CoverArtProps {
     type?: number;
   }[];
   onCoverUpload?: (file: File) => void;
+  size?: "default" | "compact";
+  resetKey?: string | null;
 }
 
-export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
+export default function CoverArt({
+  picture,
+  onCoverUpload,
+  size = "default",
+  resetKey,
+}: CoverArtProps) {
   const [uploadedCover, setUploadedCover] = useState<File | null>(null);
   const [tempImageForCropping, setTempImageForCropping] = useState<
     string | null
@@ -59,6 +66,18 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
   };
 
   const [coverSrc, setCoverSrc] = useState<string | null>(null);
+  const isCompact = size === "compact";
+
+  useEffect(() => {
+    setUploadedCover(null);
+    setShowCropper(false);
+    setTempImageForCropping((previous) => {
+      if (previous) {
+        URL.revokeObjectURL(previous);
+      }
+      return null;
+    });
+  }, [resetKey]);
 
   useEffect(() => {
     if (uploadedCover) {
@@ -80,7 +99,13 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
 
 
   return (
-    <div className="flex-shrink-0 grid grid-rows-2 gap-2">
+    <div
+      className={
+        isCompact
+          ? "flex-shrink-0 flex flex-col h-full"
+          : "flex-shrink-0 grid grid-rows-2 gap-2"
+      }
+    >
       <div className="relative">
         {coverSrc ? (
           <Image
@@ -88,11 +113,21 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
             alt="album cover"
             width={256}
             height={256}
-            className="w-64 h-64 object-cover rounded-lg border"
+            className={
+              isCompact
+                ? "w-44 h-44 object-cover rounded-lg border"
+                : "w-64 h-64 object-cover rounded-lg border"
+            }
             unoptimized
           />
         ) : (
-          <div className="w-64 h-64 bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs">
+          <div
+            className={
+              isCompact
+                ? "w-44 h-44 bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs"
+                : "w-64 h-64 bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs"
+            }
+          >
             no cover
           </div>
         )}
@@ -100,6 +135,7 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
           <Popover open={showCropper} onOpenChange={setShowCropper}>
             <PopoverTrigger asChild>
               <Button
+                type="button"
                 size="sm"
                 variant="secondary"
                 className="absolute top-2 right-2"
@@ -129,7 +165,7 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
           </Popover>
         )}
       </div>
-      <div className="flex flex-col gap-2">
+      <div className={isCompact ? "mt-auto pt-2" : "flex flex-col gap-2"}>
         <Input
           type="file"
           accept="image/*"
@@ -138,11 +174,16 @@ export default function CoverArt({ picture, onCoverUpload }: CoverArtProps) {
           ref={fileInputRef}
         />
         <Button
+          type="button"
           variant="outline"
-          className="w-64 h-24 border-dashed border-2 flex flex-col gap-2 hover:bg-accent/50 cursor-pointer"
+          className={
+            isCompact
+              ? "w-44 h-10 border-dashed border-2 flex items-center gap-2 hover:bg-accent/50 cursor-pointer"
+              : "w-64 h-24 border-dashed border-2 flex flex-col gap-2 hover:bg-accent/50 cursor-pointer"
+          }
           onClick={() => fileInputRef.current?.click()}
         >
-          <Upload className="h-6 w-6 text-muted-foreground" />
+          <Upload className={isCompact ? "h-4 w-4 text-muted-foreground" : "h-6 w-6 text-muted-foreground"} />
           <span className="text-muted-foreground text-xs">upload cover</span>
         </Button>
       </div>

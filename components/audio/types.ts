@@ -1,19 +1,35 @@
-export interface AudioMetadata {
-  title?: string;
-  artist?: string;
-  album?: string;
-  genre?: string | string[];
-  year?: number;
-  trackNumber?: number;
-  picture?: Array<{
-    format: string;
-    type: number;
-    data: Uint8Array;
-    description?: string;
-  }>;
-  duration: number;
-  bitrate: number;
-  sampleRate: number;
+import { z } from "zod";
+
+export const audioMetadataSchema = z.object({
+  filename: z.string(),
+  title: z.string(),
+  artist: z.string(),
+  album: z.string(),
+  year: z.number().nullish(),
+  genre: z.string().or(z.array(z.string())),
+  duration: z.number(),
+  bitrate: z.number(),
+  sampleRate: z.number(),
+  picture: z.array(
+    z.object({
+      format: z.string(),
+      type: z.number(),
+      description: z.string(),
+      data: z.instanceof(Uint8Array),
+    })
+  ),
+  trackNumber: z.number().nullish(),
+});
+
+export type AudioMetadata = z.infer<typeof audioMetadataSchema>;
+
+export interface TagiumFile {
+  id: string;
+  file: File;
+  originalFile: File;
+  status: "pending" | "saved" | "error";
+  filename: string;
+  metadata?: AudioMetadata;
 }
 
 export interface AlbumGroup {
@@ -24,12 +40,4 @@ export interface AlbumGroup {
   cover?: AudioMetadata["picture"];
   trackIds: string[];
   syncTrackNumbers: boolean;
-}
-
-export interface TagiumFile {
-  id: string;
-  file: File;
-  filename: string;
-  metadata?: AudioMetadata;
-  status: "pending" | "saved" | "error";
 }
