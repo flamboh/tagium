@@ -27,29 +27,33 @@ interface AlbumSidebarProps {
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
-  onMoveTrackToAlbum: (
-    trackId: string,
+  onMoveTracksToAlbum: (
+    trackIds: string[],
+    anchorTrackId: string,
     targetAlbumId: string,
     placement: "before" | "after" | "append",
     referenceTrackId?: string
   ) => void;
-  onMoveTrackToLoose: (
-    trackId: string,
+  onMoveTracksToLoose: (
+    trackIds: string[],
+    anchorTrackId: string,
     placement: "before" | "after" | "append",
     referenceTrackId?: string
   ) => void;
-  onPromptCreateAlbumFromLooseTracks: (
-    sourceTrackId: string,
-    targetTrackId: string
-  ) => void;
+  onPromptCreateAlbumFromLooseTracks: (trackIds: string[]) => void;
   onReorderAlbums: (albumId: string, targetIndex: number) => void;
+  onStartTrackDrag: (
+    trackId: string,
+    source: "album" | "loose",
+    albumId?: string
+  ) => DragPayload;
   onAudioUpload: (files: File[]) => void;
 }
 
 interface DragPayload {
-  trackId: string;
-  container: "album" | "loose";
-  albumId?: string;
+  trackIds: string[];
+  anchorTrackId: string;
+  allLoose: boolean;
 }
 
 interface AlbumDragPayload {
@@ -105,10 +109,11 @@ export default function AlbumSidebar({
   onAddAlbum,
   onEditAlbum,
   onUploadToAlbum,
-  onMoveTrackToAlbum,
-  onMoveTrackToLoose,
+  onMoveTracksToAlbum,
+  onMoveTracksToLoose,
   onPromptCreateAlbumFromLooseTracks,
   onReorderAlbums,
+  onStartTrackDrag,
   onAudioUpload,
 }: AlbumSidebarProps) {
   const albumUploadInputRef = useRef<HTMLInputElement>(null);
@@ -194,7 +199,11 @@ export default function AlbumSidebar({
           // Handle track drag
           const trackPayload = parseDragPayload(event);
           if (trackPayload) {
-            onMoveTrackToLoose(trackPayload.trackId, "append");
+            onMoveTracksToLoose(
+              trackPayload.trackIds,
+              trackPayload.anchorTrackId,
+              "append"
+            );
             return;
           }
         }}
@@ -207,7 +216,7 @@ export default function AlbumSidebar({
               event.preventDefault();
               event.stopPropagation();
               const payload = parseDragPayload(event);
-              if (payload && payload.trackId !== track.id) {
+              if (payload && !payload.trackIds.includes(track.id)) {
                 event.dataTransfer.dropEffect = "move";
               }
             }}
@@ -215,14 +224,19 @@ export default function AlbumSidebar({
               event.preventDefault();
               event.stopPropagation();
               const payload = parseDragPayload(event);
-              if (!payload || payload.trackId === track.id) return;
+              if (!payload || payload.trackIds.includes(track.id)) return;
 
-              if (payload.container === "loose" && isCenteredDrop(event)) {
-                onPromptCreateAlbumFromLooseTracks(payload.trackId, track.id);
+              if (payload.allLoose && isCenteredDrop(event)) {
+                onPromptCreateAlbumFromLooseTracks([...payload.trackIds, track.id]);
                 return;
               }
               const placement = placementForRowDrop(event);
-              onMoveTrackToLoose(payload.trackId, placement, track.id);
+              onMoveTracksToLoose(
+                payload.trackIds,
+                payload.anchorTrackId,
+                placement,
+                track.id
+              );
             }}
           >
             <Button
@@ -230,10 +244,7 @@ export default function AlbumSidebar({
               variant="ghost"
               draggable
               onDragStart={(event) => {
-                const payload: DragPayload = {
-                  trackId: track.id,
-                  container: "loose",
-                };
+                const payload = onStartTrackDrag(track.id, "loose");
                 event.dataTransfer.setData(TRACK_DRAG_TYPE, JSON.stringify(payload));
                 event.dataTransfer.effectAllowed = "move";
               }}
@@ -345,7 +356,12 @@ export default function AlbumSidebar({
               // Handle track drag
               const trackPayload = parseDragPayload(event);
               if (trackPayload) {
-                onMoveTrackToAlbum(trackPayload.trackId, album.id, "append");
+                onMoveTracksToAlbum(
+                  trackPayload.trackIds,
+                  trackPayload.anchorTrackId,
+                  album.id,
+                  "append"
+                );
                 return;
               }
             }}
@@ -425,7 +441,7 @@ export default function AlbumSidebar({
                         event.preventDefault();
                         event.stopPropagation();
                         const payload = parseDragPayload(event);
-                        if (payload && payload.trackId !== track.id) {
+                        if (payload && !payload.trackIds.includes(track.id)) {
                           event.dataTransfer.dropEffect = "move";
                         }
                       }}
@@ -433,9 +449,15 @@ export default function AlbumSidebar({
                         event.preventDefault();
                         event.stopPropagation();
                         const payload = parseDragPayload(event);
-                        if (!payload || payload.trackId === track.id) return;
+                        if (!payload || payload.trackIds.includes(track.id)) return;
                         const placement = placementForRowDrop(event);
-                        onMoveTrackToAlbum(payload.trackId, album.id, placement, track.id);
+                        onMoveTracksToAlbum(
+                          payload.trackIds,
+                          payload.anchorTrackId,
+                          album.id,
+                          placement,
+                          track.id
+                        );
                       }}
                     >
                       <Button
@@ -443,11 +465,7 @@ export default function AlbumSidebar({
                         variant="ghost"
                         draggable
                         onDragStart={(event) => {
-                          const payload: DragPayload = {
-                            trackId: track.id,
-                            container: "album",
-                            albumId: album.id,
-                          };
+                          const payload = onStartTrackDrag(track.id, "album", album.id);
                           event.dataTransfer.setData(
                             TRACK_DRAG_TYPE,
                             JSON.stringify(payload)
