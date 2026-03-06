@@ -81,6 +81,9 @@ importers:
       '@types/react-dom':
         specifier: ^19
         version: 19.1.9(@types/react@19.1.12)
+      eslint-plugin-react-hooks:
+        specifier: ^5.2.0
+        version: 5.2.0(eslint@9.34.0(jiti@2.5.1))
       shadcn:
         specifier: ^3.0.0
         version: 3.0.0(@types/node@20.19.11)(typescript@5.9.2)

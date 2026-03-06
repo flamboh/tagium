@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent, DragEvent, MouseEvent as ReactMouseEvent } from "react";
+import type { ChangeEvent, DragEvent } from "react";
 import { useRef, useState } from "react";
 import { AlertCircle, Check, FileMusic, Folder, Pencil, Plus, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 import { AlbumGroup, TagiumFile } from "./types";
 
 const TRACK_DRAG_TYPE = "application/x-tagium-track";
-const ALBUM_DRAG_TYPE = "application/x-tagium-album";
 
 interface AlbumSidebarProps {
   albums: AlbumGroup[];
@@ -17,10 +16,9 @@ interface AlbumSidebarProps {
   files: TagiumFile[];
   selectedAlbumId: string | null;
   selectedFileId: string | null;
-  selectedFileIds: Set<string>;
-  onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
-  onSelectFile: (albumId: string, fileId: string, event?: ReactMouseEvent) => void;
-  onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
+  onSelectAlbum: (albumId: string) => void;
+  onSelectFile: (albumId: string, fileId: string) => void;
+  onSelectLooseTrack: (fileId: string) => void;
   onClearSelection: () => void;
   onRemoveFile: (fileId: string) => void;
   onRemoveAlbum: (albumId: string) => void;
@@ -42,8 +40,6 @@ interface AlbumSidebarProps {
     sourceTrackId: string,
     targetTrackId: string
   ) => void;
-  onReorderAlbums: (albumId: string, targetIndex: number) => void;
-  onAudioUpload: (files: File[]) => void;
 }
 
 interface DragPayload {
@@ -52,27 +48,12 @@ interface DragPayload {
   albumId?: string;
 }
 
-interface AlbumDragPayload {
-  albumId: string;
-}
-
 function parseDragPayload(event: DragEvent) {
   const rawPayload = event.dataTransfer.getData(TRACK_DRAG_TYPE);
   if (!rawPayload) return null;
 
   try {
     return JSON.parse(rawPayload) as DragPayload;
-  } catch {
-    return null;
-  }
-}
-
-function parseAlbumDragPayload(event: DragEvent) {
-  const rawPayload = event.dataTransfer.getData(ALBUM_DRAG_TYPE);
-  if (!rawPayload) return null;
-
-  try {
-    return JSON.parse(rawPayload) as AlbumDragPayload;
   } catch {
     return null;
   }
@@ -95,7 +76,6 @@ export default function AlbumSidebar({
   files,
   selectedAlbumId,
   selectedFileId,
-  selectedFileIds,
   onSelectAlbum,
   onSelectFile,
   onSelectLooseTrack,
@@ -108,13 +88,9 @@ export default function AlbumSidebar({
   onMoveTrackToAlbum,
   onMoveTrackToLoose,
   onPromptCreateAlbumFromLooseTracks,
-  onReorderAlbums,
-  onAudioUpload,
 }: AlbumSidebarProps) {
   const albumUploadInputRef = useRef<HTMLInputElement>(null);
   const [uploadTargetAlbumId, setUploadTargetAlbumId] = useState<string | null>(null);
-  const [draggedAlbumId, setDraggedAlbumId] = useState<string | null>(null);
-  const [dragOverAlbumIndex, setDragOverAlbumIndex] = useState<number | null>(null);
   const filesById = new Map(files.map((file) => [file.id, file]));
   const looseTracks = looseTrackIds
     .map((trackId) => filesById.get(trackId))
@@ -175,28 +151,13 @@ export default function AlbumSidebar({
         }}
         onDragOver={(event) => {
           event.preventDefault();
-          event.dataTransfer.dropEffect = "move";
         }}
         onDrop={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          
-          // Handle external file drops
-          const files = Array.from(event.dataTransfer.files);
-          if (files.length > 0) {
-            const audioFiles = files.filter((file) => file.type.startsWith("audio/"));
-            if (audioFiles.length > 0) {
-              onAudioUpload(audioFiles);
-              return;
-            }
-          }
-          
-          // Handle track drag
-          const trackPayload = parseDragPayload(event);
-          if (trackPayload) {
-            onMoveTrackToLoose(trackPayload.trackId, "append");
-            return;
-          }
+          const payload = parseDragPayload(event);
+          if (!payload) return;
+          onMoveTrackToLoose(payload.trackId, "append");
         }}
       >
         {looseTracks.map((track, index) => (
@@ -205,11 +166,6 @@ export default function AlbumSidebar({
             className="relative group"
             onDragOver={(event) => {
               event.preventDefault();
-              event.stopPropagation();
-              const payload = parseDragPayload(event);
-              if (payload && payload.trackId !== track.id) {
-                event.dataTransfer.dropEffect = "move";
-              }
             }}
             onDrop={(event) => {
               event.preventDefault();
@@ -239,13 +195,9 @@ export default function AlbumSidebar({
               }}
               className={cn(
                 "justify-start h-auto py-2 px-2.5 w-full text-left font-normal pr-8 rounded-lg border bg-card/70",
-                selectedFileIds.has(track.id)
-                  ? "bg-accent text-accent-foreground border-primary/40"
-                  : selectedFileId === track.id
-                    ? "bg-accent/50 text-accent-foreground"
-                    : ""
+                selectedFileId === track.id ? "bg-accent text-accent-foreground" : ""
               )}
-              onClick={(e) => onSelectLooseTrack(track.id, e)}
+                onClick={() => onSelectLooseTrack(track.id)}
             >
               <div className="flex items-center gap-2 w-full overflow-hidden">
                 <span className="w-5 text-[11px] text-muted-foreground">{index + 1}</span>
@@ -273,101 +225,29 @@ export default function AlbumSidebar({
           </div>
         ))}
 
-        {albums.map((album, albumIndex) => (
+        {albums.map((album) => (
           <div
             key={album.id}
             className={cn(
-              "rounded-lg border bg-card/70 transition-all",
-              selectedAlbumId === album.id ? "border-primary/40 shadow-sm" : "",
-              draggedAlbumId === album.id ? "opacity-50" : "",
-              dragOverAlbumIndex === albumIndex ? "ring-2 ring-primary" : ""
+              "rounded-lg border bg-card/70",
+              selectedAlbumId === album.id ? "border-primary/40 shadow-sm" : ""
             )}
             onDragOver={(event) => {
               event.preventDefault();
-              event.stopPropagation();
-              
-              const albumPayload = parseAlbumDragPayload(event);
-              if (albumPayload && albumPayload.albumId !== album.id) {
-                event.dataTransfer.dropEffect = "move";
-                const rect = event.currentTarget.getBoundingClientRect();
-                const position = (event.clientY - rect.top) / rect.height;
-                setDragOverAlbumIndex(position < 0.5 ? albumIndex : albumIndex + 1);
-              } else {
-                setDragOverAlbumIndex(null);
-              }
-              
-              const trackPayload = parseDragPayload(event);
-              if (trackPayload) {
-                event.dataTransfer.dropEffect = "move";
-              }
-              
-              // Handle external file drops
-              if (event.dataTransfer.types.includes("Files")) {
-                event.dataTransfer.dropEffect = "copy";
-              }
-            }}
-            onDragLeave={() => {
-              setDragOverAlbumIndex(null);
             }}
             onDrop={(event) => {
               event.preventDefault();
               event.stopPropagation();
-              
-              // Handle external file drops
-              const files = Array.from(event.dataTransfer.files);
-              if (files.length > 0) {
-                const audioFiles = files.filter((file) => file.type.startsWith("audio/"));
-                if (audioFiles.length > 0) {
-                  onUploadToAlbum(album.id, audioFiles);
-                  return;
-                }
-              }
-              
-              // Handle album reordering
-              const albumPayload = parseAlbumDragPayload(event);
-              if (albumPayload && albumPayload.albumId !== album.id) {
-                const sourceIndex = albums.findIndex((a) => a.id === albumPayload.albumId);
-                if (sourceIndex >= 0) {
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  const position = (event.clientY - rect.top) / rect.height;
-                  let targetIndex = position < 0.5 ? albumIndex : albumIndex + 1;
-                  // Adjust target index if dragging from before the target
-                  if (sourceIndex < targetIndex) {
-                    targetIndex -= 1;
-                  }
-                  onReorderAlbums(albumPayload.albumId, targetIndex);
-                }
-                setDraggedAlbumId(null);
-                setDragOverAlbumIndex(null);
-                return;
-              }
-              
-              // Handle track drag
-              const trackPayload = parseDragPayload(event);
-              if (trackPayload) {
-                onMoveTrackToAlbum(trackPayload.trackId, album.id, "append");
-                return;
-              }
+              const payload = parseDragPayload(event);
+              if (!payload) return;
+              onMoveTrackToAlbum(payload.trackId, album.id, "append");
             }}
           >
             <div className="w-full flex items-center justify-between gap-1 px-2 py-1 border-b">
               <button
                 type="button"
                 className="min-w-0 flex-1 flex items-center gap-2 px-1 py-1 text-left hover:bg-accent/30 rounded cursor-pointer"
-                onClick={(e) => onSelectAlbum(album.id, e)}
-                draggable
-                onDragStart={(event) => {
-                  const payload: AlbumDragPayload = {
-                    albumId: album.id,
-                  };
-                  event.dataTransfer.setData(ALBUM_DRAG_TYPE, JSON.stringify(payload));
-                  event.dataTransfer.effectAllowed = "move";
-                  setDraggedAlbumId(album.id);
-                }}
-                onDragEnd={() => {
-                  setDraggedAlbumId(null);
-                  setDragOverAlbumIndex(null);
-                }}
+                onClick={() => onSelectAlbum(album.id)}
               >
                 <Folder className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                 <span className="text-sm font-medium truncate">{album.title}</span>
@@ -423,17 +303,12 @@ export default function AlbumSidebar({
                       className="relative group"
                       onDragOver={(event) => {
                         event.preventDefault();
-                        event.stopPropagation();
-                        const payload = parseDragPayload(event);
-                        if (payload && payload.trackId !== track.id) {
-                          event.dataTransfer.dropEffect = "move";
-                        }
                       }}
                       onDrop={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
                         const payload = parseDragPayload(event);
-                        if (!payload || payload.trackId === track.id) return;
+                        if (!payload) return;
                         const placement = placementForRowDrop(event);
                         onMoveTrackToAlbum(payload.trackId, album.id, placement, track.id);
                       }}
@@ -456,13 +331,11 @@ export default function AlbumSidebar({
                         }}
                         className={cn(
                           "justify-start h-auto py-2 px-2.5 w-full text-left font-normal pr-8",
-                          selectedFileIds.has(track.id)
-                            ? "bg-accent text-accent-foreground border-primary/40"
-                            : selectedFileId === track.id
-                              ? "bg-accent/50 text-accent-foreground"
-                              : ""
+                          selectedFileId === track.id
+                            ? "bg-accent text-accent-foreground"
+                            : ""
                         )}
-                        onClick={(e) => onSelectFile(album.id, track.id, e)}
+                        onClick={() => onSelectFile(album.id, track.id)}
                       >
                         <div className="flex items-center gap-2 w-full overflow-hidden">
                           <span className="w-5 text-[11px] text-muted-foreground">
