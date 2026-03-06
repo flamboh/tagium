@@ -28,9 +28,14 @@ interface AlbumSidebarProps {
   onMoveTrackToAlbum: (
     trackId: string,
     targetAlbumId: string,
-    targetIndex: number
+    placement: "before" | "after" | "append",
+    referenceTrackId?: string
   ) => void;
-  onMoveTrackToLoose: (trackId: string, targetIndex: number) => void;
+  onMoveTrackToLoose: (
+    trackId: string,
+    placement: "before" | "after" | "append",
+    referenceTrackId?: string
+  ) => void;
   onPromptCreateAlbumFromLooseTracks: (
     sourceTrackId: string,
     targetTrackId: string
@@ -60,10 +65,9 @@ function isCenteredDrop(event: DragEvent<HTMLElement>) {
   return position > 0.3 && position < 0.7;
 }
 
-function dropIndexForRow(event: DragEvent<HTMLElement>, rowIndex: number) {
+function placementForRowDrop(event: DragEvent<HTMLElement>) {
   const rect = event.currentTarget.getBoundingClientRect();
-  const dropAfter = event.clientY > rect.top + rect.height / 2;
-  return rowIndex + (dropAfter ? 1 : 0);
+  return event.clientY > rect.top + rect.height / 2 ? "after" : "before";
 }
 
 export default function AlbumSidebar({
@@ -153,7 +157,7 @@ export default function AlbumSidebar({
           event.stopPropagation();
           const payload = parseDragPayload(event);
           if (!payload) return;
-          onMoveTrackToLoose(payload.trackId, looseTracks.length);
+          onMoveTrackToLoose(payload.trackId, "append");
         }}
       >
         {looseTracks.map((track, index) => (
@@ -173,8 +177,8 @@ export default function AlbumSidebar({
                 onPromptCreateAlbumFromLooseTracks(payload.trackId, track.id);
                 return;
               }
-
-              onMoveTrackToLoose(payload.trackId, dropIndexForRow(event, index));
+              const placement = placementForRowDrop(event);
+              onMoveTrackToLoose(payload.trackId, placement, track.id);
             }}
           >
             <Button
@@ -193,7 +197,7 @@ export default function AlbumSidebar({
                 "justify-start h-auto py-2 px-2.5 w-full text-left font-normal pr-8 rounded-lg border bg-card/70",
                 selectedFileId === track.id ? "bg-accent text-accent-foreground" : ""
               )}
-              onClick={() => onSelectLooseTrack(track.id)}
+                onClick={() => onSelectLooseTrack(track.id)}
             >
               <div className="flex items-center gap-2 w-full overflow-hidden">
                 <span className="w-5 text-[11px] text-muted-foreground">{index + 1}</span>
@@ -236,7 +240,7 @@ export default function AlbumSidebar({
               event.stopPropagation();
               const payload = parseDragPayload(event);
               if (!payload) return;
-              onMoveTrackToAlbum(payload.trackId, album.id, album.trackIds.length);
+              onMoveTrackToAlbum(payload.trackId, album.id, "append");
             }}
           >
             <div className="w-full flex items-center justify-between gap-1 px-2 py-1 border-b">
@@ -305,11 +309,8 @@ export default function AlbumSidebar({
                         event.stopPropagation();
                         const payload = parseDragPayload(event);
                         if (!payload) return;
-                        onMoveTrackToAlbum(
-                          payload.trackId,
-                          album.id,
-                          dropIndexForRow(event, index)
-                        );
+                        const placement = placementForRowDrop(event);
+                        onMoveTrackToAlbum(payload.trackId, album.id, placement, track.id);
                       }}
                     >
                       <Button

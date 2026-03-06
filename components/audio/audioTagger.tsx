@@ -311,10 +311,6 @@ export default function AudioTagger() {
     targetTrackId: string
   ) => {
     if (sourceTrackId === targetTrackId) return;
-    const shouldCreate = window.confirm(
-      "Create a new album containing these tracks?"
-    );
-    if (!shouldCreate) return;
     const idSet = new Set([sourceTrackId, targetTrackId]);
     const orderedIds = looseTrackIds.filter((trackId) => idSet.has(trackId));
     if (orderedIds.length < 2) return;
@@ -390,13 +386,26 @@ export default function AudioTagger() {
   const handleMoveTrackToAlbum = (
     trackId: string,
     targetAlbumId: string,
-    targetIndex: number
+    placement: "before" | "after" | "append",
+    referenceTrackId?: string
   ) => {
-    const moved = moveTrackInSidebar(albums, looseTrackIds, trackId, {
-      type: "album",
-      albumId: targetAlbumId,
-      index: targetIndex,
-    });
+    const moved = moveTrackInSidebar(
+      albums,
+      looseTrackIds,
+      trackId,
+      placement === "append" || !referenceTrackId
+        ? {
+            type: "album",
+            albumId: targetAlbumId,
+            placement: "append",
+          }
+        : {
+            type: "album",
+            albumId: targetAlbumId,
+            placement,
+            referenceTrackId,
+          }
+    );
     setAlbums(moved.albums);
     setLooseTrackIds(moved.looseTrackIds);
     setSelectedAlbumId(targetAlbumId);
@@ -407,11 +416,26 @@ export default function AudioTagger() {
       );
     }
   };
-  const handleMoveTrackToLoose = (trackId: string, targetIndex: number) => {
-    const moved = moveTrackInSidebar(albums, looseTrackIds, trackId, {
-      type: "loose",
-      index: targetIndex,
-    });
+  const handleMoveTrackToLoose = (
+    trackId: string,
+    placement: "before" | "after" | "append",
+    referenceTrackId?: string
+  ) => {
+    const moved = moveTrackInSidebar(
+      albums,
+      looseTrackIds,
+      trackId,
+      placement === "append" || !referenceTrackId
+        ? {
+            type: "loose",
+            placement: "append",
+          }
+        : {
+            type: "loose",
+            placement,
+            referenceTrackId,
+          }
+    );
     setAlbums(moved.albums);
     setLooseTrackIds(moved.looseTrackIds);
     setSelectedAlbumId(null);

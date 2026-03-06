@@ -26,9 +26,14 @@ interface TagSidebarPanelProps {
   onMoveTrackToAlbum: (
     trackId: string,
     targetAlbumId: string,
-    targetIndex: number
+    placement: "before" | "after" | "append",
+    referenceTrackId?: string
   ) => void;
-  onMoveTrackToLoose: (trackId: string, targetIndex: number) => void;
+  onMoveTrackToLoose: (
+    trackId: string,
+    placement: "before" | "after" | "append",
+    referenceTrackId?: string
+  ) => void;
   onPromptCreateAlbumFromLooseTracks: (
     sourceTrackId: string,
     targetTrackId: string
