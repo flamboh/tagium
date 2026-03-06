@@ -14,8 +14,15 @@ interface MergeUploadedTracksOptions {
 }
 
 export type SidebarDropTarget =
-  | { type: "album"; albumId: string; index: number }
-  | { type: "loose"; index: number };
+  | { type: "album"; albumId: string; placement: "append" }
+  | {
+      type: "album";
+      albumId: string;
+      placement: "before" | "after";
+      referenceTrackId: string;
+    }
+  | { type: "loose"; placement: "append" }
+  | { type: "loose"; placement: "before" | "after"; referenceTrackId: string };
 
 const buildAlbumKey = (title: string, artist: string) =>
   `${title.trim().toLowerCase()}::${artist.trim().toLowerCase()}`;
@@ -147,10 +154,6 @@ export function moveTrackInSidebar(
 
   const sourceAlbum = albums.find((album) => album.trackIds.includes(trackId));
   const sourceAlbumId = sourceAlbum?.id ?? null;
-  const sourceAlbumIndex =
-    sourceAlbumId && sourceAlbum
-      ? sourceAlbum.trackIds.indexOf(trackId)
-      : -1;
   const sourceLooseIndex = looseTrackIds.indexOf(trackId);
 
   if (sourceAlbum) {
@@ -159,6 +162,24 @@ export function moveTrackInSidebar(
   if (sourceLooseIndex >= 0) {
     looseTrackIds.splice(sourceLooseIndex, 1);
   }
+
+  const resolveInsertIndex = (
+    trackIds: string[],
+    placement: "append" | "before" | "after",
+    referenceTrackId?: string
+  ) => {
+    if (placement === "append") {
+      return trackIds.length;
+    }
+    if (!referenceTrackId) {
+      return trackIds.length;
+    }
+    const referenceIndex = trackIds.indexOf(referenceTrackId);
+    if (referenceIndex < 0) {
+      return trackIds.length;
+    }
+    return placement === "before" ? referenceIndex : referenceIndex + 1;
+  };
 
   if (target.type === "album") {
     const targetAlbum = albums.find((album) => album.id === target.albumId);
@@ -169,28 +190,32 @@ export function moveTrackInSidebar(
         albumsToSync: [] as string[],
       };
     }
-
-    let insertIndex = Math.max(0, Math.min(target.index, targetAlbum.trackIds.length));
-    if (
-      sourceAlbumId &&
-      sourceAlbumId === target.albumId &&
-      sourceAlbumIndex >= 0 &&
-      sourceAlbumIndex < insertIndex
-    ) {
-      insertIndex -= 1;
+    if (target.placement !== "append" && target.referenceTrackId === trackId) {
+      return {
+        albums: pruneEmptyAlbums(albums),
+        looseTrackIds,
+        albumsToSync: [] as string[],
+      };
     }
-
+    const insertIndex = resolveInsertIndex(
+      targetAlbum.trackIds,
+      target.placement,
+      target.placement === "append" ? undefined : target.referenceTrackId
+    );
     targetAlbum.trackIds.splice(insertIndex, 0, trackId);
   } else {
-    let insertIndex = Math.max(0, Math.min(target.index, looseTrackIds.length));
-    if (
-      sourceLooseIndex >= 0 &&
-      sourceAlbumId === null &&
-      sourceLooseIndex < insertIndex
-    ) {
-      insertIndex -= 1;
+    if (target.placement !== "append" && target.referenceTrackId === trackId) {
+      return {
+        albums: pruneEmptyAlbums(albums),
+        looseTrackIds,
+        albumsToSync: [] as string[],
+      };
     }
-
+    const insertIndex = resolveInsertIndex(
+      looseTrackIds,
+      target.placement,
+      target.placement === "append" ? undefined : target.referenceTrackId
+    );
     looseTrackIds.splice(insertIndex, 0, trackId);
   }
 
