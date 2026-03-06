@@ -7,6 +7,12 @@ import { AlbumGroup, TagiumFile } from "./types";
 import { Button } from "../ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 
+interface TrackDragPayload {
+  trackIds: string[];
+  anchorTrackId: string;
+  allLoose: boolean;
+}
+
 interface TagSidebarPanelProps {
   loading: boolean;
   files: TagiumFile[];
@@ -25,22 +31,26 @@ interface TagSidebarPanelProps {
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
-  onMoveTrackToAlbum: (
-    trackId: string,
+  onMoveTracksToAlbum: (
+    trackIds: string[],
+    anchorTrackId: string,
     targetAlbumId: string,
     placement: "before" | "after" | "append",
     referenceTrackId?: string
   ) => void;
-  onMoveTrackToLoose: (
-    trackId: string,
+  onMoveTracksToLoose: (
+    trackIds: string[],
+    anchorTrackId: string,
     placement: "before" | "after" | "append",
     referenceTrackId?: string
   ) => void;
-  onPromptCreateAlbumFromLooseTracks: (
-    sourceTrackId: string,
-    targetTrackId: string
-  ) => void;
+  onPromptCreateAlbumFromLooseTracks: (trackIds: string[]) => void;
   onReorderAlbums: (albumId: string, targetIndex: number) => void;
+  onStartTrackDrag: (
+    trackId: string,
+    source: "album" | "loose",
+    albumId?: string
+  ) => TrackDragPayload;
   onSaveAll: () => void;
 }
 
@@ -62,10 +72,11 @@ export default function TagSidebarPanel({
   onAddAlbum,
   onEditAlbum,
   onUploadToAlbum,
-  onMoveTrackToAlbum,
-  onMoveTrackToLoose,
+  onMoveTracksToAlbum,
+  onMoveTracksToLoose,
   onPromptCreateAlbumFromLooseTracks,
   onReorderAlbums,
+  onStartTrackDrag,
   onSaveAll,
 }: TagSidebarPanelProps) {
   return (
@@ -90,10 +101,11 @@ export default function TagSidebarPanel({
           onAddAlbum={onAddAlbum}
           onEditAlbum={onEditAlbum}
           onUploadToAlbum={onUploadToAlbum}
-          onMoveTrackToAlbum={onMoveTrackToAlbum}
-          onMoveTrackToLoose={onMoveTrackToLoose}
+          onMoveTracksToAlbum={onMoveTracksToAlbum}
+          onMoveTracksToLoose={onMoveTracksToLoose}
           onPromptCreateAlbumFromLooseTracks={onPromptCreateAlbumFromLooseTracks}
           onReorderAlbums={onReorderAlbums}
+          onStartTrackDrag={onStartTrackDrag}
           onAudioUpload={onAudioUpload}
         />
         <div className="p-6 border-t mt-auto">
