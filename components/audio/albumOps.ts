@@ -304,3 +304,18 @@ export function createAlbumFromTracks(
     syncAlbums: [...new Set(syncAlbums)],
   };
 }
+
+export function reorderAlbums(
+  prevAlbums: AlbumGroup[],
+  albumId: string,
+  targetIndex: number
+) {
+  const albums = [...prevAlbums];
+  const sourceIndex = albums.findIndex((album) => album.id === albumId);
+  if (sourceIndex < 0 || sourceIndex === targetIndex) {
+    return albums;
+  }
+  const [movedAlbum] = albums.splice(sourceIndex, 1);
+  albums.splice(targetIndex, 0, movedAlbum);
+  return albums;
+}

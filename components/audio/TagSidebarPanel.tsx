@@ -1,5 +1,6 @@
 "use client";
 
+import type { MouseEvent as ReactMouseEvent } from "react";
 import AudioUpload from "./audioUpload";
 import AlbumSidebar from "./AlbumSidebar";
 import { AlbumGroup, TagiumFile } from "./types";
@@ -13,10 +14,11 @@ interface TagSidebarPanelProps {
   looseTrackIds: string[];
   selectedAlbumId: string | null;
   selectedFileId: string | null;
+  selectedFileIds: Set<string>;
   onAudioUpload: (files: File[]) => void;
-  onSelectAlbum: (albumId: string) => void;
-  onSelectFile: (albumId: string, fileId: string) => void;
-  onSelectLooseTrack: (fileId: string) => void;
+  onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
+  onSelectFile: (albumId: string, fileId: string, event?: ReactMouseEvent) => void;
+  onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
   onClearSelection: () => void;
   onRemoveFile: (fileId: string) => void;
   onRemoveAlbum: (albumId: string) => void;
@@ -38,6 +40,7 @@ interface TagSidebarPanelProps {
     sourceTrackId: string,
     targetTrackId: string
   ) => void;
+  onReorderAlbums: (albumId: string, targetIndex: number) => void;
   onSaveAll: () => void;
 }
 
@@ -48,6 +51,7 @@ export default function TagSidebarPanel({
   looseTrackIds,
   selectedAlbumId,
   selectedFileId,
+  selectedFileIds,
   onAudioUpload,
   onSelectAlbum,
   onSelectFile,
@@ -61,6 +65,7 @@ export default function TagSidebarPanel({
   onMoveTrackToAlbum,
   onMoveTrackToLoose,
   onPromptCreateAlbumFromLooseTracks,
+  onReorderAlbums,
   onSaveAll,
 }: TagSidebarPanelProps) {
   return (
@@ -75,6 +80,7 @@ export default function TagSidebarPanel({
           files={files}
           selectedAlbumId={selectedAlbumId}
           selectedFileId={selectedFileId}
+          selectedFileIds={selectedFileIds}
           onSelectAlbum={onSelectAlbum}
           onSelectFile={onSelectFile}
           onSelectLooseTrack={onSelectLooseTrack}
@@ -87,6 +93,8 @@ export default function TagSidebarPanel({
           onMoveTrackToAlbum={onMoveTrackToAlbum}
           onMoveTrackToLoose={onMoveTrackToLoose}
           onPromptCreateAlbumFromLooseTracks={onPromptCreateAlbumFromLooseTracks}
+          onReorderAlbums={onReorderAlbums}
+          onAudioUpload={onAudioUpload}
         />
         <div className="p-6 border-t mt-auto">
           <Button
