@@ -40,7 +40,7 @@ interface AlbumSidebarProps {
     placement: "before" | "after" | "append",
     referenceTrackId?: string
   ) => void;
-  onPromptCreateAlbumFromLooseTracks: (trackIds: string[]) => void;
+  onPromptCreateAlbumFromTracks: (trackIds: string[]) => void;
   onReorderAlbums: (albumId: string, targetIndex: number) => void;
   onStartTrackDrag: (
     trackId: string,
@@ -111,7 +111,7 @@ export default function AlbumSidebar({
   onUploadToAlbum,
   onMoveTracksToAlbum,
   onMoveTracksToLoose,
-  onPromptCreateAlbumFromLooseTracks,
+  onPromptCreateAlbumFromTracks,
   onReorderAlbums,
   onStartTrackDrag,
   onAudioUpload,
@@ -226,8 +226,8 @@ export default function AlbumSidebar({
               const payload = parseDragPayload(event);
               if (!payload || payload.trackIds.includes(track.id)) return;
 
-              if (payload.allLoose && isCenteredDrop(event)) {
-                onPromptCreateAlbumFromLooseTracks([...payload.trackIds, track.id]);
+              if (isCenteredDrop(event)) {
+                onPromptCreateAlbumFromTracks([...payload.trackIds, track.id]);
                 return;
               }
               const placement = placementForRowDrop(event);
@@ -450,6 +450,10 @@ export default function AlbumSidebar({
                         event.stopPropagation();
                         const payload = parseDragPayload(event);
                         if (!payload || payload.trackIds.includes(track.id)) return;
+                        if (isCenteredDrop(event)) {
+                          onPromptCreateAlbumFromTracks([...payload.trackIds, track.id]);
+                          return;
+                        }
                         const placement = placementForRowDrop(event);
                         onMoveTracksToAlbum(
                           payload.trackIds,

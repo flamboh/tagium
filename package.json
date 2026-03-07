@@ -19,6 +19,7 @@
     "clsx": "^2.1.1",
     "eslint": "^9.34.0",
     "eslint-config-next": "^15.5.2",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.542.0",
     "mp3tag.js": "^3.14.1",
     "music-metadata": "^11.8.3",

@@ -44,14 +44,14 @@ interface TagSidebarPanelProps {
     placement: "before" | "after" | "append",
     referenceTrackId?: string
   ) => void;
-  onPromptCreateAlbumFromLooseTracks: (trackIds: string[]) => void;
+  onPromptCreateAlbumFromTracks: (trackIds: string[]) => void;
   onReorderAlbums: (albumId: string, targetIndex: number) => void;
   onStartTrackDrag: (
     trackId: string,
     source: "album" | "loose",
     albumId?: string
   ) => TrackDragPayload;
-  onSaveAll: () => void;
+  onDownloadAll: () => void;
 }
 
 export default function TagSidebarPanel({
@@ -74,10 +74,10 @@ export default function TagSidebarPanel({
   onUploadToAlbum,
   onMoveTracksToAlbum,
   onMoveTracksToLoose,
-  onPromptCreateAlbumFromLooseTracks,
+  onPromptCreateAlbumFromTracks,
   onReorderAlbums,
   onStartTrackDrag,
-  onSaveAll,
+  onDownloadAll,
 }: TagSidebarPanelProps) {
   return (
     <div className="w-80 flex-shrink-0 flex flex-col gap-4">
@@ -103,7 +103,7 @@ export default function TagSidebarPanel({
           onUploadToAlbum={onUploadToAlbum}
           onMoveTracksToAlbum={onMoveTracksToAlbum}
           onMoveTracksToLoose={onMoveTracksToLoose}
-          onPromptCreateAlbumFromLooseTracks={onPromptCreateAlbumFromLooseTracks}
+          onPromptCreateAlbumFromTracks={onPromptCreateAlbumFromTracks}
           onReorderAlbums={onReorderAlbums}
           onStartTrackDrag={onStartTrackDrag}
           onAudioUpload={onAudioUpload}
@@ -111,10 +111,10 @@ export default function TagSidebarPanel({
         <div className="p-6 border-t mt-auto">
           <Button
             className="w-full"
-            onClick={onSaveAll}
+            onClick={onDownloadAll}
             disabled={files.length === 0 || loading}
           >
-            {loading ? "Saving..." : "Save All"}
+            {loading ? "Preparing zip..." : "Download All"}
           </Button>
         </div>
       </Card>
