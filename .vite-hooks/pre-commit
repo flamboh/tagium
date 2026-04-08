@@ -1,0 +1,5 @@
+if [ -x "$HOME/.vite-plus/bin/vp" ]; then
+  exec "$HOME/.vite-plus/bin/vp" staged
+fi
+
+exec vp staged

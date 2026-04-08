@@ -1,23 +1,25 @@
 name: CI
 
-on: [push]
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
-  build:
+  verify:
+    name: Verify Build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v6
 
-      - name: Install Dependencies
-        run: npm install -g pnpm && pnpm install
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
 
-      - name: Copy .env.example files
-        shell: bash
-        run: find . -type f -name ".env.example" -exec sh -c 'cp "$1" "${1%.*}"' _ {} \;
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Lint
-        run: pnpm lint
+      - run: vp install
+      - run: vp check
+      - run: vp test
+      - run: vp build

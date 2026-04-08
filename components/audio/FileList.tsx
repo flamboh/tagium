@@ -41,9 +41,7 @@ export default function FileList({
                 variant="ghost"
                 className={cn(
                   "justify-start h-auto py-2 px-3 w-full text-left font-normal pr-8",
-                  selectedFileId === file.id
-                    ? "bg-accent text-accent-foreground"
-                    : ""
+                  selectedFileId === file.id ? "bg-accent text-accent-foreground" : "",
                 )}
                 onClick={() => onSelectFile(file.id)}
               >
