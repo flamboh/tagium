@@ -1,6 +1,7 @@
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite-plus";
 import react from "@vitejs/plugin-react";
+import { nitro } from "nitro/vite";
 
 export default defineConfig({
   staged: {
@@ -113,7 +114,7 @@ export default defineConfig({
       typeCheck: true,
     },
   },
-  plugins: [react()],
+  plugins: [react(), nitro()],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL(".", import.meta.url)),
