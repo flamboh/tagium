@@ -35,7 +35,7 @@ Long term maintainability is a core priority. If you add new functionality, firs
 
 ## Expectations
 
-- Use shadcn for base components `bunx Tshadcn-svelte@latest add {component}`
+- Use shadcn for base components `bunx shadcn-svelte@latest add {component}`
 - Use dark mode color scheme in src/styles.css
 - Keep designs simple, no over explaining, plain colors, no gradients, no decorative elements.
 - Assume dev servers for both Convex and `bun dev` are already running.
