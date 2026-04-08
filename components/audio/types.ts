@@ -16,7 +16,7 @@ export const audioMetadataSchema = z.object({
       type: z.number(),
       description: z.string(),
       data: z.instanceof(Uint8Array),
-    })
+    }),
   ),
   trackNumber: z.number().nullish(),
 });
