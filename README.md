@@ -1,5 +1,3 @@
 # Tagium
 
-## TODO
-
-- [ ] allow batch editing
+simple mp3tag editing for music fans
