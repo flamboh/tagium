@@ -85,11 +85,7 @@ export default function AlbumMetadataDialog({
           </DialogHeader>
           <div className="p-5 overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-[11rem_minmax(0,1fr)] gap-4 md:min-h-[236px] items-stretch">
-              <CoverArt
-                picture={draft.cover}
-                onCoverUpload={handleCoverUpload}
-                size="compact"
-              />
+              <CoverArt picture={draft.cover} onCoverUpload={handleCoverUpload} size="compact" />
               <div className="min-w-0 h-full flex flex-col justify-between gap-3">
                 <div className="flex flex-col gap-3">
                   <div>
@@ -144,10 +140,7 @@ export default function AlbumMetadataDialog({
                     }
                     className="mt-0.5"
                   />
-                  <label
-                    htmlFor={trackOrderId}
-                    className="text-sm leading-5 cursor-pointer"
-                  >
+                  <label htmlFor={trackOrderId} className="text-sm leading-5 cursor-pointer">
                     use sidebar order as track number
                   </label>
                 </div>

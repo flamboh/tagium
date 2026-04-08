@@ -137,10 +137,7 @@ export async function parseUploadedTracks(uploadedFiles: File[]) {
   return parsedUploads;
 }
 
-export async function writeMetadataToFile(
-  fileToUpdate: TagiumFile,
-  newTags: AudioMetadata
-) {
+export async function writeMetadataToFile(fileToUpdate: TagiumFile, newTags: AudioMetadata) {
   const MP3Tag = (await import("mp3tag.js")).default;
   const arrayBuffer = await fileToUpdate.file.arrayBuffer();
   const mp3tag = new MP3Tag(arrayBuffer, true) as unknown as MP3TagReader;
@@ -184,6 +181,6 @@ export async function writeMetadataToFile(
     newTags.filename ? `${newTags.filename}.mp3` : fileToUpdate.filename,
     {
       type: fileToUpdate.file.type,
-    }
+    },
   );
 }

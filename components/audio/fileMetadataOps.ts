@@ -3,7 +3,7 @@ import { AlbumGroup, TagiumFile } from "./types";
 export function applyTrackOrderNumbersToFiles(
   files: TagiumFile[],
   albums: AlbumGroup[],
-  albumIdsToSync: string[]
+  albumIdsToSync: string[],
 ) {
   const numbersByTrackId = new Map<string, number>();
 
@@ -50,9 +50,7 @@ export function applyAlbumSharedTagsToFiles(files: TagiumFile[], album: AlbumGro
         album: album.title,
         genre: album.genre,
         picture: album.cover && album.cover.length > 0 ? album.cover : file.metadata.picture,
-        trackNumber: album.syncTrackNumbers
-          ? trackIndex.get(file.id)
-          : file.metadata.trackNumber,
+        trackNumber: album.syncTrackNumbers ? trackIndex.get(file.id) : file.metadata.trackNumber,
       },
     };
   });

@@ -31,17 +31,14 @@ interface AlbumSidebarProps {
     trackId: string,
     targetAlbumId: string,
     placement: "before" | "after" | "append",
-    referenceTrackId?: string
+    referenceTrackId?: string,
   ) => void;
   onMoveTrackToLoose: (
     trackId: string,
     placement: "before" | "after" | "append",
-    referenceTrackId?: string
+    referenceTrackId?: string,
   ) => void;
-  onPromptCreateAlbumFromLooseTracks: (
-    sourceTrackId: string,
-    targetTrackId: string
-  ) => void;
+  onPromptCreateAlbumFromLooseTracks: (sourceTrackId: string, targetTrackId: string) => void;
   onReorderAlbums: (albumId: string, targetIndex: number) => void;
   onAudioUpload: (files: File[]) => void;
 }
@@ -180,7 +177,7 @@ export default function AlbumSidebar({
         onDrop={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          
+
           // Handle external file drops
           const files = Array.from(event.dataTransfer.files);
           if (files.length > 0) {
@@ -190,7 +187,7 @@ export default function AlbumSidebar({
               return;
             }
           }
-          
+
           // Handle track drag
           const trackPayload = parseDragPayload(event);
           if (trackPayload) {
@@ -243,7 +240,7 @@ export default function AlbumSidebar({
                   ? "bg-accent text-accent-foreground border-primary/40"
                   : selectedFileId === track.id
                     ? "bg-accent/50 text-accent-foreground"
-                    : ""
+                    : "",
               )}
               onClick={(e) => onSelectLooseTrack(track.id, e)}
             >
@@ -280,12 +277,12 @@ export default function AlbumSidebar({
               "rounded-lg border bg-card/70 transition-all",
               selectedAlbumId === album.id ? "border-primary/40 shadow-sm" : "",
               draggedAlbumId === album.id ? "opacity-50" : "",
-              dragOverAlbumIndex === albumIndex ? "ring-2 ring-primary" : ""
+              dragOverAlbumIndex === albumIndex ? "ring-2 ring-primary" : "",
             )}
             onDragOver={(event) => {
               event.preventDefault();
               event.stopPropagation();
-              
+
               const albumPayload = parseAlbumDragPayload(event);
               if (albumPayload && albumPayload.albumId !== album.id) {
                 event.dataTransfer.dropEffect = "move";
@@ -295,12 +292,12 @@ export default function AlbumSidebar({
               } else {
                 setDragOverAlbumIndex(null);
               }
-              
+
               const trackPayload = parseDragPayload(event);
               if (trackPayload) {
                 event.dataTransfer.dropEffect = "move";
               }
-              
+
               // Handle external file drops
               if (event.dataTransfer.types.includes("Files")) {
                 event.dataTransfer.dropEffect = "copy";
@@ -312,7 +309,7 @@ export default function AlbumSidebar({
             onDrop={(event) => {
               event.preventDefault();
               event.stopPropagation();
-              
+
               // Handle external file drops
               const files = Array.from(event.dataTransfer.files);
               if (files.length > 0) {
@@ -322,7 +319,7 @@ export default function AlbumSidebar({
                   return;
                 }
               }
-              
+
               // Handle album reordering
               const albumPayload = parseAlbumDragPayload(event);
               if (albumPayload && albumPayload.albumId !== album.id) {
@@ -341,7 +338,7 @@ export default function AlbumSidebar({
                 setDragOverAlbumIndex(null);
                 return;
               }
-              
+
               // Handle track drag
               const trackPayload = parseDragPayload(event);
               if (trackPayload) {
@@ -448,10 +445,7 @@ export default function AlbumSidebar({
                             container: "album",
                             albumId: album.id,
                           };
-                          event.dataTransfer.setData(
-                            TRACK_DRAG_TYPE,
-                            JSON.stringify(payload)
-                          );
+                          event.dataTransfer.setData(TRACK_DRAG_TYPE, JSON.stringify(payload));
                           event.dataTransfer.effectAllowed = "move";
                         }}
                         className={cn(
@@ -460,14 +454,12 @@ export default function AlbumSidebar({
                             ? "bg-accent text-accent-foreground border-primary/40"
                             : selectedFileId === track.id
                               ? "bg-accent/50 text-accent-foreground"
-                              : ""
+                              : "",
                         )}
                         onClick={(e) => onSelectFile(album.id, track.id, e)}
                       >
                         <div className="flex items-center gap-2 w-full overflow-hidden">
-                          <span className="w-5 text-[11px] text-muted-foreground">
-                            {index + 1}
-                          </span>
+                          <span className="w-5 text-[11px] text-muted-foreground">{index + 1}</span>
                           <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                           <span className="truncate text-sm flex-1">{track.filename}</span>
                           {track.status === "saved" && (

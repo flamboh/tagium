@@ -32,13 +32,12 @@ const cloneAlbum = (album: AlbumGroup) => ({
   trackIds: [...album.trackIds],
 });
 
-export const pruneEmptyAlbums = (albums: AlbumGroup[]) =>
-  albums;
+export const pruneEmptyAlbums = (albums: AlbumGroup[]) => albums;
 
 export function mergeUploadedTracksIntoAlbums(
   prevAlbums: AlbumGroup[],
   parsedUploads: UploadedTrack[],
-  options: MergeUploadedTracksOptions = {}
+  options: MergeUploadedTracksOptions = {},
 ) {
   const nextAlbums = pruneEmptyAlbums(prevAlbums.map(cloneAlbum));
   const forceSingleAlbum = options.forceSingleAlbum ?? false;
@@ -85,7 +84,7 @@ export function mergeUploadedTracksIntoAlbums(
   }
 
   const albumByKey = new Map(
-    nextAlbums.map((album) => [buildAlbumKey(album.title, album.artist), album])
+    nextAlbums.map((album) => [buildAlbumKey(album.title, album.artist), album]),
   );
   let firstSelectedAlbumId: string | null = null;
   const unassignedTrackIds: string[] = [];
@@ -139,7 +138,7 @@ export function removeTrackFromAlbums(prevAlbums: AlbumGroup[], trackId: string)
     prevAlbums.map((album) => ({
       ...album,
       trackIds: album.trackIds.filter((id) => id !== trackId),
-    }))
+    })),
   );
 }
 
@@ -147,7 +146,7 @@ export function moveTrackInSidebar(
   prevAlbums: AlbumGroup[],
   prevLooseTrackIds: string[],
   trackId: string,
-  target: SidebarDropTarget
+  target: SidebarDropTarget,
 ) {
   const albums = prevAlbums.map(cloneAlbum);
   const looseTrackIds = [...prevLooseTrackIds];
@@ -166,7 +165,7 @@ export function moveTrackInSidebar(
   const resolveInsertIndex = (
     trackIds: string[],
     placement: "append" | "before" | "after",
-    referenceTrackId?: string
+    referenceTrackId?: string,
   ) => {
     if (placement === "append") {
       return trackIds.length;
@@ -200,7 +199,7 @@ export function moveTrackInSidebar(
     const insertIndex = resolveInsertIndex(
       targetAlbum.trackIds,
       target.placement,
-      target.placement === "append" ? undefined : target.referenceTrackId
+      target.placement === "append" ? undefined : target.referenceTrackId,
     );
     targetAlbum.trackIds.splice(insertIndex, 0, trackId);
   } else {
@@ -214,7 +213,7 @@ export function moveTrackInSidebar(
     const insertIndex = resolveInsertIndex(
       looseTrackIds,
       target.placement,
-      target.placement === "append" ? undefined : target.referenceTrackId
+      target.placement === "append" ? undefined : target.referenceTrackId,
     );
     looseTrackIds.splice(insertIndex, 0, trackId);
   }
@@ -239,7 +238,7 @@ export function moveTrackInSidebar(
 export function updateAlbumMetadata(
   prevAlbums: AlbumGroup[],
   albumId: string,
-  metadata: AlbumMetadataInput
+  metadata: AlbumMetadataInput,
 ) {
   return prevAlbums.map((album) =>
     album.id === albumId
@@ -251,7 +250,7 @@ export function updateAlbumMetadata(
           cover: metadata.cover,
           syncTrackNumbers: metadata.syncTrackNumbers,
         }
-      : album
+      : album,
   );
 }
 
@@ -259,7 +258,7 @@ export function createAlbumFromTracks(
   prevAlbums: AlbumGroup[],
   prevLooseTrackIds: string[],
   trackIds: string[],
-  metadata: AlbumMetadataInput
+  metadata: AlbumMetadataInput,
 ) {
   const uniqueTrackIds = [...new Set(trackIds)];
   const albums = prevAlbums.map(cloneAlbum);
@@ -287,11 +286,10 @@ export function createAlbumFromTracks(
   };
 
   const mergedAlbums = [...albums, createdAlbum];
-  const syncAlbums = [...new Set(sourceAlbumIds)]
-    .filter((albumId) => {
-      const album = albums.find((entry) => entry.id === albumId);
-      return Boolean(album?.syncTrackNumbers);
-    });
+  const syncAlbums = [...new Set(sourceAlbumIds)].filter((albumId) => {
+    const album = albums.find((entry) => entry.id === albumId);
+    return Boolean(album?.syncTrackNumbers);
+  });
 
   if (createdAlbum.syncTrackNumbers) {
     syncAlbums.push(newAlbumId);
@@ -305,11 +303,7 @@ export function createAlbumFromTracks(
   };
 }
 
-export function reorderAlbums(
-  prevAlbums: AlbumGroup[],
-  albumId: string,
-  targetIndex: number
-) {
+export function reorderAlbums(prevAlbums: AlbumGroup[], albumId: string, targetIndex: number) {
   const albums = [...prevAlbums];
   const sourceIndex = albums.findIndex((album) => album.id === albumId);
   if (sourceIndex < 0 || sourceIndex === targetIndex) {
