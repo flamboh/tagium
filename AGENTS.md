@@ -4,14 +4,13 @@ Generally speaking, you should browse the codebase to figure out what is going o
 
 ## Task Completion Requirements
 
-- All of `bun fmt`, `bun lint`, and `bun typecheck` must pass before considering tasks completed.
-- Never use `bun test`, use `bun run test` (runs Vitest).
-- Never write a $effect. If you really think you need to, see the no-use-effect skill.
+- All of `vp fmt`, `vp lint`, and `vp check` must pass before considering tasks completed.
+- Use `vp test` to verify logic changes.
+- Never write a useEffect. If you really think you need to, see the no-use-effect skill.
 
 ## Project Snapshot
 
-EQdle is a wordle-like game for guessing EQ bands and descriptors for audio clips.
-It uses Text2FX and CLAP embeddings to generate audio clips and EQ params.
+Tagium is an open web-based alternative to native mp3tagging applications, allowing anyone to update the metadata of their files for local file usage.
 
 ## Core Priorities
 
@@ -31,16 +30,13 @@ Long term maintainability is a core priority. If you add new functionality, firs
 
 ## Package Roles
 
-- `src/`: SvelteKit frontend
+- `src/`: React Frontend
 
 ## Expectations
 
-- Use shadcn for base components `bunx shadcn-svelte@latest add {component}`
-- Use dark mode color scheme in src/styles.css
-- Keep designs simple, no over explaining, plain colors, no gradients, no decorative elements.
-- Assume dev servers for both Convex and `bun dev` are already running.
+- Assume dev servers are already running.
 
 ## References
 
 - Skills: use ~/.agents/skills/find-skills to locate relevant skills wherever possible
-- Visual style and audio component design: ~/Code/oss/destruct-web
+- Vite+ (vp) docs `https://viteplus.dev/guide/`

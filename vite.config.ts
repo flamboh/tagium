@@ -1,7 +1,10 @@
 import { fileURLToPath, URL } from "node:url";
+import process from "node:process";
 import { defineConfig } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
+
+const isTest = process.env.VITEST === "true" || process.env.VITEST === "1";
 
 export default defineConfig({
   staged: {
@@ -114,7 +117,7 @@ export default defineConfig({
       typeCheck: true,
     },
   },
-  plugins: [react(), nitro()],
+  plugins: [react(), ...(isTest ? [] : [nitro()])],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL(".", import.meta.url)),
