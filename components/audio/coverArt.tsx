@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -27,9 +26,7 @@ export default function CoverArt({
   resetKey,
 }: CoverArtProps) {
   const [uploadedCover, setUploadedCover] = useState<File | null>(null);
-  const [tempImageForCropping, setTempImageForCropping] = useState<
-    string | null
-  >(null);
+  const [tempImageForCropping, setTempImageForCropping] = useState<string | null>(null);
   const [showCropper, setShowCropper] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -85,40 +82,33 @@ export default function CoverArt({
       setCoverSrc(url);
       return () => URL.revokeObjectURL(url);
     }
-    
+
     if (picture && picture.length > 0) {
       const blob = new Blob([picture[0].data as unknown as BlobPart], { type: picture[0].format });
       const url = URL.createObjectURL(blob);
       setCoverSrc(url);
       return () => URL.revokeObjectURL(url);
     }
-    
+
     setCoverSrc(null);
   }, [uploadedCover, picture]);
-
-
 
   return (
     <div
       className={
-        isCompact
-          ? "flex-shrink-0 flex flex-col h-full"
-          : "flex-shrink-0 grid grid-rows-2 gap-2"
+        isCompact ? "flex-shrink-0 flex flex-col h-full" : "flex-shrink-0 grid grid-rows-2 gap-2"
       }
     >
       <div className="relative">
         {coverSrc ? (
-          <Image
+          <img
             src={coverSrc}
             alt="album cover"
-            width={256}
-            height={256}
             className={
               isCompact
                 ? "w-44 h-44 object-cover rounded-lg border"
                 : "w-64 h-64 object-cover rounded-lg border"
             }
-            unoptimized
           />
         ) : (
           <div
@@ -144,9 +134,7 @@ export default function CoverArt({
                     URL.revokeObjectURL(tempImageForCropping);
                   }
                   // Use uploaded cover first, then fall back to original picture
-                  const imageUrl = uploadedCover
-                    ? URL.createObjectURL(uploadedCover)
-                    : coverSrc;
+                  const imageUrl = uploadedCover ? URL.createObjectURL(uploadedCover) : coverSrc;
                   setTempImageForCropping(imageUrl);
                 }}
               >
@@ -183,7 +171,11 @@ export default function CoverArt({
           }
           onClick={() => fileInputRef.current?.click()}
         >
-          <Upload className={isCompact ? "h-4 w-4 text-muted-foreground" : "h-6 w-6 text-muted-foreground"} />
+          <Upload
+            className={
+              isCompact ? "h-4 w-4 text-muted-foreground" : "h-6 w-6 text-muted-foreground"
+            }
+          />
           <span className="text-muted-foreground text-xs">upload cover</span>
         </Button>
       </div>
