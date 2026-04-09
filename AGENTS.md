@@ -10,7 +10,7 @@ Generally speaking, you should browse the codebase to figure out what is going o
 
 ## Project Snapshot
 
-Tagium is an open web-based alternative to native mp3tagging applications, allowing anyone to update the metadata of their files for local file usage.
+Tagium is an open web-based alternative to native mp3 tagging applications, allowing anyone to update the metadata of their files for local file usage.
 
 ## Core Priorities
 
