@@ -54,6 +54,7 @@ describe("fileMetadataOps", () => {
         genre: "",
         trackIds: ["track-2", "track-1"],
         syncTrackNumbers: true,
+        syncFilenames: false,
       },
     ];
 
@@ -104,6 +105,7 @@ describe("fileMetadataOps", () => {
       genre: "Ambient",
       trackIds: ["track-1"],
       syncTrackNumbers: false,
+      syncFilenames: false,
     };
 
     const [updatedFile] = applyAlbumSharedTagsToFiles(files, album);

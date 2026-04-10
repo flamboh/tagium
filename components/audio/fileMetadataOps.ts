@@ -1,3 +1,4 @@
+import filenamify from "filenamify";
 import { AlbumGroup, TagiumFile } from "./types";
 
 export function applyTrackOrderNumbersToFiles(
@@ -41,8 +42,12 @@ export function applyAlbumSharedTagsToFiles(files: TagiumFile[], album: AlbumGro
   return files.map((file) => {
     if (!trackSet.has(file.id) || !file.metadata) return file;
 
+    const syncedFilename = album.syncFilenames
+      ? filenamify(file.metadata.title, { replacement: "-" })
+      : undefined;
     return {
       ...file,
+      filename: syncedFilename ?? file.filename,
       status: file.status === "saved" ? "pending" : file.status,
       metadata: {
         ...file.metadata,
@@ -51,6 +56,7 @@ export function applyAlbumSharedTagsToFiles(files: TagiumFile[], album: AlbumGro
         genre: album.genre,
         picture: album.cover && album.cover.length > 0 ? album.cover : file.metadata.picture,
         trackNumber: album.syncTrackNumbers ? trackIndex.get(file.id) : file.metadata.trackNumber,
+        filename: syncedFilename ?? file.metadata.filename,
       },
     };
   });

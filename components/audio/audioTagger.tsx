@@ -2,6 +2,7 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useLayoutEffect, useMemo, useState, useCallback } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
+import filenamify from "filenamify";
 import AlbumMetadataDialog, { AlbumMetadataDraft } from "./AlbumMetadataDialog";
 import {
   createAlbumFromTracks,
@@ -22,6 +23,7 @@ const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
   genre: "",
   cover: undefined,
   syncTrackNumbers: false,
+  syncFilenames: false,
 };
 const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
 export default function AudioTagger() {
@@ -42,6 +44,10 @@ export default function AudioTagger() {
   const selectedFile = useMemo(
     () => files.find((file) => file.id === selectedFileId) ?? null,
     [files, selectedFileId],
+  );
+  const selectedFileAlbum = useMemo(
+    () => (selectedFile ? albums.find((a) => a.trackIds.includes(selectedFile.id)) : undefined),
+    [selectedFile, albums],
   );
   useLayoutEffect(() => {
     if (selectedFile?.metadata) {
@@ -120,8 +126,11 @@ export default function AudioTagger() {
   };
   const onSubmit: SubmitHandler<AudioMetadata> = async (data) => {
     if (!selectedFile) return;
+    const submittedData = selectedFileAlbum?.syncFilenames
+      ? { ...data, filename: filenamify(data.title, { replacement: "-" }) }
+      : data;
     try {
-      await handleTagUpdate(selectedFile, data);
+      await handleTagUpdate(selectedFile, submittedData);
     } catch (error) {
       console.error("Failed to update tags:", error);
     }
@@ -403,7 +412,7 @@ export default function AudioTagger() {
       const isInputFocused =
         target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
 
-      if (isInputFocused && event.key !== "Delete" && event.key !== "Backspace") {
+      if (isInputFocused) {
         return;
       }
 
@@ -452,6 +461,7 @@ export default function AudioTagger() {
           ? seedTrack.metadata.picture
           : undefined,
       syncTrackNumbers: false,
+      syncFilenames: false,
     });
     setAlbumDialogOpen(true);
   };
@@ -477,6 +487,7 @@ export default function AudioTagger() {
       genre: album.genre,
       cover: album.cover,
       syncTrackNumbers: album.syncTrackNumbers,
+      syncFilenames: album.syncFilenames,
     });
     setAlbumDialogOpen(true);
   };
@@ -493,6 +504,7 @@ export default function AudioTagger() {
       genre,
       cover: albumDraft.cover,
       syncTrackNumbers: albumDraft.syncTrackNumbers,
+      syncFilenames: albumDraft.syncFilenames,
     };
     if (albumDialogMode === "edit" && editingAlbumId) {
       const updatedAlbums = updateAlbumMetadata(albums, editingAlbumId, metadata);
@@ -633,6 +645,7 @@ export default function AudioTagger() {
             onTrackCoverUpload={handleTrackCoverUpload}
             onDownloadUpdatedFile={handleDownloadUpdatedFile}
             onAudioUpload={handleAudioUpload}
+            syncFilenames={selectedFileAlbum?.syncFilenames ?? false}
           />
         </div>
       </div>
