@@ -6,7 +6,9 @@ import {
   SubmitHandler,
   UseFormHandleSubmit,
   UseFormRegister,
+  useWatch,
 } from "react-hook-form";
+import filenamify from "filenamify";
 import AudioUpload from "./audioUpload";
 import CoverArt from "./coverArt";
 import { AudioMetadata, TagiumFile } from "./types";
@@ -31,6 +33,7 @@ interface TrackMetadataEditorProps {
   onTrackCoverUpload: (file: File) => void;
   onDownloadUpdatedFile: (file: TagiumFile) => void;
   onAudioUpload: (files: File[]) => void;
+  syncFilenames: boolean;
 }
 
 export default function TrackMetadataEditor({
@@ -43,7 +46,9 @@ export default function TrackMetadataEditor({
   onTrackCoverUpload,
   onDownloadUpdatedFile,
   onAudioUpload,
+  syncFilenames,
 }: TrackMetadataEditorProps) {
+  const watchedTitle = useWatch({ control, name: "title" });
   if (!selectedFile || !selectedFile.metadata) {
     return (
       <div className="flex-1 flex items-center justify-center border rounded-lg bg-muted/10">
@@ -81,12 +86,20 @@ export default function TrackMetadataEditor({
             <div className="flex-1 grid grid-cols-1 gap-3">
               <div>
                 <label className="block text-sm font-medium mb-1">filename:</label>
-                <div className="flex items-center h-9 w-full rounded-md border border-input bg-transparent dark:bg-input/30 px-3 py-1 text-base shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm">
-                  <input
-                    {...register("filename")}
-                    className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground min-w-0"
-                    placeholder="bangarang"
-                  />
+                <div
+                  className={`flex items-center h-9 w-full rounded-md border border-input px-3 py-1 text-base shadow-sm transition-colors md:text-sm ${syncFilenames ? "bg-muted/50 opacity-60 cursor-not-allowed" : "bg-transparent dark:bg-input/30 focus-within:ring-1 focus-within:ring-ring"}`}
+                >
+                  {syncFilenames ? (
+                    <span className="flex-1 min-w-0 truncate text-muted-foreground">
+                      {filenamify(watchedTitle || "", { replacement: "-" })}
+                    </span>
+                  ) : (
+                    <input
+                      {...register("filename")}
+                      className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground min-w-0"
+                      placeholder="bangarang"
+                    />
+                  )}
                   <span className="text-muted-foreground select-none">.mp3</span>
                 </div>
               </div>
