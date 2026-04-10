@@ -6,10 +6,12 @@ import {
   SubmitHandler,
   UseFormHandleSubmit,
   UseFormRegister,
+  useWatch,
 } from "react-hook-form";
+import filenamify from "filenamify";
 import AudioUpload from "./audioUpload";
 import CoverArt from "./coverArt";
-import { AudioMetadata, TagiumFile } from "./types";
+import { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
 import { Button } from "../ui/button";
 import {
   Card,
@@ -31,6 +33,7 @@ interface TrackMetadataEditorProps {
   onTrackCoverUpload: (file: File) => void;
   onDownloadUpdatedFile: (file: TagiumFile) => void;
   onAudioUpload: (files: File[]) => void;
+  selectedFileAlbum: AlbumGroup | undefined;
 }
 
 export default function TrackMetadataEditor({
@@ -43,7 +46,11 @@ export default function TrackMetadataEditor({
   onTrackCoverUpload,
   onDownloadUpdatedFile,
   onAudioUpload,
+  selectedFileAlbum,
 }: TrackMetadataEditorProps) {
+  const watchedTitle = useWatch({ control, name: "title" });
+  const syncFilenames = selectedFileAlbum?.syncFilenames ?? false;
+  const inAlbum = !!selectedFileAlbum;
   if (!selectedFile || !selectedFile.metadata) {
     return (
       <div className="flex-1 flex items-center justify-center border rounded-lg bg-muted/10">
@@ -81,12 +88,20 @@ export default function TrackMetadataEditor({
             <div className="flex-1 grid grid-cols-1 gap-3">
               <div>
                 <label className="block text-sm font-medium mb-1">filename:</label>
-                <div className="flex items-center h-9 w-full rounded-md border border-input bg-transparent dark:bg-input/30 px-3 py-1 text-base shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm">
-                  <input
-                    {...register("filename")}
-                    className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground min-w-0"
-                    placeholder="bangarang"
-                  />
+                <div
+                  className={`flex items-center h-9 w-full rounded-md border border-input bg-transparent dark:bg-input/30 px-3 py-1 text-base shadow-sm transition-colors md:text-sm ${syncFilenames ? "opacity-50 cursor-not-allowed pointer-events-none" : "focus-within:ring-1 focus-within:ring-ring"}`}
+                >
+                  {syncFilenames ? (
+                    <span className="flex-1 min-w-0 truncate text-muted-foreground">
+                      {filenamify(watchedTitle || "", { replacement: "-" })}
+                    </span>
+                  ) : (
+                    <input
+                      {...register("filename")}
+                      className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground min-w-0"
+                      placeholder="bangarang"
+                    />
+                  )}
                   <span className="text-muted-foreground select-none">.mp3</span>
                 </div>
               </div>
@@ -96,11 +111,11 @@ export default function TrackMetadataEditor({
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">artist:</label>
-                <Input {...register("artist")} placeholder="Skrillex" />
+                <Input {...register("artist")} placeholder="Skrillex" disabled={inAlbum} />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">album:</label>
-                <Input {...register("album")} placeholder="Bangarang EP" />
+                <Input {...register("album")} placeholder="Bangarang EP" disabled={inAlbum} />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">year:</label>
@@ -108,12 +123,13 @@ export default function TrackMetadataEditor({
                   type="number"
                   {...register("year", { valueAsNumber: true })}
                   placeholder="2011"
+                  disabled={inAlbum}
                   className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">genre:</label>
-                <Input {...register("genre")} placeholder="Dubstep" />
+                <Input {...register("genre")} placeholder="Dubstep" disabled={inAlbum} />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">track:</label>
@@ -121,6 +137,7 @@ export default function TrackMetadataEditor({
                   type="number"
                   {...register("trackNumber", { valueAsNumber: true })}
                   placeholder="2"
+                  disabled={selectedFileAlbum?.syncTrackNumbers}
                   className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>

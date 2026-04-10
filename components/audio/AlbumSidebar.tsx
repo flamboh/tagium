@@ -2,7 +2,17 @@
 
 import type { ChangeEvent, DragEvent, MouseEvent as ReactMouseEvent } from "react";
 import { useRef, useState } from "react";
-import { AlertCircle, Check, FileMusic, Folder, Pencil, Plus, Upload, X } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  Download,
+  FileMusic,
+  Folder,
+  Pencil,
+  Plus,
+  Upload,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -23,9 +33,9 @@ interface AlbumSidebarProps {
   onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
   onClearSelection: () => void;
   onRemoveFile: (fileId: string) => void;
-  onRemoveAlbum: (albumId: string) => void;
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
+  onDownloadAlbum: (albumId: string) => void;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
     trackId: string,
@@ -98,9 +108,9 @@ export default function AlbumSidebar({
   onSelectLooseTrack,
   onClearSelection,
   onRemoveFile,
-  onRemoveAlbum,
   onAddAlbum,
   onEditAlbum,
+  onDownloadAlbum,
   onUploadToAlbum,
   onMoveTrackToAlbum,
   onMoveTrackToLoose,
@@ -385,23 +395,20 @@ export default function AlbumSidebar({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                onClick={() => onEditAlbum(album.id)}
-                aria-label={`Edit ${album.title}`}
+                onClick={() => onDownloadAlbum(album.id)}
+                aria-label={`Download ${album.title}`}
               >
-                <Pencil className="h-3.5 w-3.5" />
+                <Download className="h-3.5 w-3.5" />
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 hover:bg-destructive/10"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRemoveAlbum(album.id);
-                }}
-                aria-label={`Remove ${album.title}`}
+                className="h-7 w-7"
+                onClick={() => onEditAlbum(album.id)}
+                aria-label={`Edit ${album.title}`}
               >
-                <X className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                <Pencil className="h-3.5 w-3.5" />
               </Button>
             </div>
             <div className="p-1 flex flex-col gap-1">
