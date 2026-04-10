@@ -21,9 +21,10 @@ const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
   title: "",
   artist: "",
   genre: "",
+  year: undefined,
   cover: undefined,
-  syncTrackNumbers: false,
-  syncFilenames: false,
+  syncTrackNumbers: true,
+  syncFilenames: true,
 };
 const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
 export default function AudioTagger() {
@@ -195,7 +196,11 @@ export default function AudioTagger() {
     if (files.length === 0) return;
     setLoading(true);
     try {
-      for (const file of files) {
+      let syncedFiles = files;
+      for (const album of albums) {
+        syncedFiles = applyAlbumSharedTagsToFiles(syncedFiles, album);
+      }
+      for (const file of syncedFiles) {
         if (file.metadata) {
           await handleTagUpdate(file, file.metadata);
         }
@@ -221,6 +226,29 @@ export default function AudioTagger() {
       ]);
     };
     reader.readAsArrayBuffer(file);
+  };
+  const handleDownloadAlbum = async (albumId: string) => {
+    const album = albums.find((a) => a.id === albumId);
+    if (!album) return;
+    const albumFiles = album.trackIds
+      .map((id) => files.find((f) => f.id === id))
+      .filter((f): f is TagiumFile => Boolean(f));
+    const { zip } = await import("fflate");
+    const entries: Record<string, [Uint8Array, { level: 0 }]> = {};
+    await Promise.all(
+      albumFiles.map(async (file) => {
+        entries[file.filename] = [new Uint8Array(await file.file.arrayBuffer()), { level: 0 }];
+      }),
+    );
+    zip(entries, (_err, data) => {
+      const blob = new Blob([data.buffer as ArrayBuffer], { type: "application/zip" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${album.title}.zip`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    });
   };
   const handleDownloadUpdatedFile = (file: TagiumFile) => {
     const url = URL.createObjectURL(file.file);
@@ -443,15 +471,11 @@ export default function AudioTagger() {
   const openCreateAlbumDialog = (seedTrackIds: string[]) => {
     const uniqueSeedTrackIds = asUniqueTrackIds(seedTrackIds);
     const seedTrack = files.find((file) => file.id === uniqueSeedTrackIds[0]);
-    const albumCount = albums.filter((album) => /^Album\s\d+$/i.test(album.title)).length;
     setAlbumDialogMode("create");
     setEditingAlbumId(null);
     setCreateSeedTrackIds(uniqueSeedTrackIds);
     setAlbumDraft({
-      title:
-        uniqueSeedTrackIds.length > 0
-          ? seedTrack?.metadata?.album?.trim() || `Album ${albumCount + 1}`
-          : `Album ${albumCount + 1}`,
+      title: "",
       artist: uniqueSeedTrackIds.length > 0 ? seedTrack?.metadata?.artist || "" : "",
       genre: uniqueSeedTrackIds.length > 0 ? toGenreString(seedTrack?.metadata?.genre) : "",
       cover:
@@ -460,8 +484,9 @@ export default function AudioTagger() {
         seedTrack.metadata.picture.length > 0
           ? seedTrack.metadata.picture
           : undefined,
-      syncTrackNumbers: false,
-      syncFilenames: false,
+      year: uniqueSeedTrackIds.length > 0 ? (seedTrack?.metadata?.year ?? undefined) : undefined,
+      syncTrackNumbers: true,
+      syncFilenames: true,
     });
     setAlbumDialogOpen(true);
   };
@@ -486,6 +511,7 @@ export default function AudioTagger() {
       artist: album.artist,
       genre: album.genre,
       cover: album.cover,
+      year: album.year,
       syncTrackNumbers: album.syncTrackNumbers,
       syncFilenames: album.syncFilenames,
     });
@@ -503,6 +529,7 @@ export default function AudioTagger() {
       artist,
       genre,
       cover: albumDraft.cover,
+      year: albumDraft.year,
       syncTrackNumbers: albumDraft.syncTrackNumbers,
       syncFilenames: albumDraft.syncFilenames,
     };
@@ -605,9 +632,22 @@ export default function AudioTagger() {
         open={albumDialogOpen}
         mode={albumDialogMode}
         draft={albumDraft}
+        trackCount={
+          albumDialogMode === "edit" && editingAlbumId
+            ? (albums.find((a) => a.id === editingAlbumId)?.trackIds.length ?? 0)
+            : 0
+        }
         onChange={setAlbumDraft}
         onClose={closeAlbumDialog}
         onSave={saveAlbumDialog}
+        onDelete={
+          albumDialogMode === "edit" && editingAlbumId
+            ? () => {
+                handleRemoveAlbum(editingAlbumId);
+                closeAlbumDialog();
+              }
+            : undefined
+        }
       />
       <div className="w-full max-w-7xl flex gap-4 min-h-[85vh]">
         <TagSidebarPanel
@@ -624,9 +664,9 @@ export default function AudioTagger() {
           onSelectLooseTrack={handleSelectLooseTrack}
           onClearSelection={handleClearSelection}
           onRemoveFile={handleRemoveFile}
-          onRemoveAlbum={handleRemoveAlbum}
           onAddAlbum={handleOpenCreateAlbumDialog}
           onEditAlbum={handleOpenEditAlbumDialog}
+          onDownloadAlbum={handleDownloadAlbum}
           onUploadToAlbum={(albumId, filesToUpload) => handleAudioUpload(filesToUpload, albumId)}
           onMoveTrackToAlbum={handleMoveTrackToAlbum}
           onMoveTrackToLoose={handleMoveTrackToLoose}
@@ -645,7 +685,7 @@ export default function AudioTagger() {
             onTrackCoverUpload={handleTrackCoverUpload}
             onDownloadUpdatedFile={handleDownloadUpdatedFile}
             onAudioUpload={handleAudioUpload}
-            syncFilenames={selectedFileAlbum?.syncFilenames ?? false}
+            selectedFileAlbum={selectedFileAlbum}
           />
         </div>
       </div>

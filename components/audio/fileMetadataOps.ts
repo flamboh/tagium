@@ -54,6 +54,7 @@ export function applyAlbumSharedTagsToFiles(files: TagiumFile[], album: AlbumGro
         artist: album.artist,
         album: album.title,
         genre: album.genre,
+        year: album.year !== undefined ? album.year : file.metadata.year,
         picture: album.cover && album.cover.length > 0 ? album.cover : file.metadata.picture,
         trackNumber: album.syncTrackNumbers ? trackIndex.get(file.id) : file.metadata.trackNumber,
         filename: syncedFilename ?? file.metadata.filename,
