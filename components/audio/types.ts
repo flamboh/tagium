@@ -39,5 +39,7 @@ export interface AlbumGroup {
   genre: string;
   cover?: AudioMetadata["picture"];
   trackIds: string[];
+  year?: number;
   syncTrackNumbers: boolean;
+  syncFilenames: boolean;
 }

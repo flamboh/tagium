@@ -6,7 +6,9 @@ export interface AlbumMetadataInput {
   artist: string;
   genre: string;
   cover?: AudioMetadata["picture"];
+  year?: number;
   syncTrackNumbers: boolean;
+  syncFilenames: boolean;
 }
 
 interface MergeUploadedTracksOptions {
@@ -53,7 +55,9 @@ export function mergeUploadedTracksIntoAlbums(
       genre: firstSeed.genre,
       cover: firstSeed.cover,
       trackIds: parsedUploads.map((upload) => upload.file.id),
+      year: undefined,
       syncTrackNumbers: false,
+      syncFilenames: false,
     };
 
     if (!createdAlbum.artist) {
@@ -108,7 +112,9 @@ export function mergeUploadedTracksIntoAlbums(
         genre: albumSeed.genre,
         cover: albumSeed.cover,
         trackIds: [],
+        year: undefined,
         syncTrackNumbers: false,
+        syncFilenames: false,
       };
       nextAlbums.push(targetAlbum);
       albumByKey.set(key, targetAlbum);
@@ -248,7 +254,9 @@ export function updateAlbumMetadata(
           artist: metadata.artist,
           genre: metadata.genre,
           cover: metadata.cover,
+          year: metadata.year,
           syncTrackNumbers: metadata.syncTrackNumbers,
+          syncFilenames: metadata.syncFilenames,
         }
       : album,
   );
@@ -281,7 +289,9 @@ export function createAlbumFromTracks(
     artist: metadata.artist,
     genre: metadata.genre,
     cover: metadata.cover,
+    year: metadata.year,
     syncTrackNumbers: metadata.syncTrackNumbers,
+    syncFilenames: metadata.syncFilenames,
     trackIds: uniqueTrackIds,
   };
 
