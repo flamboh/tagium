@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -19,6 +19,7 @@ export interface AlbumMetadataDraft {
   title: string;
   artist: string;
   genre: string;
+  year?: number;
   cover?: AudioMetadata["picture"];
   syncTrackNumbers: boolean;
   syncFilenames: boolean;
@@ -28,21 +29,27 @@ interface AlbumMetadataDialogProps {
   open: boolean;
   mode: "create" | "edit";
   draft: AlbumMetadataDraft;
+  trackCount: number;
   onChange: (draft: AlbumMetadataDraft) => void;
   onClose: () => void;
   onSave: () => void;
+  onDelete?: () => void;
 }
 
 export default function AlbumMetadataDialog({
   open,
   mode,
   draft,
+  trackCount,
   onChange,
   onClose,
   onSave,
+  onDelete,
 }: AlbumMetadataDialogProps) {
   const trackOrderId = useId();
   const syncFilenamesId = useId();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
 
   const handleCoverUpload = (file: File) => {
     const reader = new FileReader();
@@ -68,7 +75,11 @@ export default function AlbumMetadataDialog({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen) onClose();
+        if (!nextOpen) {
+          setShowDeleteConfirm(false);
+          setShowErrors(false);
+          onClose();
+        }
       }}
     >
       <DialogContent className="max-w-2xl p-0 gap-0 max-h-[85vh] overflow-hidden">
@@ -76,6 +87,10 @@ export default function AlbumMetadataDialog({
           className="flex flex-col gap-0"
           onSubmit={(event) => {
             event.preventDefault();
+            if (!draft.title.trim() || !draft.artist.trim()) {
+              setShowErrors(true);
+              return;
+            }
             onSave();
           }}
         >
@@ -101,7 +116,11 @@ export default function AlbumMetadataDialog({
                         })
                       }
                       placeholder="My Album"
+                      aria-invalid={showErrors && !draft.title.trim()}
                     />
+                    {showErrors && !draft.title.trim() && (
+                      <p className="text-xs text-destructive mt-1">album title is required</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">artist:</label>
@@ -114,7 +133,11 @@ export default function AlbumMetadataDialog({
                         })
                       }
                       placeholder="Artist Name"
+                      aria-invalid={showErrors && !draft.artist.trim()}
                     />
+                    {showErrors && !draft.artist.trim() && (
+                      <p className="text-xs text-destructive mt-1">artist is required</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">genre:</label>
@@ -127,6 +150,21 @@ export default function AlbumMetadataDialog({
                         })
                       }
                       placeholder="House"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">year:</label>
+                    <Input
+                      type="number"
+                      value={draft.year ?? ""}
+                      onChange={(event) =>
+                        onChange({
+                          ...draft,
+                          year: event.target.value ? Number(event.target.value) : undefined,
+                        })
+                      }
+                      placeholder="2024"
+                      className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                 </div>
@@ -168,10 +206,43 @@ export default function AlbumMetadataDialog({
             </div>
           </div>
           <DialogFooter className="border-t p-5 flex items-center justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              cancel
-            </Button>
-            <Button type="submit">{mode === "create" ? "create album" : "save album"}</Button>
+            {showDeleteConfirm ? (
+              <>
+                <span className="text-sm text-muted-foreground mr-auto">
+                  delete album and all {trackCount} track{trackCount !== 1 ? "s" : ""}?
+                </span>
+                <Button type="button" variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                  keep album
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    onDelete?.();
+                  }}
+                >
+                  delete
+                </Button>
+              </>
+            ) : (
+              <>
+                {mode === "edit" && onDelete && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="mr-auto text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setShowDeleteConfirm(true)}
+                  >
+                    delete album
+                  </Button>
+                )}
+                <Button type="button" variant="outline" onClick={onClose}>
+                  cancel
+                </Button>
+                <Button type="submit">{mode === "create" ? "create album" : "save album"}</Button>
+              </>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>
