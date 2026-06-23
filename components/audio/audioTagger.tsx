@@ -1,6 +1,6 @@
 "use client";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { useEffect, useLayoutEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
 import filenamify from "filenamify";
 import AlbumMetadataDialog, { AlbumMetadataDraft } from "./AlbumMetadataDialog";
@@ -16,7 +16,7 @@ import { applyAlbumSharedTagsToFiles, applyTrackOrderNumbersToFiles } from "./fi
 import TagSidebarPanel from "./TagSidebarPanel";
 import TrackMetadataEditor from "./TrackMetadataEditor";
 import { parseUploadedTracks, toGenreString, writeMetadataToFile } from "./mp3Utils";
-import { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
+import { AlbumGroup, AudioMetadata, ImportedAlbumMetadata, TagiumFile } from "./types";
 const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
   title: "",
   artist: "",
@@ -27,6 +27,29 @@ const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
   syncFilenames: true,
 };
 const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
+const getFileImportKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
+const fetchImportedCover = async (coverUrl: string): Promise<AudioMetadata["picture"]> => {
+  const response = await fetch(coverUrl);
+
+  if (!response.ok) {
+    throw new Error(`Album cover request failed (${response.status})`);
+  }
+
+  const contentType = response.headers.get("content-type");
+  if (!contentType) {
+    throw new Error("Album cover response missing content type.");
+  }
+
+  return [
+    {
+      format: contentType,
+      type: 3,
+      data: new Uint8Array(await response.arrayBuffer()),
+      description: "Album cover",
+    },
+  ];
+};
+
 export default function AudioTagger() {
   const [files, setFiles] = useState<TagiumFile[]>([]);
   const [albums, setAlbums] = useState<AlbumGroup[]>([]);
@@ -41,6 +64,12 @@ export default function AudioTagger() {
   const [albumDraft, setAlbumDraft] = useState<AlbumMetadataDraft>(EMPTY_ALBUM_DRAFT);
   const [editingAlbumId, setEditingAlbumId] = useState<string | null>(null);
   const [createSeedTrackIds, setCreateSeedTrackIds] = useState<string[]>([]);
+  const filesRef = useRef<TagiumFile[]>(files);
+  const albumsRef = useRef<AlbumGroup[]>(albums);
+  const importQueueRef = useRef(Promise.resolve());
+  const pendingImportKeysRef = useRef(new Set<string>());
+  filesRef.current = files;
+  albumsRef.current = albums;
   const { register, handleSubmit, control, setValue, reset } = useForm<AudioMetadata>();
   const selectedFile = useMemo(
     () => files.find((file) => file.id === selectedFileId) ?? null,
@@ -58,7 +87,7 @@ export default function AudioTagger() {
   useEffect(() => {
     const fileIdSet = new Set(files.map((file) => file.id));
     setLooseTrackIds((prevLooseTrackIds) =>
-      prevLooseTrackIds.filter((trackId) => fileIdSet.has(trackId)),
+      asUniqueTrackIds(prevLooseTrackIds.filter((trackId) => fileIdSet.has(trackId))),
     );
   }, [files]);
   useEffect(() => {
@@ -136,61 +165,126 @@ export default function AudioTagger() {
       console.error("Failed to update tags:", error);
     }
   };
-  const handleAudioUpload = async (uploadedFiles: File[], targetAlbumId?: string) => {
-    setLoading(true);
-    try {
-      const parsedUploads = await parseUploadedTracks(uploadedFiles);
-      if (parsedUploads.length === 0) return;
-      setFiles((prevFiles) => [...prevFiles, ...parsedUploads.map((upload) => upload.file)]);
-      const hasTargetAlbum = Boolean(
-        targetAlbumId && albums.some((album) => album.id === targetAlbumId),
+  const handleAudioUpload = async (
+    uploadedFiles: File[],
+    targetAlbumId?: string,
+    importedAlbum?: ImportedAlbumMetadata,
+  ) => {
+    const runImport = async () => {
+      const existingImportKeys = new Set(
+        filesRef.current.map((file) => getFileImportKey(file.originalFile)),
       );
-      const forceSingleAlbum = !hasTargetAlbum && parsedUploads.length > 1;
-      let firstSelectedAlbumId: string | null = null;
-      if (hasTargetAlbum && targetAlbumId) {
-        const uploadedTrackIds = parsedUploads.map((upload) => upload.file.id);
-        let nextAlbums: AlbumGroup[] = [];
-        setAlbums((prevAlbums) => {
-          nextAlbums = prevAlbums.map((album) =>
+      const reservedImportKeys: string[] = [];
+      const uniqueUploadedFiles = uploadedFiles.filter((file) => {
+        const importKey = getFileImportKey(file);
+        if (existingImportKeys.has(importKey) || pendingImportKeysRef.current.has(importKey)) {
+          return false;
+        }
+        existingImportKeys.add(importKey);
+        pendingImportKeysRef.current.add(importKey);
+        reservedImportKeys.push(importKey);
+        return true;
+      });
+
+      if (uniqueUploadedFiles.length === 0) return;
+
+      setLoading(true);
+      try {
+        const parsedUploads = await parseUploadedTracks(uniqueUploadedFiles);
+        if (parsedUploads.length === 0) return;
+
+        const nextFiles = [...filesRef.current, ...parsedUploads.map((upload) => upload.file)];
+        filesRef.current = nextFiles;
+        setFiles(nextFiles);
+
+        const currentAlbums = albumsRef.current;
+        const hasTargetAlbum = Boolean(
+          targetAlbumId && currentAlbums.some((album) => album.id === targetAlbumId),
+        );
+        const forceSingleAlbum =
+          !hasTargetAlbum && (parsedUploads.length > 1 || Boolean(importedAlbum));
+        let firstSelectedAlbumId: string | null = null;
+
+        if (hasTargetAlbum && targetAlbumId) {
+          const uploadedTrackIds = parsedUploads.map((upload) => upload.file.id);
+          const nextAlbums = currentAlbums.map((album) =>
             album.id === targetAlbumId
-              ? { ...album, trackIds: [...album.trackIds, ...uploadedTrackIds] }
+              ? { ...album, trackIds: asUniqueTrackIds([...album.trackIds, ...uploadedTrackIds]) }
               : album,
           );
-          return nextAlbums;
-        });
-        const targetAlbum = nextAlbums.find((album) => album.id === targetAlbumId);
-        if (targetAlbum) {
-          setFiles((prevFiles) => applyAlbumSharedTagsToFiles(prevFiles, targetAlbum));
-          if (targetAlbum.syncTrackNumbers) {
-            setFiles((prevFiles) =>
-              applyTrackOrderNumbersToFiles(prevFiles, nextAlbums, [targetAlbumId]),
-            );
+          albumsRef.current = nextAlbums;
+          setAlbums(nextAlbums);
+          const targetAlbum = nextAlbums.find((album) => album.id === targetAlbumId);
+          if (targetAlbum) {
+            let taggedFiles = applyAlbumSharedTagsToFiles(filesRef.current, targetAlbum);
+            if (targetAlbum.syncTrackNumbers) {
+              taggedFiles = applyTrackOrderNumbersToFiles(taggedFiles, nextAlbums, [targetAlbumId]);
+            }
+            filesRef.current = taggedFiles;
+            setFiles(taggedFiles);
           }
-        }
-        setSelectedFileId(parsedUploads[0].file.id);
-        setSelectedAlbumId(targetAlbumId);
-      } else {
-        setAlbums((prevAlbums) => {
-          const merged = mergeUploadedTracksIntoAlbums(prevAlbums, parsedUploads, {
+          setSelectedFileId(parsedUploads[0].file.id);
+          setSelectedAlbumId(targetAlbumId);
+        } else if (importedAlbum) {
+          let importedCover: AudioMetadata["picture"] | undefined;
+          if (importedAlbum.coverUrl) {
+            try {
+              importedCover = await fetchImportedCover(importedAlbum.coverUrl);
+            } catch (error) {
+              console.warn("Failed to import album cover:", error);
+            }
+          }
+          const embeddedCover = parsedUploads.find((upload) => upload.albumSeed.cover)?.albumSeed
+            .cover;
+          const downloadedAlbum: AlbumGroup = {
+            id: crypto.randomUUID(),
+            title: importedAlbum.title,
+            artist: importedAlbum.artist,
+            genre: importedAlbum.genre,
+            cover: importedCover ?? embeddedCover,
+            trackIds: parsedUploads.map((upload) => upload.file.id),
+            year: importedAlbum.year,
+            syncTrackNumbers: true,
+            syncFilenames: false,
+          };
+          const nextAlbums = [...currentAlbums, downloadedAlbum];
+          albumsRef.current = nextAlbums;
+          setAlbums(nextAlbums);
+          const taggedFiles = applyTrackOrderNumbersToFiles(
+            applyAlbumSharedTagsToFiles(filesRef.current, downloadedAlbum),
+            nextAlbums,
+            [downloadedAlbum.id],
+          );
+          filesRef.current = taggedFiles;
+          setFiles(taggedFiles);
+          setSelectedFileId(parsedUploads[0].file.id);
+          setSelectedAlbumId(downloadedAlbum.id);
+        } else {
+          const merged = mergeUploadedTracksIntoAlbums(currentAlbums, parsedUploads, {
             forceSingleAlbum,
           });
           firstSelectedAlbumId = merged.firstSelectedAlbumId;
+          albumsRef.current = merged.albums;
+          setAlbums(merged.albums);
           if (!forceSingleAlbum && merged.unassignedTrackIds.length > 0) {
-            setLooseTrackIds((prevLooseTrackIds) => [
-              ...prevLooseTrackIds,
-              ...merged.unassignedTrackIds,
-            ]);
+            setLooseTrackIds((prevLooseTrackIds) =>
+              asUniqueTrackIds([...prevLooseTrackIds, ...merged.unassignedTrackIds]),
+            );
           }
-          return merged.albums;
-        });
-        const firstUploadedTrack = parsedUploads[0];
-        const firstTrackIsLoose = !forceSingleAlbum && !firstUploadedTrack.albumSeed.title.trim();
-        setSelectedFileId(firstUploadedTrack.file.id);
-        setSelectedAlbumId(firstTrackIsLoose ? null : firstSelectedAlbumId);
+          const firstUploadedTrack = parsedUploads[0];
+          const firstTrackIsLoose = !forceSingleAlbum && !firstUploadedTrack.albumSeed.title.trim();
+          setSelectedFileId(firstUploadedTrack.file.id);
+          setSelectedAlbumId(firstTrackIsLoose ? null : firstSelectedAlbumId);
+        }
+      } finally {
+        reservedImportKeys.forEach((importKey) => pendingImportKeysRef.current.delete(importKey));
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    const queuedImport = importQueueRef.current.then(runImport, runImport);
+    importQueueRef.current = queuedImport.catch(() => undefined);
+    await queuedImport;
   };
   const handleSaveAll = async () => {
     if (files.length === 0) return;
@@ -659,6 +753,9 @@ export default function AudioTagger() {
           selectedFileId={selectedFileId}
           selectedFileIds={selectedFileIds}
           onAudioUpload={handleAudioUpload}
+          onAlbumDownload={(downloadedFiles, album) =>
+            handleAudioUpload(downloadedFiles, undefined, album)
+          }
           onSelectAlbum={handleSelectAlbum}
           onSelectFile={handleSelectFile}
           onSelectLooseTrack={handleSelectLooseTrack}
