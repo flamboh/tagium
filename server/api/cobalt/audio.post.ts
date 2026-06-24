@@ -7,7 +7,7 @@
  * and returns the downloaded audio bytes to the browser.
  */
 import { defineHandler } from "nitro";
-import { env } from "node:process";
+import { env as processEnv } from "node:process";
 import { z } from "zod";
 
 enum CobaltResponseType {
@@ -51,28 +51,45 @@ const cobaltResponseSchema = z.discriminatedUnion("status", [
 ]);
 
 type CobaltResponse = z.infer<typeof cobaltResponseSchema>;
+type CobaltRuntimeEnv = {
+  COBALT_ALLOWED_ORIGIN?: string;
+  COBALT_API_KEY?: string;
+  COBALT_API_URL?: string;
+};
+type CloudflareRequest = Request & {
+  runtime?: {
+    cloudflare?: {
+      env?: CobaltRuntimeEnv;
+    };
+  };
+};
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 120;
 const COBALT_REQUEST_TIMEOUT_MS = 300_000;
 const rateLimitBuckets = new Map<string, { startedAt: number; count: number }>();
 
-const getCobaltApiUrl = () => {
-  if (!env.COBALT_API_URL) {
+const getRuntimeEnv = (request: Request): CobaltRuntimeEnv => ({
+  ...processEnv,
+  ...(request as CloudflareRequest).runtime?.cloudflare?.env,
+});
+
+const getCobaltApiUrl = (runtimeEnv: CobaltRuntimeEnv) => {
+  if (!runtimeEnv.COBALT_API_URL) {
     throw new Error("COBALT_API_URL is not configured.");
   }
 
-  return env.COBALT_API_URL;
+  return runtimeEnv.COBALT_API_URL;
 };
 
-const getCobaltHeaders = () => {
+const getCobaltHeaders = (runtimeEnv: CobaltRuntimeEnv) => {
   const headers: Record<string, string> = {
     Accept: "application/json",
     "Content-Type": "application/json",
   };
 
-  if (env.COBALT_API_KEY) {
-    headers.Authorization = `Api-Key ${env.COBALT_API_KEY}`;
+  if (runtimeEnv.COBALT_API_KEY) {
+    headers.Authorization = `Api-Key ${runtimeEnv.COBALT_API_KEY}`;
   }
 
   return headers;
@@ -88,9 +105,13 @@ const getRequestOrigin = (request: Request) => {
   return origin;
 };
 
-const getAllowedOrigin = (request: Request, requestOrigin: string) => {
-  if (env.COBALT_ALLOWED_ORIGIN) {
-    return env.COBALT_ALLOWED_ORIGIN;
+const getAllowedOrigin = (
+  request: Request,
+  requestOrigin: string,
+  runtimeEnv: CobaltRuntimeEnv,
+) => {
+  if (runtimeEnv.COBALT_ALLOWED_ORIGIN) {
+    return runtimeEnv.COBALT_ALLOWED_ORIGIN;
   }
 
   return new URL(request.url, requestOrigin).origin;
@@ -105,13 +126,13 @@ const getClientKey = (request: Request) => {
   return "unknown";
 };
 
-const enforceSameOrigin = (request: Request) => {
+const enforceSameOrigin = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
   const requestOrigin = getRequestOrigin(request);
   if (!requestOrigin) {
     return new Response("Download requests require an Origin header.", { status: 403 });
   }
 
-  const allowedOrigin = getAllowedOrigin(request, requestOrigin);
+  const allowedOrigin = getAllowedOrigin(request, requestOrigin, runtimeEnv);
   if (requestOrigin !== allowedOrigin) {
     return new Response("Download origin is not allowed.", { status: 403 });
   }
@@ -147,16 +168,20 @@ const parseCobaltJson = async (response: Response) => {
   return cobaltResponseSchema.parse(await response.json());
 };
 
-const requestCobaltAudio = async (url: string, audioBitrate: string) => {
+const requestCobaltAudio = async (
+  runtimeEnv: CobaltRuntimeEnv,
+  url: string,
+  audioBitrate: string,
+) => {
   let response: Response;
 
   try {
-    const endpoint = new URL("/", getCobaltApiUrl());
+    const endpoint = new URL("/", getCobaltApiUrl(runtimeEnv));
     response = await fetch(endpoint, {
       method: "POST",
       redirect: "manual",
       signal: AbortSignal.timeout(COBALT_REQUEST_TIMEOUT_MS),
-      headers: getCobaltHeaders(),
+      headers: getCobaltHeaders(runtimeEnv),
       body: JSON.stringify({
         url,
         downloadMode: "audio",
@@ -237,7 +262,8 @@ const parseAudioRequest = async (request: Request) => {
 
 export default defineHandler(async (event) => {
   try {
-    const forbidden = enforceSameOrigin(event.req);
+    const runtimeEnv = getRuntimeEnv(event.req);
+    const forbidden = enforceSameOrigin(event.req, runtimeEnv);
     if (forbidden) {
       return forbidden;
     }
@@ -252,7 +278,7 @@ export default defineHandler(async (event) => {
       return new Response("Invalid audio download request.", { status: 400 });
     }
 
-    const cobaltResponse = await requestCobaltAudio(body.url, body.audioBitrate);
+    const cobaltResponse = await requestCobaltAudio(runtimeEnv, body.url, body.audioBitrate);
 
     if (cobaltResponse.status === CobaltResponseType.Error) {
       return cobaltErrorResponse(cobaltResponse.error.code);
