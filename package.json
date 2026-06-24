@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vp dev",
+    "dev:cobalt": "API_URL=http://localhost:9000/ pnpm --dir ../oss/cobalt/api start",
     "build": "tsc -b && vp build",
     "lint": "vp lint .",
     "lint:fix": "vp lint . --fix",
