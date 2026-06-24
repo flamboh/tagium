@@ -6,7 +6,6 @@ import AudioDownloader from "./AudioDownloader";
 import AlbumSidebar from "./AlbumSidebar";
 import { AlbumGroup, ImportedAlbumMetadata, TagiumFile } from "./types";
 import { Button } from "../ui/button";
-import { Card, CardHeader } from "@/components/ui/card";
 
 interface TagSidebarPanelProps {
   loading: boolean;
@@ -69,40 +68,44 @@ export default function TagSidebarPanel({
   onSaveAll,
 }: TagSidebarPanelProps) {
   return (
-    <div className="w-80 flex-shrink-0 flex flex-col gap-4">
-      <Card className="h-full flex flex-col overflow-hidden py-0 gap-2">
-        <CardHeader className="p-6 border-b gap-3">
-          <AudioDownloader onAudioUpload={onAudioUpload} onAlbumDownload={onAlbumDownload} />
-          <AudioUpload onAudioUpload={onAudioUpload} />
-        </CardHeader>
-        <AlbumSidebar
-          albums={albums}
-          looseTrackIds={looseTrackIds}
-          files={files}
-          selectedAlbumId={selectedAlbumId}
-          selectedFileId={selectedFileId}
-          selectedFileIds={selectedFileIds}
-          onSelectAlbum={onSelectAlbum}
-          onSelectFile={onSelectFile}
-          onSelectLooseTrack={onSelectLooseTrack}
-          onClearSelection={onClearSelection}
-          onRemoveFile={onRemoveFile}
-          onAddAlbum={onAddAlbum}
-          onEditAlbum={onEditAlbum}
-          onDownloadAlbum={onDownloadAlbum}
-          onUploadToAlbum={onUploadToAlbum}
-          onMoveTrackToAlbum={onMoveTrackToAlbum}
-          onMoveTrackToLoose={onMoveTrackToLoose}
-          onPromptCreateAlbumFromLooseTracks={onPromptCreateAlbumFromLooseTracks}
-          onReorderAlbums={onReorderAlbums}
-          onAudioUpload={onAudioUpload}
-        />
-        <div className="p-6 border-t mt-auto">
-          <Button className="w-full" onClick={onSaveAll} disabled={files.length === 0 || loading}>
-            {loading ? "Saving..." : "Save All"}
-          </Button>
-        </div>
-      </Card>
+    <div className="w-full md:w-72 flex-shrink-0 flex flex-col border-b md:border-b-0 md:border-r bg-card overflow-hidden max-h-[45vh] md:max-h-none">
+      <div className="h-14 flex items-center px-5 border-b flex-shrink-0">
+        <span className="font-bold text-xl tracking-tight select-none">tagium</span>
+      </div>
+
+      <div className="px-3 py-3 border-b flex flex-col gap-2 flex-shrink-0">
+        <AudioDownloader onAudioUpload={onAudioUpload} onAlbumDownload={onAlbumDownload} />
+        <AudioUpload onAudioUpload={onAudioUpload} />
+      </div>
+
+      <AlbumSidebar
+        albums={albums}
+        looseTrackIds={looseTrackIds}
+        files={files}
+        selectedAlbumId={selectedAlbumId}
+        selectedFileId={selectedFileId}
+        selectedFileIds={selectedFileIds}
+        onSelectAlbum={onSelectAlbum}
+        onSelectFile={onSelectFile}
+        onSelectLooseTrack={onSelectLooseTrack}
+        onClearSelection={onClearSelection}
+        onRemoveFile={onRemoveFile}
+        onAddAlbum={onAddAlbum}
+        onEditAlbum={onEditAlbum}
+        onDownloadAlbum={onDownloadAlbum}
+        onUploadToAlbum={onUploadToAlbum}
+        onMoveTrackToAlbum={onMoveTrackToAlbum}
+        onMoveTrackToLoose={onMoveTrackToLoose}
+        onPromptCreateAlbumFromLooseTracks={onPromptCreateAlbumFromLooseTracks}
+        onReorderAlbums={onReorderAlbums}
+        onAudioUpload={onAudioUpload}
+      />
+
+      <div className="px-3 py-3 border-t flex-shrink-0">
+        <Button className="w-full" onClick={onSaveAll} disabled={files.length === 0 || loading}>
+          {loading ? "Saving..." : "Save All"}
+        </Button>
+      </div>
     </div>
   );
 }

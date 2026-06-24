@@ -6,30 +6,11 @@ import { Download, Loader2, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { downloadCobaltAudio, type AudioDownloadBitrate } from "./cobaltDownload";
+import { getDownloadErrorMessage } from "./downloadErrorMessage";
 import { isSoundCloudSetUrl, resolveSoundCloudSet, toImportedAlbumMetadata } from "./soundcloudSet";
 import { ImportedAlbumMetadata } from "./types";
 
 const bitrateOptions: AudioDownloadBitrate[] = ["320", "256", "128", "96", "64"];
-
-const getDownloadErrorMessage = (error: Error) => {
-  if (error.message.includes("COBALT_API_URL is not configured.")) {
-    return "Set COBALT_API_URL on the Tagium server.";
-  }
-
-  if (error.message.includes("error.api.unreachable")) {
-    return "Cobalt API unreachable. Run bun run dev:cobalt and set COBALT_API_URL.";
-  }
-
-  if (error.message.includes("error.api.timed_out")) {
-    return "Cobalt API timed out.";
-  }
-
-  if (error.message.includes("error.tunnel.probe")) {
-    return "Cobalt tunnel failed before download.";
-  }
-
-  return error.message;
-};
 
 interface AudioDownloaderProps {
   onAudioUpload: (audio: File[]) => void | Promise<void>;

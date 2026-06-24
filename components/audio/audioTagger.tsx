@@ -14,6 +14,7 @@ import {
 } from "./albumOps";
 import { applyAlbumSharedTagsToFiles, applyTrackOrderNumbersToFiles } from "./fileMetadataOps";
 import TagSidebarPanel from "./TagSidebarPanel";
+import LandingScreen from "./LandingScreen";
 import TrackMetadataEditor from "./TrackMetadataEditor";
 import { parseUploadedTracks, toGenreString, writeMetadataToFile } from "./mp3Utils";
 import { AlbumGroup, AudioMetadata, ImportedAlbumMetadata, TagiumFile } from "./types";
@@ -720,6 +721,18 @@ export default function AudioTagger() {
       );
     }
   };
+
+  if (files.length === 0) {
+    return (
+      <LandingScreen
+        onAudioUpload={handleAudioUpload}
+        onAlbumDownload={(downloadedFiles, album) =>
+          handleAudioUpload(downloadedFiles, undefined, album)
+        }
+      />
+    );
+  }
+
   return (
     <>
       <AlbumMetadataDialog
@@ -743,7 +756,7 @@ export default function AudioTagger() {
             : undefined
         }
       />
-      <div className="w-full max-w-7xl flex gap-4 min-h-[85vh]">
+      <div className="min-h-screen md:h-screen flex flex-col md:flex-row overflow-hidden bg-background">
         <TagSidebarPanel
           loading={loading}
           files={files}
@@ -771,7 +784,7 @@ export default function AudioTagger() {
           onReorderAlbums={handleReorderAlbums}
           onSaveAll={handleSaveAll}
         />
-        <div className="flex-1 flex flex-col">
+        <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
           <TrackMetadataEditor
             selectedFile={selectedFile}
             selectedFileId={selectedFileId}
