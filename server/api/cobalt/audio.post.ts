@@ -295,7 +295,7 @@ export default defineHandler(async (event) => {
         return cobaltErrorResponse("Cobalt returned multiple items without a single audio file.");
       }
 
-      return fetchAudioResponse(cobaltResponse.audio, cobaltResponse.audioFilename);
+      return await fetchAudioResponse(cobaltResponse.audio, cobaltResponse.audioFilename);
     }
 
     if (cobaltResponse.status === CobaltResponseType.Tunnel) {
@@ -305,7 +305,7 @@ export default defineHandler(async (event) => {
       }
     }
 
-    return fetchAudioResponse(cobaltResponse.url, cobaltResponse.filename);
+    return await fetchAudioResponse(cobaltResponse.url, cobaltResponse.filename);
   } catch (error) {
     if (error instanceof Error) {
       return cobaltErrorResponse(error.message);
