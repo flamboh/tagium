@@ -756,7 +756,7 @@ export default function AudioTagger() {
             : undefined
         }
       />
-      <div className="h-screen flex overflow-hidden bg-background">
+      <div className="min-h-screen md:h-screen flex flex-col md:flex-row overflow-hidden bg-background">
         <TagSidebarPanel
           loading={loading}
           files={files}
@@ -784,7 +784,7 @@ export default function AudioTagger() {
           onReorderAlbums={handleReorderAlbums}
           onSaveAll={handleSaveAll}
         />
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
           <TrackMetadataEditor
             selectedFile={selectedFile}
             selectedFileId={selectedFileId}
