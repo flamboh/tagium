@@ -13,14 +13,6 @@ import AudioUpload from "./audioUpload";
 import CoverArt from "./coverArt";
 import { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
 import { Button } from "../ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "../ui/input";
 
 interface TrackMetadataEditorProps {
@@ -51,28 +43,25 @@ export default function TrackMetadataEditor({
   const watchedTitle = useWatch({ control, name: "title" });
   const syncFilenames = selectedFileAlbum?.syncFilenames ?? false;
   const inAlbum = !!selectedFileAlbum;
+
   if (!selectedFile || !selectedFile.metadata) {
     return (
-      <div className="flex-1 flex items-center justify-center border rounded-lg bg-muted/10">
+      <div className="flex-1 flex items-center justify-center bg-muted/5">
         <div className="text-center">
-          <h3 className="text-lg font-medium">No track selected</h3>
-          <p className="text-muted-foreground">Upload tracks to get started</p>
-          <div className="mt-4">
-            <AudioUpload onAudioUpload={onAudioUpload} />
-          </div>
+          <p className="text-muted-foreground mb-4">Select a track to edit its tags</p>
+          <AudioUpload onAudioUpload={onAudioUpload} />
         </div>
       </div>
     );
   }
 
   return (
-    <Card className="flex-1 overflow-hidden py-0">
+    <div className="flex-1 flex flex-col overflow-hidden">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full">
-        <CardHeader className="p-6 space-y-2 h-[104px] border-b">
-          <CardTitle>track metadata</CardTitle>
-          <CardDescription>{selectedFile.filename}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-y-auto p-6">
+        <div className="p-6 h-[104px] border-b flex-shrink-0 flex flex-col justify-center gap-1">
+          <h2 className="text-lg font-semibold truncate">{selectedFile.filename}</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="flex gap-4 flex-col lg:flex-row">
             <Controller
               name="picture"
@@ -144,11 +133,7 @@ export default function TrackMetadataEditor({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm pt-2 border-t">
                 <div>
                   <span className="font-medium">duration: </span>
-                  {`${Math.floor(selectedFile.metadata.duration / 60)}:${(
-                    selectedFile.metadata.duration % 60
-                  )
-                    .toFixed(0)
-                    .padStart(2, "0")}`}
+                  {`${Math.floor(selectedFile.metadata.duration / 60)}:${String(Math.round(selectedFile.metadata.duration % 60)).padStart(2, "0")}`}
                 </div>
                 <div>
                   <span className="font-medium">size: </span>
@@ -157,8 +142,8 @@ export default function TrackMetadataEditor({
               </div>
             </div>
           </div>
-        </CardContent>
-        <CardFooter className="p-6 border-t mt-auto flex justify-end gap-2">
+        </div>
+        <div className="p-6 border-t flex-shrink-0 flex justify-end gap-2">
           <Button
             variant="outline"
             type="button"
@@ -167,8 +152,8 @@ export default function TrackMetadataEditor({
             Download
           </Button>
           <Button type="submit">Save Changes</Button>
-        </CardFooter>
+        </div>
       </form>
-    </Card>
+    </div>
   );
 }
