@@ -2,8 +2,9 @@
 
 import type { MouseEvent as ReactMouseEvent } from "react";
 import AudioUpload from "./audioUpload";
+import AudioDownloader from "./AudioDownloader";
 import AlbumSidebar from "./AlbumSidebar";
-import { AlbumGroup, TagiumFile } from "./types";
+import { AlbumGroup, ImportedAlbumMetadata, TagiumFile } from "./types";
 import { Button } from "../ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 
@@ -16,6 +17,7 @@ interface TagSidebarPanelProps {
   selectedFileId: string | null;
   selectedFileIds: Set<string>;
   onAudioUpload: (files: File[]) => void;
+  onAlbumDownload: (files: File[], album: ImportedAlbumMetadata) => void;
   onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
   onSelectFile: (albumId: string, fileId: string, event?: ReactMouseEvent) => void;
   onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
@@ -50,6 +52,7 @@ export default function TagSidebarPanel({
   selectedFileId,
   selectedFileIds,
   onAudioUpload,
+  onAlbumDownload,
   onSelectAlbum,
   onSelectFile,
   onSelectLooseTrack,
@@ -68,7 +71,8 @@ export default function TagSidebarPanel({
   return (
     <div className="w-80 flex-shrink-0 flex flex-col gap-4">
       <Card className="h-full flex flex-col overflow-hidden py-0 gap-2">
-        <CardHeader className="p-6 border-b h-[104px]">
+        <CardHeader className="p-6 border-b gap-3">
+          <AudioDownloader onAudioUpload={onAudioUpload} onAlbumDownload={onAlbumDownload} />
           <AudioUpload onAudioUpload={onAudioUpload} />
         </CardHeader>
         <AlbumSidebar
