@@ -185,7 +185,7 @@ const requestCobaltAudio = async (
       body: JSON.stringify({
         url,
         downloadMode: "audio",
-        audioFormat: "mp3",
+        audioFormat: "best",
         audioBitrate,
         alwaysProxy: true,
         localProcessing: "disabled",
