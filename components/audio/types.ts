@@ -43,3 +43,11 @@ export interface AlbumGroup {
   syncTrackNumbers: boolean;
   syncFilenames: boolean;
 }
+
+export interface ImportedAlbumMetadata {
+  title: string;
+  artist: string;
+  genre: string;
+  year?: number;
+  coverUrl?: string;
+}

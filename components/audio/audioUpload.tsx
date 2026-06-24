@@ -2,7 +2,7 @@
 
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { useRef } from "react";
+import { useId, useRef } from "react";
 import { Upload } from "lucide-react";
 
 interface AudioUploadProps {
@@ -11,6 +11,7 @@ interface AudioUploadProps {
 
 export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputId = useId();
 
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -34,7 +35,7 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
     <div className="w-full">
       <Input
         type="file"
-        id="audio"
+        id={inputId}
         className="hidden"
         accept="audio/*"
         onChange={handleAudioUpload}
@@ -45,6 +46,7 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
         variant="outline"
         className="w-full cursor-pointer border-dashed border-2 h-12 hover:bg-accent/50 flex flex-col gap-2"
         onClick={handleButtonClick}
+        aria-label="Upload audio files"
       >
         <Upload className="h-6 w-6 text-muted-foreground" />
       </Button>
