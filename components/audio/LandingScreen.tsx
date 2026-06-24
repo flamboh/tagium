@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Music4, Link2, Download, Loader2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { downloadCobaltAudio, type AudioDownloadBitrate } from "./cobaltDownload";
+import { getDownloadErrorMessage } from "./downloadErrorMessage";
 import { isSoundCloudSetUrl, resolveSoundCloudSet, toImportedAlbumMetadata } from "./soundcloudSet";
 import type { ImportedAlbumMetadata } from "./types";
 
@@ -82,7 +83,11 @@ export default function LandingScreen({ onAudioUpload, onAlbumDownload }: Landin
       await onAudioUpload([file]);
       setUrl("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Download failed.");
+      if (err instanceof Error) {
+        setError(getDownloadErrorMessage(err));
+      } else {
+        setError("Download failed.");
+      }
     } finally {
       setProgress(null);
       setDownloading(false);

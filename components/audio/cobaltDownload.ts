@@ -5,6 +5,11 @@ interface CobaltAudioDownloadRequest {
   audioBitrate: AudioDownloadBitrate;
 }
 
+const getStableLastModified = (sourceUrl: string) =>
+  Array.from(sourceUrl).reduce((hash, character) => {
+    return (hash * 31 + character.charCodeAt(0)) % 2_147_483_647;
+  }, 1);
+
 export async function downloadCobaltAudio({ sourceUrl, audioBitrate }: CobaltAudioDownloadRequest) {
   const response = await fetch("/api/cobalt/audio", {
     method: "POST",
@@ -30,5 +35,6 @@ export async function downloadCobaltAudio({ sourceUrl, audioBitrate }: CobaltAud
   const blob = await response.blob();
   return new File([blob], decodeURIComponent(filename), {
     type: blob.type,
+    lastModified: getStableLastModified(sourceUrl),
   });
 }

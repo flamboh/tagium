@@ -68,7 +68,7 @@ export default function TagSidebarPanel({
   onSaveAll,
 }: TagSidebarPanelProps) {
   return (
-    <div className="w-72 flex-shrink-0 flex flex-col border-r bg-card overflow-hidden">
+    <div className="w-full md:w-72 flex-shrink-0 flex flex-col border-b md:border-b-0 md:border-r bg-card overflow-hidden max-h-[45vh] md:max-h-none">
       <div className="h-14 flex items-center px-5 border-b flex-shrink-0">
         <span className="font-bold text-xl tracking-tight select-none">tagium</span>
       </div>
