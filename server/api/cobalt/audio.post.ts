@@ -220,25 +220,28 @@ const requestCobaltAudio = async (
 };
 
 const probeCobaltTunnel = async (url: string) => {
-  const response = await fetch(`${url}&p=1`).catch(() => undefined);
+  const response = await fetch(`${url}&p=1`, {
+    signal: AbortSignal.timeout(COBALT_REQUEST_TIMEOUT_MS),
+  }).catch(() => undefined);
   return response?.status === 200;
 };
 
 const fetchAudioResponse = async (url: string, filename: string) => {
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(COBALT_REQUEST_TIMEOUT_MS),
+  });
 
   if (!response.ok) {
     throw new Error(`Cobalt file request failed (${response.status}).`);
   }
 
-  const contentType = response.headers.get("content-type");
-  if (!contentType) {
-    throw new Error("Cobalt file response missing content type.");
+  if (response.headers.get("content-length") === "0") {
+    throw new Error("Cobalt file response was empty.");
   }
 
   return new Response(response.body, {
     headers: {
-      "Content-Type": contentType,
+      "Content-Type": "audio/mpeg",
       "X-Tagium-Filename": encodeURIComponent(filename),
     },
   });
