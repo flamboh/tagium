@@ -5,6 +5,7 @@
     "": {
       "name": "tagium",
       "dependencies": {
+        "@imput/libav.js-encode-cli": "6.8.7",
         "@radix-ui/react-label": "^2.1.7",
         "@radix-ui/react-popover": "^1.1.15",
         "@radix-ui/react-slot": "^1.2.3",
@@ -154,6 +155,8 @@
     "@humanwhocodes/module-importer": ["@humanwhocodes/module-importer@1.0.1", "", {}, "sha512-bxveV4V8v5Yb4ncFTT3rPSgZBOpCkjfK0y4oVVVJwIuDVBRMDXrPyXRL988i5ap9m9bnyEEjWfm5WkBmtffLfA=="],
 
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
+
+    "@imput/libav.js-encode-cli": ["@imput/libav.js-encode-cli@6.8.7", "", {}, "sha512-kWZmCwDYOQVSFu1ARsFfd5P0HqEx5TlhDMZFM/o8cWvMv7okCZWzKRMlEvw3EEGkxWkXUsgcf6F65wQEOE/08A=="],
 
     "@inquirer/confirm": ["@inquirer/confirm@5.1.16", "", { "dependencies": { "@inquirer/core": "10.2.0", "@inquirer/type": "3.0.8" }, "optionalDependencies": { "@types/node": "24.12.2" } }, "sha512-j1a5VstaK5KQy8Mu8cHmuQvN1Zc62TbLhjJxwHvKPPKEoowSF6h/0UdOpA9DNdWZ+9Inq73+puRq1df6OJ8Sag=="],
 
