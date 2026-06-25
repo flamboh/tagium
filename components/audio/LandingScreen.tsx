@@ -158,7 +158,10 @@ export default function LandingScreen({ onAudioUpload, onAlbumDownload }: Landin
               <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <input
                 type="url"
+                name="landing-media-url"
+                autoComplete="url"
                 value={url}
+                aria-label="Media URL"
                 onChange={(e) => {
                   setUrl(e.target.value);
                   setError(null);
@@ -196,11 +199,15 @@ export default function LandingScreen({ onAudioUpload, onAlbumDownload }: Landin
           </div>
 
           {progress && (
-            <p className="text-xs text-muted-foreground text-center">
-              Downloading track {progress}...
+            <p className="text-xs text-muted-foreground text-center" aria-live="polite">
+              Downloading track {progress}
             </p>
           )}
-          {error && <p className="text-xs text-destructive text-center">{error}</p>}
+          {error && (
+            <p className="text-xs text-destructive text-center" aria-live="polite">
+              {error}
+            </p>
+          )}
         </form>
       </div>
     </div>

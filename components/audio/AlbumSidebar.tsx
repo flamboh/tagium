@@ -1,46 +1,13 @@
 "use client";
 
 import type { ChangeEvent, DragEvent, MouseEvent as ReactMouseEvent } from "react";
-import { useMemo, useRef, useState } from "react";
-import {
-  AlertCircle,
-  Check,
-  Download,
-  FileMusic,
-  Music2,
-  Pencil,
-  Plus,
-  Upload,
-  X,
-} from "lucide-react";
+import { useRef, useState } from "react";
+import { AlertCircle, Check, Download, FileMusic, Pencil, Plus, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { AlbumCoverThumb } from "./AlbumCoverThumb";
 import { AlbumGroup, TagiumFile } from "./types";
-
-function AlbumCoverThumb({ picture }: { picture?: { format: string; data: Uint8Array }[] }) {
-  const src = useMemo(() => {
-    const pic = picture?.[0];
-    if (!pic) return null;
-    const blob = new Blob([pic.data as unknown as BlobPart], { type: pic.format });
-    return URL.createObjectURL(blob);
-  }, [picture]);
-
-  if (!src) {
-    return (
-      <div className="w-9 h-9 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-        <Music2 className="h-4 w-4 text-muted-foreground" />
-      </div>
-    );
-  }
-  return (
-    <img
-      src={src}
-      alt=""
-      className="w-9 h-9 rounded-md object-cover flex-shrink-0 ring-1 ring-border/50"
-    />
-  );
-}
 
 const TRACK_DRAG_TYPE = "application/x-tagium-track";
 const ALBUM_DRAG_TYPE = "application/x-tagium-album";
