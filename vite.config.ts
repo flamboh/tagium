@@ -1,10 +1,70 @@
-import { fileURLToPath, URL } from "node:url";
 import process from "node:process";
+import { createReadStream } from "node:fs";
+import { copyFile, mkdir, stat } from "node:fs/promises";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { extname, join, normalize, relative, resolve, sep } from "node:path";
+import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite-plus";
+import type { Plugin, ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
 
 const isTest = process.env.VITEST === "true" || process.env.VITEST === "1";
+const libavDist = fileURLToPath(
+  new URL("./node_modules/@imput/libav.js-encode-cli/dist/", import.meta.url),
+);
+const libavAssetFiles = ["libav-6.8.7.1-encode-cli.wasm.mjs", "libav-6.8.7.1-encode-cli.wasm.wasm"];
+
+const contentTypes: Record<string, string> = {
+  ".js": "text/javascript;charset=UTF-8",
+  ".mjs": "text/javascript;charset=UTF-8",
+  ".wasm": "application/wasm",
+};
+
+const libavAssets = (): Plugin => ({
+  name: "tagium-libav-assets",
+  async writeBundle() {
+    const outputDir = resolve(".output/public/_libav");
+    await mkdir(outputDir, { recursive: true });
+    await Promise.all(
+      libavAssetFiles.map((filename) =>
+        copyFile(join(libavDist, filename), join(outputDir, filename)),
+      ),
+    );
+  },
+  configureServer(server: ViteDevServer) {
+    server.middlewares.use(
+      "/_libav",
+      async (request: IncomingMessage, response: ServerResponse, next: () => void) => {
+        const requestUrl = new URL(request.url ?? "/", "http://localhost");
+        const filePath = normalize(join(libavDist, decodeURIComponent(requestUrl.pathname)));
+        const libavRelativePath = relative(libavDist, filePath);
+
+        if (libavRelativePath.startsWith("..") || libavRelativePath.includes(`..${sep}`)) {
+          next();
+          return;
+        }
+
+        try {
+          const fileStat = await stat(filePath);
+          if (!fileStat.isFile()) {
+            next();
+            return;
+          }
+
+          const contentType = contentTypes[extname(filePath)];
+          if (contentType) {
+            response.setHeader("Content-Type", contentType);
+          }
+          response.setHeader("Content-Length", fileStat.size);
+          createReadStream(filePath).pipe(response);
+        } catch {
+          next();
+        }
+      },
+    );
+  },
+});
 
 export default defineConfig({
   staged: {
@@ -117,7 +177,7 @@ export default defineConfig({
       typeCheck: true,
     },
   },
-  plugins: [react(), ...(isTest ? [] : [nitro()])],
+  plugins: [react(), libavAssets(), ...(isTest ? [] : [nitro()])],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL(".", import.meta.url)),

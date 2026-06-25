@@ -4,7 +4,7 @@
  * - web/src/lib/api/api.ts
  *
  * Changes: runs server-side in Tagium, uses server env for Cobalt URL/auth,
- * and returns the downloaded audio bytes to the browser.
+ * and returns a browser-executable download plan without exposing auth.
  */
 import { defineHandler } from "nitro";
 import { env as processEnv } from "node:process";
@@ -47,6 +47,25 @@ const cobaltResponseSchema = z.discriminatedUnion("status", [
   }),
   z.object({
     status: z.literal(CobaltResponseType.LocalProcessing),
+    type: z.enum(["merge", "mute", "audio", "gif", "remux", "proxy"]),
+    service: z.string(),
+    tunnel: z.array(z.string().url()),
+    output: z.object({
+      type: z.string(),
+      filename: z.string(),
+      metadata: z.record(z.string(), z.string().optional()).optional(),
+      subtitles: z.boolean().optional(),
+    }),
+    audio: z
+      .object({
+        copy: z.boolean(),
+        format: z.string(),
+        bitrate: z.string(),
+        cover: z.boolean().optional(),
+        cropCover: z.boolean().optional(),
+      })
+      .optional(),
+    isHLS: z.boolean().optional(),
   }),
 ]);
 
@@ -188,7 +207,7 @@ const requestCobaltAudio = async (
         audioFormat: "mp3",
         audioBitrate,
         alwaysProxy: true,
-        localProcessing: "disabled",
+        localProcessing: "forced",
         filenameStyle: "pretty",
       }),
     });
@@ -219,40 +238,37 @@ const requestCobaltAudio = async (
   }
 };
 
-const probeCobaltTunnel = async (url: string) => {
-  const response = await fetch(`${url}&p=1`, {
-    signal: AbortSignal.timeout(COBALT_REQUEST_TIMEOUT_MS),
-  }).catch(() => undefined);
-  return response?.status === 200;
-};
-
-const fetchAudioResponse = async (url: string, filename: string) => {
-  const response = await fetch(url, {
-    signal: AbortSignal.timeout(COBALT_REQUEST_TIMEOUT_MS),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Cobalt file request failed (${response.status}).`);
-  }
-
-  if (response.headers.get("content-length") === "0") {
-    throw new Error("Cobalt file response was empty.");
-  }
-
-  return new Response(response.body, {
-    headers: {
-      "Content-Type": "audio/mpeg",
-      "X-Tagium-Filename": encodeURIComponent(filename),
-    },
-  });
-};
-
 const cobaltErrorResponse = (message: string) =>
   new Response(message, {
     status: 502,
     headers: {
       "Content-Type": "text/plain;charset=UTF-8",
     },
+  });
+
+const toTunnelProxyUrl = (request: Request, tunnelUrl: string) => {
+  const proxyUrl = new URL("/api/cobalt/tunnel", request.url);
+  proxyUrl.searchParams.set("url", tunnelUrl);
+  return `${proxyUrl.pathname}${proxyUrl.search}`;
+};
+
+const proxiedTunnelResponse = (
+  request: Request,
+  response: Extract<CobaltResponse, { url: string }>,
+) =>
+  Response.json({
+    status: CobaltResponseType.Tunnel,
+    url: toTunnelProxyUrl(request, response.url),
+    filename: response.filename,
+  });
+
+const localProcessingResponse = (
+  request: Request,
+  response: Extract<CobaltResponse, { status: CobaltResponseType.LocalProcessing }>,
+) =>
+  Response.json({
+    ...response,
+    tunnel: response.tunnel.map((tunnelUrl) => toTunnelProxyUrl(request, tunnelUrl)),
   });
 
 const parseAudioRequest = async (request: Request) => {
@@ -288,9 +304,7 @@ export default defineHandler(async (event) => {
     }
 
     if (cobaltResponse.status === CobaltResponseType.LocalProcessing) {
-      return cobaltErrorResponse(
-        "Cobalt returned local processing; use a server-side tunnel instance.",
-      );
+      return localProcessingResponse(event.req, cobaltResponse);
     }
 
     if (cobaltResponse.status === CobaltResponseType.Picker) {
@@ -298,17 +312,14 @@ export default defineHandler(async (event) => {
         return cobaltErrorResponse("Cobalt returned multiple items without a single audio file.");
       }
 
-      return await fetchAudioResponse(cobaltResponse.audio, cobaltResponse.audioFilename);
+      return proxiedTunnelResponse(event.req, {
+        status: CobaltResponseType.Tunnel,
+        url: cobaltResponse.audio,
+        filename: cobaltResponse.audioFilename,
+      });
     }
 
-    if (cobaltResponse.status === CobaltResponseType.Tunnel) {
-      const tunnelIsReady = await probeCobaltTunnel(cobaltResponse.url);
-      if (!tunnelIsReady) {
-        return cobaltErrorResponse("error.tunnel.probe");
-      }
-    }
-
-    return await fetchAudioResponse(cobaltResponse.url, cobaltResponse.filename);
+    return proxiedTunnelResponse(event.req, cobaltResponse);
   } catch (error) {
     if (error instanceof Error) {
       return cobaltErrorResponse(error.message);
