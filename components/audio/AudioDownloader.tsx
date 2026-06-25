@@ -81,6 +81,10 @@ export default function AudioDownloader({ onAudioUpload, onAlbumDownload }: Audi
         <div className="relative min-w-0 flex-1">
           <Link className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            type="url"
+            name="media-url"
+            autoComplete="url"
+            aria-label="Media URL"
             value={sourceUrl}
             onChange={(event) => setSourceUrl(event.target.value)}
             placeholder="Paste media URL"
@@ -106,8 +110,16 @@ export default function AudioDownloader({ onAudioUpload, onAlbumDownload }: Audi
           {!downloading && <Download />}
         </Button>
       </div>
-      {progress && <p className="text-xs text-muted-foreground">Downloading {progress}</p>}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {progress && (
+        <p className="text-xs text-muted-foreground" aria-live="polite">
+          Downloading {progress}
+        </p>
+      )}
+      {error && (
+        <p className="text-xs text-destructive" aria-live="polite">
+          {error}
+        </p>
+      )}
     </form>
   );
 }

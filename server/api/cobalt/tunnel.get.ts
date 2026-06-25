@@ -28,6 +28,36 @@ const getCobaltApiUrl = (runtimeEnv: CobaltRuntimeEnv) => {
   return runtimeEnv.COBALT_API_URL;
 };
 
+const streamNonEmptyBody = async (response: Response) => {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    return undefined;
+  }
+
+  const firstChunk = await reader.read();
+  if (firstChunk.done) {
+    return undefined;
+  }
+
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(firstChunk.value);
+    },
+    async pull(controller) {
+      const chunk = await reader.read();
+      if (chunk.done) {
+        controller.close();
+        return;
+      }
+
+      controller.enqueue(chunk.value);
+    },
+    async cancel(reason) {
+      await reader.cancel(reason);
+    },
+  });
+};
+
 const parseTunnelUrl = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
   const requestUrl = new URL(request.url);
   const tunnelUrlParam = requestUrl.searchParams.get("url");
@@ -60,7 +90,8 @@ export default defineHandler(async (event) => {
       return new Response(`Cobalt tunnel request failed (${response.status}).`, { status: 502 });
     }
 
-    if (response.headers.get("content-length") === "0") {
+    const body = await streamNonEmptyBody(response);
+    if (!body) {
       return new Response("Cobalt tunnel response was empty.", { status: 502 });
     }
 
@@ -70,12 +101,7 @@ export default defineHandler(async (event) => {
       headers.set("Content-Type", contentType);
     }
 
-    const contentLength = response.headers.get("content-length");
-    if (contentLength) {
-      headers.set("Content-Length", contentLength);
-    }
-
-    return new Response(response.body, { headers });
+    return new Response(body, { headers });
   } catch (error) {
     if (error instanceof Error) {
       return new Response(error.message, { status: 502 });

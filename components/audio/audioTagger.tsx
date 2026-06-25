@@ -722,7 +722,7 @@ export default function AudioTagger() {
     }
   };
 
-  if (files.length === 0) {
+  if (files.length === 0 && albums.length === 0 && looseTrackIds.length === 0) {
     return (
       <LandingScreen
         onAudioUpload={handleAudioUpload}
