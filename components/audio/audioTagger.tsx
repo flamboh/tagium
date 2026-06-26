@@ -23,7 +23,13 @@ import {
 import TagSidebarPanel from "./TagSidebarPanel";
 import LandingScreen from "./LandingScreen";
 import TrackMetadataEditor from "./TrackMetadataEditor";
-import { parseUploadedTracks, toGenreString, writeMetadataToFile } from "./mp3Utils";
+import {
+  parseUploadedTracks,
+  sortTrackIdsByTrackNumber,
+  sortUploadedTracksByTrackNumber,
+  toGenreString,
+  writeMetadataToFile,
+} from "./mp3Utils";
 import type { SoundCloudSet } from "./soundcloudSet";
 import { AlbumGroup, AudioMetadata, ImportedAlbumMetadata, TagiumFile } from "./types";
 const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
@@ -340,8 +346,9 @@ export default function AudioTagger() {
       try {
         const parsedUploads = await parseUploadedTracks(uniqueUploadedFiles);
         if (parsedUploads.length === 0) return;
+        const orderedUploads = sortUploadedTracksByTrackNumber(parsedUploads);
 
-        const nextFiles = [...filesRef.current, ...parsedUploads.map((upload) => upload.file)];
+        const nextFiles = [...filesRef.current, ...orderedUploads.map((upload) => upload.file)];
         filesRef.current = nextFiles;
         setFiles(nextFiles);
 
@@ -354,10 +361,16 @@ export default function AudioTagger() {
         let firstSelectedAlbumId: string | null = null;
 
         if (hasTargetAlbum && targetAlbumId) {
-          const uploadedTrackIds = parsedUploads.map((upload) => upload.file.id);
+          const uploadedTrackIds = orderedUploads.map((upload) => upload.file.id);
           const nextAlbums = currentAlbums.map((album) =>
             album.id === targetAlbumId
-              ? { ...album, trackIds: asUniqueTrackIds([...album.trackIds, ...uploadedTrackIds]) }
+              ? {
+                  ...album,
+                  trackIds: sortTrackIdsByTrackNumber(
+                    asUniqueTrackIds([...album.trackIds, ...uploadedTrackIds]),
+                    nextFiles,
+                  ),
+                }
               : album,
           );
           albumsRef.current = nextAlbums;
@@ -371,7 +384,7 @@ export default function AudioTagger() {
             filesRef.current = taggedFiles;
             setFiles(taggedFiles);
           }
-          setSelectedFileId(parsedUploads[0].file.id);
+          setSelectedFileId(orderedUploads[0].file.id);
           setSelectedAlbumId(targetAlbumId);
         } else if (importedAlbum) {
           let importedCover: AudioMetadata["picture"] | undefined;
@@ -390,7 +403,7 @@ export default function AudioTagger() {
             artist: importedAlbum.artist,
             genre: importedAlbum.genre,
             cover: importedCover ?? embeddedCover,
-            trackIds: parsedUploads.map((upload) => upload.file.id),
+            trackIds: orderedUploads.map((upload) => upload.file.id),
             year: importedAlbum.year,
             syncTrackNumbers: true,
             syncFilenames: false,
@@ -405,11 +418,12 @@ export default function AudioTagger() {
           );
           filesRef.current = taggedFiles;
           setFiles(taggedFiles);
-          setSelectedFileId(parsedUploads[0].file.id);
+          setSelectedFileId(orderedUploads[0].file.id);
           setSelectedAlbumId(downloadedAlbum.id);
         } else {
-          const merged = mergeUploadedTracksIntoAlbums(currentAlbums, parsedUploads, {
+          const merged = mergeUploadedTracksIntoAlbums(currentAlbums, orderedUploads, {
             forceSingleAlbum,
+            albumSeedUploads: parsedUploads,
           });
           firstSelectedAlbumId = merged.firstSelectedAlbumId;
           albumsRef.current = merged.albums;
@@ -419,7 +433,7 @@ export default function AudioTagger() {
               asUniqueTrackIds([...prevLooseTrackIds, ...merged.unassignedTrackIds]),
             );
           }
-          const firstUploadedTrack = parsedUploads[0];
+          const firstUploadedTrack = orderedUploads[0];
           const firstTrackIsLoose = !forceSingleAlbum && !firstUploadedTrack.albumSeed.title.trim();
           setSelectedFileId(firstUploadedTrack.file.id);
           setSelectedAlbumId(firstTrackIsLoose ? null : firstSelectedAlbumId);
