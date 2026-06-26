@@ -106,6 +106,8 @@ export async function parseUploadedTracks(uploadedFiles: File[]) {
           originalFile: file,
           filename: file.name,
           status: "pending",
+          downloadStatus: "ready",
+          hasBufferedChanges: false,
           metadata,
         },
         albumSeed: {
@@ -124,6 +126,9 @@ export async function parseUploadedTracks(uploadedFiles: File[]) {
           originalFile: file,
           filename: file.name,
           status: "error",
+          downloadStatus: "ready",
+          downloadError: error instanceof Error ? error.message : "Unable to parse audio metadata.",
+          hasBufferedChanges: false,
         },
         albumSeed: {
           title: "",
@@ -138,6 +143,10 @@ export async function parseUploadedTracks(uploadedFiles: File[]) {
 }
 
 export async function writeMetadataToFile(fileToUpdate: TagiumFile, newTags: AudioMetadata) {
+  if (!fileToUpdate.file) {
+    throw new Error("Audio file is still downloading.");
+  }
+
   const MP3Tag = (await import("mp3tag.js")).default;
   const arrayBuffer = await fileToUpdate.file.arrayBuffer();
   const mp3tag = new MP3Tag(arrayBuffer, true) as unknown as MP3TagReader;
