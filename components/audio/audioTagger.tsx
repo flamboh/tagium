@@ -85,11 +85,13 @@ const createPendingDownloadTrack = (
   id: string,
   metadata: AudioMetadata,
   hasBufferedChanges: boolean,
+  downloadRequest: TagiumFile["downloadRequest"],
 ): TagiumFile => ({
   id,
   filename: `${metadata.filename}.mp3`,
   status: "pending",
   downloadStatus: "downloading",
+  downloadRequest,
   hasBufferedChanges,
   metadata,
 });
@@ -522,6 +524,7 @@ export default function AudioTagger() {
         genre: "",
       }),
       false,
+      { sourceUrl, audioBitrate },
     );
     const nextFiles = [...filesRef.current, pendingFile];
     filesRef.current = nextFiles;
@@ -556,6 +559,7 @@ export default function AudioTagger() {
           trackNumber: track.trackNumber,
         }),
         true,
+        { sourceUrl: track.url, audioBitrate },
       ),
     );
     const album: AlbumGroup = {
@@ -638,6 +642,33 @@ export default function AudioTagger() {
         }
       })();
     });
+  };
+  const handleRetryDownload = (fileId: string) => {
+    const fileToRetry = filesRef.current.find((file) => file.id === fileId);
+    const downloadRequest = fileToRetry?.downloadRequest;
+    if (!fileToRetry || !downloadRequest) return;
+
+    const nextFiles = filesRef.current.map((file) =>
+      file.id === fileId
+        ? {
+            ...file,
+            status: "pending" as const,
+            downloadStatus: "downloading" as const,
+            downloadError: undefined,
+          }
+        : file,
+    );
+    filesRef.current = nextFiles;
+    setFiles(nextFiles);
+
+    void (async () => {
+      try {
+        const downloadedFile = await downloadCobaltAudio(downloadRequest);
+        await hydrateDownloadedTrack(fileId, downloadedFile);
+      } catch (error) {
+        markDownloadError(fileId, error);
+      }
+    })();
   };
   const handleSaveAll = async () => {
     if (files.length === 0) return;
@@ -1133,6 +1164,7 @@ export default function AudioTagger() {
           onSelectLooseTrack={handleSelectLooseTrack}
           onClearSelection={handleClearSelection}
           onRemoveFile={handleRemoveFile}
+          onRetryDownload={handleRetryDownload}
           onAddAlbum={handleOpenCreateAlbumDialog}
           onEditAlbum={handleOpenEditAlbumDialog}
           onDownloadAlbum={handleDownloadAlbum}

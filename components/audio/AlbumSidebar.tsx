@@ -10,6 +10,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  RefreshCw,
   Upload,
   X,
 } from "lucide-react";
@@ -34,6 +35,7 @@ interface AlbumSidebarProps {
   onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
   onClearSelection: () => void;
   onRemoveFile: (fileId: string) => void;
+  onRetryDownload: (fileId: string) => void;
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
   onDownloadAlbum: (albumId: string) => void;
@@ -109,6 +111,7 @@ export default function AlbumSidebar({
   onSelectLooseTrack,
   onClearSelection,
   onRemoveFile,
+  onRetryDownload,
   onAddAlbum,
   onEditAlbum,
   onDownloadAlbum,
@@ -141,6 +144,10 @@ export default function AlbumSidebar({
     event.currentTarget.value = "";
     setUploadTargetAlbumId(null);
   };
+
+  const isRetryableError = (track: TagiumFile) =>
+    Boolean(track.downloadRequest) &&
+    (track.downloadStatus === "error" || track.status === "error");
 
   if (albums.length === 0 && looseTracks.length === 0) {
     return (
@@ -268,7 +275,12 @@ export default function AlbumSidebar({
                     <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
                   )}
                   {(track.downloadStatus === "error" || track.status === "error") && (
-                    <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+                    <AlertCircle
+                      className={cn(
+                        "h-3 w-3 text-red-500 flex-shrink-0",
+                        isRetryableError(track) ? "group-hover:opacity-0" : "",
+                      )}
+                    />
                   )}
                 </div>
                 {(track.downloadStatus === "error" || track.status === "error") &&
@@ -279,6 +291,20 @@ export default function AlbumSidebar({
                   )}
               </div>
             </Button>
+            {isRetryableError(track) && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRetryDownload(track.id);
+                }}
+                className="absolute right-7 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-full cursor-pointer"
+                title="Retry download"
+                aria-label={`Retry download for ${track.filename}`}
+              >
+                <RefreshCw className="h-3 w-3 text-muted-foreground hover:text-primary" />
+              </button>
+            )}
             <button
               type="button"
               onClick={(event) => {
@@ -503,7 +529,12 @@ export default function AlbumSidebar({
                                   <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
                                 )}
                               {(track.downloadStatus === "error" || track.status === "error") && (
-                                <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+                                <AlertCircle
+                                  className={cn(
+                                    "h-3 w-3 text-red-500 flex-shrink-0",
+                                    isRetryableError(track) ? "group-hover:opacity-0" : "",
+                                  )}
+                                />
                               )}
                             </div>
                             {(track.downloadStatus === "error" || track.status === "error") &&
@@ -517,6 +548,20 @@ export default function AlbumSidebar({
                               )}
                           </div>
                         </Button>
+                        {isRetryableError(track) && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onRetryDownload(track.id);
+                            }}
+                            className="absolute right-7 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-full cursor-pointer"
+                            title="Retry download"
+                            aria-label={`Retry download for ${track.filename}`}
+                          >
+                            <RefreshCw className="h-3 w-3 text-muted-foreground hover:text-primary" />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={(event) => {
