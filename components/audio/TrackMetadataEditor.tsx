@@ -43,6 +43,7 @@ export default function TrackMetadataEditor({
   const watchedTitle = useWatch({ control, name: "title" });
   const syncFilenames = selectedFileAlbum?.syncFilenames ?? false;
   const inAlbum = !!selectedFileAlbum;
+  const audioReady = Boolean(selectedFile?.file);
 
   if (!selectedFile || !selectedFile.metadata) {
     return (
@@ -60,6 +61,12 @@ export default function TrackMetadataEditor({
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full">
         <div className="p-6 h-[104px] border-b flex-shrink-0 flex flex-col justify-center gap-1">
           <h2 className="text-lg font-semibold truncate">{selectedFile.filename}</h2>
+          {(selectedFile.downloadStatus === "error" || selectedFile.status === "error") &&
+            selectedFile.downloadError && (
+              <p className="text-xs text-destructive truncate" aria-live="polite">
+                error: {selectedFile.downloadError}
+              </p>
+            )}
         </div>
         <div className="flex-1 overflow-y-auto p-6">
           <div className="flex gap-4 flex-col lg:flex-row">
@@ -137,7 +144,18 @@ export default function TrackMetadataEditor({
                 </div>
                 <div>
                   <span className="font-medium">size: </span>
-                  {(selectedFile.file.size / (1024 * 1024)).toFixed(2)} MB
+                  {selectedFile.file &&
+                    selectedFile.status !== "error" &&
+                    `${(selectedFile.file.size / (1024 * 1024)).toFixed(2)} MB`}
+                  {selectedFile.file &&
+                    selectedFile.status === "error" &&
+                    `${(selectedFile.file.size / (1024 * 1024)).toFixed(2)} MB (metadata failed)`}
+                  {!selectedFile.file &&
+                    selectedFile.downloadStatus === "downloading" &&
+                    "downloading"}
+                  {!selectedFile.file &&
+                    selectedFile.downloadStatus === "error" &&
+                    "download failed"}
                 </div>
               </div>
             </div>
@@ -148,6 +166,7 @@ export default function TrackMetadataEditor({
             variant="outline"
             type="button"
             onClick={() => onDownloadUpdatedFile(selectedFile)}
+            disabled={!audioReady}
           >
             Download
           </Button>

@@ -3,19 +3,26 @@
 import { useRef, useState } from "react";
 import { Music4, Link2, Download, Loader2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { downloadCobaltAudio, type AudioDownloadBitrate } from "./cobaltDownload";
+import type { AudioDownloadBitrate } from "./cobaltDownload";
 import { getDownloadErrorMessage } from "./downloadErrorMessage";
-import { isSoundCloudSetUrl, resolveSoundCloudSet, toImportedAlbumMetadata } from "./soundcloudSet";
-import type { ImportedAlbumMetadata } from "./types";
+import { isSoundCloudSetUrl, resolveSoundCloudSet, type SoundCloudSet } from "./soundcloudSet";
 
 const BITRATE_OPTIONS: AudioDownloadBitrate[] = ["320", "256", "128", "96", "64"];
 
 interface LandingScreenProps {
   onAudioUpload: (files: File[]) => void | Promise<void>;
-  onAlbumDownload: (files: File[], album: ImportedAlbumMetadata) => void | Promise<void>;
+  onAudioDownload: (sourceUrl: string, bitrate: AudioDownloadBitrate) => void | Promise<void>;
+  onSoundCloudSetDownload: (
+    set: SoundCloudSet,
+    bitrate: AudioDownloadBitrate,
+  ) => void | Promise<void>;
 }
 
-export default function LandingScreen({ onAudioUpload, onAlbumDownload }: LandingScreenProps) {
+export default function LandingScreen({
+  onAudioUpload,
+  onAudioDownload,
+  onSoundCloudSetDownload,
+}: LandingScreenProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -67,20 +74,13 @@ export default function LandingScreen({ onAudioUpload, onAlbumDownload }: Landin
     try {
       if (isSoundCloudSetUrl(trimmed)) {
         const set = await resolveSoundCloudSet(trimmed);
-        const downloadedFiles: File[] = [];
-        for (const [i, track] of set.tracks.entries()) {
-          setProgress(`${i + 1} / ${set.tracks.length}`);
-          downloadedFiles.push(
-            await downloadCobaltAudio({ sourceUrl: track.url, audioBitrate: bitrate }),
-          );
-        }
-        await onAlbumDownload(downloadedFiles, toImportedAlbumMetadata(set));
+        setProgress(`${set.tracks.length} tracks`);
+        await onSoundCloudSetDownload(set, bitrate);
         setUrl("");
         return;
       }
 
-      const file = await downloadCobaltAudio({ sourceUrl: trimmed, audioBitrate: bitrate });
-      await onAudioUpload([file]);
+      await onAudioDownload(trimmed, bitrate);
       setUrl("");
     } catch (err) {
       if (err instanceof Error) {

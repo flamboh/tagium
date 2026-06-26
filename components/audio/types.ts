@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AudioDownloadBitrate } from "./cobaltDownload";
 
 export const audioMetadataSchema = z.object({
   filename: z.string(),
@@ -25,9 +26,16 @@ export type AudioMetadata = z.infer<typeof audioMetadataSchema>;
 
 export interface TagiumFile {
   id: string;
-  file: File;
-  originalFile: File;
+  file?: File;
+  originalFile?: File;
   status: "pending" | "saved" | "error";
+  downloadStatus: "downloading" | "ready" | "error";
+  downloadError?: string;
+  downloadRequest?: {
+    sourceUrl: string;
+    audioBitrate: AudioDownloadBitrate;
+  };
+  hasBufferedChanges: boolean;
   filename: string;
   metadata?: AudioMetadata;
 }

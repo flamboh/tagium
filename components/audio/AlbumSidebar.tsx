@@ -2,7 +2,18 @@
 
 import type { ChangeEvent, DragEvent, MouseEvent as ReactMouseEvent } from "react";
 import { useRef, useState } from "react";
-import { AlertCircle, Check, Download, FileMusic, Pencil, Plus, Upload, X } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  Download,
+  FileMusic,
+  Loader2,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Upload,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -24,6 +35,7 @@ interface AlbumSidebarProps {
   onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
   onClearSelection: () => void;
   onRemoveFile: (fileId: string) => void;
+  onRetryDownload: (fileId: string) => void;
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
   onDownloadAlbum: (albumId: string) => void;
@@ -99,6 +111,7 @@ export default function AlbumSidebar({
   onSelectLooseTrack,
   onClearSelection,
   onRemoveFile,
+  onRetryDownload,
   onAddAlbum,
   onEditAlbum,
   onDownloadAlbum,
@@ -131,6 +144,10 @@ export default function AlbumSidebar({
     event.currentTarget.value = "";
     setUploadTargetAlbumId(null);
   };
+
+  const isRetryableError = (track: TagiumFile) =>
+    Boolean(track.downloadRequest) &&
+    (track.downloadStatus === "error" || track.status === "error");
 
   if (albums.length === 0 && looseTracks.length === 0) {
     return (
@@ -237,6 +254,7 @@ export default function AlbumSidebar({
               }}
               className={cn(
                 "justify-start h-auto py-2 px-2.5 w-full text-left font-normal pr-8 rounded-lg border bg-card/70",
+                track.downloadStatus === "downloading" ? "opacity-65" : "",
                 selectedFileIds.has(track.id)
                   ? "bg-accent text-accent-foreground border-primary/40"
                   : selectedFileId === track.id
@@ -245,18 +263,48 @@ export default function AlbumSidebar({
               )}
               onClick={(e) => onSelectLooseTrack(track.id, e)}
             >
-              <div className="flex items-center gap-2 w-full overflow-hidden">
-                <span className="w-5 text-[11px] text-muted-foreground">{index + 1}</span>
-                <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-                <span className="truncate text-sm flex-1">{track.filename}</span>
-                {track.status === "saved" && (
-                  <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
-                )}
-                {track.status === "error" && (
-                  <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
-                )}
+              <div className="flex flex-col gap-1 w-full min-w-0">
+                <div className="flex items-center gap-2 w-full overflow-hidden">
+                  <span className="w-5 text-[11px] text-muted-foreground">{index + 1}</span>
+                  <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                  <span className="truncate text-sm flex-1">{track.filename}</span>
+                  {track.downloadStatus === "downloading" && (
+                    <Loader2 className="h-3 w-3 text-muted-foreground flex-shrink-0 animate-spin" />
+                  )}
+                  {track.downloadStatus !== "downloading" && track.status === "saved" && (
+                    <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+                  )}
+                  {(track.downloadStatus === "error" || track.status === "error") && (
+                    <AlertCircle
+                      className={cn(
+                        "h-3 w-3 text-red-500 flex-shrink-0",
+                        isRetryableError(track) ? "group-hover:opacity-0" : "",
+                      )}
+                    />
+                  )}
+                </div>
+                {(track.downloadStatus === "error" || track.status === "error") &&
+                  track.downloadError && (
+                    <span className="pl-7 text-xs text-destructive truncate" aria-live="polite">
+                      error: {track.downloadError}
+                    </span>
+                  )}
               </div>
             </Button>
+            {isRetryableError(track) && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRetryDownload(track.id);
+                }}
+                className="absolute right-7 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-full cursor-pointer"
+                title="Retry download"
+                aria-label={`Retry download for ${track.filename}`}
+              >
+                <RefreshCw className="h-3 w-3 text-muted-foreground hover:text-primary" />
+              </button>
+            )}
             <button
               type="button"
               onClick={(event) => {
@@ -271,227 +319,268 @@ export default function AlbumSidebar({
           </div>
         ))}
 
-        {albums.map((album, albumIndex) => (
-          <div
-            key={album.id}
-            className={cn(
-              "rounded-lg border bg-card/70 transition-all",
-              selectedAlbumId === album.id ? "border-primary/40 shadow-sm" : "",
-              draggedAlbumId === album.id ? "opacity-50" : "",
-              dragOverAlbumIndex === albumIndex ? "ring-2 ring-primary" : "",
-            )}
-            onDragOver={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
+        {albums.map((album, albumIndex) => {
+          const canDownloadAlbum = album.trackIds.every((trackId) => filesById.get(trackId)?.file);
+          return (
+            <div
+              key={album.id}
+              className={cn(
+                "rounded-lg border bg-card/70 transition-all",
+                selectedAlbumId === album.id ? "border-primary/40 shadow-sm" : "",
+                draggedAlbumId === album.id ? "opacity-50" : "",
+                dragOverAlbumIndex === albumIndex ? "ring-2 ring-primary" : "",
+              )}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
 
-              const albumPayload = parseAlbumDragPayload(event);
-              if (albumPayload && albumPayload.albumId !== album.id) {
-                event.dataTransfer.dropEffect = "move";
-                const rect = event.currentTarget.getBoundingClientRect();
-                const position = (event.clientY - rect.top) / rect.height;
-                setDragOverAlbumIndex(position < 0.5 ? albumIndex : albumIndex + 1);
-              } else {
-                setDragOverAlbumIndex(null);
-              }
-
-              const trackPayload = parseDragPayload(event);
-              if (trackPayload) {
-                event.dataTransfer.dropEffect = "move";
-              }
-
-              // Handle external file drops
-              if (event.dataTransfer.types.includes("Files")) {
-                event.dataTransfer.dropEffect = "copy";
-              }
-            }}
-            onDragLeave={() => {
-              setDragOverAlbumIndex(null);
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-
-              // Handle external file drops
-              const files = Array.from(event.dataTransfer.files);
-              if (files.length > 0) {
-                const audioFiles = files.filter((file) => file.type.startsWith("audio/"));
-                if (audioFiles.length > 0) {
-                  onUploadToAlbum(album.id, audioFiles);
-                  return;
-                }
-              }
-
-              // Handle album reordering
-              const albumPayload = parseAlbumDragPayload(event);
-              if (albumPayload && albumPayload.albumId !== album.id) {
-                const sourceIndex = albums.findIndex((a) => a.id === albumPayload.albumId);
-                if (sourceIndex >= 0) {
+                const albumPayload = parseAlbumDragPayload(event);
+                if (albumPayload && albumPayload.albumId !== album.id) {
+                  event.dataTransfer.dropEffect = "move";
                   const rect = event.currentTarget.getBoundingClientRect();
                   const position = (event.clientY - rect.top) / rect.height;
-                  let targetIndex = position < 0.5 ? albumIndex : albumIndex + 1;
-                  // Adjust target index if dragging from before the target
-                  if (sourceIndex < targetIndex) {
-                    targetIndex -= 1;
-                  }
-                  onReorderAlbums(albumPayload.albumId, targetIndex);
+                  setDragOverAlbumIndex(position < 0.5 ? albumIndex : albumIndex + 1);
+                } else {
+                  setDragOverAlbumIndex(null);
                 }
-                setDraggedAlbumId(null);
-                setDragOverAlbumIndex(null);
-                return;
-              }
 
-              // Handle track drag
-              const trackPayload = parseDragPayload(event);
-              if (trackPayload) {
-                onMoveTrackToAlbum(trackPayload.trackId, album.id, "append");
-                return;
-              }
-            }}
-          >
-            <div className="w-full flex items-center justify-between gap-1 px-2 py-1 border-b">
-              <button
-                type="button"
-                className="min-w-0 flex-1 flex items-center gap-2 px-1 py-1 text-left hover:bg-accent/30 rounded cursor-pointer"
-                onClick={(e) => onSelectAlbum(album.id, e)}
-                draggable
-                onDragStart={(event) => {
-                  const payload: AlbumDragPayload = {
-                    albumId: album.id,
-                  };
-                  event.dataTransfer.setData(ALBUM_DRAG_TYPE, JSON.stringify(payload));
-                  event.dataTransfer.effectAllowed = "move";
-                  setDraggedAlbumId(album.id);
-                }}
-                onDragEnd={() => {
+                const trackPayload = parseDragPayload(event);
+                if (trackPayload) {
+                  event.dataTransfer.dropEffect = "move";
+                }
+
+                // Handle external file drops
+                if (event.dataTransfer.types.includes("Files")) {
+                  event.dataTransfer.dropEffect = "copy";
+                }
+              }}
+              onDragLeave={() => {
+                setDragOverAlbumIndex(null);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                // Handle external file drops
+                const files = Array.from(event.dataTransfer.files);
+                if (files.length > 0) {
+                  const audioFiles = files.filter((file) => file.type.startsWith("audio/"));
+                  if (audioFiles.length > 0) {
+                    onUploadToAlbum(album.id, audioFiles);
+                    return;
+                  }
+                }
+
+                // Handle album reordering
+                const albumPayload = parseAlbumDragPayload(event);
+                if (albumPayload && albumPayload.albumId !== album.id) {
+                  const sourceIndex = albums.findIndex((a) => a.id === albumPayload.albumId);
+                  if (sourceIndex >= 0) {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    const position = (event.clientY - rect.top) / rect.height;
+                    let targetIndex = position < 0.5 ? albumIndex : albumIndex + 1;
+                    // Adjust target index if dragging from before the target
+                    if (sourceIndex < targetIndex) {
+                      targetIndex -= 1;
+                    }
+                    onReorderAlbums(albumPayload.albumId, targetIndex);
+                  }
                   setDraggedAlbumId(null);
                   setDragOverAlbumIndex(null);
-                }}
-              >
-                <AlbumCoverThumb picture={album.cover} />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium truncate leading-tight">{album.title}</div>
-                  <div className="text-xs text-muted-foreground truncate leading-tight">
-                    {album.artist || "Unknown"} &middot; {album.trackIds.length} track
-                    {album.trackIds.length !== 1 ? "s" : ""}
-                  </div>
-                </div>
-              </button>
-              <span className="text-xs text-muted-foreground">{album.trackIds.length}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => triggerAlbumUpload(album.id)}
-                aria-label={`Upload tracks to ${album.title}`}
-              >
-                <Upload className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => onDownloadAlbum(album.id)}
-                aria-label={`Download ${album.title}`}
-              >
-                <Download className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => onEditAlbum(album.id)}
-                aria-label={`Edit ${album.title}`}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-            <div className="p-1 flex flex-col gap-1">
-              {album.trackIds.length === 0 ? (
-                <div className="text-xs text-muted-foreground px-2 py-3 text-center border border-dashed rounded-md">
-                  drag tracks here
-                </div>
-              ) : (
-                album.trackIds.map((trackId, index) => {
-                  const track = filesById.get(trackId);
-                  if (!track) return null;
+                  return;
+                }
 
-                  return (
-                    <div
-                      key={track.id}
-                      className="relative group"
-                      onDragOver={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        const payload = parseDragPayload(event);
-                        if (payload && payload.trackId !== track.id) {
-                          event.dataTransfer.dropEffect = "move";
-                        }
-                      }}
-                      onDrop={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        const payload = parseDragPayload(event);
-                        if (!payload || payload.trackId === track.id) return;
-                        const placement = placementForRowDrop(event);
-                        onMoveTrackToAlbum(payload.trackId, album.id, placement, track.id);
-                      }}
-                    >
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        draggable
-                        onDragStart={(event) => {
-                          const payload: DragPayload = {
-                            trackId: track.id,
-                            container: "album",
-                            albumId: album.id,
-                          };
-                          event.dataTransfer.setData(TRACK_DRAG_TYPE, JSON.stringify(payload));
-                          event.dataTransfer.effectAllowed = "move";
-                        }}
-                        className={cn(
-                          "justify-start h-auto py-2 px-2.5 w-full text-left font-normal pr-8",
-                          selectedFileIds.has(track.id)
-                            ? "bg-accent text-accent-foreground border-primary/40"
-                            : selectedFileId === track.id
-                              ? "bg-accent/50 text-accent-foreground"
-                              : "",
-                        )}
-                        onClick={(e) => onSelectFile(album.id, track.id, e)}
-                      >
-                        <div className="flex items-center gap-2 w-full overflow-hidden">
-                          <span className="w-5 text-[11px] text-muted-foreground">{index + 1}</span>
-                          <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-                          <span className="truncate text-sm flex-1">{track.filename}</span>
-                          {track.status === "saved" && (
-                            <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
-                          )}
-                          {track.status === "error" && (
-                            <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
-                          )}
-                        </div>
-                      </Button>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onRemoveFile(track.id);
-                        }}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
-                        title="Remove track"
-                      >
-                        <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                      </button>
+                // Handle track drag
+                const trackPayload = parseDragPayload(event);
+                if (trackPayload) {
+                  onMoveTrackToAlbum(trackPayload.trackId, album.id, "append");
+                  return;
+                }
+              }}
+            >
+              <div className="w-full flex items-center justify-between gap-1 px-2 py-1 border-b">
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 flex items-center gap-2 px-1 py-1 text-left hover:bg-accent/30 rounded cursor-pointer"
+                  onClick={(e) => onSelectAlbum(album.id, e)}
+                  draggable
+                  onDragStart={(event) => {
+                    const payload: AlbumDragPayload = {
+                      albumId: album.id,
+                    };
+                    event.dataTransfer.setData(ALBUM_DRAG_TYPE, JSON.stringify(payload));
+                    event.dataTransfer.effectAllowed = "move";
+                    setDraggedAlbumId(album.id);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedAlbumId(null);
+                    setDragOverAlbumIndex(null);
+                  }}
+                >
+                  <AlbumCoverThumb picture={album.cover} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate leading-tight">{album.title}</div>
+                    <div className="text-xs text-muted-foreground truncate leading-tight">
+                      {album.artist || "Unknown"} &middot; {album.trackIds.length} track
+                      {album.trackIds.length !== 1 ? "s" : ""}
                     </div>
-                  );
-                })
-              )}
+                  </div>
+                </button>
+                <span className="text-xs text-muted-foreground">{album.trackIds.length}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => triggerAlbumUpload(album.id)}
+                  aria-label={`Upload tracks to ${album.title}`}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => onDownloadAlbum(album.id)}
+                  disabled={!canDownloadAlbum}
+                  aria-label={`Download ${album.title}`}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => onEditAlbum(album.id)}
+                  aria-label={`Edit ${album.title}`}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <div className="p-1 flex flex-col gap-1">
+                {album.trackIds.length === 0 ? (
+                  <div className="text-xs text-muted-foreground px-2 py-3 text-center border border-dashed rounded-md">
+                    drag tracks here
+                  </div>
+                ) : (
+                  album.trackIds.map((trackId, index) => {
+                    const track = filesById.get(trackId);
+                    if (!track) return null;
+
+                    return (
+                      <div
+                        key={track.id}
+                        className="relative group"
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const payload = parseDragPayload(event);
+                          if (payload && payload.trackId !== track.id) {
+                            event.dataTransfer.dropEffect = "move";
+                          }
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const payload = parseDragPayload(event);
+                          if (!payload || payload.trackId === track.id) return;
+                          const placement = placementForRowDrop(event);
+                          onMoveTrackToAlbum(payload.trackId, album.id, placement, track.id);
+                        }}
+                      >
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          draggable
+                          onDragStart={(event) => {
+                            const payload: DragPayload = {
+                              trackId: track.id,
+                              container: "album",
+                              albumId: album.id,
+                            };
+                            event.dataTransfer.setData(TRACK_DRAG_TYPE, JSON.stringify(payload));
+                            event.dataTransfer.effectAllowed = "move";
+                          }}
+                          className={cn(
+                            "justify-start h-auto py-2 px-2.5 w-full text-left font-normal pr-8",
+                            track.downloadStatus === "downloading" ? "opacity-65" : "",
+                            selectedFileIds.has(track.id)
+                              ? "bg-accent text-accent-foreground border-primary/40"
+                              : selectedFileId === track.id
+                                ? "bg-accent/50 text-accent-foreground"
+                                : "",
+                          )}
+                          onClick={(e) => onSelectFile(album.id, track.id, e)}
+                        >
+                          <div className="flex flex-col gap-1 w-full min-w-0">
+                            <div className="flex items-center gap-2 w-full overflow-hidden">
+                              <span className="w-5 text-[11px] text-muted-foreground">
+                                {index + 1}
+                              </span>
+                              <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                              <span className="truncate text-sm flex-1">{track.filename}</span>
+                              {track.downloadStatus === "downloading" && (
+                                <Loader2 className="h-3 w-3 text-muted-foreground flex-shrink-0 animate-spin" />
+                              )}
+                              {track.downloadStatus !== "downloading" &&
+                                track.status === "saved" && (
+                                  <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+                                )}
+                              {(track.downloadStatus === "error" || track.status === "error") && (
+                                <AlertCircle
+                                  className={cn(
+                                    "h-3 w-3 text-red-500 flex-shrink-0",
+                                    isRetryableError(track) ? "group-hover:opacity-0" : "",
+                                  )}
+                                />
+                              )}
+                            </div>
+                            {(track.downloadStatus === "error" || track.status === "error") &&
+                              track.downloadError && (
+                                <span
+                                  className="pl-7 text-xs text-destructive truncate"
+                                  aria-live="polite"
+                                >
+                                  error: {track.downloadError}
+                                </span>
+                              )}
+                          </div>
+                        </Button>
+                        {isRetryableError(track) && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onRetryDownload(track.id);
+                            }}
+                            className="absolute right-7 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-full cursor-pointer"
+                            title="Retry download"
+                            aria-label={`Retry download for ${track.filename}`}
+                          >
+                            <RefreshCw className="h-3 w-3 text-muted-foreground hover:text-primary" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onRemoveFile(track.id);
+                          }}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
+                          title="Remove track"
+                        >
+                          <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

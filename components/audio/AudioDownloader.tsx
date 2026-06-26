@@ -5,19 +5,24 @@ import { useState } from "react";
 import { Download, Loader2, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { downloadCobaltAudio, type AudioDownloadBitrate } from "./cobaltDownload";
+import type { AudioDownloadBitrate } from "./cobaltDownload";
 import { getDownloadErrorMessage } from "./downloadErrorMessage";
-import { isSoundCloudSetUrl, resolveSoundCloudSet, toImportedAlbumMetadata } from "./soundcloudSet";
-import { ImportedAlbumMetadata } from "./types";
+import { isSoundCloudSetUrl, resolveSoundCloudSet, type SoundCloudSet } from "./soundcloudSet";
 
 const bitrateOptions: AudioDownloadBitrate[] = ["320", "256", "128", "96", "64"];
 
 interface AudioDownloaderProps {
-  onAudioUpload: (audio: File[]) => void | Promise<void>;
-  onAlbumDownload: (audio: File[], album: ImportedAlbumMetadata) => void | Promise<void>;
+  onAudioDownload: (sourceUrl: string, bitrate: AudioDownloadBitrate) => void | Promise<void>;
+  onSoundCloudSetDownload: (
+    set: SoundCloudSet,
+    bitrate: AudioDownloadBitrate,
+  ) => void | Promise<void>;
 }
 
-export default function AudioDownloader({ onAudioUpload, onAlbumDownload }: AudioDownloaderProps) {
+export default function AudioDownloader({
+  onAudioDownload,
+  onSoundCloudSetDownload,
+}: AudioDownloaderProps) {
   const [sourceUrl, setSourceUrl] = useState("");
   const [audioBitrate, setAudioBitrate] = useState<AudioDownloadBitrate>("320");
   const [downloading, setDownloading] = useState(false);
@@ -40,28 +45,13 @@ export default function AudioDownloader({ onAudioUpload, onAlbumDownload }: Audi
     try {
       if (isSoundCloudSetUrl(trimmedUrl)) {
         const set = await resolveSoundCloudSet(trimmedUrl);
-        const downloadedFiles: File[] = [];
-
-        for (const [index, track] of set.tracks.entries()) {
-          setProgress(`${index + 1}/${set.tracks.length}`);
-          downloadedFiles.push(
-            await downloadCobaltAudio({
-              sourceUrl: track.url,
-              audioBitrate,
-            }),
-          );
-        }
-
-        await onAlbumDownload(downloadedFiles, toImportedAlbumMetadata(set));
+        setProgress(`${set.tracks.length} tracks`);
+        await onSoundCloudSetDownload(set, audioBitrate);
         setSourceUrl("");
         return;
       }
 
-      const file = await downloadCobaltAudio({
-        sourceUrl: trimmedUrl,
-        audioBitrate,
-      });
-      await onAudioUpload([file]);
+      await onAudioDownload(trimmedUrl, audioBitrate);
       setSourceUrl("");
     } catch (caughtError) {
       let message = "Download failed.";
