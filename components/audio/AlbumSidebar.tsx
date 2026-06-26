@@ -1,7 +1,7 @@
 "use client";
 
-import type { ChangeEvent, DragEvent, MouseEvent as ReactMouseEvent } from "react";
-import { useRef, useState } from "react";
+import type { DragEvent, MouseEvent as ReactMouseEvent } from "react";
+import { useState } from "react";
 import {
   AlertCircle,
   Check,
@@ -11,11 +11,9 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  Upload,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { AlbumCoverThumb } from "./AlbumCoverThumb";
 import { AlbumGroup, TagiumFile } from "./types";
@@ -122,28 +120,12 @@ export default function AlbumSidebar({
   onReorderAlbums,
   onAudioUpload,
 }: AlbumSidebarProps) {
-  const albumUploadInputRef = useRef<HTMLInputElement>(null);
-  const [uploadTargetAlbumId, setUploadTargetAlbumId] = useState<string | null>(null);
   const [draggedAlbumId, setDraggedAlbumId] = useState<string | null>(null);
   const [dragOverAlbumIndex, setDragOverAlbumIndex] = useState<number | null>(null);
   const filesById = new Map(files.map((file) => [file.id, file]));
   const looseTracks = looseTrackIds
     .map((trackId) => filesById.get(trackId))
     .filter((track): track is TagiumFile => Boolean(track));
-
-  const triggerAlbumUpload = (albumId: string) => {
-    setUploadTargetAlbumId(albumId);
-    albumUploadInputRef.current?.click();
-  };
-
-  const handleAlbumUpload = (event: ChangeEvent<HTMLInputElement>) => {
-    const uploadedFiles = Array.from(event.target.files || []);
-    if (uploadedFiles.length > 0 && uploadTargetAlbumId) {
-      onUploadToAlbum(uploadTargetAlbumId, uploadedFiles);
-    }
-    event.currentTarget.value = "";
-    setUploadTargetAlbumId(null);
-  };
 
   const isRetryableError = (track: TagiumFile) =>
     Boolean(track.downloadRequest) &&
@@ -164,25 +146,17 @@ export default function AlbumSidebar({
 
   return (
     <div className="w-full flex-1 min-h-0 flex flex-col">
-      <Input
-        type="file"
-        className="hidden"
-        accept="audio/*"
-        multiple
-        ref={albumUploadInputRef}
-        onChange={handleAlbumUpload}
-      />
-      <div className="pb-2 pl-6 border-b flex items-center justify-between pr-3">
-        <span className="font-semibold text-sm text-muted-foreground">
+      <div className="h-12 px-4 border-b flex items-center justify-between flex-shrink-0">
+        <span className="font-semibold text-sm leading-none text-muted-foreground">
           library ({files.length})
         </span>
-        <Button type="button" variant="ghost" size="sm" onClick={onAddAlbum}>
+        <Button type="button" variant="ghost" size="icon" className="size-8" onClick={onAddAlbum}>
           <Plus className="h-4 w-4" />
         </Button>
       </div>
 
       <div
-        className="flex-1 overflow-y-auto p-2 flex flex-col gap-2"
+        className="flex-1 overflow-y-auto flex flex-col"
         onClick={(event) => {
           if (event.target === event.currentTarget) {
             onClearSelection();
@@ -214,11 +188,13 @@ export default function AlbumSidebar({
           }
         }}
       >
-        {looseTracks.map((track, index) => (
+        {looseTracks.map((track) => (
           <div
             key={track.id}
-            className="relative group"
+            className="relative group border-b"
             onDragOver={(event) => {
+              if (event.dataTransfer.types.includes("Files")) return;
+
               event.preventDefault();
               event.stopPropagation();
               const payload = parseDragPayload(event);
@@ -227,6 +203,8 @@ export default function AlbumSidebar({
               }
             }}
             onDrop={(event) => {
+              if (event.dataTransfer.files.length > 0) return;
+
               event.preventDefault();
               event.stopPropagation();
               const payload = parseDragPayload(event);
@@ -253,10 +231,10 @@ export default function AlbumSidebar({
                 event.dataTransfer.effectAllowed = "move";
               }}
               className={cn(
-                "justify-start h-auto py-2 px-2.5 w-full text-left font-normal pr-8 rounded-lg border bg-card/70",
+                "justify-start h-auto py-3 px-4 w-full text-left font-normal pr-8 rounded-none hover:bg-accent/30",
                 track.downloadStatus === "downloading" ? "opacity-65" : "",
                 selectedFileIds.has(track.id)
-                  ? "bg-accent text-accent-foreground border-primary/40"
+                  ? "bg-accent text-accent-foreground"
                   : selectedFileId === track.id
                     ? "bg-accent/50 text-accent-foreground"
                     : "",
@@ -265,7 +243,6 @@ export default function AlbumSidebar({
             >
               <div className="flex flex-col gap-1 w-full min-w-0">
                 <div className="flex items-center gap-2 w-full overflow-hidden">
-                  <span className="w-5 text-[11px] text-muted-foreground">{index + 1}</span>
                   <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                   <span className="truncate text-sm flex-1">{track.filename}</span>
                   {track.downloadStatus === "downloading" && (
@@ -311,7 +288,7 @@ export default function AlbumSidebar({
                 event.stopPropagation();
                 onRemoveFile(track.id);
               }}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
+              className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
               title="Remove track"
             >
               <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
@@ -325,10 +302,10 @@ export default function AlbumSidebar({
             <div
               key={album.id}
               className={cn(
-                "rounded-lg border bg-card/70 transition-all",
-                selectedAlbumId === album.id ? "border-primary/40 shadow-sm" : "",
+                "border-b transition-all",
+                selectedAlbumId === album.id ? "bg-primary/5" : "",
                 draggedAlbumId === album.id ? "opacity-50" : "",
-                dragOverAlbumIndex === albumIndex ? "ring-2 ring-primary" : "",
+                dragOverAlbumIndex === albumIndex ? "shadow-[inset_0_0_0_2px_var(--primary)]" : "",
               )}
               onDragOver={(event) => {
                 event.preventDefault();
@@ -398,10 +375,10 @@ export default function AlbumSidebar({
                 }
               }}
             >
-              <div className="w-full flex items-center justify-between gap-1 px-2 py-1 border-b">
+              <div className="w-full flex items-center justify-between gap-1 px-3 py-3 border-b">
                 <button
                   type="button"
-                  className="min-w-0 flex-1 flex items-center gap-2 px-1 py-1 text-left hover:bg-accent/30 rounded cursor-pointer"
+                  className="min-w-0 flex-1 flex items-center gap-2 text-left cursor-pointer"
                   onClick={(e) => onSelectAlbum(album.id, e)}
                   draggable
                   onDragStart={(event) => {
@@ -426,17 +403,6 @@ export default function AlbumSidebar({
                     </div>
                   </div>
                 </button>
-                <span className="text-xs text-muted-foreground">{album.trackIds.length}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => triggerAlbumUpload(album.id)}
-                  aria-label={`Upload tracks to ${album.title}`}
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                </Button>
                 <Button
                   type="button"
                   variant="ghost"
@@ -459,9 +425,9 @@ export default function AlbumSidebar({
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
               </div>
-              <div className="p-1 flex flex-col gap-1">
+              <div className="flex flex-col">
                 {album.trackIds.length === 0 ? (
-                  <div className="text-xs text-muted-foreground px-2 py-3 text-center border border-dashed rounded-md">
+                  <div className="text-xs text-muted-foreground px-4 py-3 text-center">
                     drag tracks here
                   </div>
                 ) : (
@@ -472,8 +438,10 @@ export default function AlbumSidebar({
                     return (
                       <div
                         key={track.id}
-                        className="relative group"
+                        className="relative group border-t first:border-t-0"
                         onDragOver={(event) => {
+                          if (event.dataTransfer.types.includes("Files")) return;
+
                           event.preventDefault();
                           event.stopPropagation();
                           const payload = parseDragPayload(event);
@@ -482,6 +450,8 @@ export default function AlbumSidebar({
                           }
                         }}
                         onDrop={(event) => {
+                          if (event.dataTransfer.files.length > 0) return;
+
                           event.preventDefault();
                           event.stopPropagation();
                           const payload = parseDragPayload(event);
@@ -504,10 +474,10 @@ export default function AlbumSidebar({
                             event.dataTransfer.effectAllowed = "move";
                           }}
                           className={cn(
-                            "justify-start h-auto py-2 px-2.5 w-full text-left font-normal pr-8",
+                            "justify-start h-auto py-2.5 px-4 w-full text-left font-normal pr-8 rounded-none hover:bg-accent/30",
                             track.downloadStatus === "downloading" ? "opacity-65" : "",
                             selectedFileIds.has(track.id)
-                              ? "bg-accent text-accent-foreground border-primary/40"
+                              ? "bg-accent text-accent-foreground"
                               : selectedFileId === track.id
                                 ? "bg-accent/50 text-accent-foreground"
                                 : "",
@@ -515,11 +485,10 @@ export default function AlbumSidebar({
                           onClick={(e) => onSelectFile(album.id, track.id, e)}
                         >
                           <div className="flex flex-col gap-1 w-full min-w-0">
-                            <div className="flex items-center gap-2 w-full overflow-hidden">
-                              <span className="w-5 text-[11px] text-muted-foreground">
+                            <div className="flex items-center gap-1.5 w-full overflow-hidden">
+                              <span className="min-w-3 text-[11px] text-muted-foreground">
                                 {index + 1}
                               </span>
-                              <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                               <span className="truncate text-sm flex-1">{track.filename}</span>
                               {track.downloadStatus === "downloading" && (
                                 <Loader2 className="h-3 w-3 text-muted-foreground flex-shrink-0 animate-spin" />
@@ -568,7 +537,7 @@ export default function AlbumSidebar({
                             event.stopPropagation();
                             onRemoveFile(track.id);
                           }}
-                          className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
                           title="Remove track"
                         >
                           <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />

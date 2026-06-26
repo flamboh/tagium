@@ -3,19 +3,13 @@
 import { useRef, useState } from "react";
 import { Music4, Link2, Download, Loader2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AudioDownloadBitrate } from "./cobaltDownload";
 import { getDownloadErrorMessage } from "./downloadErrorMessage";
 import { isSoundCloudSetUrl, resolveSoundCloudSet, type SoundCloudSet } from "./soundcloudSet";
 
-const BITRATE_OPTIONS: AudioDownloadBitrate[] = ["320", "256", "128", "96", "64"];
-
 interface LandingScreenProps {
   onAudioUpload: (files: File[]) => void | Promise<void>;
-  onAudioDownload: (sourceUrl: string, bitrate: AudioDownloadBitrate) => void | Promise<void>;
-  onSoundCloudSetDownload: (
-    set: SoundCloudSet,
-    bitrate: AudioDownloadBitrate,
-  ) => void | Promise<void>;
+  onAudioDownload: (sourceUrl: string) => void | Promise<void>;
+  onSoundCloudSetDownload: (set: SoundCloudSet) => void | Promise<void>;
 }
 
 export default function LandingScreen({
@@ -27,7 +21,6 @@ export default function LandingScreen({
   const dragCounterRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
   const [url, setUrl] = useState("");
-  const [bitrate, setBitrate] = useState<AudioDownloadBitrate>("320");
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -75,12 +68,12 @@ export default function LandingScreen({
       if (isSoundCloudSetUrl(trimmed)) {
         const set = await resolveSoundCloudSet(trimmed);
         setProgress(`${set.tracks.length} tracks`);
-        await onSoundCloudSetDownload(set, bitrate);
+        await onSoundCloudSetDownload(set);
         setUrl("");
         return;
       }
 
-      await onAudioDownload(trimmed, bitrate);
+      await onAudioDownload(trimmed);
       setUrl("");
     } catch (err) {
       if (err instanceof Error) {
@@ -171,19 +164,6 @@ export default function LandingScreen({
                 className="w-full h-10 rounded-lg border border-input bg-transparent pl-9 pr-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-ring transition-shadow disabled:opacity-50 placeholder:text-muted-foreground"
               />
             </div>
-            <select
-              value={bitrate}
-              onChange={(e) => setBitrate(e.target.value as AudioDownloadBitrate)}
-              disabled={downloading}
-              aria-label="Audio bitrate"
-              className="h-10 rounded-lg border border-input bg-transparent px-2 text-sm shadow-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-            >
-              {BITRATE_OPTIONS.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
             <button
               type="submit"
               disabled={!url.trim() || downloading}

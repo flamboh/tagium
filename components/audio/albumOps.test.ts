@@ -52,5 +52,20 @@ describe("albumOps", () => {
     expect(result.albums[0].artist).toBe("Tagged Artist");
     expect(result.albums[0].genre).toBe("Rock");
     expect(result.albums[0].trackIds).toEqual(["track-1", "track-10"]);
+    expect(result.albumsToSync).toEqual([result.albums[0].id]);
+  });
+
+  it("uses settings for uploaded album track-number defaults", () => {
+    const result = mergeUploadedTracksIntoAlbums(
+      [],
+      [upload("track-1", { title: "Tagged Album", artist: "Tagged Artist", genre: "Rock" }, 1)],
+      {
+        settings: {
+          syncTrackNumbers: false,
+        },
+      },
+    );
+
+    expect(result.albumsToSync).toEqual([]);
   });
 });

@@ -9,7 +9,6 @@ import {
   useWatch,
 } from "react-hook-form";
 import filenamify from "filenamify";
-import AudioUpload from "./audioUpload";
 import CoverArt from "./coverArt";
 import { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
 import { Button } from "../ui/button";
@@ -24,8 +23,9 @@ interface TrackMetadataEditorProps {
   onSubmit: SubmitHandler<AudioMetadata>;
   onTrackCoverUpload: (file: File) => void;
   onDownloadUpdatedFile: (file: TagiumFile) => void;
-  onAudioUpload: (files: File[]) => void;
   selectedFileAlbum: AlbumGroup | undefined;
+  syncFilenames: boolean;
+  syncTrackNumbers: boolean;
 }
 
 export default function TrackMetadataEditor({
@@ -37,11 +37,11 @@ export default function TrackMetadataEditor({
   onSubmit,
   onTrackCoverUpload,
   onDownloadUpdatedFile,
-  onAudioUpload,
   selectedFileAlbum,
+  syncFilenames,
+  syncTrackNumbers,
 }: TrackMetadataEditorProps) {
   const watchedTitle = useWatch({ control, name: "title" });
-  const syncFilenames = selectedFileAlbum?.syncFilenames ?? false;
   const inAlbum = !!selectedFileAlbum;
   const audioReady = Boolean(selectedFile?.file);
 
@@ -49,8 +49,7 @@ export default function TrackMetadataEditor({
     return (
       <div className="flex-1 flex items-center justify-center bg-muted/5">
         <div className="text-center">
-          <p className="text-muted-foreground mb-4">Select a track to edit its tags</p>
-          <AudioUpload onAudioUpload={onAudioUpload} />
+          <p className="text-muted-foreground">Select a track to edit its tags</p>
         </div>
       </div>
     );
@@ -68,7 +67,7 @@ export default function TrackMetadataEditor({
               </p>
             )}
         </div>
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 pb-28">
           <div className="flex gap-4 flex-col lg:flex-row">
             <Controller
               name="picture"
@@ -133,11 +132,11 @@ export default function TrackMetadataEditor({
                   type="number"
                   {...register("trackNumber", { valueAsNumber: true })}
                   placeholder="2"
-                  disabled={selectedFileAlbum?.syncTrackNumbers}
+                  disabled={inAlbum && syncTrackNumbers}
                   className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm pt-2 border-t">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                 <div>
                   <span className="font-medium">duration: </span>
                   {`${Math.floor(selectedFile.metadata.duration / 60)}:${String(Math.round(selectedFile.metadata.duration % 60)).padStart(2, "0")}`}
@@ -158,19 +157,19 @@ export default function TrackMetadataEditor({
                     "download failed"}
                 </div>
               </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => onDownloadUpdatedFile(selectedFile)}
+                  disabled={!audioReady}
+                >
+                  Download
+                </Button>
+                <Button type="submit">Save Changes</Button>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="p-6 border-t flex-shrink-0 flex justify-end gap-2">
-          <Button
-            variant="outline"
-            type="button"
-            onClick={() => onDownloadUpdatedFile(selectedFile)}
-            disabled={!audioReady}
-          >
-            Download
-          </Button>
-          <Button type="submit">Save Changes</Button>
         </div>
       </form>
     </div>
