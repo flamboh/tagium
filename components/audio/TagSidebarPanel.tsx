@@ -4,7 +4,9 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import AudioUpload from "./audioUpload";
 import AudioDownloader from "./AudioDownloader";
 import AlbumSidebar from "./AlbumSidebar";
-import { AlbumGroup, ImportedAlbumMetadata, TagiumFile } from "./types";
+import type { AudioDownloadBitrate } from "./cobaltDownload";
+import type { SoundCloudSet } from "./soundcloudSet";
+import { AlbumGroup, TagiumFile } from "./types";
 import { Button } from "../ui/button";
 
 interface TagSidebarPanelProps {
@@ -16,7 +18,8 @@ interface TagSidebarPanelProps {
   selectedFileId: string | null;
   selectedFileIds: Set<string>;
   onAudioUpload: (files: File[]) => void;
-  onAlbumDownload: (files: File[], album: ImportedAlbumMetadata) => void;
+  onAudioDownload: (sourceUrl: string, bitrate: AudioDownloadBitrate) => void;
+  onSoundCloudSetDownload: (set: SoundCloudSet, bitrate: AudioDownloadBitrate) => void;
   onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
   onSelectFile: (albumId: string, fileId: string, event?: ReactMouseEvent) => void;
   onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
@@ -51,7 +54,8 @@ export default function TagSidebarPanel({
   selectedFileId,
   selectedFileIds,
   onAudioUpload,
-  onAlbumDownload,
+  onAudioDownload,
+  onSoundCloudSetDownload,
   onSelectAlbum,
   onSelectFile,
   onSelectLooseTrack,
@@ -74,7 +78,10 @@ export default function TagSidebarPanel({
       </div>
 
       <div className="px-3 py-3 border-b flex flex-col gap-2 flex-shrink-0">
-        <AudioDownloader onAudioUpload={onAudioUpload} onAlbumDownload={onAlbumDownload} />
+        <AudioDownloader
+          onAudioDownload={onAudioDownload}
+          onSoundCloudSetDownload={onSoundCloudSetDownload}
+        />
         <AudioUpload onAudioUpload={onAudioUpload} />
       </div>
 
