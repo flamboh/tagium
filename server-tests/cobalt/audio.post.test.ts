@@ -44,7 +44,7 @@ describe("cobalt audio endpoint", () => {
     vi.unstubAllGlobals();
   });
 
-  it("requests YouTube HLS and retries without HLS only when Cobalt has no HLS streams", async () => {
+  it("requests non-HLS Cobalt audio", async () => {
     const cobaltBodies: unknown[] = [];
     const audioTunnel =
       "https://cobalt.test/tunnel?id=123456789012345678901&exp=1234567890123&sig=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&sec=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&iv=cccccccccccccccccccccc";
@@ -52,15 +52,6 @@ describe("cobalt audio endpoint", () => {
       "https://cobalt.test/tunnel?id=223456789012345678901&exp=1234567890123&sig=ddddddddddddddddddddddddddddddddddddddddddd&sec=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee&iv=ffffffffffffffffffffff";
     const fetchMock = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
       cobaltBodies.push(JSON.parse(init?.body as string));
-
-      if (cobaltBodies.length === 1) {
-        return Response.json({
-          status: "error",
-          error: {
-            code: "error.api.youtube.no_hls_streams",
-          },
-        });
-      }
 
       return Response.json({
         status: "local-processing",
@@ -89,7 +80,7 @@ describe("cobalt audio endpoint", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(cobaltBodies).toMatchObject([{ youtubeHLS: true }, { youtubeHLS: false }]);
+    expect(cobaltBodies).toMatchObject([{ youtubeHLS: false }]);
     expect(body).toMatchObject({
       status: "local-processing",
       tunnel: [
