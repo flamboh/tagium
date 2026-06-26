@@ -25,6 +25,7 @@ interface TagSidebarPanelProps {
   onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
   onClearSelection: () => void;
   onRemoveFile: (fileId: string) => void;
+  onRetryDownload: (fileId: string) => void;
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
   onDownloadAlbum: (albumId: string) => void;
@@ -61,6 +62,7 @@ export default function TagSidebarPanel({
   onSelectLooseTrack,
   onClearSelection,
   onRemoveFile,
+  onRetryDownload,
   onAddAlbum,
   onEditAlbum,
   onDownloadAlbum,
@@ -97,6 +99,7 @@ export default function TagSidebarPanel({
         onSelectLooseTrack={onSelectLooseTrack}
         onClearSelection={onClearSelection}
         onRemoveFile={onRemoveFile}
+        onRetryDownload={onRetryDownload}
         onAddAlbum={onAddAlbum}
         onEditAlbum={onEditAlbum}
         onDownloadAlbum={onDownloadAlbum}
