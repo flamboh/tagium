@@ -86,7 +86,6 @@ type CloudflareRequest = Request & {
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 120;
 const COBALT_REQUEST_TIMEOUT_MS = 300_000;
-const YOUTUBE_HLS_UNAVAILABLE_ERROR = "error.api.youtube.no_hls_streams";
 const rateLimitBuckets = new Map<string, { startedAt: number; count: number }>();
 
 const getRuntimeEnv = (request: Request): CobaltRuntimeEnv => ({
@@ -192,7 +191,6 @@ const requestCobaltAudio = async (
   runtimeEnv: CobaltRuntimeEnv,
   url: string,
   audioBitrate: string,
-  youtubeHLS: boolean,
 ) => {
   let response: Response;
 
@@ -211,7 +209,7 @@ const requestCobaltAudio = async (
         alwaysProxy: true,
         localProcessing: "forced",
         filenameStyle: "pretty",
-        youtubeHLS,
+        youtubeHLS: false,
       }),
     });
   } catch (error) {
@@ -239,23 +237,6 @@ const requestCobaltAudio = async (
       error: { code },
     } satisfies CobaltResponse;
   }
-};
-
-const requestCobaltAudioWithHlsFallback = async (
-  runtimeEnv: CobaltRuntimeEnv,
-  url: string,
-  audioBitrate: string,
-) => {
-  const response = await requestCobaltAudio(runtimeEnv, url, audioBitrate, true);
-
-  if (
-    response.status === CobaltResponseType.Error &&
-    response.error.code === YOUTUBE_HLS_UNAVAILABLE_ERROR
-  ) {
-    return await requestCobaltAudio(runtimeEnv, url, audioBitrate, false);
-  }
-
-  return response;
 };
 
 const cobaltErrorResponse = (message: string) =>
@@ -317,11 +298,7 @@ export default defineHandler(async (event) => {
       return new Response("Invalid audio download request.", { status: 400 });
     }
 
-    const cobaltResponse = await requestCobaltAudioWithHlsFallback(
-      runtimeEnv,
-      body.url,
-      body.audioBitrate,
-    );
+    const cobaltResponse = await requestCobaltAudio(runtimeEnv, body.url, body.audioBitrate);
 
     if (cobaltResponse.status === CobaltResponseType.Error) {
       return cobaltErrorResponse(cobaltResponse.error.code);

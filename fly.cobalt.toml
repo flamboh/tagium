@@ -1,0 +1,25 @@
+app = "tagium-cobalt"
+primary_region = "lax"
+
+[build]
+image = "registry.fly.io/tagium-cobalt@sha256:ed27935513f69bb6ed754daa7296a14dff85490f6c9623f11e197e40106101a0"
+
+[processes]
+app = "node src/cobalt"
+
+[env]
+CUSTOM_INNERTUBE_CLIENT = "WEB_EMBEDDED"
+YOUTUBE_GENERATE_PO_TOKENS = "0"
+
+[http_service]
+internal_port = 9000
+force_https = true
+auto_stop_machines = false
+auto_start_machines = true
+min_machines_running = 1
+processes = ["app"]
+
+[[vm]]
+memory = "1024mb"
+cpu_kind = "shared"
+cpus = 1
