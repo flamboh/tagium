@@ -1,10 +1,9 @@
 "use client";
 
-import type { MouseEvent as ReactMouseEvent } from "react";
 import { useRef, useState } from "react";
 import { Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
-import AlbumSidebar from "./AlbumSidebar";
+import AlbumSidebar, { type LibraryTreeSelection } from "./AlbumSidebar";
 import { AlbumGroup, TagiumFile } from "./types";
 import { Button } from "../ui/button";
 
@@ -16,11 +15,10 @@ interface TagSidebarPanelProps {
   selectedAlbumId: string | null;
   selectedFileId: string | null;
   selectedFileIds: Set<string>;
+  externalSelectionRevision: number;
   settingsOpen: boolean;
   onAudioUpload: (files: File[]) => void;
-  onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
-  onSelectFile: (albumId: string, fileId: string, event?: ReactMouseEvent) => void;
-  onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
+  onTreeSelectionChange: (selection: LibraryTreeSelection) => void;
   onClearSelection: () => void;
   onRemoveFile: (fileId: string) => void;
   onRetryDownload: (fileId: string) => void;
@@ -53,11 +51,10 @@ export default function TagSidebarPanel({
   selectedAlbumId,
   selectedFileId,
   selectedFileIds,
+  externalSelectionRevision,
   settingsOpen,
   onAudioUpload,
-  onSelectAlbum,
-  onSelectFile,
-  onSelectLooseTrack,
+  onTreeSelectionChange,
   onClearSelection,
   onRemoveFile,
   onRetryDownload,
@@ -143,9 +140,8 @@ export default function TagSidebarPanel({
         selectedAlbumId={selectedAlbumId}
         selectedFileId={selectedFileId}
         selectedFileIds={selectedFileIds}
-        onSelectAlbum={onSelectAlbum}
-        onSelectFile={onSelectFile}
-        onSelectLooseTrack={onSelectLooseTrack}
+        externalSelectionRevision={externalSelectionRevision}
+        onTreeSelectionChange={onTreeSelectionChange}
         onClearSelection={onClearSelection}
         onRemoveFile={onRemoveFile}
         onRetryDownload={onRetryDownload}

@@ -1,5 +1,4 @@
 "use client";
-import type { MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
 import filenamify from "filenamify";
@@ -29,6 +28,7 @@ import {
   getLibraryDownloadEntries,
 } from "./downloadLibrary";
 import TagSidebarPanel from "./TagSidebarPanel";
+import type { LibraryTreeSelection } from "./AlbumSidebar";
 import LandingScreen from "./LandingScreen";
 import TrackMetadataEditor from "./TrackMetadataEditor";
 import SettingsPage from "./SettingsPage";
@@ -142,7 +142,7 @@ export default function AudioTagger() {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
   const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
-  const [lastSelectedFileId, setLastSelectedFileId] = useState<string | null>(null);
+  const [sidebarSelectionRevision, setSidebarSelectionRevision] = useState(0);
   const [loading, setLoading] = useState(false);
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [albumDialogMode, setAlbumDialogMode] = useState<"create" | "edit">("create");
@@ -153,6 +153,7 @@ export default function AudioTagger() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const filesRef = useRef<TagiumFile[]>(files);
   const albumsRef = useRef<AlbumGroup[]>(albums);
+  const looseTrackIdsRef = useRef<string[]>(looseTrackIds);
   const selectedFileIdRef = useRef<string | null>(selectedFileId);
   const lastResetFileIdRef = useRef<string | null>(null);
   const formDirtyRef = useRef(false);
@@ -160,6 +161,7 @@ export default function AudioTagger() {
   const pendingImportKeysRef = useRef(new Set<string>());
   filesRef.current = files;
   albumsRef.current = albums;
+  looseTrackIdsRef.current = looseTrackIds;
   selectedFileIdRef.current = selectedFileId;
   const {
     register,
@@ -649,7 +651,6 @@ export default function AudioTagger() {
     setSelectedAlbumId(null);
     setSelectedFileId(id);
     setSelectedFileIds(new Set([id]));
-    setLastSelectedFileId(id);
 
     void (async () => {
       try {
@@ -700,7 +701,6 @@ export default function AudioTagger() {
     setSelectedAlbumId(albumId);
     setSelectedFileId(pendingFiles[0]?.id ?? null);
     setSelectedFileIds(new Set(pendingFiles[0] ? [pendingFiles[0].id] : []));
-    setLastSelectedFileId(pendingFiles[0]?.id ?? null);
 
     const coverUrl = set.coverUrl;
     if (coverUrl) {
@@ -937,123 +937,12 @@ export default function AudioTagger() {
       closeAlbumDialog();
     }
   };
-  const handleSelectAlbum = (albumId: string, event?: ReactMouseEvent) => {
+  const handleTreeSelectionChange = (selection: LibraryTreeSelection) => {
     setActiveView("editor");
     bufferCurrentFormMetadata();
-    const isMultiSelect = event?.ctrlKey || event?.metaKey;
-
-    if (isMultiSelect) {
-      setSelectedAlbumId(albumId);
-      const album = albums.find((entry) => entry.id === albumId);
-      const firstTrackId = album?.trackIds[0];
-      if (firstTrackId) {
-        setSelectedFileIds((prev) => {
-          const next = new Set(prev);
-          if (next.has(firstTrackId)) {
-            next.delete(firstTrackId);
-          } else {
-            next.add(firstTrackId);
-          }
-          return next;
-        });
-        setSelectedFileId(firstTrackId);
-        setLastSelectedFileId(firstTrackId);
-      }
-    } else {
-      setSelectedAlbumId(albumId);
-      const album = albums.find((entry) => entry.id === albumId);
-      const firstTrackId = album?.trackIds[0] ?? null;
-      setSelectedFileId(firstTrackId);
-      setSelectedFileIds(firstTrackId ? new Set([firstTrackId]) : new Set());
-      setLastSelectedFileId(firstTrackId);
-    }
-  };
-
-  const handleSelectFile = (albumId: string, fileId: string, event?: ReactMouseEvent) => {
-    setActiveView("editor");
-    bufferCurrentFormMetadata();
-    const isMultiSelect = event?.ctrlKey || event?.metaKey;
-    const isRangeSelect = event?.shiftKey && lastSelectedFileId;
-
-    if (isRangeSelect) {
-      const album = albums.find((entry) => entry.id === albumId);
-      if (!album) return;
-      const trackIds = album.trackIds;
-      const startIndex = trackIds.indexOf(lastSelectedFileId);
-      const endIndex = trackIds.indexOf(fileId);
-      if (startIndex >= 0 && endIndex >= 0) {
-        const minIndex = Math.min(startIndex, endIndex);
-        const maxIndex = Math.max(startIndex, endIndex);
-        const rangeIds = trackIds.slice(minIndex, maxIndex + 1);
-        setSelectedFileIds((prev) => {
-          const next = new Set(prev);
-          rangeIds.forEach((id) => next.add(id));
-          return next;
-        });
-        setSelectedFileId(fileId);
-        setLastSelectedFileId(fileId);
-      }
-    } else if (isMultiSelect) {
-      setSelectedAlbumId(albumId);
-      setSelectedFileIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(fileId)) {
-          next.delete(fileId);
-        } else {
-          next.add(fileId);
-        }
-        return next;
-      });
-      setSelectedFileId(fileId);
-      setLastSelectedFileId(fileId);
-    } else {
-      setSelectedAlbumId(albumId);
-      setSelectedFileId(fileId);
-      setSelectedFileIds(new Set([fileId]));
-      setLastSelectedFileId(fileId);
-    }
-  };
-
-  const handleSelectLooseTrack = (fileId: string, event?: ReactMouseEvent) => {
-    setActiveView("editor");
-    bufferCurrentFormMetadata();
-    const isMultiSelect = event?.ctrlKey || event?.metaKey;
-    const isRangeSelect = event?.shiftKey && lastSelectedFileId;
-
-    if (isRangeSelect) {
-      const startIndex = looseTrackIds.indexOf(lastSelectedFileId);
-      const endIndex = looseTrackIds.indexOf(fileId);
-      if (startIndex >= 0 && endIndex >= 0) {
-        const minIndex = Math.min(startIndex, endIndex);
-        const maxIndex = Math.max(startIndex, endIndex);
-        const rangeIds = looseTrackIds.slice(minIndex, maxIndex + 1);
-        setSelectedFileIds((prev) => {
-          const next = new Set(prev);
-          rangeIds.forEach((id) => next.add(id));
-          return next;
-        });
-        setSelectedFileId(fileId);
-        setLastSelectedFileId(fileId);
-      }
-    } else if (isMultiSelect) {
-      setSelectedAlbumId(null);
-      setSelectedFileIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(fileId)) {
-          next.delete(fileId);
-        } else {
-          next.add(fileId);
-        }
-        return next;
-      });
-      setSelectedFileId(fileId);
-      setLastSelectedFileId(fileId);
-    } else {
-      setSelectedAlbumId(null);
-      setSelectedFileId(fileId);
-      setSelectedFileIds(new Set([fileId]));
-      setLastSelectedFileId(fileId);
-    }
+    setSelectedAlbumId(selection.selectedAlbumId);
+    setSelectedFileId(selection.selectedFileId);
+    setSelectedFileIds(new Set(selection.selectedFileIds));
   };
 
   const handleClearSelection = useCallback(() => {
@@ -1062,7 +951,7 @@ export default function AudioTagger() {
     setSelectedAlbumId(null);
     setSelectedFileId(null);
     setSelectedFileIds(new Set());
-    setLastSelectedFileId(null);
+    setSidebarSelectionRevision((revision) => revision + 1);
   }, [bufferCurrentFormMetadata]);
 
   const handleRemoveSelectedFiles = useCallback(() => {
@@ -1088,7 +977,6 @@ export default function AudioTagger() {
     );
     setSelectedFileIds(new Set());
     setSelectedFileId(null);
-    setLastSelectedFileId(null);
   }, [selectedFileIds, settings.syncTrackNumbers]);
 
   const handleSelectAllFiles = useCallback(() => {
@@ -1097,8 +985,8 @@ export default function AudioTagger() {
     setSelectedFileIds(allFileIds);
     if (files.length > 0) {
       setSelectedFileId(files[0].id);
-      setLastSelectedFileId(files[0].id);
     }
+    setSidebarSelectionRevision((revision) => revision + 1);
   }, [files, bufferCurrentFormMetadata]);
 
   const handleReorderAlbums = (albumId: string, targetIndex: number) => {
@@ -1258,8 +1146,8 @@ export default function AudioTagger() {
     setActiveView("editor");
     bufferCurrentFormMetadata();
     const moved = moveTrackInSidebar(
-      albums,
-      looseTrackIds,
+      albumsRef.current,
+      looseTrackIdsRef.current,
       trackId,
       placement === "append" || !referenceTrackId
         ? {
@@ -1275,6 +1163,8 @@ export default function AudioTagger() {
           },
       settings,
     );
+    albumsRef.current = moved.albums;
+    looseTrackIdsRef.current = moved.looseTrackIds;
     setAlbums(moved.albums);
     setLooseTrackIds(moved.looseTrackIds);
     setSelectedAlbumId(targetAlbumId);
@@ -1293,8 +1183,8 @@ export default function AudioTagger() {
     setActiveView("editor");
     bufferCurrentFormMetadata();
     const moved = moveTrackInSidebar(
-      albums,
-      looseTrackIds,
+      albumsRef.current,
+      looseTrackIdsRef.current,
       trackId,
       placement === "append" || !referenceTrackId
         ? {
@@ -1308,6 +1198,8 @@ export default function AudioTagger() {
           },
       settings,
     );
+    albumsRef.current = moved.albums;
+    looseTrackIdsRef.current = moved.looseTrackIds;
     setAlbums(moved.albums);
     setLooseTrackIds(moved.looseTrackIds);
     setSelectedAlbumId(null);
@@ -1353,11 +1245,10 @@ export default function AudioTagger() {
           selectedAlbumId={selectedAlbumId}
           selectedFileId={selectedFileId}
           selectedFileIds={selectedFileIds}
+          externalSelectionRevision={sidebarSelectionRevision}
           settingsOpen={activeView === "settings"}
           onAudioUpload={handleAudioUpload}
-          onSelectAlbum={handleSelectAlbum}
-          onSelectFile={handleSelectFile}
-          onSelectLooseTrack={handleSelectLooseTrack}
+          onTreeSelectionChange={handleTreeSelectionChange}
           onClearSelection={handleClearSelection}
           onRemoveFile={handleRemoveFile}
           onRetryDownload={handleRetryDownload}
