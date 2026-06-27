@@ -23,10 +23,11 @@ export default function AudioDownloader({
   const canDownload = sourceUrl.trim().length > 0 && !downloading;
 
   const handleDownload = async () => {
-    const trimmedUrl = sourceUrl.trim();
-    if (trimmedUrl.length === 0) {
+    if (!canDownload) {
       return;
     }
+
+    const trimmedUrl = sourceUrl.trim();
 
     setDownloading(true);
     setProgress(null);
@@ -44,7 +45,7 @@ export default function AudioDownloader({
       await onAudioDownload(trimmedUrl);
       setSourceUrl("");
     } catch (caughtError) {
-      let message = "Download failed.";
+      let message = "download failed.";
       if (caughtError instanceof Error) {
         message = getDownloadErrorMessage(caughtError);
       }
@@ -64,7 +65,7 @@ export default function AudioDownloader({
             type="url"
             name="media-url"
             autoComplete="url"
-            aria-label="Media URL"
+            aria-label="media url"
             value={sourceUrl}
             onChange={(event) => setSourceUrl(event.target.value)}
             onKeyDown={(event) => {
@@ -73,7 +74,7 @@ export default function AudioDownloader({
                 void handleDownload();
               }
             }}
-            placeholder="Paste media URL"
+            placeholder="paste media url"
             className="pl-9"
             disabled={downloading}
           />
@@ -82,7 +83,7 @@ export default function AudioDownloader({
           type="button"
           size="icon"
           disabled={!canDownload}
-          aria-label="Download audio"
+          aria-label="download audio"
           onClick={() => void handleDownload()}
         >
           {downloading && <Loader2 className="animate-spin" />}
@@ -91,7 +92,7 @@ export default function AudioDownloader({
       </div>
       {progress && (
         <p className="text-xs text-muted-foreground" aria-live="polite">
-          Downloading {progress}
+          downloading {progress}
         </p>
       )}
       {error && (

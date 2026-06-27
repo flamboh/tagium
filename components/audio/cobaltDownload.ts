@@ -122,7 +122,7 @@ const fetchTunnelFile = async (url: string, filename: string, lastModified: numb
   }
   const blob = await response.blob();
   if (blob.size === 0) {
-    throw new Error("Cobalt tunnel response was empty.");
+    throw new Error("cobalt tunnel response was empty.");
   }
 
   return new File([blob], filename, {
@@ -178,12 +178,12 @@ const processLocalAudio = async (
   );
   const outputFormat = plan.output.filename.split(".").pop();
   if (!outputFormat) {
-    throw new Error("Cobalt local processing response missing output format.");
+    throw new Error("cobalt local processing response missing output format.");
   }
 
   const audioFile = inputFiles[0];
   if (!audioFile) {
-    throw new Error("Cobalt local processing response missing audio tunnel.");
+    throw new Error("cobalt local processing response missing audio tunnel.");
   }
 
   const blob = await runLocalProcessingWorker([audioFile], makeAudioArgs(plan), {
@@ -239,7 +239,7 @@ const tagCobaltAudioFile = async (
       {
         format: coverFile.type,
         type: 3,
-        description: "Cover",
+        description: "cover",
         data: Array.from(new Uint8Array(await coverFile.arrayBuffer())),
       },
     ];
@@ -247,7 +247,7 @@ const tagCobaltAudioFile = async (
 
   mp3tag.save?.();
   if (mp3tag.error || !mp3tag.buffer) {
-    throw new Error(mp3tag.error ?? "Unable to save metadata");
+    throw new Error(mp3tag.error ?? "unable to save metadata");
   }
 
   return new File([new Uint8Array(mp3tag.buffer)], plan.output.filename, {

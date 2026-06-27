@@ -165,7 +165,7 @@ export async function parseUploadedTracks(uploadedFiles: File[]) {
         },
       });
     } catch (error) {
-      console.error(`Error parsing metadata for ${file.name}:`, error);
+      console.error(`error parsing metadata for ${file.name}:`, error);
       parsedUploads.push({
         file: {
           id,
@@ -174,7 +174,7 @@ export async function parseUploadedTracks(uploadedFiles: File[]) {
           filename: file.name,
           status: "error",
           downloadStatus: "ready",
-          downloadError: error instanceof Error ? error.message : "Unable to parse audio metadata.",
+          downloadError: error instanceof Error ? error.message : "unable to parse audio metadata.",
           hasBufferedChanges: false,
         },
         albumSeed: {
@@ -191,7 +191,7 @@ export async function parseUploadedTracks(uploadedFiles: File[]) {
 
 export async function writeMetadataToFile(fileToUpdate: TagiumFile, newTags: AudioMetadata) {
   if (!fileToUpdate.file) {
-    throw new Error("Audio file is still downloading.");
+    throw new Error("audio file is still downloading.");
   }
 
   const MP3Tag = (await import("mp3tag.js")).default;
@@ -229,7 +229,7 @@ export async function writeMetadataToFile(fileToUpdate: TagiumFile, newTags: Aud
 
   mp3tag.save?.();
   if (mp3tag.error || !mp3tag.buffer) {
-    throw new Error(mp3tag.error || "Unable to save metadata");
+    throw new Error(mp3tag.error || "unable to save metadata");
   }
 
   return new File(
