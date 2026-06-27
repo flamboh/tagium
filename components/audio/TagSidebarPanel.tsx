@@ -164,8 +164,8 @@ export default function TagSidebarPanel({
           {loading ? "Saving..." : "Save All"}
         </Button>
         <Button
-          variant={settingsOpen ? "secondary" : "outline"}
-          className="w-full justify-start"
+          variant={settingsOpen ? "ghost" : "outline"}
+          className={cn("w-full justify-start", settingsOpen && "bg-accent text-accent-foreground")}
           onClick={onOpenSettings}
         >
           <Settings />

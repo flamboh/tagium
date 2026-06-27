@@ -133,10 +133,21 @@ export default function AlbumSidebar({
 
   if (albums.length === 0 && looseTracks.length === 0) {
     return (
-      <div className="w-full flex-1 min-h-0 flex flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground px-4">
+      <div
+        className="w-full flex-1 min-h-0 flex flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground px-4"
+        onClick={onClearSelection}
+      >
         <p>no tracks yet</p>
         <p className="text-xs">create an empty album or upload tracks</p>
-        <Button type="button" variant="outline" size="sm" onClick={onAddAlbum}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={(event) => {
+            event.stopPropagation();
+            onAddAlbum();
+          }}
+        >
           <Plus className="h-4 w-4" />
           add album
         </Button>
@@ -427,7 +438,10 @@ export default function AlbumSidebar({
               </div>
               <div className="flex flex-col">
                 {album.trackIds.length === 0 ? (
-                  <div className="text-xs text-muted-foreground px-4 py-3 text-center">
+                  <div
+                    className="text-xs text-muted-foreground px-4 py-3 text-center"
+                    onClick={onClearSelection}
+                  >
                     drag tracks here
                   </div>
                 ) : (
