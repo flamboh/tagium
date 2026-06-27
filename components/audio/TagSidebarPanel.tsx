@@ -113,7 +113,7 @@ export default function TagSidebarPanel({
   return (
     <div
       className={cn(
-        "w-full md:w-72 flex-shrink-0 flex flex-col border-b md:border-b-0 md:border-r bg-card overflow-hidden max-h-[45vh] md:max-h-none transition-colors duration-200",
+        "order-2 min-h-screen w-full flex-shrink-0 flex flex-col border-t bg-card overflow-hidden transition-colors duration-200 md:order-none md:min-h-0 md:w-72 md:border-t-0 md:border-r",
         isDraggingFile && "bg-primary/5 shadow-[inset_0_0_0_2px_var(--primary)]",
       )}
       onDragEnter={handleSidebarDragEnter}
@@ -167,7 +167,7 @@ export default function TagSidebarPanel({
         <Button
           variant="outline"
           className={cn(
-            "w-full justify-start",
+            "h-auto w-full flex-col justify-center gap-1 py-3 text-center",
             settingsOpen &&
               "border-transparent bg-accent text-accent-foreground shadow-none hover:bg-accent",
           )}
