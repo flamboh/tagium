@@ -17,70 +17,68 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
         <h2 className="text-lg font-semibold truncate">settings</h2>
       </div>
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="min-h-full max-w-xl flex flex-col justify-between gap-10">
-          <div className="flex flex-col gap-6">
-            <section className="flex flex-col gap-3">
-              <h3 className="text-sm font-medium">metadata</h3>
-              <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer">
-                <Checkbox
-                  checked={settings.syncTrackNumbers}
-                  onCheckedChange={(checked) =>
-                    onChange({
-                      ...settings,
-                      syncTrackNumbers: checked === true,
-                    })
-                  }
-                  className="mt-0.5"
-                />
-                <span className="text-sm font-medium">use album sidebar order as track number</span>
-              </label>
-              <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer">
-                <Checkbox
-                  checked={settings.syncFilenames}
-                  onCheckedChange={(checked) =>
-                    onChange({
-                      ...settings,
-                      syncFilenames: checked === true,
-                    })
-                  }
-                  className="mt-0.5"
-                />
-                <span className="text-sm font-medium">sync all filenames with track titles</span>
-              </label>
-            </section>
+        <div className="max-w-xl flex flex-col gap-6">
+          <section className="flex flex-col gap-3">
+            <h3 className="text-sm font-medium">metadata</h3>
+            <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer">
+              <Checkbox
+                checked={settings.syncTrackNumbers}
+                onCheckedChange={(checked) =>
+                  onChange({
+                    ...settings,
+                    syncTrackNumbers: checked === true,
+                  })
+                }
+                className="mt-0.5"
+              />
+              <span className="text-sm font-medium">use album sidebar order as track number</span>
+            </label>
+            <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer">
+              <Checkbox
+                checked={settings.syncFilenames}
+                onCheckedChange={(checked) =>
+                  onChange({
+                    ...settings,
+                    syncFilenames: checked === true,
+                  })
+                }
+                className="mt-0.5"
+              />
+              <span className="text-sm font-medium">sync all filenames with track titles</span>
+            </label>
+          </section>
 
-            <section className="flex flex-col gap-3">
-              <h3 className="text-sm font-medium">downloads</h3>
-              <label className="flex flex-col gap-2 rounded-md border p-3">
-                <span className="text-sm font-medium">download bitrate</span>
-                <select
-                  value={settings.audioBitrate}
-                  onChange={(event) =>
-                    onChange({
-                      ...settings,
-                      audioBitrate: event.target.value as AudioDownloadBitrate,
-                    })
-                  }
-                  className="border-input bg-background h-9 rounded-md border px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] dark:bg-input/30"
-                  aria-label="download bitrate"
-                >
-                  {AUDIO_BITRATE_OPTIONS.map((bitrate) => (
-                    <option key={bitrate} value={bitrate}>
-                      {bitrate}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </section>
-          </div>
+          <section className="flex flex-col gap-3">
+            <h3 className="text-sm font-medium">downloads</h3>
+            <label className="flex flex-col gap-2 rounded-md border p-3">
+              <span className="text-sm font-medium">download bitrate</span>
+              <select
+                value={settings.audioBitrate}
+                onChange={(event) =>
+                  onChange({
+                    ...settings,
+                    audioBitrate: event.target.value as AudioDownloadBitrate,
+                  })
+                }
+                className="border-input bg-background h-9 rounded-md border px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] dark:bg-input/30"
+                aria-label="download bitrate"
+              >
+                {AUDIO_BITRATE_OPTIONS.map((bitrate) => (
+                  <option key={bitrate} value={bitrate}>
+                    {bitrate}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </section>
 
-          <nav className="flex items-center gap-2" aria-label="social links">
+          <nav className="flex items-center gap-3" aria-label="social links">
             <a
               href="https://x.com/flambohh"
               target="_blank"
               rel="noreferrer"
               aria-label="Twitter"
-              className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+              className="inline-flex size-12 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -90,7 +88,7 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="size-4"
+                className="size-6"
                 aria-hidden="true"
               >
                 <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />
@@ -101,7 +99,7 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
               target="_blank"
               rel="noreferrer"
               aria-label="GitHub"
-              className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+              className="inline-flex size-12 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -111,7 +109,7 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="size-4"
+                className="size-6"
                 aria-hidden="true"
               >
                 <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
