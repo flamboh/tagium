@@ -46,7 +46,7 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
         variant="outline"
         className="w-full cursor-pointer border-dashed border-2 h-12 hover:bg-accent/50 flex flex-col gap-2"
         onClick={handleButtonClick}
-        aria-label="Upload audio files"
+        aria-label="upload audio files"
       >
         <Upload className="h-6 w-6 text-muted-foreground" />
       </Button>

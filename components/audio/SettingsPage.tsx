@@ -61,7 +61,7 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
                   })
                 }
                 className="border-input bg-background h-9 rounded-md border px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] dark:bg-input/30"
-                aria-label="Download bitrate"
+                aria-label="download bitrate"
               >
                 {AUDIO_BITRATE_OPTIONS.map((bitrate) => (
                   <option key={bitrate} value={bitrate}>
