@@ -1,7 +1,7 @@
 # Tagium
 
-simple mp3tag editing for music fans
+simple mp3tag editing for music fans.
 
 ## Docs
 
-- [Cobalt audio downloads](docs/cobalt-audio-downloads.md)
+see `./docs`.
