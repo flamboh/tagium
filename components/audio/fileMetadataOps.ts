@@ -58,21 +58,42 @@ export function applyTrackOrderNumbersToFiles(
   });
 }
 
+export function applySyncedFilenamesToFiles(files: TagiumFile[], trackIds?: string[]) {
+  const trackIdSet = trackIds ? new Set(trackIds) : undefined;
+
+  return files.map((file) => {
+    if (trackIdSet && !trackIdSet.has(file.id)) return file;
+    if (!file.metadata) return file;
+
+    const syncedFilename = filenamify(file.metadata.title, { replacement: "-" });
+    if (!syncedFilename) return file;
+    if (file.filename === `${syncedFilename}.mp3` && file.metadata.filename === syncedFilename) {
+      return file;
+    }
+
+    return {
+      ...file,
+      filename: `${syncedFilename}.mp3`,
+      status: file.status === "saved" ? "pending" : file.status,
+      hasBufferedChanges: true,
+      metadata: {
+        ...file.metadata,
+        filename: syncedFilename,
+      },
+    };
+  });
+}
+
 export function applyAlbumSharedTagsToFiles(files: TagiumFile[], album: AlbumGroup) {
   if (album.trackIds.length === 0) return files;
 
   const trackSet = new Set(album.trackIds);
-  const trackIndex = new Map(album.trackIds.map((trackId, index) => [trackId, index + 1]));
 
   return files.map((file) => {
     if (!trackSet.has(file.id) || !file.metadata) return file;
 
-    const syncedFilename = album.syncFilenames
-      ? filenamify(file.metadata.title, { replacement: "-" })
-      : undefined;
     return {
       ...file,
-      filename: syncedFilename ?? file.filename,
       status: file.status === "saved" ? "pending" : file.status,
       hasBufferedChanges: true,
       metadata: {
@@ -82,8 +103,6 @@ export function applyAlbumSharedTagsToFiles(files: TagiumFile[], album: AlbumGro
         genre: album.genre,
         year: album.year !== undefined ? album.year : file.metadata.year,
         picture: album.cover && album.cover.length > 0 ? album.cover : file.metadata.picture,
-        trackNumber: album.syncTrackNumbers ? trackIndex.get(file.id) : file.metadata.trackNumber,
-        filename: syncedFilename ?? file.metadata.filename,
       },
     };
   });

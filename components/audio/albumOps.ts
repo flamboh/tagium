@@ -1,5 +1,5 @@
 import { UploadedTrack } from "./mp3Utils";
-import { AlbumGroup, AudioMetadata } from "./types";
+import { AlbumGroup, AppSettings, AudioMetadata } from "./types";
 
 export interface AlbumMetadataInput {
   title: string;
@@ -7,13 +7,12 @@ export interface AlbumMetadataInput {
   genre: string;
   cover?: AudioMetadata["picture"];
   year?: number;
-  syncTrackNumbers: boolean;
-  syncFilenames: boolean;
 }
 
 interface MergeUploadedTracksOptions {
   forceSingleAlbum?: boolean;
   albumSeedUploads?: UploadedTrack[];
+  settings?: Pick<AppSettings, "syncTrackNumbers">;
 }
 
 export type SidebarDropTarget =
@@ -44,6 +43,7 @@ export function mergeUploadedTracksIntoAlbums(
 ) {
   const nextAlbums = pruneEmptyAlbums(prevAlbums.map(cloneAlbum));
   const forceSingleAlbum = options.forceSingleAlbum ?? false;
+  const syncTrackNumbers = options.settings?.syncTrackNumbers ?? true;
 
   if (forceSingleAlbum && parsedUploads.length > 0) {
     const albumSeedUploads = options.albumSeedUploads ?? parsedUploads;
@@ -60,8 +60,6 @@ export function mergeUploadedTracksIntoAlbums(
       cover: firstSeed.cover,
       trackIds: parsedUploads.map((upload) => upload.file.id),
       year: undefined,
-      syncTrackNumbers: false,
-      syncFilenames: false,
     };
 
     if (!createdAlbum.artist) {
@@ -88,6 +86,7 @@ export function mergeUploadedTracksIntoAlbums(
       albums: nextAlbums,
       firstSelectedAlbumId: createdAlbum.id,
       unassignedTrackIds: [] as string[],
+      albumsToSync: syncTrackNumbers ? [createdAlbum.id] : [],
     };
   }
 
@@ -96,6 +95,7 @@ export function mergeUploadedTracksIntoAlbums(
   );
   let firstSelectedAlbumId: string | null = null;
   const unassignedTrackIds: string[] = [];
+  const albumsToSync = new Set<string>();
 
   parsedUploads.forEach((upload, index) => {
     const { albumSeed } = upload;
@@ -117,8 +117,6 @@ export function mergeUploadedTracksIntoAlbums(
         cover: albumSeed.cover,
         trackIds: [],
         year: undefined,
-        syncTrackNumbers: false,
-        syncFilenames: false,
       };
       nextAlbums.push(targetAlbum);
       albumByKey.set(key, targetAlbum);
@@ -131,6 +129,9 @@ export function mergeUploadedTracksIntoAlbums(
     }
 
     targetAlbum.trackIds.push(upload.file.id);
+    if (syncTrackNumbers) {
+      albumsToSync.add(targetAlbum.id);
+    }
     if (index === 0 || !firstSelectedAlbumId) {
       firstSelectedAlbumId = targetAlbum.id;
     }
@@ -140,6 +141,7 @@ export function mergeUploadedTracksIntoAlbums(
     albums: nextAlbums,
     firstSelectedAlbumId,
     unassignedTrackIds,
+    albumsToSync: [...albumsToSync],
   };
 }
 
@@ -157,6 +159,7 @@ export function moveTrackInSidebar(
   prevLooseTrackIds: string[],
   trackId: string,
   target: SidebarDropTarget,
+  settings: Pick<AppSettings, "syncTrackNumbers">,
 ) {
   const albums = prevAlbums.map(cloneAlbum);
   const looseTrackIds = [...prevLooseTrackIds];
@@ -233,10 +236,9 @@ export function moveTrackInSidebar(
     .filter((id): id is string => Boolean(id))
     .filter((id, index, list) => list.indexOf(id) === index);
 
-  const albumsToSync = albumIdsToCheck.filter((albumId) => {
-    const album = prunedAlbums.find((entry) => entry.id === albumId);
-    return Boolean(album?.syncTrackNumbers);
-  });
+  const albumsToSync = settings.syncTrackNumbers
+    ? albumIdsToCheck.filter((albumId) => prunedAlbums.some((entry) => entry.id === albumId))
+    : [];
 
   return {
     albums: prunedAlbums,
@@ -259,8 +261,6 @@ export function updateAlbumMetadata(
           genre: metadata.genre,
           cover: metadata.cover,
           year: metadata.year,
-          syncTrackNumbers: metadata.syncTrackNumbers,
-          syncFilenames: metadata.syncFilenames,
         }
       : album,
   );
@@ -271,6 +271,7 @@ export function createAlbumFromTracks(
   prevLooseTrackIds: string[],
   trackIds: string[],
   metadata: AlbumMetadataInput,
+  settings: Pick<AppSettings, "syncTrackNumbers">,
 ) {
   const uniqueTrackIds = [...new Set(trackIds)];
   const albums = prevAlbums.map(cloneAlbum);
@@ -294,20 +295,11 @@ export function createAlbumFromTracks(
     genre: metadata.genre,
     cover: metadata.cover,
     year: metadata.year,
-    syncTrackNumbers: metadata.syncTrackNumbers,
-    syncFilenames: metadata.syncFilenames,
     trackIds: uniqueTrackIds,
   };
 
   const mergedAlbums = [...albums, createdAlbum];
-  const syncAlbums = [...new Set(sourceAlbumIds)].filter((albumId) => {
-    const album = albums.find((entry) => entry.id === albumId);
-    return Boolean(album?.syncTrackNumbers);
-  });
-
-  if (createdAlbum.syncTrackNumbers) {
-    syncAlbums.push(newAlbumId);
-  }
+  const syncAlbums = settings.syncTrackNumbers ? [...new Set([...sourceAlbumIds, newAlbumId])] : [];
 
   return {
     albums: mergedAlbums,

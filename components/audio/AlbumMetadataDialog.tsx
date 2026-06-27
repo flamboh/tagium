@@ -1,8 +1,7 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -21,8 +20,6 @@ export interface AlbumMetadataDraft {
   genre: string;
   year?: number;
   cover?: AudioMetadata["picture"];
-  syncTrackNumbers: boolean;
-  syncFilenames: boolean;
 }
 
 interface AlbumMetadataDialogProps {
@@ -46,8 +43,6 @@ export default function AlbumMetadataDialog({
   onSave,
   onDelete,
 }: AlbumMetadataDialogProps) {
-  const trackOrderId = useId();
-  const syncFilenamesId = useId();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
 
@@ -97,7 +92,7 @@ export default function AlbumMetadataDialog({
           <DialogHeader className="border-b p-5">
             <DialogTitle>{mode === "create" ? "create album" : "edit album"}</DialogTitle>
             <DialogDescription className="sr-only">
-              Edit album metadata including cover art and track numbering behavior.
+              Edit album metadata including cover art.
             </DialogDescription>
           </DialogHeader>
           <div className="p-5 overflow-y-auto">
@@ -166,40 +161,6 @@ export default function AlbumMetadataDialog({
                       placeholder="2024"
                       className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-start gap-2">
-                    <Checkbox
-                      id={trackOrderId}
-                      checked={draft.syncTrackNumbers}
-                      onCheckedChange={(checked) =>
-                        onChange({
-                          ...draft,
-                          syncTrackNumbers: checked === true,
-                        })
-                      }
-                      className="mt-0.5"
-                    />
-                    <label htmlFor={trackOrderId} className="text-sm leading-5 cursor-pointer">
-                      use sidebar order as track number
-                    </label>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Checkbox
-                      id={syncFilenamesId}
-                      checked={draft.syncFilenames}
-                      onCheckedChange={(checked) =>
-                        onChange({
-                          ...draft,
-                          syncFilenames: checked === true,
-                        })
-                      }
-                      className="mt-0.5"
-                    />
-                    <label htmlFor={syncFilenamesId} className="text-sm leading-5 cursor-pointer">
-                      sync filenames with track titles
-                    </label>
                   </div>
                 </div>
               </div>

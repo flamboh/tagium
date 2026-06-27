@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   applyAlbumSharedTagsToFiles,
+  applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
   prepareDownloadedTrackHydration,
   resolveDownloadedTrackHydrationWrite,
@@ -91,8 +92,6 @@ describe("fileMetadataOps", () => {
         artist: "Artist",
         genre: "",
         trackIds: ["track-2", "track-1"],
-        syncTrackNumbers: true,
-        syncFilenames: false,
       },
     ];
 
@@ -145,8 +144,6 @@ describe("fileMetadataOps", () => {
       artist: "New Artist",
       genre: "Ambient",
       trackIds: ["track-1"],
-      syncTrackNumbers: false,
-      syncFilenames: false,
     };
 
     const [updatedFile] = applyAlbumSharedTagsToFiles(files, album);
@@ -158,6 +155,52 @@ describe("fileMetadataOps", () => {
     expect(updatedFile.metadata?.genre).toBe("Ambient");
     expect(updatedFile.metadata?.trackNumber).toBe(9);
     expect(updatedFile.metadata?.picture).toEqual(originalCover);
+  });
+
+  it("syncs filenames from titles across any tracks", () => {
+    const files = [
+      readyFile({
+        id: "track-1",
+        filename: "old.mp3",
+        status: "saved",
+        metadata: metadata({ filename: "old", title: "New Track Title" }),
+      }),
+      readyFile({
+        id: "track-2",
+        filename: "same.mp3",
+        status: "pending",
+        metadata: metadata({ filename: "same", title: "Same" }),
+      }),
+    ];
+
+    const result = applySyncedFilenamesToFiles(files);
+
+    expect(result[0].filename).toBe("New Track Title.mp3");
+    expect(result[0].metadata?.filename).toBe("New Track Title");
+    expect(result[0].status).toBe("pending");
+    expect(result[0].hasBufferedChanges).toBe(true);
+    expect(result[1].filename).toBe("Same.mp3");
+    expect(result[1].metadata?.filename).toBe("Same");
+  });
+
+  it("can sync filenames for a selected track set", () => {
+    const files = [
+      readyFile({
+        id: "track-1",
+        filename: "old.mp3",
+        metadata: metadata({ filename: "old", title: "Selected Track" }),
+      }),
+      readyFile({
+        id: "track-2",
+        filename: "old-too.mp3",
+        metadata: metadata({ filename: "old-too", title: "Unselected Track" }),
+      }),
+    ];
+
+    const result = applySyncedFilenamesToFiles(files, ["track-1"]);
+
+    expect(result[0].filename).toBe("Selected Track.mp3");
+    expect(result[1]).toBe(files[1]);
   });
 
   it("keeps buffered metadata while hydrating downloaded technical fields", () => {
