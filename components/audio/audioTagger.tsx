@@ -975,6 +975,7 @@ export default function AudioTagger() {
   };
 
   const handleClearSelection = () => {
+    setActiveView("editor");
     setSelectedAlbumId(null);
     setSelectedFileId(null);
     setSelectedFileIds(new Set());
