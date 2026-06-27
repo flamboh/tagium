@@ -66,7 +66,7 @@ const render = async (libav, request) => {
       { type: request.output.type },
     );
     if (blob.size === 0) {
-      throw new Error("Cobalt local processing produced an empty file.");
+      throw new Error("cobalt local processing produced an empty file.");
     }
 
     return blob;
@@ -98,7 +98,7 @@ self.onmessage = async (event) => {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Cobalt local processing failed.";
+    const message = error instanceof Error ? error.message : "cobalt local processing failed.";
     self.postMessage({
       cobaltLocalProcessing: {
         error: message,

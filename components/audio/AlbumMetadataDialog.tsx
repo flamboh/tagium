@@ -58,7 +58,7 @@ export default function AlbumMetadataDialog({
             format: file.type,
             type: 3,
             data: uint8Array,
-            description: "Uploaded cover",
+            description: "uploaded cover",
           },
         ],
       });
@@ -92,7 +92,7 @@ export default function AlbumMetadataDialog({
           <DialogHeader className="border-b p-5">
             <DialogTitle>{mode === "create" ? "create album" : "edit album"}</DialogTitle>
             <DialogDescription className="sr-only">
-              Edit album metadata including cover art.
+              edit album metadata including cover art.
             </DialogDescription>
           </DialogHeader>
           <div className="p-5 overflow-y-auto">

@@ -287,8 +287,8 @@ export default function AlbumSidebar({
                   onRetryDownload(track.id);
                 }}
                 className="absolute right-7 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-full cursor-pointer"
-                title="Retry download"
-                aria-label={`Retry download for ${track.filename}`}
+                title="retry download"
+                aria-label={`retry download for ${track.filename}`}
               >
                 <RefreshCw className="h-3 w-3 text-muted-foreground hover:text-primary" />
               </button>
@@ -300,7 +300,7 @@ export default function AlbumSidebar({
                 onRemoveFile(track.id);
               }}
               className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
-              title="Remove track"
+              title="remove track"
             >
               <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
             </button>
@@ -308,7 +308,12 @@ export default function AlbumSidebar({
         ))}
 
         {albums.map((album, albumIndex) => {
-          const canDownloadAlbum = album.trackIds.every((trackId) => filesById.get(trackId)?.file);
+          const canDownloadAlbum =
+            album.trackIds.length > 0 &&
+            album.trackIds.every((trackId) => {
+              const file = filesById.get(trackId);
+              return file?.file && file.metadata;
+            });
           return (
             <div
               key={album.id}
@@ -409,7 +414,7 @@ export default function AlbumSidebar({
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate leading-tight">{album.title}</div>
                     <div className="text-xs text-muted-foreground truncate leading-tight">
-                      {album.artist || "Unknown"} &middot; {album.trackIds.length} track
+                      {album.artist || "unknown"} &middot; {album.trackIds.length} track
                       {album.trackIds.length !== 1 ? "s" : ""}
                     </div>
                   </div>
@@ -421,7 +426,7 @@ export default function AlbumSidebar({
                   className="h-7 w-7"
                   onClick={() => onDownloadAlbum(album.id)}
                   disabled={!canDownloadAlbum}
-                  aria-label={`Download ${album.title}`}
+                  aria-label={`download ${album.title}`}
                 >
                   <Download className="h-3.5 w-3.5" />
                 </Button>
@@ -431,7 +436,7 @@ export default function AlbumSidebar({
                   size="icon"
                   className="h-7 w-7"
                   onClick={() => onEditAlbum(album.id)}
-                  aria-label={`Edit ${album.title}`}
+                  aria-label={`edit ${album.title}`}
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
@@ -539,8 +544,8 @@ export default function AlbumSidebar({
                               onRetryDownload(track.id);
                             }}
                             className="absolute right-7 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-full cursor-pointer"
-                            title="Retry download"
-                            aria-label={`Retry download for ${track.filename}`}
+                            title="retry download"
+                            aria-label={`retry download for ${track.filename}`}
                           >
                             <RefreshCw className="h-3 w-3 text-muted-foreground hover:text-primary" />
                           </button>
@@ -552,7 +557,7 @@ export default function AlbumSidebar({
                             onRemoveFile(track.id);
                           }}
                           className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
-                          title="Remove track"
+                          title="remove track"
                         >
                           <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
                         </button>
