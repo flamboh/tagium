@@ -1344,7 +1344,7 @@ export default function AudioTagger() {
             : undefined
         }
       />
-      <div className="h-screen flex flex-col md:flex-row overflow-hidden bg-background">
+      <div className="min-h-screen flex flex-col bg-background md:h-screen md:flex-row md:overflow-hidden">
         <TagSidebarPanel
           loading={loading}
           files={files}
@@ -1372,7 +1372,7 @@ export default function AudioTagger() {
           onDownloadAll={handleDownloadAll}
           onOpenSettings={() => setActiveView("settings")}
         />
-        <div className="relative min-h-0 flex-1 flex flex-col overflow-hidden">
+        <div className="relative order-1 h-screen flex flex-col overflow-hidden md:order-none md:h-auto md:min-h-0 md:flex-1">
           {activeView === "settings" ? (
             <SettingsPage settings={settings} onChange={handleSettingsChange} />
           ) : libraryIsEmpty ? (
