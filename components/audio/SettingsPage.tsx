@@ -20,7 +20,7 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
         <div className="max-w-xl flex flex-col gap-6">
           <section className="flex flex-col gap-3">
             <h3 className="text-sm font-medium">metadata</h3>
-            <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer">
+            <label className="flex cursor-pointer items-start gap-3 py-1">
               <Checkbox
                 checked={settings.syncTrackNumbers}
                 onCheckedChange={(checked) =>
@@ -33,7 +33,7 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
               />
               <span className="text-sm font-medium">use album sidebar order as track number</span>
             </label>
-            <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer">
+            <label className="flex cursor-pointer items-start gap-3 py-1">
               <Checkbox
                 checked={settings.syncFilenames}
                 onCheckedChange={(checked) =>
@@ -50,7 +50,7 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
 
           <section className="flex flex-col gap-3">
             <h3 className="text-sm font-medium">downloads</h3>
-            <label className="flex flex-col gap-2 rounded-md border p-3">
+            <label className="flex flex-col gap-2">
               <span className="text-sm font-medium">download bitrate</span>
               <select
                 value={settings.audioBitrate}
@@ -70,6 +70,53 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
                 ))}
               </select>
             </label>
+          </section>
+
+          <section className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <h3 className="text-sm font-medium">about</h3>
+              <p className="text-sm leading-6 text-muted-foreground">
+                tagium exists to make device-local music more accessible to everyone.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <h3 className="text-sm font-medium">acknowledgements</h3>
+              <div className="flex flex-col gap-2 text-sm leading-6 text-muted-foreground">
+                <p>
+                  <a
+                    href="https://cobalt.tools/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    cobalt
+                  </a>{" "}
+                  and{" "}
+                  <a
+                    href="https://imput.net/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    imput
+                  </a>
+                  , for their incredible downloading api service. they're a huge inspiration for
+                  this tool!
+                </p>
+                <p>
+                  <a
+                    href="https://mp3tag.js.org/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    mp3tag.js
+                  </a>
+                  , for the fantastic metadata editing library.
+                </p>
+              </div>
+            </div>
           </section>
 
           <nav className="flex items-center gap-3" aria-label="social links">
