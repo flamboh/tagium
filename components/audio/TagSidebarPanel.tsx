@@ -167,7 +167,7 @@ export default function TagSidebarPanel({
         <Button
           variant="outline"
           className={cn(
-            "w-full justify-start",
+            "h-auto w-full flex-col justify-center gap-1 py-3 text-center",
             settingsOpen &&
               "border-transparent bg-accent text-accent-foreground shadow-none hover:bg-accent",
           )}
