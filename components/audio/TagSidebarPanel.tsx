@@ -41,7 +41,7 @@ interface TagSidebarPanelProps {
   ) => void;
   onPromptCreateAlbumFromLooseTracks: (sourceTrackId: string, targetTrackId: string) => void;
   onReorderAlbums: (albumId: string, targetIndex: number) => void;
-  onSaveAll: () => void;
+  onDownloadAll: () => void;
   onOpenSettings: () => void;
 }
 
@@ -69,11 +69,12 @@ export default function TagSidebarPanel({
   onMoveTrackToLoose,
   onPromptCreateAlbumFromLooseTracks,
   onReorderAlbums,
-  onSaveAll,
+  onDownloadAll,
   onOpenSettings,
 }: TagSidebarPanelProps) {
   const dragCounterRef = useRef(0);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const canDownloadAll = files.length > 0 && files.every((file) => file.file && file.metadata);
 
   const isFileDrag = (event: React.DragEvent<HTMLDivElement>) =>
     event.dataTransfer.types.includes("Files");
@@ -160,8 +161,8 @@ export default function TagSidebarPanel({
       />
 
       <div className="px-3 py-3 border-t flex-shrink-0 flex flex-col gap-2">
-        <Button className="w-full" onClick={onSaveAll} disabled={files.length === 0 || loading}>
-          {loading ? "Saving..." : "Save All"}
+        <Button className="w-full" onClick={onDownloadAll} disabled={!canDownloadAll || loading}>
+          {loading ? "downloading..." : "download all"}
         </Button>
         <Button
           variant="outline"

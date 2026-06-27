@@ -79,7 +79,7 @@ export default function LandingScreen({
       if (err instanceof Error) {
         setError(getDownloadErrorMessage(err));
       } else {
-        setError("Download failed.");
+        setError("download failed.");
       }
     } finally {
       setProgress(null);
@@ -133,7 +133,7 @@ export default function LandingScreen({
           )}
           <div className="text-center">
             <p className="text-lg font-semibold text-foreground">
-              {isDragging ? "Drop to import" : "Drop your MP3s here"}
+              {isDragging ? "drop to import" : "drop your mp3s here"}
             </p>
             <p className="text-sm text-muted-foreground mt-1">or click to browse files</p>
           </div>
@@ -141,7 +141,7 @@ export default function LandingScreen({
 
         <div className="w-full flex items-center gap-4 text-sm text-muted-foreground">
           <div className="flex-1 h-px bg-border" />
-          <span>or import from a URL</span>
+          <span>or import from a url</span>
           <div className="flex-1 h-px bg-border" />
         </div>
 
@@ -154,12 +154,12 @@ export default function LandingScreen({
                 name="landing-media-url"
                 autoComplete="url"
                 value={url}
-                aria-label="Media URL"
+                aria-label="media url"
                 onChange={(e) => {
                   setUrl(e.target.value);
                   setError(null);
                 }}
-                placeholder="SoundCloud or YouTube URL"
+                placeholder="soundcloud or youtube url"
                 disabled={downloading}
                 className="w-full h-10 rounded-lg border border-input bg-transparent pl-9 pr-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-ring transition-shadow disabled:opacity-50 placeholder:text-muted-foreground"
               />
@@ -167,7 +167,7 @@ export default function LandingScreen({
             <button
               type="submit"
               disabled={!url.trim() || downloading}
-              aria-label="Download audio"
+              aria-label="download audio"
               className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-primary/90 transition-colors"
             >
               {downloading ? (
@@ -180,7 +180,7 @@ export default function LandingScreen({
 
           {progress && (
             <p className="text-xs text-muted-foreground text-center" aria-live="polite">
-              Downloading track {progress}
+              downloading track {progress}
             </p>
           )}
           {error && (

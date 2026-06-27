@@ -20,9 +20,8 @@ interface TrackMetadataEditorProps {
   register: UseFormRegister<AudioMetadata>;
   control: Control<AudioMetadata>;
   handleSubmit: UseFormHandleSubmit<AudioMetadata>;
-  onSubmit: SubmitHandler<AudioMetadata>;
   onTrackCoverUpload: (file: File) => void;
-  onDownloadUpdatedFile: (file: TagiumFile) => void;
+  onDownloadUpdatedFile: SubmitHandler<AudioMetadata>;
   selectedFileAlbum: AlbumGroup | undefined;
   syncFilenames: boolean;
   syncTrackNumbers: boolean;
@@ -34,7 +33,6 @@ export default function TrackMetadataEditor({
   register,
   control,
   handleSubmit,
-  onSubmit,
   onTrackCoverUpload,
   onDownloadUpdatedFile,
   selectedFileAlbum,
@@ -49,7 +47,7 @@ export default function TrackMetadataEditor({
     return (
       <div className="flex-1 flex items-center justify-center bg-muted/5">
         <div className="text-center">
-          <p className="text-muted-foreground">Select a track to edit its tags</p>
+          <p className="text-muted-foreground">select a track to edit its tags</p>
         </div>
       </div>
     );
@@ -57,7 +55,12 @@ export default function TrackMetadataEditor({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+        }}
+        className="flex flex-col h-full"
+      >
         <div className="p-6 h-[104px] border-b flex-shrink-0 flex flex-col justify-center gap-1">
           <h2 className="text-lg font-semibold truncate">{selectedFile.filename}</h2>
           {(selectedFile.downloadStatus === "error" || selectedFile.status === "error") &&
@@ -159,14 +162,12 @@ export default function TrackMetadataEditor({
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button
-                  variant="outline"
                   type="button"
-                  onClick={() => onDownloadUpdatedFile(selectedFile)}
+                  onClick={handleSubmit(onDownloadUpdatedFile)}
                   disabled={!audioReady}
                 >
-                  Download
+                  download
                 </Button>
-                <Button type="submit">Save Changes</Button>
               </div>
             </div>
           </div>
