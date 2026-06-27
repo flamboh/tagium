@@ -48,8 +48,12 @@ export interface AlbumGroup {
   cover?: AudioMetadata["picture"];
   trackIds: string[];
   year?: number;
+}
+
+export interface AppSettings {
   syncTrackNumbers: boolean;
   syncFilenames: boolean;
+  audioBitrate: AudioDownloadBitrate;
 }
 
 export interface ImportedAlbumMetadata {
