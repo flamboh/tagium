@@ -13,6 +13,7 @@ export interface AlbumMetadataInput {
 
 interface MergeUploadedTracksOptions {
   forceSingleAlbum?: boolean;
+  albumSeedUploads?: UploadedTrack[];
 }
 
 export type SidebarDropTarget =
@@ -45,7 +46,10 @@ export function mergeUploadedTracksIntoAlbums(
   const forceSingleAlbum = options.forceSingleAlbum ?? false;
 
   if (forceSingleAlbum && parsedUploads.length > 0) {
-    const firstSeed = parsedUploads[0].albumSeed;
+    const albumSeedUploads = options.albumSeedUploads ?? parsedUploads;
+    const firstSeed =
+      albumSeedUploads.find((upload) => upload.albumSeed.title.trim())?.albumSeed ??
+      albumSeedUploads[0].albumSeed;
     const albumTitle = firstSeed.title || `Album ${nextAlbums.length + 1}`;
 
     const createdAlbum: AlbumGroup = {
