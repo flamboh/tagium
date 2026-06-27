@@ -84,10 +84,37 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
               <h3 className="text-sm font-medium">acknowledgements</h3>
               <div className="flex flex-col gap-2 text-sm leading-6 text-muted-foreground">
                 <p>
-                  cobalt and imput, for their incredible downloading api service. they're a huge
-                  inspiration for this tool!
+                  <a
+                    href="https://cobalt.tools/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    cobalt
+                  </a>{" "}
+                  and{" "}
+                  <a
+                    href="https://imput.net/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    imput
+                  </a>
+                  , for their incredible downloading api service. they're a huge inspiration for
+                  this tool!
                 </p>
-                <p>mp3tag.js, for the fantastic metadata editing library.</p>
+                <p>
+                  <a
+                    href="https://mp3tag.js.org/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    mp3tag.js
+                  </a>
+                  , for the fantastic metadata editing library.
+                </p>
               </div>
             </div>
           </section>
