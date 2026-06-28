@@ -36,7 +36,8 @@ export type SidebarDragData =
 export type SidebarDropData =
   | SidebarDragData
   | { type: "container"; container: "loose" }
-  | { type: "container"; container: "album"; albumId: string };
+  | { type: "container"; container: "album"; albumId: string }
+  | { type: "combine"; sourceTrackId: string; targetTrackId: string };
 
 export const albumItemId = (albumId: string) => `album:${albumId}`;
 export const albumContainerId = (albumId: string) => `container:album:${albumId}`;
@@ -90,15 +91,6 @@ export const rowPlacement = (
 
   const y = initialY + event.delta.y;
   return y > rect.top + rect.height / 2 ? "after" : "before";
-};
-
-export const isCenteredLooseDrop = (event: DragEndEvent, initialY: number | null) => {
-  const rect = event.over?.rect;
-  if (!rect) return false;
-  if (initialY === null) return false;
-  const y = initialY + event.delta.y;
-  const position = (y - rect.top) / rect.height;
-  return position > 0.3 && position < 0.7;
 };
 
 const artistLabel = (artist: string) => (artist ? artist : "unknown");
