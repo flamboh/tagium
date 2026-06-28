@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
-import { mergeUploadedTracksIntoAlbums } from "./albumOps";
+import { mergeUploadedTracksIntoAlbums, moveTrackInSidebar, reorderAlbums } from "./albumOps";
 import type { UploadedTrack } from "./mp3Utils";
-import type { AudioMetadata } from "./types";
+import type { AlbumGroup, AudioMetadata } from "./types";
 
 const metadata = (trackNumber?: number): AudioMetadata => ({
   filename: "track",
@@ -33,6 +33,14 @@ const upload = (
     metadata: metadata(trackNumber),
   },
   albumSeed,
+});
+
+const album = (id: string, trackIds: string[]): AlbumGroup => ({
+  id,
+  title: id,
+  artist: "",
+  genre: "",
+  trackIds,
 });
 
 describe("albumOps", () => {
@@ -67,5 +75,53 @@ describe("albumOps", () => {
     );
 
     expect(result.albumsToSync).toEqual([]);
+  });
+
+  it("moves tracks between album and loose sidebar lists", () => {
+    const result = moveTrackInSidebar(
+      [album("album-1", ["a", "b"]), album("album-2", ["c"])],
+      ["loose-1"],
+      "b",
+      {
+        type: "album",
+        albumId: "album-2",
+        placement: "before",
+        referenceTrackId: "c",
+      },
+      { syncTrackNumbers: true },
+    );
+
+    expect(result.albums.map((entry) => entry.trackIds)).toEqual([["a"], ["b", "c"]]);
+    expect(result.looseTrackIds).toEqual(["loose-1"]);
+    expect(result.albumsToSync).toEqual(["album-1", "album-2"]);
+  });
+
+  it("keeps track moves single-track and preserves empty albums", () => {
+    const result = moveTrackInSidebar(
+      [album("album-1", ["a"])],
+      ["loose-1", "loose-2"],
+      "a",
+      {
+        type: "loose",
+        placement: "after",
+        referenceTrackId: "loose-1",
+      },
+      { syncTrackNumbers: false },
+    );
+
+    expect(result.albums).toEqual([album("album-1", [])]);
+    expect(result.looseTrackIds).toEqual(["loose-1", "a", "loose-2"]);
+    expect(result.albumsToSync).toEqual([]);
+  });
+
+  it("reorders albums by target index", () => {
+    const albums = [album("album-1", []), album("album-2", []), album("album-3", [])];
+
+    expect(reorderAlbums(albums, "album-1", 2).map((entry) => entry.id)).toEqual([
+      "album-2",
+      "album-3",
+      "album-1",
+    ]);
+    expect(reorderAlbums(albums, "missing", 1)).toEqual(albums);
   });
 });
