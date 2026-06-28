@@ -15,7 +15,6 @@ import {
   Check,
   Download,
   FileMusic,
-  GripVertical,
   Loader2,
   Pencil,
   RefreshCw,
@@ -27,6 +26,7 @@ import { AlbumCoverThumb } from "./AlbumCoverThumb";
 import type { AlbumGroup, TagiumFile } from "./types";
 
 export const LOOSE_CONTAINER_ID = "container:loose";
+export const LOOSE_APPEND_CONTAINER_ID = "container:loose:append";
 
 export type SidebarDragData =
   | { type: "album"; albumId: string }
@@ -101,10 +101,7 @@ export const isCenteredLooseDrop = (event: DragEndEvent, initialY: number | null
   return position > 0.3 && position < 0.7;
 };
 
-const artistLabel = (artist: string) => {
-  if (artist) return artist;
-  return "unknown";
-};
+const artistLabel = (artist: string) => (artist ? artist : "unknown");
 
 type TrackRowBaseProps = {
   track: TagiumFile;
@@ -125,7 +122,7 @@ const sortableStyle = (
   transition: string | undefined,
 ) => ({
   transform: transform
-    ? `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0) scaleX(${transform.scaleX}) scaleY(${transform.scaleY})`
+    ? `translate3d(0, ${Math.round(transform.y)}px, 0) scaleX(${transform.scaleX}) scaleY(${transform.scaleY})`
     : undefined,
   transition,
 });
@@ -168,27 +165,20 @@ export function SortableTrackRow({
       )}
       style={sortableStyle(transform, transition)}
     >
-      <button
-        type="button"
-        ref={setActivatorNodeRef}
-        className="absolute left-1 top-1/2 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground opacity-60 transition-opacity hover:bg-accent hover:opacity-100 focus-visible:opacity-100 touch-none"
-        aria-label={`drag ${track.filename}`}
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical className="h-3.5 w-3.5" />
-      </button>
       <Button
         type="button"
+        ref={setActivatorNodeRef}
         variant="ghost"
         className={cn(
-          "justify-start h-auto py-2.5 pl-9 pr-8 w-full text-left font-normal rounded-none hover:bg-accent/30",
+          "justify-start h-auto py-2.5 px-4 pr-8 w-full text-left font-normal rounded-none hover:bg-accent/30",
           container === "loose" ? "py-3" : "",
           muted ? "opacity-65" : "",
           selectedTone === "primary" ? "bg-accent text-accent-foreground" : "",
           selectedTone === "secondary" ? "bg-accent/50 text-accent-foreground" : "",
         )}
         onClick={onSelect}
+        {...attributes}
+        {...listeners}
       >
         <div className="flex flex-col gap-1 w-full min-w-0">
           <div className="flex items-center gap-1.5 w-full overflow-hidden">
@@ -302,17 +292,10 @@ export function SortableAlbumCard({
         <button
           type="button"
           ref={setActivatorNodeRef}
-          className="flex size-9 items-center justify-center rounded-md text-muted-foreground opacity-60 transition-opacity hover:bg-accent hover:opacity-100 focus-visible:opacity-100 touch-none"
-          aria-label={`drag ${album.title}`}
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
           className="min-w-0 flex-1 flex items-center gap-2 text-left cursor-pointer"
           onClick={onSelect}
+          {...attributes}
+          {...listeners}
         >
           <AlbumCoverThumb picture={album.cover} />
           <div className="min-w-0 flex-1">
@@ -354,10 +337,12 @@ export function DroppableTrackContainer({
   id,
   data,
   children,
+  className,
 }: {
   id: string;
   data: SidebarDropData;
-  children: ReactNode;
+  children?: ReactNode;
+  className?: string;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id, data });
 
@@ -367,9 +352,46 @@ export function DroppableTrackContainer({
       className={cn(
         "flex flex-col min-h-8 transition-shadow",
         isOver ? "shadow-[inset_0_0_0_2px_var(--primary)]" : "",
+        className,
       )}
     >
       {children}
     </div>
   );
+}
+
+export function SidebarDragPreview({
+  active,
+  album,
+  track,
+}: {
+  active: SidebarDragData;
+  album?: AlbumGroup;
+  track?: TagiumFile;
+}) {
+  if (active.type === "album" && album) {
+    return (
+      <div className="flex w-64 max-w-[calc(100vw-2rem)] items-center gap-2 rounded-md border bg-card px-3 py-3 text-left shadow-lg">
+        <AlbumCoverThumb picture={album.cover} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium leading-tight">{album.title}</div>
+          <div className="truncate text-xs text-muted-foreground leading-tight">
+            {artistLabel(album.artist)} &middot; {album.trackIds.length} track
+            {album.trackIds.length !== 1 ? "s" : ""}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (active.type === "track" && track) {
+    return (
+      <div className="flex w-64 max-w-[calc(100vw-2rem)] items-center gap-2 rounded-md border bg-card px-4 py-3 text-left shadow-lg">
+        <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+        <span className="min-w-0 flex-1 truncate text-sm">{track.filename}</span>
+      </div>
+    );
+  }
+
+  return null;
 }

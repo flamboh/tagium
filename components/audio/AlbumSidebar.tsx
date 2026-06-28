@@ -1,9 +1,10 @@
 "use client";
 
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import {
   DndContext,
+  DragOverlay,
   type DragEndEvent,
   type DragStartEvent,
   KeyboardSensor,
@@ -26,9 +27,11 @@ import {
   dragStartY,
   DroppableTrackContainer,
   isCenteredLooseDrop,
+  LOOSE_APPEND_CONTAINER_ID,
   LOOSE_CONTAINER_ID,
   rowPlacement,
   sidebarCollisionDetection,
+  SidebarDragPreview,
   SortableAlbumCard,
   SortableTrackRow,
   trackItemId,
@@ -95,6 +98,7 @@ export default function AlbumSidebar({
   onReorderAlbums,
   onAudioUpload,
 }: AlbumSidebarProps) {
+  const [activeDrag, setActiveDrag] = useState<SidebarDragData | null>(null);
   const dragStartYRef = useRef<number | null>(null);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -102,6 +106,11 @@ export default function AlbumSidebar({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const filesById = new Map(files.map((file) => [file.id, file]));
+  const activeTrack = activeDrag?.type === "track" ? filesById.get(activeDrag.trackId) : undefined;
+  const activeAlbum =
+    activeDrag?.type === "album"
+      ? albums.find((album) => album.id === activeDrag.albumId)
+      : undefined;
   const looseTracks = looseTrackIds
     .map((trackId) => filesById.get(trackId))
     .filter((track): track is TagiumFile => Boolean(track));
@@ -116,6 +125,7 @@ export default function AlbumSidebar({
   };
 
   const handleDragStart = (event: DragStartEvent) => {
+    setActiveDrag((event.active.data.current as SidebarDragData | undefined) ?? null);
     dragStartYRef.current = dragStartY(event.activatorEvent);
   };
 
@@ -194,6 +204,7 @@ export default function AlbumSidebar({
       handleTrackDragEnd(event, active, over);
     }
     dragStartYRef.current = null;
+    setActiveDrag(null);
   };
 
   const handleFileDrop = (event: React.DragEvent, onUpload: (files: File[]) => void) => {
@@ -247,11 +258,12 @@ export default function AlbumSidebar({
         onDragStart={handleDragStart}
         onDragCancel={() => {
           dragStartYRef.current = null;
+          setActiveDrag(null);
         }}
         onDragEnd={handleDragEnd}
       >
         <div
-          className="flex-1 overflow-y-auto flex flex-col"
+          className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col"
           onClick={(event) => {
             if (event.target === event.currentTarget) onClearSelection();
           }}
@@ -359,7 +371,17 @@ export default function AlbumSidebar({
               );
             })}
           </SortableContext>
+          <DroppableTrackContainer
+            id={LOOSE_APPEND_CONTAINER_ID}
+            data={{ type: "container", container: "loose" }}
+            className="flex-1 min-h-16"
+          />
         </div>
+        <DragOverlay dropAnimation={null}>
+          {activeDrag ? (
+            <SidebarDragPreview active={activeDrag} album={activeAlbum} track={activeTrack} />
+          ) : null}
+        </DragOverlay>
       </DndContext>
     </div>
   );
