@@ -101,7 +101,7 @@ export default function LandingScreen({
       <input
         ref={fileInputRef}
         type="file"
-        accept="audio/*"
+        accept=".mp3,audio/mpeg"
         multiple
         className="hidden"
         onChange={handleFileChange}

@@ -15,7 +15,7 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
 
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    // The accept="audio/*" attribute on the Input component already filters for audio files.
+    // The accept=".mp3,audio/mpeg" attribute on the Input component already filters for MP3 files.
     // No need for explicit filtering here unless more specific audio types are required.
 
     if (files.length > 0) {
@@ -37,7 +37,7 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
         type="file"
         id={inputId}
         className="hidden"
-        accept="audio/*"
+        accept=".mp3,audio/mpeg"
         onChange={handleAudioUpload}
         multiple
         ref={fileInputRef}
