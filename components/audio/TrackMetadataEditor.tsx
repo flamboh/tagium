@@ -71,7 +71,7 @@ export default function TrackMetadataEditor({
             )}
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 md:p-6 md:pb-28">
-          <div className="flex min-h-full flex-col gap-3 lg:flex-row lg:gap-4">
+          <div className="flex min-h-full flex-col gap-3 lg:min-h-0 lg:flex-row lg:gap-4">
             <Controller
               name="picture"
               control={control}
