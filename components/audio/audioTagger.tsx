@@ -1344,7 +1344,7 @@ export default function AudioTagger() {
             : undefined
         }
       />
-      <div className="min-h-screen flex flex-col bg-background md:h-screen md:flex-row md:overflow-hidden">
+      <div className="min-h-svh flex flex-col bg-background md:h-svh md:flex-row md:overflow-hidden">
         <TagSidebarPanel
           loading={loading}
           files={files}
@@ -1372,29 +1372,31 @@ export default function AudioTagger() {
           onDownloadAll={handleDownloadAll}
           onOpenSettings={() => setActiveView("settings")}
         />
-        <div className="relative order-1 h-svh flex flex-col overflow-hidden md:order-none md:h-auto md:min-h-0 md:flex-1">
-          {activeView === "settings" ? (
-            <SettingsPage settings={settings} onChange={handleSettingsChange} />
-          ) : libraryIsEmpty ? (
-            <LandingScreen
-              onAudioUpload={handleAudioUpload}
-              onAudioDownload={handleAudioDownload}
-              onSoundCloudSetDownload={handleSoundCloudSetDownload}
-            />
-          ) : (
-            <TrackMetadataEditor
-              selectedFile={selectedFile}
-              selectedFileId={selectedFileId}
-              register={register}
-              control={control}
-              handleSubmit={handleSubmit}
-              onTrackCoverUpload={handleTrackCoverUpload}
-              onDownloadUpdatedFile={handleDownloadUpdatedFile}
-              selectedFileAlbum={selectedFileAlbum}
-              syncFilenames={settings.syncFilenames}
-              syncTrackNumbers={settings.syncTrackNumbers}
-            />
-          )}
+        <div className="relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1">
+          <div className="h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1">
+            {activeView === "settings" ? (
+              <SettingsPage settings={settings} onChange={handleSettingsChange} />
+            ) : libraryIsEmpty ? (
+              <LandingScreen
+                onAudioUpload={handleAudioUpload}
+                onAudioDownload={handleAudioDownload}
+                onSoundCloudSetDownload={handleSoundCloudSetDownload}
+              />
+            ) : (
+              <TrackMetadataEditor
+                selectedFile={selectedFile}
+                selectedFileId={selectedFileId}
+                register={register}
+                control={control}
+                handleSubmit={handleSubmit}
+                onTrackCoverUpload={handleTrackCoverUpload}
+                onDownloadUpdatedFile={handleDownloadUpdatedFile}
+                selectedFileAlbum={selectedFileAlbum}
+                syncFilenames={settings.syncFilenames}
+                syncTrackNumbers={settings.syncTrackNumbers}
+              />
+            )}
+          </div>
           {!libraryIsEmpty && activeView === "editor" && (
             <div className="flex-shrink-0 border-t bg-background/95 p-3 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-4 lg:z-10 lg:flex lg:justify-center lg:border-t-0 lg:bg-transparent lg:px-4 lg:p-0">
               <div className="pointer-events-auto w-full max-w-3xl">

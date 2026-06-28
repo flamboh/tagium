@@ -90,7 +90,7 @@ export default function LandingScreen({
   return (
     <div
       className={cn(
-        "min-h-screen flex flex-col items-center justify-center p-8 transition-colors duration-200",
+        "h-full min-h-0 overflow-y-auto flex flex-col items-center justify-center p-8 transition-colors duration-200",
         isDragging && "bg-primary/5",
       )}
       onDragEnter={handleDragEnter}
@@ -107,7 +107,7 @@ export default function LandingScreen({
         onChange={handleFileChange}
       />
 
-      <div className="flex flex-col items-center gap-10 w-full max-w-md">
+      <div className="flex flex-col items-center gap-10 w-full max-w-md max-lg:[@media(max-height:700px)]:gap-6">
         <div className="text-center select-none">
           <h1 className="text-7xl font-bold tracking-tighter text-foreground">tagium</h1>
           <p className="text-muted-foreground mt-3 text-base">tag your music</p>
@@ -118,7 +118,7 @@ export default function LandingScreen({
           onClick={() => fileInputRef.current?.click()}
           className={cn(
             "w-full rounded-3xl border-2 border-dashed transition-all duration-200 cursor-pointer",
-            "flex flex-col items-center justify-center gap-5 py-16 px-8 outline-none",
+            "flex flex-col items-center justify-center gap-5 py-16 px-8 outline-none max-lg:[@media(max-height:700px)]:gap-3 max-lg:[@media(max-height:700px)]:py-8",
             isDragging
               ? "border-primary bg-primary/10 scale-[1.015] shadow-xl shadow-primary/10"
               : "border-border hover:border-primary/50 hover:bg-accent/20 focus-visible:border-primary/50",
