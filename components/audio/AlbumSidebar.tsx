@@ -6,6 +6,7 @@ import {
   DndContext,
   DragOverlay,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
   KeyboardSensor,
   MouseSensor,
@@ -20,6 +21,7 @@ import {
 } from "@dnd-kit/sortable";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AlbumSidebarEmptyState } from "./AlbumSidebarEmptyState";
 import {
   albumIdFromDrop,
   albumContainerId,
@@ -100,6 +102,7 @@ export default function AlbumSidebar({
 }: AlbumSidebarProps) {
   const [activeDrag, setActiveDrag] = useState<SidebarDragData | null>(null);
   const dragStartYRef = useRef<number | null>(null);
+  const recentLooseTargetRef = useRef<{ trackId: string; expiresAt: number } | null>(null);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
@@ -126,7 +129,19 @@ export default function AlbumSidebar({
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDrag((event.active.data.current as SidebarDragData | undefined) ?? null);
+    recentLooseTargetRef.current = null;
     dragStartYRef.current = dragStartY(event.activatorEvent);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const active = event.active.data.current as SidebarDragData | undefined;
+    const over = event.over?.data.current as SidebarDropData | undefined;
+    if (active?.type !== "track") return;
+    if (active.container !== "loose") return;
+    if (over?.type !== "track") return;
+    if (over.container !== "loose") return;
+    if (over.trackId === active.trackId) return;
+    recentLooseTargetRef.current = { trackId: over.trackId, expiresAt: Date.now() + 700 };
   };
 
   const trackIdsForDrop = (drop: Extract<SidebarDropData, { type: "track" }>) => {
@@ -191,6 +206,16 @@ export default function AlbumSidebar({
     }
 
     if (over.type === "container" && over.container === "loose") {
+      const recentLooseTarget = recentLooseTargetRef.current;
+      if (
+        active.container === "loose" &&
+        event.over?.id !== LOOSE_APPEND_CONTAINER_ID &&
+        recentLooseTarget &&
+        recentLooseTarget.expiresAt > Date.now()
+      ) {
+        onPromptCreateAlbumFromLooseTracks(active.trackId, recentLooseTarget.trackId);
+        return;
+      }
       onMoveTrackToLoose(active.trackId, "append");
     }
   };
@@ -204,6 +229,7 @@ export default function AlbumSidebar({
       handleTrackDragEnd(event, active, over);
     }
     dragStartYRef.current = null;
+    recentLooseTargetRef.current = null;
     setActiveDrag(null);
   };
 
@@ -218,27 +244,7 @@ export default function AlbumSidebar({
   };
 
   if (albums.length === 0 && looseTracks.length === 0) {
-    return (
-      <div
-        className="w-full flex-1 min-h-0 flex flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground px-4"
-        onClick={onClearSelection}
-      >
-        <p>no tracks yet</p>
-        <p className="text-xs">create an empty album or upload tracks</p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={(event) => {
-            event.stopPropagation();
-            onAddAlbum();
-          }}
-        >
-          <Plus className="h-4 w-4" />
-          add album
-        </Button>
-      </div>
-    );
+    return <AlbumSidebarEmptyState onAddAlbum={onAddAlbum} onClearSelection={onClearSelection} />;
   }
 
   return (
@@ -256,8 +262,10 @@ export default function AlbumSidebar({
         sensors={sensors}
         collisionDetection={sidebarCollisionDetection}
         onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragCancel={() => {
           dragStartYRef.current = null;
+          recentLooseTargetRef.current = null;
           setActiveDrag(null);
         }}
         onDragEnd={handleDragEnd}
@@ -281,6 +289,7 @@ export default function AlbumSidebar({
             <DroppableTrackContainer
               id={LOOSE_CONTAINER_ID}
               data={{ type: "container", container: "loose" }}
+              className={looseTracks.length === 0 ? "min-h-0" : ""}
             >
               {looseTracks.map((track) => (
                 <SortableTrackRow
