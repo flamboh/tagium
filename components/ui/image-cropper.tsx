@@ -91,8 +91,9 @@ export default function ImageCropper({ src, onCrop, onCancel }: ImageCropperProp
 
   return (
     <div className="space-y-4">
-      <div className="w-80 h-80 flex items-center justify-center">
+      <div className="flex size-[min(20rem,calc(100svw-2.5rem))] items-center justify-center">
         <ReactCrop
+          className="max-h-full"
           crop={crop}
           onChange={(c) => setCrop(c)}
           onComplete={(c) => setCompletedCrop(c)}
@@ -103,7 +104,7 @@ export default function ImageCropper({ src, onCrop, onCancel }: ImageCropperProp
           <img
             ref={imgRef}
             alt="Crop preview"
-            style={{ maxWidth: "320px", maxHeight: "320px" }}
+            style={{ maxWidth: "100%", maxHeight: "100%" }}
             src={src}
             onLoad={onImageLoad}
           />

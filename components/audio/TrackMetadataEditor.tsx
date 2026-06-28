@@ -54,15 +54,15 @@ export default function TrackMetadataEditor({
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <form
         onSubmit={(event) => {
           event.preventDefault();
         }}
-        className="flex flex-col h-full"
+        className="flex min-h-0 flex-col h-full"
       >
-        <div className="p-6 h-[104px] border-b flex-shrink-0 flex flex-col justify-center gap-1">
-          <h2 className="text-lg font-semibold truncate">{selectedFile.filename}</h2>
+        <div className="h-16 border-b flex-shrink-0 flex flex-col justify-center gap-1 px-4 md:h-[104px] md:p-6">
+          <h2 className="truncate text-base font-semibold md:text-lg">{selectedFile.filename}</h2>
           {(selectedFile.downloadStatus === "error" || selectedFile.status === "error") &&
             selectedFile.downloadError && (
               <p className="text-xs text-destructive truncate" aria-live="polite">
@@ -70,8 +70,8 @@ export default function TrackMetadataEditor({
               </p>
             )}
         </div>
-        <div className="flex-1 overflow-y-auto p-6 pb-28">
-          <div className="flex gap-4 flex-col lg:flex-row">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 md:p-6 md:pb-28">
+          <div className="flex flex-col gap-3 lg:flex-row lg:gap-4">
             <Controller
               name="picture"
               control={control}
@@ -83,9 +83,9 @@ export default function TrackMetadataEditor({
                 />
               )}
             />
-            <div className="flex-1 grid grid-cols-1 gap-3">
+            <div className="flex-1 grid grid-cols-1 gap-2 md:gap-3">
               <div>
-                <label className="block text-sm font-medium mb-1">filename:</label>
+                <label className="mb-1 block text-xs font-medium md:text-sm">filename:</label>
                 <div
                   className={`flex items-center h-9 w-full rounded-md border border-input bg-transparent dark:bg-input/30 px-3 py-1 text-base shadow-sm transition-colors md:text-sm ${syncFilenames ? "opacity-50 cursor-not-allowed pointer-events-none" : "focus-within:ring-1 focus-within:ring-ring"}`}
                 >
@@ -104,42 +104,44 @@ export default function TrackMetadataEditor({
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">title:</label>
+                <label className="mb-1 block text-xs font-medium md:text-sm">title:</label>
                 <Input {...register("title")} placeholder="Bangarang" />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">artist:</label>
+                <label className="mb-1 block text-xs font-medium md:text-sm">artist:</label>
                 <Input {...register("artist")} placeholder="Skrillex" disabled={inAlbum} />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">album:</label>
+                <label className="mb-1 block text-xs font-medium md:text-sm">album:</label>
                 <Input {...register("album")} placeholder="Bangarang EP" disabled={inAlbum} />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">year:</label>
-                <Input
-                  type="number"
-                  {...register("year", { valueAsNumber: true })}
-                  placeholder="2011"
-                  disabled={inAlbum}
-                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
+              <div className="grid grid-cols-[minmax(4.5rem,0.8fr)_minmax(0,1.4fr)_minmax(4.5rem,0.8fr)] gap-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium md:text-sm">year:</label>
+                  <Input
+                    type="number"
+                    {...register("year", { valueAsNumber: true })}
+                    placeholder="2011"
+                    disabled={inAlbum}
+                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium md:text-sm">genre:</label>
+                  <Input {...register("genre")} placeholder="Dubstep" disabled={inAlbum} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium md:text-sm">track:</label>
+                  <Input
+                    type="number"
+                    {...register("trackNumber", { valueAsNumber: true })}
+                    placeholder="2"
+                    disabled={inAlbum && syncTrackNumbers}
+                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">genre:</label>
-                <Input {...register("genre")} placeholder="Dubstep" disabled={inAlbum} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">track:</label>
-                <Input
-                  type="number"
-                  {...register("trackNumber", { valueAsNumber: true })}
-                  placeholder="2"
-                  disabled={inAlbum && syncTrackNumbers}
-                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+              <div className="grid grid-cols-2 gap-2 text-xs md:text-sm">
                 <div>
                   <span className="font-medium">duration: </span>
                   {`${Math.floor(selectedFile.metadata.duration / 60)}:${String(Math.round(selectedFile.metadata.duration % 60)).padStart(2, "0")}`}
@@ -160,7 +162,7 @@ export default function TrackMetadataEditor({
                     "download failed"}
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-1 md:pt-2">
                 <Button
                   type="button"
                   onClick={handleSubmit(onDownloadUpdatedFile)}

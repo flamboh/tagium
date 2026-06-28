@@ -96,26 +96,28 @@ export default function CoverArt({
   return (
     <div
       className={
-        isCompact ? "flex-shrink-0 flex flex-col h-full" : "flex-shrink-0 grid grid-rows-2 gap-2"
+        isCompact
+          ? "flex-shrink-0 flex gap-2 md:h-full md:flex-col"
+          : "flex-shrink-0 flex gap-2 md:grid md:grid-rows-2"
       }
     >
-      <div className="relative">
+      <div className={isCompact ? "relative w-24 md:w-44" : "relative w-fit"}>
         {coverSrc ? (
           <img
             src={coverSrc}
             alt="album cover"
             className={
               isCompact
-                ? "w-44 h-44 object-cover rounded-lg border"
-                : "w-64 h-64 object-cover rounded-lg border"
+                ? "size-24 object-cover rounded-lg border md:size-44"
+                : "size-24 object-cover rounded-lg border md:size-64"
             }
           />
         ) : (
           <div
             className={
               isCompact
-                ? "w-44 h-44 bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs"
-                : "w-64 h-64 bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs"
+                ? "size-24 bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs md:size-44"
+                : "size-24 bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs md:size-64"
             }
           >
             no cover
@@ -128,7 +130,8 @@ export default function CoverArt({
                 type="button"
                 size="sm"
                 variant="secondary"
-                className="absolute top-2 right-2"
+                aria-label="crop cover art"
+                className="absolute top-2 right-2 size-10 p-0 md:size-8"
                 onClick={() => {
                   if (tempImageForCropping) {
                     URL.revokeObjectURL(tempImageForCropping);
@@ -141,7 +144,11 @@ export default function CoverArt({
                 <Crop className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-4" side="right">
+            <PopoverContent
+              className="w-auto max-w-[calc(100svw-1rem)] p-3 md:p-4"
+              side="bottom"
+              align="start"
+            >
               {tempImageForCropping && (
                 <ImageCropper
                   src={tempImageForCropping}
@@ -153,7 +160,13 @@ export default function CoverArt({
           </Popover>
         )}
       </div>
-      <div className={isCompact ? "mt-auto pt-2" : "flex flex-col gap-2"}>
+      <div
+        className={
+          isCompact
+            ? "flex min-w-0 flex-1 md:mt-auto md:block md:flex-none md:pt-2"
+            : "flex min-w-0 flex-1 md:flex-none md:flex-col md:gap-2"
+        }
+      >
         <Input
           type="file"
           accept="image/*"
@@ -166,8 +179,8 @@ export default function CoverArt({
           variant="outline"
           className={
             isCompact
-              ? "w-44 h-10 border-dashed border-2 flex items-center gap-2 hover:bg-accent/50 cursor-pointer"
-              : "w-64 h-24 border-dashed border-2 flex flex-col gap-2 hover:bg-accent/50 cursor-pointer"
+              ? "h-24 w-full border-dashed border-2 flex flex-col items-center gap-1 px-2 hover:bg-accent/50 cursor-pointer md:h-10 md:w-44 md:flex-row md:gap-2 md:px-3"
+              : "h-24 w-full border-dashed border-2 flex flex-col gap-2 hover:bg-accent/50 cursor-pointer md:w-64"
           }
           onClick={() => fileInputRef.current?.click()}
         >
@@ -176,7 +189,9 @@ export default function CoverArt({
               isCompact ? "h-4 w-4 text-muted-foreground" : "h-6 w-6 text-muted-foreground"
             }
           />
-          <span className="text-muted-foreground text-xs">upload cover</span>
+          <span className="text-muted-foreground whitespace-nowrap text-[11px] md:text-xs">
+            upload cover
+          </span>
         </Button>
       </div>
     </div>
