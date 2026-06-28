@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
+import { ChevronsUpDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AUDIO_BITRATE_OPTIONS } from "./settings";
-import type { AudioDownloadBitrate } from "./cobaltDownload";
 import type { AppSettings } from "./types";
 
 interface SettingsPageProps {
@@ -11,6 +14,8 @@ interface SettingsPageProps {
 }
 
 export default function SettingsPage({ settings, onChange }: SettingsPageProps) {
+  const [bitrateOpen, setBitrateOpen] = useState(false);
+
   return (
     <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
       <div className="p-6 h-[104px] border-b flex-shrink-0 flex flex-col justify-center gap-1">
@@ -50,26 +55,48 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
 
           <section className="flex flex-col gap-3">
             <h3 className="text-sm font-medium">downloads</h3>
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium">download bitrate</span>
-              <select
-                value={settings.audioBitrate}
-                onChange={(event) =>
-                  onChange({
-                    ...settings,
-                    audioBitrate: event.target.value as AudioDownloadBitrate,
-                  })
-                }
-                className="border-input bg-background h-9 rounded-md border px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] dark:bg-input/30"
-                aria-label="download bitrate"
-              >
-                {AUDIO_BITRATE_OPTIONS.map((bitrate) => (
-                  <option key={bitrate} value={bitrate}>
-                    {bitrate}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="flex flex-col gap-2">
+              <span id="download-bitrate-label" className="text-sm font-medium">
+                download bitrate
+              </span>
+              <Popover open={bitrateOpen} onOpenChange={setBitrateOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 w-full justify-between px-2 font-normal"
+                    aria-labelledby="download-bitrate-label"
+                  >
+                    <span>
+                      {settings.audioBitrate} <span className="text-muted-foreground">kbps</span>
+                    </span>
+                    <ChevronsUpDown className="size-4 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  className="w-(--radix-popover-trigger-width) p-1"
+                  role="listbox"
+                >
+                  {AUDIO_BITRATE_OPTIONS.map((bitrate) => (
+                    <Button
+                      key={bitrate}
+                      type="button"
+                      variant="ghost"
+                      className={`h-8 w-full justify-start px-2 font-normal ${settings.audioBitrate === bitrate ? "bg-accent text-accent-foreground" : ""}`}
+                      aria-selected={settings.audioBitrate === bitrate}
+                      role="option"
+                      onClick={() => {
+                        onChange({ ...settings, audioBitrate: bitrate });
+                        setBitrateOpen(false);
+                      }}
+                    >
+                      {bitrate} <span className="text-muted-foreground">kbps</span>
+                    </Button>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            </div>
           </section>
 
           <section className="flex flex-col gap-5">

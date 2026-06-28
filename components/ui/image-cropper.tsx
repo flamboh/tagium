@@ -112,10 +112,10 @@ export default function ImageCropper({ src, onCrop, onCancel }: ImageCropperProp
       </div>
       <div className="flex gap-2 justify-end">
         <Button variant="outline" onClick={onCancel}>
-          Cancel
+          cancel
         </Button>
         <Button onClick={handleCrop} disabled={!completedCrop}>
-          Apply Crop
+          apply crop
         </Button>
       </div>
     </div>
