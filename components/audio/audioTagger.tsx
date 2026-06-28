@@ -1396,7 +1396,7 @@ export default function AudioTagger() {
             />
           )}
           {!libraryIsEmpty && activeView === "editor" && (
-            <div className="flex-shrink-0 border-t bg-background/95 p-3 md:pointer-events-none md:absolute md:inset-x-0 md:bottom-4 md:z-10 md:flex md:justify-center md:border-t-0 md:bg-transparent md:px-4 md:p-0">
+            <div className="flex-shrink-0 border-t bg-background/95 p-3 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-4 lg:z-10 lg:flex lg:justify-center lg:border-t-0 lg:bg-transparent lg:px-4 lg:p-0">
               <div className="pointer-events-auto w-full max-w-3xl">
                 <AudioDownloader
                   onAudioDownload={handleAudioDownload}
