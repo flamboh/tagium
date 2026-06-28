@@ -71,7 +71,7 @@ export default function TrackMetadataEditor({
             )}
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 md:p-6 md:pb-28">
-          <div className="flex flex-col gap-3 lg:flex-row lg:gap-4">
+          <div className="flex min-h-full flex-col gap-3 lg:flex-row lg:gap-4">
             <Controller
               name="picture"
               control={control}
@@ -83,7 +83,7 @@ export default function TrackMetadataEditor({
                 />
               )}
             />
-            <div className="flex-1 grid grid-cols-1 gap-2 md:gap-3">
+            <div className="flex flex-1 flex-col gap-2 md:gap-3">
               <div>
                 <label className="mb-1 block text-xs font-medium md:text-sm">filename:</label>
                 <div
@@ -146,7 +146,7 @@ export default function TrackMetadataEditor({
                   <span className="font-medium">duration: </span>
                   {`${Math.floor(selectedFile.metadata.duration / 60)}:${String(Math.round(selectedFile.metadata.duration % 60)).padStart(2, "0")}`}
                 </div>
-                <div>
+                <div className="justify-self-end text-right">
                   <span className="font-medium">size: </span>
                   {selectedFile.file &&
                     selectedFile.status !== "error" &&
@@ -162,13 +162,14 @@ export default function TrackMetadataEditor({
                     "download failed"}
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-1 md:pt-2">
+              <div className="flex min-h-0 flex-1 items-center justify-center gap-2 pt-1 md:flex-none md:justify-end md:pt-2">
                 <Button
                   type="button"
                   onClick={handleSubmit(onDownloadUpdatedFile)}
                   disabled={!audioReady}
+                  className="min-w-36"
                 >
-                  download
+                  download track
                 </Button>
               </div>
             </div>
