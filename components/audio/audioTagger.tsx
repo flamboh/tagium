@@ -1372,7 +1372,7 @@ export default function AudioTagger() {
           onDownloadAll={handleDownloadAll}
           onOpenSettings={() => setActiveView("settings")}
         />
-        <div className="relative order-1 h-screen flex flex-col overflow-hidden md:order-none md:h-auto md:min-h-0 md:flex-1">
+        <div className="relative order-1 h-svh flex flex-col overflow-hidden md:order-none md:h-auto md:min-h-0 md:flex-1">
           {activeView === "settings" ? (
             <SettingsPage settings={settings} onChange={handleSettingsChange} />
           ) : libraryIsEmpty ? (
@@ -1396,7 +1396,7 @@ export default function AudioTagger() {
             />
           )}
           {!libraryIsEmpty && activeView === "editor" && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center px-4">
+            <div className="flex-shrink-0 border-t bg-background/95 p-3 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-4 lg:z-10 lg:flex lg:justify-center lg:border-t-0 lg:bg-transparent lg:px-4 lg:p-0">
               <div className="pointer-events-auto w-full max-w-3xl">
                 <AudioDownloader
                   onAudioDownload={handleAudioDownload}
