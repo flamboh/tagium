@@ -289,7 +289,11 @@ export default function AlbumSidebar({
             <DroppableTrackContainer
               id={LOOSE_CONTAINER_ID}
               data={{ type: "container", container: "loose" }}
-              className={looseTracks.length === 0 && activeDrag?.type === "track" ? "min-h-12" : ""}
+              className={
+                looseTracks.length === 0 && activeDrag?.type === "track"
+                  ? "min-h-12 shrink-0"
+                  : "shrink-0"
+              }
             >
               {looseTracks.map((track) => (
                 <SortableTrackRow
