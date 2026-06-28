@@ -280,7 +280,7 @@ export function SortableAlbumCard({
     <div
       ref={setNodeRef}
       className={cn(
-        "border-b transition-all",
+        "border-b transition-all shrink-0",
         selected ? "bg-primary/5" : "",
         isDragging ? "z-10 opacity-60" : "",
       )}
