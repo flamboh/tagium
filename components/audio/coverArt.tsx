@@ -98,10 +98,16 @@ export default function CoverArt({
       className={
         isCompact
           ? "flex-shrink-0 flex gap-2 md:h-full md:flex-col"
-          : "flex-shrink-0 flex items-start gap-2 md:grid md:grid-rows-2"
+          : "flex-shrink-0 flex flex-col items-center gap-2 md:grid md:grid-rows-2 md:items-start"
       }
     >
-      <div className={isCompact ? "relative w-24 md:w-44" : "relative w-fit"}>
+      <div
+        className={
+          isCompact
+            ? "relative w-24 md:w-44"
+            : "relative size-[min(80vw,clamp(7.5rem,calc(75svh-25.3125rem),19.25rem))] md:size-auto"
+        }
+      >
         {coverSrc ? (
           <img
             src={coverSrc}
@@ -109,7 +115,7 @@ export default function CoverArt({
             className={
               isCompact
                 ? "size-24 object-cover rounded-lg border md:size-44"
-                : "size-40 object-cover rounded-lg border md:size-64"
+                : "size-full object-cover rounded-lg border md:size-64"
             }
           />
         ) : (
@@ -117,7 +123,7 @@ export default function CoverArt({
             className={
               isCompact
                 ? "size-24 bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs md:size-44"
-                : "size-40 bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs md:size-64"
+                : "size-full bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs md:size-64"
             }
           >
             no cover
@@ -164,7 +170,7 @@ export default function CoverArt({
         className={
           isCompact
             ? "flex min-w-0 flex-1 md:mt-auto md:block md:flex-none md:pt-2"
-            : "flex min-w-0 flex-1 md:flex-none md:flex-col md:gap-2"
+            : "flex w-[min(80vw,clamp(7.5rem,calc(75svh-25.3125rem),19.25rem))] md:w-auto md:flex-none md:flex-col md:gap-2"
         }
       >
         <Input
@@ -180,7 +186,7 @@ export default function CoverArt({
           className={
             isCompact
               ? "h-24 w-full border-dashed border-2 flex flex-col items-center gap-1 px-2 hover:bg-accent/50 cursor-pointer md:h-10 md:w-44 md:flex-row md:gap-2 md:px-3"
-              : "h-10 w-full border-dashed border-2 flex gap-2 px-3 hover:bg-accent/50 cursor-pointer md:h-24 md:w-64 md:flex-col"
+              : "h-8 w-full border-dashed border-2 flex gap-2 px-3 hover:bg-accent/50 cursor-pointer md:h-24 md:w-64 md:flex-col"
           }
           onClick={() => fileInputRef.current?.click()}
         >
