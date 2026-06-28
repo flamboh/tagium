@@ -1,14 +1,7 @@
 "use client";
 
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
-import {
-  closestCorners,
-  type CollisionDetection,
-  type DragEndEvent,
-  pointerWithin,
-  rectIntersection,
-  useDroppable,
-} from "@dnd-kit/core";
+import { type DragEndEvent, useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import {
   AlertCircle,
@@ -42,16 +35,6 @@ export type SidebarDropData =
 export const albumItemId = (albumId: string) => `album:${albumId}`;
 export const albumContainerId = (albumId: string) => `container:album:${albumId}`;
 export const trackItemId = (trackId: string) => `track:${trackId}`;
-
-export const sidebarCollisionDetection: CollisionDetection = (args) => {
-  const pointerCollisions = pointerWithin(args);
-  if (pointerCollisions.length > 0) return pointerCollisions;
-
-  const intersections = rectIntersection(args);
-  if (intersections.length > 0) return intersections;
-
-  return closestCorners(args);
-};
 
 export const dragStartY = (event: Event) => {
   const sourceEvent = event as Event & {
@@ -100,6 +83,7 @@ type TrackRowBaseProps = {
   selectedTone: "primary" | "secondary" | null;
   muted: boolean;
   retryable: boolean;
+  combineTarget?: ReactNode;
   onSelect: (event: ReactMouseEvent) => void;
   onRemove: () => void;
   onRetry: () => void;
@@ -127,6 +111,7 @@ export function SortableTrackRow({
   selectedTone,
   muted,
   retryable,
+  combineTarget,
   onSelect,
   onRemove,
   onRetry,
@@ -149,85 +134,87 @@ export function SortableTrackRow({
 
   return (
     <div
-      ref={setNodeRef}
       className={cn(
-        "relative group border-t first:border-t-0",
+        "border-t first:border-t-0",
         container === "loose" ? "border-b border-t-0 first:border-t-0" : "",
         isDragging ? "z-10 opacity-60" : "",
       )}
       style={sortableStyle(transform, transition)}
     >
-      <Button
-        type="button"
-        ref={setActivatorNodeRef}
-        variant="ghost"
-        className={cn(
-          "justify-start h-auto py-2.5 px-4 pr-8 w-full text-left font-normal rounded-none hover:bg-accent/30",
-          container === "loose" ? "py-3" : "",
-          muted ? "opacity-65" : "",
-          selectedTone === "primary" ? "bg-accent text-accent-foreground" : "",
-          selectedTone === "secondary" ? "bg-accent/50 text-accent-foreground" : "",
-        )}
-        onClick={onSelect}
-        {...attributes}
-        {...listeners}
-      >
-        <div className="flex flex-col gap-1 w-full min-w-0">
-          <div className="flex items-center gap-1.5 w-full overflow-hidden">
-            {container === "loose" ? (
-              <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-            ) : (
-              <span className="min-w-3 text-[11px] text-muted-foreground">{index}</span>
-            )}
-            <span className="truncate text-sm flex-1">{track.filename}</span>
-            {track.downloadStatus === "downloading" && (
-              <Loader2 className="h-3 w-3 text-muted-foreground flex-shrink-0 animate-spin" />
-            )}
-            {track.downloadStatus !== "downloading" && track.status === "saved" && (
-              <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
-            )}
-            {(track.downloadStatus === "error" || track.status === "error") && (
-              <AlertCircle
-                className={cn(
-                  "h-3 w-3 text-red-500 flex-shrink-0",
-                  retryable ? "group-hover:opacity-0" : "",
-                )}
-              />
-            )}
+      <div ref={setNodeRef} className="relative group">
+        <Button
+          type="button"
+          ref={setActivatorNodeRef}
+          variant="ghost"
+          className={cn(
+            "justify-start h-auto py-2.5 px-4 pr-8 w-full text-left font-normal rounded-none hover:bg-accent/30",
+            container === "loose" ? "py-3" : "",
+            muted ? "opacity-65" : "",
+            selectedTone === "primary" ? "bg-accent text-accent-foreground" : "",
+            selectedTone === "secondary" ? "bg-accent/50 text-accent-foreground" : "",
+          )}
+          onClick={onSelect}
+          {...attributes}
+          {...listeners}
+        >
+          <div className="flex flex-col gap-1 w-full min-w-0">
+            <div className="flex items-center gap-1.5 w-full overflow-hidden">
+              {container === "loose" ? (
+                <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+              ) : (
+                <span className="min-w-3 text-[11px] text-muted-foreground">{index}</span>
+              )}
+              <span className="truncate text-sm flex-1">{track.filename}</span>
+              {track.downloadStatus === "downloading" && (
+                <Loader2 className="h-3 w-3 text-muted-foreground flex-shrink-0 animate-spin" />
+              )}
+              {track.downloadStatus !== "downloading" && track.status === "saved" && (
+                <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+              )}
+              {(track.downloadStatus === "error" || track.status === "error") && (
+                <AlertCircle
+                  className={cn(
+                    "h-3 w-3 text-red-500 flex-shrink-0",
+                    retryable ? "group-hover:opacity-0" : "",
+                  )}
+                />
+              )}
+            </div>
+            {(track.downloadStatus === "error" || track.status === "error") &&
+              track.downloadError && (
+                <span className="pl-7 text-xs text-destructive truncate" aria-live="polite">
+                  error: {track.downloadError}
+                </span>
+              )}
           </div>
-          {(track.downloadStatus === "error" || track.status === "error") &&
-            track.downloadError && (
-              <span className="pl-7 text-xs text-destructive truncate" aria-live="polite">
-                error: {track.downloadError}
-              </span>
-            )}
-        </div>
-      </Button>
-      {retryable && (
+        </Button>
+        {retryable && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRetry();
+            }}
+            className="absolute right-7 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-full cursor-pointer"
+            title="retry download"
+            aria-label={`retry download for ${track.filename}`}
+          >
+            <RefreshCw className="h-3 w-3 text-muted-foreground hover:text-primary" />
+          </button>
+        )}
         <button
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            onRetry();
+            onRemove();
           }}
-          className="absolute right-7 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-full cursor-pointer"
-          title="retry download"
-          aria-label={`retry download for ${track.filename}`}
+          className="absolute right-3 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
+          title="remove track"
         >
-          <RefreshCw className="h-3 w-3 text-muted-foreground hover:text-primary" />
+          <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
         </button>
-      )}
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onRemove();
-        }}
-        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
-        title="remove track"
-      >
-        <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-      </button>
+      </div>
+      {combineTarget}
     </div>
   );
 }

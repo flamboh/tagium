@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type MouseEvent as ReactMouseEvent } from "react";
+import { type MouseEvent as ReactMouseEvent } from "react";
 import { useRef, useState } from "react";
 import {
   DndContext,
@@ -23,6 +23,7 @@ import {
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AlbumSidebarEmptyState } from "./AlbumSidebarEmptyState";
+import { sidebarCollisionDetection } from "./AlbumSidebarCollision";
 import {
   albumIdFromDrop,
   albumContainerId,
@@ -32,7 +33,6 @@ import {
   LOOSE_APPEND_CONTAINER_ID,
   LOOSE_CONTAINER_ID,
   rowPlacement,
-  sidebarCollisionDetection,
   SidebarDragPreview,
   SortableAlbumCard,
   SortableTrackRow,
@@ -288,21 +288,22 @@ export default function AlbumSidebar({
               className={looseTracks.length === 0 && activeDrag?.type === "track" ? "min-h-12" : ""}
             >
               {looseTracks.map((track) => (
-                <Fragment key={track.id}>
-                  <SortableTrackRow
-                    track={track}
-                    container="loose"
-                    selectedTone={selectedTone(track.id)}
-                    muted={track.downloadStatus === "downloading"}
-                    retryable={isRetryableError(track)}
-                    onSelect={(event) => onSelectLooseTrack(track.id, event)}
-                    onRetry={() => onRetryDownload(track.id)}
-                    onRemove={() => onRemoveFile(track.id)}
-                  />
-                  {looseCombineTarget.target?.targetTrackId === track.id ? (
-                    <LooseCombineDropTarget target={looseCombineTarget.target} />
-                  ) : null}
-                </Fragment>
+                <SortableTrackRow
+                  key={track.id}
+                  track={track}
+                  container="loose"
+                  selectedTone={selectedTone(track.id)}
+                  muted={track.downloadStatus === "downloading"}
+                  retryable={isRetryableError(track)}
+                  combineTarget={
+                    looseCombineTarget.target?.targetTrackId === track.id ? (
+                      <LooseCombineDropTarget target={looseCombineTarget.target} />
+                    ) : undefined
+                  }
+                  onSelect={(event) => onSelectLooseTrack(track.id, event)}
+                  onRetry={() => onRetryDownload(track.id)}
+                  onRemove={() => onRemoveFile(track.id)}
+                />
               ))}
             </DroppableTrackContainer>
           </SortableContext>
