@@ -113,7 +113,7 @@ export default function TagSidebarPanel({
   return (
     <div
       className={cn(
-        "order-2 min-h-screen w-full flex-shrink-0 flex flex-col border-t bg-card overflow-hidden transition-colors duration-200 md:order-none md:min-h-0 md:w-72 md:border-t-0 md:border-r",
+        "order-2 h-svh w-full flex-shrink-0 flex flex-col border-t bg-card overflow-hidden transition-colors duration-200 md:order-none md:h-auto md:min-h-0 md:w-72 md:border-t-0 md:border-r",
         isDraggingFile && "bg-primary/5 shadow-[inset_0_0_0_2px_var(--primary)]",
       )}
       onDragEnter={handleSidebarDragEnter}

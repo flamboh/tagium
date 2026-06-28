@@ -105,7 +105,7 @@ export default function CoverArt({
         className={
           isCompact
             ? "relative w-24 md:w-44"
-            : "relative size-[min(80vw,clamp(7.5rem,calc(75svh-25.3125rem),19.25rem))] lg:size-auto"
+            : "relative size-[min(80vw,clamp(7.5rem,calc(75svh-25.3125rem),19.25rem))] max-lg:[@media(max-height:700px)]:size-24 lg:size-auto"
         }
       >
         {coverSrc ? (
@@ -137,7 +137,7 @@ export default function CoverArt({
                 size="sm"
                 variant="secondary"
                 aria-label="crop cover art"
-                className="absolute top-2 right-2 size-10 p-0 md:size-8"
+                className="absolute top-2 right-2 size-10 p-0 max-lg:[@media(max-height:700px)]:top-1.5 max-lg:[@media(max-height:700px)]:right-1.5"
                 onClick={() => {
                   if (tempImageForCropping) {
                     URL.revokeObjectURL(tempImageForCropping);
@@ -170,7 +170,7 @@ export default function CoverArt({
         className={
           isCompact
             ? "flex min-w-0 flex-1 md:mt-auto md:block md:flex-none md:pt-2"
-            : "flex w-[min(80vw,clamp(7.5rem,calc(75svh-25.3125rem),19.25rem))] lg:w-auto lg:flex-none lg:flex-col lg:gap-2"
+            : "flex w-[min(80vw,clamp(7.5rem,calc(75svh-25.3125rem),19.25rem))] max-lg:[@media(max-height:700px)]:w-24 lg:w-auto lg:flex-none lg:flex-col lg:gap-2"
         }
       >
         <Input
@@ -186,16 +186,18 @@ export default function CoverArt({
           className={
             isCompact
               ? "h-24 w-full border-dashed border-2 flex flex-col items-center gap-1 px-2 hover:bg-accent/50 cursor-pointer md:h-10 md:w-44 md:flex-row md:gap-2 md:px-3"
-              : "h-8 w-full border-dashed border-2 flex gap-2 px-3 hover:bg-accent/50 cursor-pointer lg:h-24 lg:w-64 lg:flex-col"
+              : "h-10 w-full border-dashed border-2 flex gap-2 px-3 hover:bg-accent/50 cursor-pointer max-lg:[@media(max-height:700px)]:gap-1 lg:h-24 lg:w-64 lg:flex-col"
           }
           onClick={() => fileInputRef.current?.click()}
         >
           <Upload
             className={
-              isCompact ? "h-4 w-4 text-muted-foreground" : "h-6 w-6 text-muted-foreground"
+              isCompact
+                ? "h-4 w-4 text-muted-foreground"
+                : "h-6 w-6 text-muted-foreground max-lg:[@media(max-height:700px)]:h-4 max-lg:[@media(max-height:700px)]:w-4"
             }
           />
-          <span className="text-muted-foreground whitespace-nowrap text-[11px] md:text-xs">
+          <span className="text-muted-foreground whitespace-nowrap text-[10px] md:text-xs">
             upload cover
           </span>
         </Button>

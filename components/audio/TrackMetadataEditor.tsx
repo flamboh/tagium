@@ -61,8 +61,10 @@ export default function TrackMetadataEditor({
         }}
         className="flex min-h-0 flex-col h-full"
       >
-        <div className="h-16 border-b flex-shrink-0 flex flex-col justify-center gap-1 px-4 lg:h-[104px] lg:p-6">
-          <h2 className="truncate text-base font-semibold lg:text-lg">{selectedFile.filename}</h2>
+        <div className="h-16 border-b flex-shrink-0 flex flex-col justify-center gap-1 px-4 max-lg:[@media(max-height:700px)]:h-12 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:p-6">
+          <h2 className="truncate text-base font-semibold max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
+            {selectedFile.filename}
+          </h2>
           {(selectedFile.downloadStatus === "error" || selectedFile.status === "error") &&
             selectedFile.downloadError && (
               <p className="text-xs text-destructive truncate" aria-live="polite">
@@ -70,8 +72,8 @@ export default function TrackMetadataEditor({
               </p>
             )}
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 lg:p-6 lg:pb-28">
-          <div className="flex min-h-full flex-col gap-3 lg:min-h-0 lg:flex-row lg:gap-4">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 max-lg:[@media(max-height:700px)]:p-2 lg:p-6 lg:pb-28">
+          <div className="flex min-h-full flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:min-h-0 lg:flex-row lg:gap-4">
             <Controller
               name="picture"
               control={control}
@@ -83,7 +85,7 @@ export default function TrackMetadataEditor({
                 />
               )}
             />
-            <div className="flex flex-1 flex-col gap-2 lg:gap-3">
+            <div className="flex flex-1 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3">
               <div>
                 <label className="mb-1 block text-xs font-medium md:text-sm">filename:</label>
                 <div
@@ -162,12 +164,12 @@ export default function TrackMetadataEditor({
                     "download failed"}
                 </div>
               </div>
-              <div className="flex min-h-0 flex-1 items-center justify-center gap-2 pt-1 lg:flex-none lg:justify-end lg:pt-2">
+              <div className="flex min-h-0 flex-1 items-center justify-center gap-2 pt-1 max-lg:[@media(max-height:700px)]:flex-none max-lg:[@media(max-height:700px)]:pt-0 lg:flex-none lg:justify-end lg:pt-2">
                 <Button
                   type="button"
                   onClick={handleSubmit(onDownloadUpdatedFile)}
                   disabled={!audioReady}
-                  className="min-w-36"
+                  className="min-w-36 max-lg:[@media(max-height:700px)]:h-10 max-lg:[@media(max-height:700px)]:text-xs"
                 >
                   download track
                 </Button>
