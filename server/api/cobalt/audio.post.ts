@@ -9,6 +9,7 @@
 import { defineHandler } from "nitro";
 import { env as processEnv } from "node:process";
 import { z } from "zod";
+import { parseCobaltMachineId, signCobaltMachine } from "../../utils/cobalt-machine-affinity";
 
 enum CobaltResponseType {
   Error = "error",
@@ -70,10 +71,15 @@ const cobaltResponseSchema = z.discriminatedUnion("status", [
 ]);
 
 type CobaltResponse = z.infer<typeof cobaltResponseSchema>;
+type CobaltAudioResult = {
+  response: CobaltResponse;
+  machineId: string | undefined;
+};
 type CobaltRuntimeEnv = {
   COBALT_ALLOWED_ORIGIN?: string;
   COBALT_API_KEY?: string;
   COBALT_API_URL?: string;
+  COBALT_MACHINE_AFFINITY_SECRET?: string;
 };
 type CloudflareRequest = Request & {
   runtime?: {
@@ -84,7 +90,7 @@ type CloudflareRequest = Request & {
 };
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX_REQUESTS = 120;
+const RATE_LIMIT_MAX_REQUESTS = 60;
 const COBALT_REQUEST_TIMEOUT_MS = 300_000;
 const rateLimitBuckets = new Map<string, { startedAt: number; count: number }>();
 
@@ -191,7 +197,7 @@ const requestCobaltAudio = async (
   runtimeEnv: CobaltRuntimeEnv,
   url: string,
   audioBitrate: string,
-) => {
+): Promise<CobaltAudioResult> => {
   let response: Response;
 
   try {
@@ -219,13 +225,19 @@ const requestCobaltAudio = async (
     }
 
     return {
-      status: CobaltResponseType.Error,
-      error: { code },
-    } satisfies CobaltResponse;
+      response: {
+        status: CobaltResponseType.Error,
+        error: { code },
+      },
+      machineId: undefined,
+    };
   }
 
   try {
-    return await parseCobaltJson(response);
+    return {
+      response: await parseCobaltJson(response),
+      machineId: parseCobaltMachineId(response.headers.get("X-Cobalt-Machine-Id")),
+    };
   } catch (error) {
     let code = "error.api.invalid_response";
     if (error instanceof Error) {
@@ -233,9 +245,12 @@ const requestCobaltAudio = async (
     }
 
     return {
-      status: CobaltResponseType.Error,
-      error: { code },
-    } satisfies CobaltResponse;
+      response: {
+        status: CobaltResponseType.Error,
+        error: { code },
+      },
+      machineId: undefined,
+    };
   }
 };
 
@@ -247,29 +262,44 @@ const cobaltErrorResponse = (message: string) =>
     },
   });
 
-const toTunnelProxyUrl = (request: Request, tunnelUrl: string) => {
+const toTunnelProxyUrl = (
+  request: Request,
+  runtimeEnv: CobaltRuntimeEnv,
+  tunnelUrl: string,
+  machineId: string | undefined,
+) => {
   const proxyUrl = new URL("/api/cobalt/tunnel", request.url);
   proxyUrl.searchParams.set("url", tunnelUrl);
+  if (machineId) {
+    proxyUrl.searchParams.set("machine", machineId);
+    proxyUrl.searchParams.set("signature", signCobaltMachine(runtimeEnv, tunnelUrl, machineId));
+  }
   return `${proxyUrl.pathname}${proxyUrl.search}`;
 };
 
 const proxiedTunnelResponse = (
   request: Request,
+  runtimeEnv: CobaltRuntimeEnv,
   response: Extract<CobaltResponse, { url: string }>,
+  machineId: string | undefined,
 ) =>
   Response.json({
     status: CobaltResponseType.Tunnel,
-    url: toTunnelProxyUrl(request, response.url),
+    url: toTunnelProxyUrl(request, runtimeEnv, response.url, machineId),
     filename: response.filename,
   });
 
 const localProcessingResponse = (
   request: Request,
+  runtimeEnv: CobaltRuntimeEnv,
   response: Extract<CobaltResponse, { status: CobaltResponseType.LocalProcessing }>,
+  machineId: string | undefined,
 ) =>
   Response.json({
     ...response,
-    tunnel: response.tunnel.map((tunnelUrl) => toTunnelProxyUrl(request, tunnelUrl)),
+    tunnel: response.tunnel.map((tunnelUrl) =>
+      toTunnelProxyUrl(request, runtimeEnv, tunnelUrl, machineId),
+    ),
   });
 
 const parseAudioRequest = async (request: Request) => {
@@ -298,14 +328,15 @@ export default defineHandler(async (event) => {
       return new Response("Invalid audio download request.", { status: 400 });
     }
 
-    const cobaltResponse = await requestCobaltAudio(runtimeEnv, body.url, body.audioBitrate);
+    const cobaltResult = await requestCobaltAudio(runtimeEnv, body.url, body.audioBitrate);
+    const cobaltResponse = cobaltResult.response;
 
     if (cobaltResponse.status === CobaltResponseType.Error) {
       return cobaltErrorResponse(cobaltResponse.error.code);
     }
 
     if (cobaltResponse.status === CobaltResponseType.LocalProcessing) {
-      return localProcessingResponse(event.req, cobaltResponse);
+      return localProcessingResponse(event.req, runtimeEnv, cobaltResponse, cobaltResult.machineId);
     }
 
     if (cobaltResponse.status === CobaltResponseType.Picker) {
@@ -313,14 +344,19 @@ export default defineHandler(async (event) => {
         return cobaltErrorResponse("Cobalt returned multiple items without a single audio file.");
       }
 
-      return proxiedTunnelResponse(event.req, {
-        status: CobaltResponseType.Tunnel,
-        url: cobaltResponse.audio,
-        filename: cobaltResponse.audioFilename,
-      });
+      return proxiedTunnelResponse(
+        event.req,
+        runtimeEnv,
+        {
+          status: CobaltResponseType.Tunnel,
+          url: cobaltResponse.audio,
+          filename: cobaltResponse.audioFilename,
+        },
+        cobaltResult.machineId,
+      );
     }
 
-    return proxiedTunnelResponse(event.req, cobaltResponse);
+    return proxiedTunnelResponse(event.req, runtimeEnv, cobaltResponse, cobaltResult.machineId);
   } catch (error) {
     if (error instanceof Error) {
       return cobaltErrorResponse(error.message);

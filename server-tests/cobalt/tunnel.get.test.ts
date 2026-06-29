@@ -6,25 +6,43 @@ type RuntimeRequest = Request & {
     cloudflare: {
       env: {
         COBALT_API_URL: string;
+        COBALT_MACHINE_AFFINITY_SECRET: string;
       };
     };
   };
 };
 
+const machineAffinitySecret = "test-machine-affinity-secret";
+const tunnelUrl =
+  "https://cobalt.test/tunnel?id=123456789012345678901&exp=1234567890123&sig=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&sec=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&iv=cccccccccccccccccccccc";
+const tunnelSignature = "2302919c93e4a4b8486de4ab75fff6f2030499d2c6e85b65a3195de735782113";
+
 const makeTunnelRequest = () => {
   const request = new Request(
-    "https://tagium.test/api/cobalt/tunnel?url=https%3A%2F%2Fcobalt.test%2Ftunnel%3Fid%3D123456789012345678901%26exp%3D1234567890123%26sig%3Daaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa%26sec%3Dbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb%26iv%3Dcccccccccccccccccccccc",
+    `https://tagium.test/api/cobalt/tunnel?url=${encodeURIComponent(tunnelUrl)}`,
   ) as RuntimeRequest;
 
   request.runtime = {
     cloudflare: {
       env: {
         COBALT_API_URL: "https://cobalt.test/",
+        COBALT_MACHINE_AFFINITY_SECRET: machineAffinitySecret,
       },
     },
   };
 
   return request;
+};
+
+const makeTunnelRequestForMachine = () => {
+  const request = makeTunnelRequest();
+  const url = new URL(request.url);
+  url.searchParams.set("machine", "cobalt-machine-1");
+  url.searchParams.set("signature", tunnelSignature);
+  const machineRequest = new Request(url, request) as RuntimeRequest;
+  machineRequest.runtime = request.runtime;
+
+  return machineRequest;
 };
 
 const makeEvent = (request: RuntimeRequest) => {
@@ -55,6 +73,57 @@ describe("cobalt tunnel endpoint", () => {
     expect(response.headers.get("Content-Type")).toBe("audio/mpeg");
     expect(response.headers.get("Content-Length")).toBeNull();
     expect(await response.text()).toBe("audio-bytes");
+  });
+
+  it("forwards Fly machine affinity when machine param is present", async () => {
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => {
+      return new Response("audio-bytes", {
+        headers: {
+          "Content-Type": "audio/mpeg",
+        },
+      });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await handler(makeEvent(makeTunnelRequestForMachine()));
+    const [, init] = fetchMock.mock.calls[0];
+    const headers = new Headers(init?.headers);
+
+    expect(response.status).toBe(200);
+    expect(headers.get("Fly-Force-Instance-Id")).toBe("cobalt-machine-1");
+  });
+
+  it("rejects tampered tunnel machine affinity", async () => {
+    const request = makeTunnelRequestForMachine();
+    const url = new URL(request.url);
+    url.searchParams.set("machine", "cobalt-machine-2");
+    const tamperedRequest = new Request(url, request) as RuntimeRequest;
+    tamperedRequest.runtime = request.runtime;
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await handler(makeEvent(tamperedRequest));
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).toBe("Invalid Cobalt tunnel URL.");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects tampered tunnel machine signatures", async () => {
+    const request = makeTunnelRequestForMachine();
+    const url = new URL(request.url);
+    url.searchParams.set("signature", "a".repeat(64));
+    const tamperedRequest = new Request(url, request) as RuntimeRequest;
+    tamperedRequest.runtime = request.runtime;
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await handler(makeEvent(tamperedRequest));
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).toBe("Invalid Cobalt tunnel URL.");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("rejects empty successful Cobalt tunnel responses", async () => {

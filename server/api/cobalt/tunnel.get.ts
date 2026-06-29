@@ -1,8 +1,13 @@
 import { defineHandler } from "nitro";
 import { env as processEnv } from "node:process";
+import {
+  isCobaltMachineId,
+  isValidCobaltMachineSignature,
+} from "../../utils/cobalt-machine-affinity";
 
 type CobaltRuntimeEnv = {
   COBALT_API_URL?: string;
+  COBALT_MACHINE_AFFINITY_SECRET?: string;
 };
 
 type CloudflareRequest = Request & {
@@ -58,31 +63,61 @@ const streamNonEmptyBody = async (response: Response) => {
   });
 };
 
-const parseTunnelUrl = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
+const parseTunnelRequest = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
   const requestUrl = new URL(request.url);
   const tunnelUrlParam = requestUrl.searchParams.get("url");
   if (!tunnelUrlParam) {
     return undefined;
   }
 
-  const tunnelUrl = new URL(tunnelUrlParam);
+  let tunnelUrl: URL;
+  try {
+    tunnelUrl = new URL(tunnelUrlParam);
+  } catch {
+    return undefined;
+  }
+
   const cobaltUrl = new URL(getCobaltApiUrl(runtimeEnv));
   if (tunnelUrl.origin !== cobaltUrl.origin || tunnelUrl.pathname !== "/tunnel") {
     return undefined;
   }
 
-  return tunnelUrl;
+  const machineId = requestUrl.searchParams.get("machine");
+  const signature = requestUrl.searchParams.get("signature");
+  if (machineId === null) {
+    if (signature !== null) {
+      return undefined;
+    }
+
+    return { tunnelUrl, machineId };
+  }
+
+  if (!isCobaltMachineId(machineId) || signature === null) {
+    return undefined;
+  }
+
+  if (!isValidCobaltMachineSignature(runtimeEnv, tunnelUrlParam, machineId, signature)) {
+    return undefined;
+  }
+
+  return { tunnelUrl, machineId };
 };
 
 export default defineHandler(async (event) => {
   try {
     const runtimeEnv = getRuntimeEnv(event.req);
-    const tunnelUrl = parseTunnelUrl(event.req, runtimeEnv);
-    if (!tunnelUrl) {
+    const tunnelRequest = parseTunnelRequest(event.req, runtimeEnv);
+    if (!tunnelRequest) {
       return new Response("Invalid Cobalt tunnel URL.", { status: 400 });
     }
 
-    const response = await fetch(tunnelUrl, {
+    const requestHeaders = new Headers();
+    if (tunnelRequest.machineId) {
+      requestHeaders.set("Fly-Force-Instance-Id", tunnelRequest.machineId);
+    }
+
+    const response = await fetch(tunnelRequest.tunnelUrl, {
+      headers: requestHeaders,
       signal: AbortSignal.timeout(COBALT_TUNNEL_TIMEOUT_MS),
     });
 
@@ -95,13 +130,13 @@ export default defineHandler(async (event) => {
       return new Response("Cobalt tunnel response was empty.", { status: 502 });
     }
 
-    const headers = new Headers();
+    const responseHeaders = new Headers();
     const contentType = response.headers.get("content-type");
     if (contentType) {
-      headers.set("Content-Type", contentType);
+      responseHeaders.set("Content-Type", contentType);
     }
 
-    return new Response(body, { headers });
+    return new Response(body, { headers: responseHeaders });
   } catch (error) {
     if (error instanceof Error) {
       return new Response(error.message, { status: 502 });
