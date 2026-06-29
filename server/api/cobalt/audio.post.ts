@@ -84,7 +84,7 @@ type CloudflareRequest = Request & {
 };
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX_REQUESTS = 120;
+const RATE_LIMIT_MAX_REQUESTS = 60;
 const COBALT_REQUEST_TIMEOUT_MS = 300_000;
 const rateLimitBuckets = new Map<string, { startedAt: number; count: number }>();
 
