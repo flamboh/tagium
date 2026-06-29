@@ -1,6 +1,6 @@
 "use client";
 
-import type { MouseEvent as ReactMouseEvent } from "react";
+import { type MouseEvent as ReactMouseEvent } from "react";
 import { useRef, useState } from "react";
 import {
   DndContext,
@@ -9,6 +9,7 @@ import {
   type DragOverEvent,
   type DragStartEvent,
   KeyboardSensor,
+  MeasuringStrategy,
   MouseSensor,
   useSensor,
   useSensors,
@@ -22,17 +23,16 @@ import {
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AlbumSidebarEmptyState } from "./AlbumSidebarEmptyState";
+import { sidebarCollisionDetection } from "./AlbumSidebarCollision";
 import {
   albumIdFromDrop,
   albumContainerId,
   albumItemId,
   dragStartY,
   DroppableTrackContainer,
-  isCenteredLooseDrop,
   LOOSE_APPEND_CONTAINER_ID,
   LOOSE_CONTAINER_ID,
   rowPlacement,
-  sidebarCollisionDetection,
   SidebarDragPreview,
   SortableAlbumCard,
   SortableTrackRow,
@@ -40,6 +40,11 @@ import {
   type SidebarDragData,
   type SidebarDropData,
 } from "./AlbumSidebarDnd";
+import {
+  LooseCombineDropTarget,
+  looseCombineTargetFromDrag,
+  useLooseCombineTarget,
+} from "./AlbumSidebarLooseCombine";
 import type { AlbumGroup, TagiumFile } from "./types";
 
 interface AlbumSidebarProps {
@@ -102,7 +107,7 @@ export default function AlbumSidebar({
 }: AlbumSidebarProps) {
   const [activeDrag, setActiveDrag] = useState<SidebarDragData | null>(null);
   const dragStartYRef = useRef<number | null>(null);
-  const recentLooseTargetRef = useRef<{ trackId: string; expiresAt: number } | null>(null);
+  const looseCombineTarget = useLooseCombineTarget();
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
@@ -129,19 +134,18 @@ export default function AlbumSidebar({
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDrag((event.active.data.current as SidebarDragData | undefined) ?? null);
-    recentLooseTargetRef.current = null;
+    looseCombineTarget.clear();
     dragStartYRef.current = dragStartY(event.activatorEvent);
   };
 
   const handleDragOver = (event: DragOverEvent) => {
     const active = event.active.data.current as SidebarDragData | undefined;
     const over = event.over?.data.current as SidebarDropData | undefined;
-    if (active?.type !== "track") return;
-    if (active.container !== "loose") return;
-    if (over?.type !== "track") return;
-    if (over.container !== "loose") return;
-    if (over.trackId === active.trackId) return;
-    recentLooseTargetRef.current = { trackId: over.trackId, expiresAt: Date.now() + 700 };
+    if (over?.type === "combine") return;
+    if (looseCombineTarget.target && over?.type === "container" && over.container === "loose") {
+      return;
+    }
+    looseCombineTarget.queue(looseCombineTargetFromDrag(active, over));
   };
 
   const trackIdsForDrop = (drop: Extract<SidebarDropData, { type: "track" }>) => {
@@ -172,6 +176,11 @@ export default function AlbumSidebar({
   ) => {
     if (active.type !== "track") return;
 
+    if (over.type === "combine") {
+      onPromptCreateAlbumFromLooseTracks(over.sourceTrackId, over.targetTrackId);
+      return;
+    }
+
     if (over.type === "track") {
       if (over.trackId === active.trackId) return;
 
@@ -183,10 +192,6 @@ export default function AlbumSidebar({
         dragStartYRef.current,
       );
       if (over.container === "loose") {
-        if (active.container === "loose" && isCenteredLooseDrop(event, dragStartYRef.current)) {
-          onPromptCreateAlbumFromLooseTracks(active.trackId, over.trackId);
-          return;
-        }
         onMoveTrackToLoose(active.trackId, placement, over.trackId);
         return;
       }
@@ -206,16 +211,6 @@ export default function AlbumSidebar({
     }
 
     if (over.type === "container" && over.container === "loose") {
-      const recentLooseTarget = recentLooseTargetRef.current;
-      if (
-        active.container === "loose" &&
-        event.over?.id !== LOOSE_APPEND_CONTAINER_ID &&
-        recentLooseTarget &&
-        recentLooseTarget.expiresAt > Date.now()
-      ) {
-        onPromptCreateAlbumFromLooseTracks(active.trackId, recentLooseTarget.trackId);
-        return;
-      }
       onMoveTrackToLoose(active.trackId, "append");
     }
   };
@@ -229,7 +224,7 @@ export default function AlbumSidebar({
       handleTrackDragEnd(event, active, over);
     }
     dragStartYRef.current = null;
-    recentLooseTargetRef.current = null;
+    looseCombineTarget.clear();
     setActiveDrag(null);
   };
 
@@ -261,11 +256,12 @@ export default function AlbumSidebar({
       <DndContext
         sensors={sensors}
         collisionDetection={sidebarCollisionDetection}
+        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragCancel={() => {
           dragStartYRef.current = null;
-          recentLooseTargetRef.current = null;
+          looseCombineTarget.clear();
           setActiveDrag(null);
         }}
         onDragEnd={handleDragEnd}
@@ -303,6 +299,11 @@ export default function AlbumSidebar({
                   selectedTone={selectedTone(track.id)}
                   muted={track.downloadStatus === "downloading"}
                   retryable={isRetryableError(track)}
+                  combineTarget={
+                    looseCombineTarget.target?.targetTrackId === track.id ? (
+                      <LooseCombineDropTarget target={looseCombineTarget.target} />
+                    ) : undefined
+                  }
                   onSelect={(event) => onSelectLooseTrack(track.id, event)}
                   onRetry={() => onRetryDownload(track.id)}
                   onRemove={() => onRemoveFile(track.id)}
