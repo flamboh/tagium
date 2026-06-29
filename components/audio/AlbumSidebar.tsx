@@ -43,6 +43,7 @@ import {
 import type { AlbumGroup, TagiumFile } from "./types";
 
 interface AlbumSidebarProps {
+  downloadDisabled: boolean;
   albums: AlbumGroup[];
   looseTrackIds: string[];
   files: TagiumFile[];
@@ -78,6 +79,7 @@ interface AlbumSidebarProps {
 const isFileDrag = (event: React.DragEvent) => event.dataTransfer.types.includes("Files");
 
 export default function AlbumSidebar({
+  downloadDisabled,
   albums,
   looseTrackIds,
   files,
@@ -323,7 +325,7 @@ export default function AlbumSidebar({
                   key={album.id}
                   album={album}
                   selected={selectedAlbumId === album.id}
-                  canDownload={canDownloadAlbum}
+                  canDownload={canDownloadAlbum && !downloadDisabled}
                   onSelect={(event) => onSelectAlbum(album.id, event)}
                   onEdit={() => onEditAlbum(album.id)}
                   onDownload={() => onDownloadAlbum(album.id)}

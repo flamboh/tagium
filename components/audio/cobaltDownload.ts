@@ -29,6 +29,20 @@ interface CobaltAudioDownloadRequest {
   audioBitrate: AudioDownloadBitrate;
 }
 
+export type CobaltDownloadProgress =
+  | {
+      phase: "download";
+      receivedBytes: number;
+      totalBytes?: number;
+    }
+  | {
+      phase: "processing";
+    };
+
+export interface CobaltDownloadOptions {
+  onProgress?: (progress: CobaltDownloadProgress) => void;
+}
+
 interface MP3TagPicture {
   format: string;
   type: number;
@@ -110,7 +124,13 @@ const makeAudioArgs = (plan: Extract<CobaltDownloadPlan, { status: "local-proces
   return ffargs;
 };
 
-const fetchTunnelFile = async (url: string, filename: string, lastModified: number) => {
+export const fetchTunnelFile = async (
+  url: string,
+  filename: string,
+  lastModified: number,
+  options: CobaltDownloadOptions = {},
+) => {
+  const { onProgress } = options;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(await response.text());
@@ -120,7 +140,38 @@ const fetchTunnelFile = async (url: string, filename: string, lastModified: numb
   if (!contentType) {
     contentType = "application/octet-stream";
   }
-  const blob = await response.blob();
+  let totalBytes: number | undefined;
+  const contentLength = response.headers.get("Content-Length");
+  if (contentLength) {
+    const parsedContentLength = Number(contentLength);
+    if (Number.isFinite(parsedContentLength) && parsedContentLength > 0) {
+      totalBytes = parsedContentLength;
+    }
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("cobalt tunnel response was empty.");
+  }
+
+  let receivedBytes = 0;
+  const chunks: ArrayBuffer[] = [];
+  while (true) {
+    const chunk = await reader.read();
+    if (chunk.done) {
+      break;
+    }
+
+    receivedBytes += chunk.value.byteLength;
+    chunks.push(new Uint8Array(chunk.value).buffer);
+    onProgress?.({
+      phase: "download",
+      receivedBytes,
+      totalBytes,
+    });
+  }
+
+  const blob = new Blob(chunks, { type: contentType });
   if (blob.size === 0) {
     throw new Error("cobalt tunnel response was empty.");
   }
@@ -172,10 +223,49 @@ const runLocalProcessingWorker = async (
 const processLocalAudio = async (
   plan: Extract<CobaltDownloadPlan, { status: "local-processing" }>,
   lastModified: number,
+  options: CobaltDownloadOptions,
 ) => {
+  const { onProgress } = options;
+  const receivedBytes = plan.tunnel.map(() => 0);
+  const totalBytes = plan.tunnel.map(() => undefined as number | undefined);
+  const progressForTunnel = (index: number) => (progress: CobaltDownloadProgress) => {
+    if (progress.phase === "processing") {
+      return;
+    }
+
+    receivedBytes[index] = progress.receivedBytes;
+    totalBytes[index] = progress.totalBytes;
+
+    const totalReceivedBytes = receivedBytes.reduce((sum, value) => sum + value, 0);
+    let aggregateTotalBytes = 0;
+    for (const tunnelTotalBytes of totalBytes) {
+      if (!tunnelTotalBytes) {
+        onProgress?.({
+          phase: "download",
+          receivedBytes: totalReceivedBytes,
+        });
+        return;
+      }
+
+      aggregateTotalBytes += tunnelTotalBytes;
+    }
+
+    onProgress?.({
+      phase: "download",
+      receivedBytes: totalReceivedBytes,
+      totalBytes: aggregateTotalBytes,
+    });
+  };
+
   const inputFiles = await Promise.all(
-    plan.tunnel.map((url, index) => fetchTunnelFile(url, `input-${index}`, lastModified)),
+    plan.tunnel.map((url, index) =>
+      fetchTunnelFile(url, `input-${index}`, lastModified, {
+        onProgress: progressForTunnel(index),
+      }),
+    ),
   );
+  onProgress?.({ phase: "processing" });
+
   const outputFormat = plan.output.filename.split(".").pop();
   if (!outputFormat) {
     throw new Error("cobalt local processing response missing output format.");
@@ -256,7 +346,10 @@ const tagCobaltAudioFile = async (
   });
 };
 
-export async function downloadCobaltAudio({ sourceUrl, audioBitrate }: CobaltAudioDownloadRequest) {
+export async function downloadCobaltAudio(
+  { sourceUrl, audioBitrate }: CobaltAudioDownloadRequest,
+  options: CobaltDownloadOptions = {},
+) {
   const response = await fetch("/api/cobalt/audio", {
     method: "POST",
     headers: {
@@ -277,8 +370,8 @@ export async function downloadCobaltAudio({ sourceUrl, audioBitrate }: CobaltAud
   const lastModified = getStableLastModified(sourceUrl);
 
   if (plan.status === "local-processing") {
-    return await processLocalAudio(plan, lastModified);
+    return await processLocalAudio(plan, lastModified, options);
   }
 
-  return await fetchTunnelFile(plan.url, plan.filename, lastModified);
+  return await fetchTunnelFile(plan.url, plan.filename, lastModified, options);
 }

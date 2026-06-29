@@ -53,6 +53,30 @@ export default function TrackMetadataEditor({
     );
   }
 
+  const downloadProgress = selectedFile.downloadProgress;
+  let downloadProgressPercent: number | null = null;
+  let downloadProgressBarWidth = "100%";
+  if (
+    downloadProgress &&
+    downloadProgress.value !== undefined &&
+    downloadProgress.max !== undefined &&
+    downloadProgress.max > 0
+  ) {
+    downloadProgressPercent = Math.min(
+      100,
+      Math.max(0, Math.round((downloadProgress.value / downloadProgress.max) * 100)),
+    );
+    downloadProgressBarWidth = `${downloadProgressPercent}%`;
+  }
+  const downloadProgressValueProps =
+    downloadProgressPercent === null
+      ? {}
+      : {
+          "aria-valuemin": 0,
+          "aria-valuemax": 100,
+          "aria-valuenow": downloadProgressPercent,
+        };
+
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <form
@@ -162,6 +186,32 @@ export default function TrackMetadataEditor({
                     "download failed"}
                 </div>
               </div>
+              {selectedFile.downloadStatus === "downloading" && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div
+                    role="progressbar"
+                    aria-label={`download progress for ${selectedFile.filename}`}
+                    aria-valuetext={downloadProgress?.label ?? "downloading"}
+                    {...downloadProgressValueProps}
+                    className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
+                  >
+                    <div
+                      className={`h-full rounded-full bg-primary ${downloadProgressPercent === null ? "animate-pulse" : ""}`}
+                      style={{ width: downloadProgressBarWidth }}
+                    />
+                  </div>
+                  <span className="shrink-0" aria-live="polite" aria-atomic="true">
+                    {downloadProgress?.label}
+                    {downloadProgress && !downloadProgress.label && downloadProgressPercent !== null
+                      ? `${downloadProgressPercent}%`
+                      : ""}
+                    {downloadProgress && !downloadProgress.label && downloadProgressPercent === null
+                      ? "downloading"
+                      : ""}
+                    {!downloadProgress && "downloading"}
+                  </span>
+                </div>
+              )}
               <div className="flex min-h-0 flex-1 items-center justify-center gap-2 pt-1 lg:flex-none lg:justify-end lg:pt-2">
                 <Button
                   type="button"

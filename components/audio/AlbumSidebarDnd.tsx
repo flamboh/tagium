@@ -139,6 +139,30 @@ export function SortableTrackRow({
   onRemove,
   onRetry,
 }: TrackRowProps) {
+  const downloadProgress = track.downloadProgress;
+  let downloadProgressPercent: number | null = null;
+  let downloadProgressBarWidth = "100%";
+  if (
+    downloadProgress &&
+    downloadProgress.value !== undefined &&
+    downloadProgress.max !== undefined &&
+    downloadProgress.max > 0
+  ) {
+    downloadProgressPercent = Math.min(
+      100,
+      Math.max(0, Math.round((downloadProgress.value / downloadProgress.max) * 100)),
+    );
+    downloadProgressBarWidth = `${downloadProgressPercent}%`;
+  }
+  const downloadProgressValueProps =
+    downloadProgressPercent === null
+      ? {}
+      : {
+          "aria-valuemin": 0,
+          "aria-valuemax": 100,
+          "aria-valuenow": downloadProgressPercent,
+        };
+
   const {
     attributes,
     listeners,
@@ -209,6 +233,35 @@ export function SortableTrackRow({
                 error: {track.downloadError}
               </span>
             )}
+          {track.downloadStatus === "downloading" && (
+            <div className="pl-7 flex items-center gap-2" aria-live="polite">
+              <div
+                role="progressbar"
+                aria-label={`download progress for ${track.filename}`}
+                aria-valuetext={downloadProgress?.label ?? "downloading"}
+                {...downloadProgressValueProps}
+                className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
+              >
+                <div
+                  className={cn(
+                    "h-full rounded-full bg-primary",
+                    downloadProgressPercent === null ? "animate-pulse" : "",
+                  )}
+                  style={{ width: downloadProgressBarWidth }}
+                />
+              </div>
+              <span className="shrink-0 text-[11px] text-muted-foreground">
+                {downloadProgress?.label}
+                {downloadProgress && !downloadProgress.label && downloadProgressPercent !== null
+                  ? `${downloadProgressPercent}%`
+                  : ""}
+                {downloadProgress && !downloadProgress.label && downloadProgressPercent === null
+                  ? "downloading"
+                  : ""}
+                {!downloadProgress && "downloading"}
+              </span>
+            </div>
+          )}
         </div>
       </Button>
       {retryable && (

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   allTracksReadyForDownload,
+  createZipBlob,
   createLibraryDownloadFilename,
   getLibraryDownloadEntries,
 } from "./downloadLibrary";
+import type { CreateZipProgress } from "./downloadLibrary";
 import type { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
 
 const metadata = (filename: string): AudioMetadata => ({
@@ -62,6 +64,56 @@ describe("downloadLibrary", () => {
     expect(createLibraryDownloadFilename(new Date(2026, 0, 2, 3, 4, 5))).toBe(
       "tagium-download-20260102-030405.zip",
     );
+  });
+
+  it("reports indeterminate zip progress before the zip is complete", async () => {
+    const entries = [
+      { path: "albums/Album/first.mp3", file: new File(["abc"], "first.mp3") },
+      { path: "singles/second.mp3", file: new File(["defg"], "second.mp3") },
+    ];
+    const progress: CreateZipProgress[] = [];
+
+    const blob = await createZipBlob(entries, (nextProgress) => {
+      progress.push(nextProgress);
+    });
+
+    const { strFromU8, unzipSync } = await import("fflate");
+    const zipEntries = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+    const readingProgress = progress.filter((entry) => entry.phase === "reading");
+    const zippingProgress = progress.find((entry) => entry.phase === "zipping");
+
+    expect(blob.type).toBe("application/zip");
+    expect(strFromU8(zipEntries["albums/Album/first.mp3"])).toBe("abc");
+    expect(strFromU8(zipEntries["singles/second.mp3"])).toBe("defg");
+    expect(progress.map((entry) => entry.phase)).toEqual([
+      "reading",
+      "reading",
+      "zipping",
+      "complete",
+    ]);
+    expect(readingProgress).toHaveLength(2);
+    expect(readingProgress.map((entry) => entry.entriesProcessed)).toEqual([1, 2]);
+    expect(readingProgress[readingProgress.length - 1]).toMatchObject({
+      bytesProcessed: 7,
+      totalBytes: 7,
+    });
+    expect(new Set(readingProgress.map((entry) => entry.currentEntry))).toEqual(
+      new Set(["albums/Album/first.mp3", "singles/second.mp3"]),
+    );
+    expect(zippingProgress).toMatchObject({
+      phase: "zipping",
+      entriesProcessed: 0,
+      totalEntries: 0,
+      bytesProcessed: 0,
+      totalBytes: 0,
+    });
+    expect(progress[progress.length - 1]).toMatchObject({
+      phase: "complete",
+      entriesProcessed: 2,
+      totalEntries: 2,
+      bytesProcessed: 7,
+      totalBytes: 7,
+    });
   });
 
   it("builds album and singles entries in sidebar order", () => {

@@ -100,6 +100,10 @@ export default defineHandler(async (event) => {
     if (contentType) {
       headers.set("Content-Type", contentType);
     }
+    const contentLength = response.headers.get("content-length");
+    if (contentLength && contentLength !== "0") {
+      headers.set("Content-Length", contentLength);
+    }
 
     return new Response(body, { headers });
   } catch (error) {

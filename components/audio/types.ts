@@ -24,12 +24,19 @@ export const audioMetadataSchema = z.object({
 
 export type AudioMetadata = z.infer<typeof audioMetadataSchema>;
 
+export interface AudioProgress {
+  value?: number;
+  max?: number;
+  label?: string;
+}
+
 export interface TagiumFile {
   id: string;
   file?: File;
   originalFile?: File;
   status: "pending" | "saved" | "error";
   downloadStatus: "downloading" | "ready" | "error";
+  downloadProgress?: AudioProgress;
   downloadError?: string;
   downloadRequest?: {
     sourceUrl: string;

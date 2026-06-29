@@ -57,6 +57,27 @@ describe("cobalt tunnel endpoint", () => {
     expect(await response.text()).toBe("audio-bytes");
   });
 
+  it("preserves upstream content-length when available", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response("audio-bytes", {
+          headers: {
+            "Content-Length": "11",
+            "Content-Type": "audio/mpeg",
+          },
+        });
+      }),
+    );
+
+    const response = await handler(makeEvent(makeTunnelRequest()));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("audio/mpeg");
+    expect(response.headers.get("Content-Length")).toBe("11");
+    expect(await response.text()).toBe("audio-bytes");
+  });
+
   it("rejects empty successful Cobalt tunnel responses", async () => {
     vi.stubGlobal(
       "fetch",

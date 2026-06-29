@@ -6,6 +6,17 @@ export interface DownloadZipEntry {
   file: File;
 }
 
+export interface CreateZipProgress {
+  phase: "reading" | "zipping" | "complete";
+  entriesProcessed: number;
+  totalEntries: number;
+  bytesProcessed: number;
+  totalBytes: number;
+  currentEntry?: string;
+}
+
+export type CreateZipProgressCallback = (progress: CreateZipProgress) => void;
+
 export const allTracksReadyForDownload = (files: TagiumFile[]) =>
   files.every((file) => Boolean(file.file && file.metadata));
 
@@ -39,14 +50,45 @@ const createZipData = async (entries: Record<string, [Uint8Array, { level: 0 }]>
   });
 };
 
-export async function createZipBlob(entries: DownloadZipEntry[]) {
+export async function createZipBlob(
+  entries: DownloadZipEntry[],
+  onProgress?: CreateZipProgressCallback,
+) {
   const zipEntries: Record<string, [Uint8Array, { level: 0 }]> = {};
+  const totalBytes = entries.reduce((total, entry) => total + entry.file.size, 0);
+  let entriesProcessed = 0;
+  let bytesProcessed = 0;
+
   await Promise.all(
     entries.map(async (entry) => {
       zipEntries[entry.path] = [new Uint8Array(await entry.file.arrayBuffer()), { level: 0 }];
+      entriesProcessed++;
+      bytesProcessed += entry.file.size;
+      onProgress?.({
+        phase: "reading",
+        entriesProcessed,
+        totalEntries: entries.length,
+        bytesProcessed,
+        totalBytes,
+        currentEntry: entry.path,
+      });
     }),
   );
+  onProgress?.({
+    phase: "zipping",
+    entriesProcessed: 0,
+    totalEntries: 0,
+    bytesProcessed: 0,
+    totalBytes: 0,
+  });
   const data = await createZipData(zipEntries);
+  onProgress?.({
+    phase: "complete",
+    entriesProcessed,
+    totalEntries: entries.length,
+    bytesProcessed,
+    totalBytes,
+  });
   return new Blob([data.buffer as ArrayBuffer], { type: "application/zip" });
 }
 

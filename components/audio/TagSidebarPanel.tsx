@@ -5,11 +5,12 @@ import { useRef, useState } from "react";
 import { Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AlbumSidebar from "./AlbumSidebar";
-import { AlbumGroup, TagiumFile } from "./types";
+import { AlbumGroup, AudioProgress, TagiumFile } from "./types";
 import { Button } from "../ui/button";
 
 interface TagSidebarPanelProps {
   loading: boolean;
+  exportProgress?: AudioProgress;
   files: TagiumFile[];
   albums: AlbumGroup[];
   looseTrackIds: string[];
@@ -47,6 +48,7 @@ interface TagSidebarPanelProps {
 
 export default function TagSidebarPanel({
   loading,
+  exportProgress,
   files,
   albums,
   looseTrackIds,
@@ -75,6 +77,28 @@ export default function TagSidebarPanel({
   const dragCounterRef = useRef(0);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const canDownloadAll = files.length > 0 && files.every((file) => file.file && file.metadata);
+  let exportProgressPercent: number | null = null;
+  let exportProgressBarWidth = "100%";
+  if (
+    exportProgress &&
+    exportProgress.value !== undefined &&
+    exportProgress.max !== undefined &&
+    exportProgress.max > 0
+  ) {
+    exportProgressPercent = Math.min(
+      100,
+      Math.max(0, Math.round((exportProgress.value / exportProgress.max) * 100)),
+    );
+    exportProgressBarWidth = `${exportProgressPercent}%`;
+  }
+  const exportProgressValueProps =
+    exportProgressPercent === null
+      ? {}
+      : {
+          "aria-valuemin": 0,
+          "aria-valuemax": 100,
+          "aria-valuenow": exportProgressPercent,
+        };
 
   const isFileDrag = (event: React.DragEvent<HTMLDivElement>) =>
     event.dataTransfer.types.includes("Files");
@@ -137,6 +161,7 @@ export default function TagSidebarPanel({
       </div>
 
       <AlbumSidebar
+        downloadDisabled={loading}
         albums={albums}
         looseTrackIds={looseTrackIds}
         files={files}
@@ -164,6 +189,29 @@ export default function TagSidebarPanel({
         <Button className="w-full" onClick={onDownloadAll} disabled={!canDownloadAll || loading}>
           {loading ? "downloading..." : "download all"}
         </Button>
+        {exportProgress && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
+            <div
+              role="progressbar"
+              aria-label="export progress"
+              aria-valuetext={exportProgress.label ?? "exporting"}
+              {...exportProgressValueProps}
+              className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
+            >
+              <div
+                className={`h-full rounded-full bg-primary ${exportProgressPercent === null ? "animate-pulse" : ""}`}
+                style={{ width: exportProgressBarWidth }}
+              />
+            </div>
+            <span className="shrink-0">
+              {exportProgress.label}
+              {!exportProgress.label && exportProgressPercent !== null
+                ? `${exportProgressPercent}%`
+                : ""}
+              {!exportProgress.label && exportProgressPercent === null ? "exporting" : ""}
+            </span>
+          </div>
+        )}
         <Button
           variant="outline"
           className={cn(

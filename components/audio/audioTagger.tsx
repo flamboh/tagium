@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } fr
 import { SubmitHandler, useForm } from "react-hook-form";
 import filenamify from "filenamify";
 import AlbumMetadataDialog, { AlbumMetadataDraft } from "./AlbumMetadataDialog";
-import { downloadCobaltAudio } from "./cobaltDownload";
+import { downloadCobaltAudio, type CobaltDownloadProgress } from "./cobaltDownload";
 import {
   createAlbumFromTracks,
   mergeUploadedTracksIntoAlbums,
@@ -28,6 +28,7 @@ import {
   downloadBlob,
   getLibraryDownloadEntries,
 } from "./downloadLibrary";
+import type { CreateZipProgress } from "./downloadLibrary";
 import TagSidebarPanel from "./TagSidebarPanel";
 import LandingScreen from "./LandingScreen";
 import TrackMetadataEditor from "./TrackMetadataEditor";
@@ -42,7 +43,14 @@ import {
 } from "./mp3Utils";
 import { DEFAULT_APP_SETTINGS } from "./settings";
 import type { SoundCloudSet } from "./soundcloudSet";
-import { AlbumGroup, AppSettings, AudioMetadata, ImportedAlbumMetadata, TagiumFile } from "./types";
+import {
+  AlbumGroup,
+  AppSettings,
+  AudioMetadata,
+  AudioProgress,
+  ImportedAlbumMetadata,
+  TagiumFile,
+} from "./types";
 
 type ActiveView = "editor" | "settings";
 
@@ -59,6 +67,35 @@ const filenameFromTitle = (title: string) => {
   const filename = filenamify(title.trim(), { replacement: "-" });
   if (filename) return `${filename}.mp3`;
   return "downloading-track.mp3";
+};
+const audioProgressFromCobaltProgress = (progress: CobaltDownloadProgress): AudioProgress => {
+  if (progress.phase === "processing") {
+    return { label: "processing audio" };
+  }
+
+  if (progress.totalBytes) {
+    return {
+      value: progress.receivedBytes,
+      max: progress.totalBytes,
+    };
+  }
+
+  return { label: "downloading audio" };
+};
+const zipProgressLabel = (progress: CreateZipProgress, scope: string) => {
+  if (progress.phase === "zipping") {
+    return `${scope}: creating zip`;
+  }
+
+  let phase: string = progress.phase;
+  if (progress.phase === "reading") {
+    phase = "reading files";
+  }
+  if (progress.phase === "complete") {
+    phase = "zip ready";
+  }
+
+  return `${scope}: ${phase} ${progress.entriesProcessed}/${progress.totalEntries}`;
 };
 const titleFromSourceUrl = (sourceUrl: string) => {
   try {
@@ -109,6 +146,7 @@ const createPendingDownloadTrack = (
   filename: `${metadata.filename}.mp3`,
   status: "pending",
   downloadStatus: "downloading",
+  downloadProgress: { label: "queued" },
   downloadRequest,
   hasBufferedChanges,
   metadata,
@@ -144,6 +182,8 @@ export default function AudioTagger() {
   const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
   const [lastSelectedFileId, setLastSelectedFileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exportProgress, setExportProgress] = useState<AudioProgress | undefined>();
+  const loadingRef = useRef(false);
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [albumDialogMode, setAlbumDialogMode] = useState<"create" | "edit">("create");
   const [albumDraft, setAlbumDraft] = useState<AlbumMetadataDraft>(EMPTY_ALBUM_DRAFT);
@@ -553,6 +593,20 @@ export default function AudioTagger() {
     filesRef.current = nextFiles;
     setFiles(nextFiles);
   };
+  const updateTrackDownloadProgress = (fileId: string, progress: AudioProgress) => {
+    const nextFiles = filesRef.current.map((file) =>
+      file.id === fileId ? { ...file, downloadProgress: progress } : file,
+    );
+    filesRef.current = nextFiles;
+    setFiles(nextFiles);
+  };
+  const clearTrackDownloadProgress = (fileId: string) => {
+    const nextFiles = filesRef.current.map((file) =>
+      file.id === fileId ? { ...file, downloadProgress: undefined } : file,
+    );
+    filesRef.current = nextFiles;
+    setFiles(nextFiles);
+  };
   const markDownloadError = (fileId: string, error: unknown) => {
     let message = "download failed.";
     if (error instanceof Error) {
@@ -564,6 +618,7 @@ export default function AudioTagger() {
             ...file,
             status: "error" as const,
             downloadStatus: "error" as const,
+            downloadProgress: undefined,
             downloadError: message,
           }
         : file,
@@ -571,7 +626,12 @@ export default function AudioTagger() {
     filesRef.current = nextFiles;
     setFiles(nextFiles);
   };
-  const hydrateDownloadedTrack = async (fileId: string, downloadedFile: File) => {
+  const hydrateDownloadedTrack = async (
+    fileId: string,
+    downloadedFile: File,
+    onProgress?: (progress: AudioProgress) => void,
+  ) => {
+    onProgress?.({ label: "reading metadata" });
     const [parsedUpload] = await parseUploadedTracks([downloadedFile]);
     if (!parsedUpload) {
       throw new Error("downloaded track could not be parsed.");
@@ -593,6 +653,7 @@ export default function AudioTagger() {
 
     if (metadataToWrite) {
       try {
+        onProgress?.({ label: "writing metadata" });
         const updatedFile = await writeMetadataToFile(hydratedFile, metadataToWrite);
         const latestFile = filesRef.current.find((file) => file.id === fileId);
         if (!latestFile) return;
@@ -631,6 +692,7 @@ export default function AudioTagger() {
     setActiveView("editor");
     const id = crypto.randomUUID();
     const title = titleFromSourceUrl(sourceUrl);
+    const downloadRequest = { sourceUrl, audioBitrate: settings.audioBitrate };
     const pendingFile = createPendingDownloadTrack(
       id,
       createDownloadMetadata({
@@ -640,7 +702,7 @@ export default function AudioTagger() {
         genre: "",
       }),
       false,
-      { sourceUrl, audioBitrate: settings.audioBitrate },
+      downloadRequest,
     );
     const nextFiles = [...filesRef.current, pendingFile];
     filesRef.current = nextFiles;
@@ -652,14 +714,19 @@ export default function AudioTagger() {
     setLastSelectedFileId(id);
 
     void (async () => {
+      updateTrackDownloadProgress(id, { label: "starting download" });
       try {
-        const downloadedFile = await downloadCobaltAudio({
-          sourceUrl,
-          audioBitrate: settings.audioBitrate,
+        const downloadedFile = await downloadCobaltAudio(downloadRequest, {
+          onProgress: (progress) =>
+            updateTrackDownloadProgress(id, audioProgressFromCobaltProgress(progress)),
         });
-        await hydrateDownloadedTrack(id, downloadedFile);
+        await hydrateDownloadedTrack(id, downloadedFile, (progress) =>
+          updateTrackDownloadProgress(id, progress),
+        );
       } catch (error) {
         markDownloadError(id, error);
+      } finally {
+        clearTrackDownloadProgress(id);
       }
     })();
   };
@@ -750,14 +817,30 @@ export default function AudioTagger() {
       const track = set.tracks[index];
       if (!track) return;
       void (async () => {
+        updateTrackDownloadProgress(pendingFile.id, {
+          label: `queued track ${index + 1}/${pendingFiles.length}`,
+        });
         try {
-          const downloadedFile = await downloadCobaltAudio({
-            sourceUrl: track.url,
-            audioBitrate: settings.audioBitrate,
-          });
-          await hydrateDownloadedTrack(pendingFile.id, downloadedFile);
+          const downloadedFile = await downloadCobaltAudio(
+            {
+              sourceUrl: track.url,
+              audioBitrate: settings.audioBitrate,
+            },
+            {
+              onProgress: (progress) =>
+                updateTrackDownloadProgress(
+                  pendingFile.id,
+                  audioProgressFromCobaltProgress(progress),
+                ),
+            },
+          );
+          await hydrateDownloadedTrack(pendingFile.id, downloadedFile, (progress) =>
+            updateTrackDownloadProgress(pendingFile.id, progress),
+          );
         } catch (error) {
           markDownloadError(pendingFile.id, error);
+        } finally {
+          clearTrackDownloadProgress(pendingFile.id);
         }
       })();
     });
@@ -773,6 +856,7 @@ export default function AudioTagger() {
             ...file,
             status: "pending" as const,
             downloadStatus: "downloading" as const,
+            downloadProgress: { label: "retrying download" },
             downloadError: undefined,
           }
         : file,
@@ -781,20 +865,32 @@ export default function AudioTagger() {
     setFiles(nextFiles);
 
     void (async () => {
+      updateTrackDownloadProgress(fileId, { label: "retrying download" });
       try {
-        const downloadedFile = await downloadCobaltAudio(downloadRequest);
-        await hydrateDownloadedTrack(fileId, downloadedFile);
+        const downloadedFile = await downloadCobaltAudio(downloadRequest, {
+          onProgress: (progress) =>
+            updateTrackDownloadProgress(fileId, audioProgressFromCobaltProgress(progress)),
+        });
+        await hydrateDownloadedTrack(fileId, downloadedFile, (progress) =>
+          updateTrackDownloadProgress(fileId, progress),
+        );
       } catch (error) {
         markDownloadError(fileId, error);
+      } finally {
+        clearTrackDownloadProgress(fileId);
       }
     })();
   };
   const handleDownloadAll = async () => {
     if (files.length === 0) return;
     if (!allTracksReadyForDownload(filesRef.current)) return;
+    if (loading || loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
+    setExportProgress({ label: "preparing download all" });
     try {
       const syncedFiles = prepareFilesForExport();
+      setExportProgress({ label: "writing download all tags" });
       await writeFilesForExport(syncedFiles);
 
       const entries = getLibraryDownloadEntries({
@@ -804,11 +900,20 @@ export default function AudioTagger() {
       });
       if (entries.length === 0) return;
 
-      const blob = await createZipBlob(entries);
+      const blob = await createZipBlob(entries, (progress: CreateZipProgress) => {
+        setExportProgress({
+          value: progress.entriesProcessed,
+          max: progress.totalEntries,
+          label: zipProgressLabel(progress, "download all"),
+        });
+      });
+      setExportProgress({ label: "saving download all" });
       downloadBlob(blob, createLibraryDownloadFilename());
     } catch (error) {
       console.error("error downloading all files:", error);
     } finally {
+      setExportProgress(undefined);
+      loadingRef.current = false;
       setLoading(false);
     }
   };
@@ -851,9 +956,12 @@ export default function AudioTagger() {
     reader.readAsArrayBuffer(file);
   };
   const handleDownloadAlbum = async (albumId: string) => {
+    if (loading || loadingRef.current) return;
     const album = albumsRef.current.find((a) => a.id === albumId);
     if (!album) return;
+    loadingRef.current = true;
     setLoading(true);
+    setExportProgress({ label: `preparing ${album.title}` });
     try {
       const syncedFiles = prepareFilesForExport([albumId]);
       const albumFiles = album.trackIds
@@ -862,6 +970,7 @@ export default function AudioTagger() {
           Boolean(file?.file && file.metadata),
         );
       if (albumFiles.length !== album.trackIds.length) return;
+      setExportProgress({ label: `writing ${album.title} tags` });
       await writeFilesForExport(albumFiles);
 
       const entries = getLibraryDownloadEntries({
@@ -873,8 +982,15 @@ export default function AudioTagger() {
       });
       if (entries.length === 0) return;
 
-      const blob = await createZipBlob(entries);
+      const blob = await createZipBlob(entries, (progress: CreateZipProgress) => {
+        setExportProgress({
+          value: progress.entriesProcessed,
+          max: progress.totalEntries,
+          label: zipProgressLabel(progress, album.title),
+        });
+      });
       const albumFilename = filenamify(album.title, { replacement: "-" });
+      setExportProgress({ label: `saving ${album.title}` });
       if (albumFilename) {
         downloadBlob(blob, `${albumFilename}.zip`);
         return;
@@ -883,20 +999,31 @@ export default function AudioTagger() {
     } catch (error) {
       console.error("error downloading album:", error);
     } finally {
+      setExportProgress(undefined);
+      loadingRef.current = false;
       setLoading(false);
     }
   };
   const handleDownloadUpdatedFile: SubmitHandler<AudioMetadata> = async (data) => {
     if (!selectedFile) return;
+    if (loading || loadingRef.current) return;
     const fileId = selectedFile.id;
     const submittedData = getSubmittedMetadata(data);
+    loadingRef.current = true;
+    setLoading(true);
+    setExportProgress({ label: `writing ${selectedFile.filename}` });
     try {
       await handleTagUpdate(selectedFile, submittedData);
       const updatedFile = filesRef.current.find((file) => file.id === fileId);
       if (!updatedFile?.file) return;
+      setExportProgress({ label: `saving ${updatedFile.filename}` });
       downloadBlob(updatedFile.file, updatedFile.filename);
     } catch (error) {
       console.error("failed to update tags before download:", error);
+    } finally {
+      setExportProgress(undefined);
+      loadingRef.current = false;
+      setLoading(false);
     }
   };
   const handleRemoveFile = (idToRemove: string) => {
@@ -1347,6 +1474,7 @@ export default function AudioTagger() {
       <div className="min-h-screen flex flex-col bg-background md:h-screen md:flex-row md:overflow-hidden">
         <TagSidebarPanel
           loading={loading}
+          exportProgress={exportProgress}
           files={files}
           albums={albums}
           looseTrackIds={looseTrackIds}
