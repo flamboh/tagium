@@ -61,7 +61,7 @@ import {
   writeMetadataToFile,
 } from "./mp3Utils";
 import { loadAppSettings, saveAppSettings } from "./settings";
-import type { SoundCloudSet } from "./soundcloudSet";
+import { shouldApplySoundCloudSetCoverToTracks, type SoundCloudSet } from "./soundcloudSet";
 import { AlbumGroup, AppSettings, AudioMetadata, ImportedAlbumMetadata, TagiumFile } from "./types";
 
 type ActiveView = "editor" | "settings";
@@ -988,6 +988,7 @@ export default function AudioTagger() {
     setLastSelectedFileId(pendingFiles[0]?.id ?? null);
 
     const coverUrl = set.coverUrl;
+    const applyCoverToTracks = shouldApplySoundCloudSetCoverToTracks(set, settings);
     if (coverUrl) {
       void (async () => {
         try {
@@ -997,22 +998,21 @@ export default function AudioTagger() {
           );
           albumsRef.current = coveredAlbums;
           setAlbums(coveredAlbums);
-          const trackIdSet = new Set(album.trackIds);
-          const coveredFiles = filesRef.current.map((file) =>
-            trackIdSet.has(file.id) && file.file && file.metadata
-              ? {
-                  ...file,
-                  metadata: {
-                    ...file.metadata,
-                    picture: cover,
-                  },
-                  status: file.status === "saved" ? "pending" : file.status,
-                  hasBufferedChanges: true,
-                }
-              : file,
+          if (!applyCoverToTracks) return;
+
+          const covered = applyAlbumCoverToFilesWithSelectedMetadata(
+            filesRef.current,
+            album.trackIds,
+            cover,
+            selectedFileIdRef.current,
           );
+          const coveredFiles = covered.files;
           filesRef.current = coveredFiles;
           setFiles(coveredFiles);
+          if (covered.selectedMetadata) {
+            reset(covered.selectedMetadata);
+          }
+          const trackIdSet = new Set(album.trackIds);
           await Promise.all(
             coveredFiles
               .filter((file) => trackIdSet.has(file.id) && Boolean(file.file) && file.metadata)

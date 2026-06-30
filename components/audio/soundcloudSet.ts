@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ImportedAlbumMetadata } from "./types";
+import type { AppSettings, ImportedAlbumMetadata } from "./types";
 
 const soundCloudSetSchema = z.object({
   title: z.string(),
@@ -55,3 +55,8 @@ export const toImportedAlbumMetadata = (set: SoundCloudSet): ImportedAlbumMetada
   year: set.year,
   coverUrl: set.coverUrl,
 });
+
+export const shouldApplySoundCloudSetCoverToTracks = (
+  set: Pick<SoundCloudSet, "isAlbum">,
+  settings: Pick<AppSettings, "applySoundCloudAlbumCoverToTracks">,
+) => set.isAlbum && settings.applySoundCloudAlbumCoverToTracks;

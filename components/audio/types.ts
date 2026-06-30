@@ -54,6 +54,7 @@ export interface AppSettings {
   syncTrackNumbers: boolean;
   syncFilenames: boolean;
   audioBitrate: AudioDownloadBitrate;
+  applySoundCloudAlbumCoverToTracks: boolean;
 }
 
 export interface ImportedAlbumMetadata {

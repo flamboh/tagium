@@ -51,6 +51,7 @@ describe("settings", () => {
         syncTrackNumbers: false,
         syncFilenames: "no",
         audioBitrate: "999",
+        applySoundCloudAlbumCoverToTracks: "yes",
       }),
     );
 
@@ -66,6 +67,7 @@ describe("settings", () => {
       syncTrackNumbers: false,
       syncFilenames: false,
       audioBitrate: "256",
+      applySoundCloudAlbumCoverToTracks: false,
     };
 
     saveAppSettings(settings, storage);
