@@ -16,7 +16,6 @@ import {
 import {
   applyAlbumCoverToFilesWithSelectedMetadata,
   applyAlbumSharedTagsToFiles,
-  applySoundCloudSetImportedCover,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
   prepareDownloadedTrackHydration,
@@ -62,6 +61,11 @@ import {
   writeMetadataToFile,
 } from "./mp3Utils";
 import { loadAppSettings, saveAppSettings } from "./settings";
+import {
+  createDownloadMetadata,
+  createPendingDownloadTrack,
+  fetchImportedCover,
+} from "./soundcloudSetImport";
 import type { SoundCloudSet } from "./soundcloudSet";
 import { AlbumGroup, AppSettings, AudioMetadata, ImportedAlbumMetadata, TagiumFile } from "./types";
 
@@ -95,11 +99,6 @@ const isPlaylistDownloadAbort = (error: unknown) => {
 };
 const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
 const getFileImportKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
-const filenameFromTitle = (title: string) => {
-  const filename = filenamify(title.trim(), { replacement: "-" });
-  if (filename) return `${filename}.mp3`;
-  return "downloading-track.mp3";
-};
 const titleFromSourceUrl = (sourceUrl: string) => {
   try {
     const url = new URL(sourceUrl);
@@ -109,70 +108,6 @@ const titleFromSourceUrl = (sourceUrl: string) => {
   } catch {
     return "downloading audio";
   }
-};
-const createDownloadMetadata = ({
-  title,
-  artist,
-  album,
-  genre,
-  year,
-  duration,
-  trackNumber,
-}: {
-  title: string;
-  artist: string;
-  album: string;
-  genre: string;
-  year?: number;
-  duration?: number;
-  trackNumber?: number;
-}): AudioMetadata => ({
-  filename: filenameFromTitle(title).replace(/\.mp3$/i, ""),
-  title,
-  artist,
-  album,
-  year,
-  genre,
-  duration: duration ?? 0,
-  bitrate: 0,
-  sampleRate: 0,
-  picture: [],
-  trackNumber,
-});
-const createPendingDownloadTrack = (
-  id: string,
-  metadata: AudioMetadata,
-  hasBufferedChanges: boolean,
-  downloadRequest: TagiumFile["downloadRequest"],
-): TagiumFile => ({
-  id,
-  filename: `${metadata.filename}.mp3`,
-  status: "pending",
-  downloadStatus: "downloading",
-  downloadRequest,
-  hasBufferedChanges,
-  metadata,
-});
-const fetchImportedCover = async (coverUrl: string): Promise<AudioMetadata["picture"]> => {
-  const response = await fetch(coverUrl);
-
-  if (!response.ok) {
-    throw new Error(`album cover request failed (${response.status})`);
-  }
-
-  const contentType = response.headers.get("content-type");
-  if (!contentType) {
-    throw new Error("album cover response missing content type.");
-  }
-
-  return [
-    {
-      format: contentType,
-      type: 3,
-      data: new Uint8Array(await response.arrayBuffer()),
-      description: "album cover",
-    },
-  ];
 };
 const getManagedDownloadTrackTitle = (file: TagiumFile) => {
   if (file.metadata?.title) return file.metadata.title;
