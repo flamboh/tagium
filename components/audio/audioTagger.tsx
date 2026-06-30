@@ -59,7 +59,7 @@ import {
   toGenreString,
   writeMetadataToFile,
 } from "./mp3Utils";
-import { DEFAULT_APP_SETTINGS } from "./settings";
+import { loadAppSettings, saveAppSettings } from "./settings";
 import type { SoundCloudSet } from "./soundcloudSet";
 import { AlbumGroup, AppSettings, AudioMetadata, ImportedAlbumMetadata, TagiumFile } from "./types";
 
@@ -209,7 +209,7 @@ export default function AudioTagger() {
   const [editingAlbumId, setEditingAlbumId] = useState<string | null>(null);
   const [createSeedTrackIds, setCreateSeedTrackIds] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<ActiveView>("editor");
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
+  const [settings, setSettings] = useState<AppSettings>(loadAppSettings);
   const [playlistDownloadQueue, setPlaylistDownloadQueue] =
     useState<PlaylistDownloadQueueState | null>(null);
   const filesRef = useRef<TagiumFile[]>(files);
@@ -1090,6 +1090,7 @@ export default function AudioTagger() {
     }
   };
   const handleSettingsChange = (nextSettings: AppSettings) => {
+    saveAppSettings(nextSettings);
     setSettings(nextSettings);
     let syncedFiles = filesRef.current;
     if (!settings.syncTrackNumbers && nextSettings.syncTrackNumbers) {
