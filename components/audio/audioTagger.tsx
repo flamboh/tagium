@@ -16,6 +16,7 @@ import {
 import {
   applyAlbumCoverToFilesWithSelectedMetadata,
   applyAlbumSharedTagsToFiles,
+  applySoundCloudSetImportedCover,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
   prepareDownloadedTrackHydration,
@@ -61,7 +62,7 @@ import {
   writeMetadataToFile,
 } from "./mp3Utils";
 import { loadAppSettings, saveAppSettings } from "./settings";
-import { shouldApplySoundCloudSetCoverToTracks, type SoundCloudSet } from "./soundcloudSet";
+import type { SoundCloudSet } from "./soundcloudSet";
 import { AlbumGroup, AppSettings, AudioMetadata, ImportedAlbumMetadata, TagiumFile } from "./types";
 
 type ActiveView = "editor" | "settings";
@@ -988,29 +989,32 @@ export default function AudioTagger() {
     setLastSelectedFileId(pendingFiles[0]?.id ?? null);
 
     const coverUrl = set.coverUrl;
-    const applyCoverToTracks = shouldApplySoundCloudSetCoverToTracks(set, settings);
     if (coverUrl) {
       void (async () => {
         try {
           const cover = await fetchImportedCover(coverUrl);
-          const coveredAlbums = albumsRef.current.map((currentAlbum) =>
-            currentAlbum.id === albumId ? { ...currentAlbum, cover } : currentAlbum,
-          );
-          albumsRef.current = coveredAlbums;
-          setAlbums(coveredAlbums);
-          if (!applyCoverToTracks) return;
-
-          const covered = applyAlbumCoverToFilesWithSelectedMetadata(
+          const {
+            albums: coveredAlbums,
+            files: coveredFiles,
+            selectedMetadata,
+          } = applySoundCloudSetImportedCover(
             filesRef.current,
+            albumsRef.current,
+            albumId,
             album.trackIds,
+            set,
+            settings,
             cover,
             selectedFileIdRef.current,
           );
-          const coveredFiles = covered.files;
+          albumsRef.current = coveredAlbums;
+          setAlbums(coveredAlbums);
+          if (coveredFiles === filesRef.current) return;
+
           filesRef.current = coveredFiles;
           setFiles(coveredFiles);
-          if (covered.selectedMetadata) {
-            reset(covered.selectedMetadata);
+          if (selectedMetadata) {
+            reset(selectedMetadata);
           }
           const trackIdSet = new Set(album.trackIds);
           await Promise.all(

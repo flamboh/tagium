@@ -85,6 +85,7 @@ describe("settings", () => {
       syncTrackNumbers: false,
       syncFilenames: false,
       audioBitrate: "256",
+      applySoundCloudAlbumCoverToTracks: false,
     };
 
     expect(() => saveAppSettings(settings, storage)).not.toThrow();
