@@ -28,7 +28,7 @@ const soundCloudPlaylistSchema = z.object({
   title: z.string(),
   genre: z.string().optional(),
   display_date: z.string().optional(),
-  release_date: z.string().optional(),
+  release_date: z.string().nullable().optional(),
   is_album: z.boolean().optional(),
   set_type: z.string().optional(),
   artwork_url: z.string().nullable().optional(),
