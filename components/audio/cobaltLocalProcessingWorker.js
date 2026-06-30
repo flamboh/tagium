@@ -1,110 +1,235 @@
 /*
- * Adapted from imputnet/cobalt:
- * - web/src/lib/libav.ts
- * - web/src/lib/task-manager/workers/ffmpeg.ts
- *
- * Changes: standalone audio encoder worker for Tagium downloads.
+ * Adapted from imputnet/cobalt's browser LibAV local-processing path.
+ * Tagium keeps the single-audio-file workflow and streams output through
+ * LibAV writer devices instead of loading input/output through MEMFS.
  */
 import EncodeLibAV from "@imput/libav.js-encode-cli";
 
-const progressEntries = (data) =>
-  Object.fromEntries(
-    new TextDecoder()
-      .decode(new Uint8Array(data))
-      .split("\n")
-      .filter(Boolean)
-      .map((entry) => entry.split("=")),
-  );
+const inputName = "tagium-audio-input";
+const outputName = (format) => `tagium-output.${format}`;
+const progressName = "tagium-progress.txt";
+const cobaltFileMetadataKeys = [
+  "album",
+  "composer",
+  "genre",
+  "copyright",
+  "title",
+  "artist",
+  "album_artist",
+  "track",
+  "date",
+  "sublanguage",
+];
 
-const render = async (libav, request) => {
-  const outputName = `output.${request.output.format}`;
-  const chunks = [];
+const postLocalProcessingMessage = (message) => {
+  globalThis.self.postMessage({
+    cobaltLocalProcessing: message,
+  });
+};
 
-  try {
-    const ffInputs = [];
-    for (const [index, file] of request.files.entries()) {
-      const inputName = `input${index}`;
-      await libav.mkreadaheadfile(inputName, file);
-      ffInputs.push("-i", inputName);
+export const createProgressSink = (postProgress) => {
+  const decoder = new TextDecoder();
+  let pending = "";
+
+  return (data) => {
+    pending += decoder.decode(new Uint8Array(data), { stream: true });
+    const lines = pending.split(/\r?\n/);
+    pending = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const separator = line.indexOf("=");
+      if (separator === -1) {
+        continue;
+      }
+
+      const key = line.slice(0, separator);
+      if (key !== "total_size") {
+        continue;
+      }
+
+      const value = line.slice(separator + 1);
+      const progress = Number(value);
+      if (value && Number.isFinite(progress)) {
+        postProgress(progress);
+        continue;
+      }
+
+      postProgress(undefined);
+    }
+  };
+};
+
+export const createOutputSink = () => {
+  const patches = [];
+  let size = 0;
+
+  return {
+    write(position, data) {
+      const patch = Uint8Array.from(new Uint8Array(data));
+      const end = position + patch.length;
+      if (end > size) {
+        size = end;
+      }
+
+      patches.push({ position, data: patch });
+    },
+    toBlob(type) {
+      const bytes = new Uint8Array(size);
+      for (const patch of patches) {
+        bytes.set(patch.data, patch.position);
+      }
+
+      return new Blob([bytes], { type });
+    },
+  };
+};
+
+const stripMetadataControlCharacters = (value) =>
+  Array.from(value)
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code > 31 && code !== 127;
+    })
+    .join("");
+
+const makeMetadataArgs = (metadata) => {
+  if (!metadata) {
+    return [];
+  }
+
+  return Object.entries(metadata).flatMap(([name, value]) => {
+    if (!cobaltFileMetadataKeys.includes(name) || !value) {
+      return [];
     }
 
-    await libav.mkwriterdev(outputName);
-    await libav.mkwriterdev("progress.txt");
+    if (name === "sublanguage") {
+      return ["-metadata:s:s:0", `language=${stripMetadataControlCharacters(value)}`];
+    }
 
-    libav.onwrite = async (name, position, data) => {
-      if (name === "progress.txt") {
-        const entries = progressEntries(data);
-        const size = Number(entries.total_size);
-        self.postMessage({
-          cobaltLocalProcessing: {
-            progress: Number.isNaN(size) ? undefined : size,
-          },
-        });
-        return;
-      }
+    return ["-metadata", `${name}=${stripMetadataControlCharacters(value)}`];
+  });
+};
 
-      if (name === outputName) {
-        chunks.push({ position, data: new Uint8Array(data) });
-      }
-    };
+const makeAudioFfmpegArgs = (request) => {
+  const args = [
+    "-nostdin",
+    "-y",
+    "-loglevel",
+    "error",
+    "-progress",
+    progressName,
+    "-i",
+    inputName,
+    "-vn",
+  ];
 
-    await libav.ffmpeg([
-      "-nostdin",
-      "-y",
-      "-loglevel",
-      "error",
-      "-progress",
-      "progress.txt",
-      ...ffInputs,
-      ...request.args,
-      outputName,
-    ]);
+  if (request.audio.copy) {
+    args.push("-c:a", "copy");
+  } else {
+    args.push("-b:a", `${request.audio.bitrate}k`);
+  }
 
-    chunks.sort((a, b) => a.position - b.position);
-    const blob = new Blob(
-      chunks.map((chunk) => chunk.data),
-      { type: request.output.type },
-    );
+  args.push(...makeMetadataArgs(request.output.metadata));
+
+  if (request.audio.format === "mp3" && request.audio.bitrate === "8") {
+    args.push("-ar", "12000");
+  }
+
+  if (request.audio.format === "opus") {
+    args.push("-vbr", "off");
+  }
+
+  if (request.audio.format === "m4a") {
+    args.push("-f", "ipod");
+  } else {
+    args.push("-f", request.audio.format);
+  }
+
+  args.push(outputName(request.output.format));
+
+  return args;
+};
+
+const unlinkCreatedFiles = async (libav, request, inputRegistered) => {
+  await Promise.allSettled([
+    libav.unlink(outputName(request.output.format)),
+    libav.unlink(progressName),
+    inputRegistered ? libav.unlinkreadaheadfile(inputName) : Promise.resolve(),
+  ]);
+};
+
+export const encodeWithLibAV = async (libav, request, postProgress) => {
+  let inputRegistered = false;
+  const progressSink = createProgressSink(postProgress);
+  const outputSink = createOutputSink();
+
+  libav.onwrite = (name, _position, data) => {
+    if (name === progressName) {
+      progressSink(data);
+      return;
+    }
+
+    if (name === outputName(request.output.format)) {
+      outputSink.write(_position, data);
+    }
+  };
+
+  try {
+    inputRegistered = true;
+    await libav.mkreadaheadfile(inputName, request.audioFile);
+
+    await libav.mkwriterdev(outputName(request.output.format));
+    await libav.mkwriterdev(progressName);
+    await libav.ffmpeg(makeAudioFfmpegArgs(request));
+
+    const blob = outputSink.toBlob(request.output.type);
     if (blob.size === 0) {
-      throw new Error("cobalt local processing produced an empty file.");
+      throw new Error("local audio processing produced an empty file.");
     }
 
     return blob;
   } finally {
-    await Promise.allSettled([
-      libav.unlink(outputName),
-      libav.unlink("progress.txt"),
-      ...request.files.map((_, index) => libav.unlinkreadaheadfile(`input${index}`)),
-    ]);
+    await unlinkCreatedFiles(libav, request, inputRegistered);
   }
 };
 
-self.onmessage = async (event) => {
-  const request = event.data.cobaltLocalProcessing;
-  if (!request) {
-    return;
-  }
-
-  const libav = await EncodeLibAV.LibAV({
+const createLibAV = async () =>
+  await EncodeLibAV.LibAV({
     base: "/_libav",
     noworker: true,
   });
 
+const errorMessage = (error) => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "local audio processing failed.";
+};
+
+export const processLocalAudio = async (request) => {
+  let libav;
+
   try {
-    const blob = await render(libav, request);
-    self.postMessage({
-      cobaltLocalProcessing: {
-        blob,
-      },
+    libav = await createLibAV();
+    const blob = await encodeWithLibAV(libav, request, (progress) => {
+      postLocalProcessingMessage({ progress });
     });
+    postLocalProcessingMessage({ blob });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "cobalt local processing failed.";
-    self.postMessage({
-      cobaltLocalProcessing: {
-        error: message,
-      },
-    });
+    postLocalProcessingMessage({ error: errorMessage(error) });
   } finally {
-    libav.terminate();
+    libav?.terminate();
   }
 };
+
+if (globalThis.self) {
+  globalThis.self.onmessage = async (event) => {
+    const request = event.data.cobaltLocalProcessing;
+    if (!request) {
+      return;
+    }
+
+    await processLocalAudio(request);
+  };
+}

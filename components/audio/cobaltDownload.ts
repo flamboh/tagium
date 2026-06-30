@@ -1,6 +1,6 @@
 export type AudioDownloadBitrate = "320" | "256" | "128" | "96" | "64";
 
-type CobaltDownloadPlan =
+export type CobaltDownloadPlan =
   | {
       status: "tunnel";
       url: string;
@@ -43,6 +43,20 @@ export interface CobaltAudioDownloadRequest {
   signal?: AbortSignal;
 }
 
+type LocalAudioProcessingRequest = {
+  audioFile: File;
+  audio: {
+    copy: boolean;
+    format: string;
+    bitrate: string;
+  };
+  output: {
+    type: string;
+    format: string;
+    metadata?: Record<string, string | undefined>;
+  };
+};
+
 interface MP3TagPicture {
   format: string;
   type: number;
@@ -64,24 +78,16 @@ interface MP3TagReader {
     track?: string;
     v2?: {
       APIC?: MP3TagPicture[];
+      TCOM?: string;
+      TCOP?: string;
+      TLAN?: string;
+      TPE2?: string;
     };
   };
 }
 
 const MAX_CONCURRENT_COBALT_DOWNLOADS = 4;
 const COBALT_TUNNEL_START_INTERVAL_MS = 1_600;
-const cobaltFileMetadataKeys = [
-  "album",
-  "composer",
-  "genre",
-  "copyright",
-  "title",
-  "artist",
-  "album_artist",
-  "track",
-  "date",
-  "sublanguage",
-];
 let activeCobaltDownloads = 0;
 const pendingCobaltDownloads: (() => void)[] = [];
 let nextCobaltTunnelStartAt = 0;
@@ -164,6 +170,8 @@ const waitForCobaltTunnelStart = async (
   onLifecycle?: CobaltAudioDownloadLifecycleCallback,
   signal?: AbortSignal,
 ) => {
+  signal?.throwIfAborted();
+
   let releaseQueue = () => {};
   const previousQueue = cobaltTunnelStartQueue;
   cobaltTunnelStartQueue = new Promise<void>((resolve) => {
@@ -178,7 +186,24 @@ const waitForCobaltTunnelStart = async (
       onLifecycle?.({ type: "tunnel-budget-wait-started" });
     }
 
-    await previousQueue;
+    await new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        signal?.removeEventListener("abort", onAbort);
+        reject(signal?.reason);
+      };
+
+      previousQueue.then(
+        () => {
+          signal?.removeEventListener("abort", onAbort);
+          resolve();
+        },
+        (error) => {
+          signal?.removeEventListener("abort", onAbort);
+          reject(error);
+        },
+      );
+      signal?.addEventListener("abort", onAbort, { once: true });
+    });
 
     signal?.throwIfAborted();
 
@@ -210,41 +235,11 @@ const getStableLastModified = (sourceUrl: string) =>
 
 const stripMetadataControlCharacters = (value: string) =>
   Array.from(value)
-    .filter((character) => character.charCodeAt(0) > 9)
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code > 31 && code !== 127;
+    })
     .join("");
-
-const ffmpegMetadataArgs = (metadata: Record<string, string | undefined>) =>
-  Object.entries(metadata).flatMap(([name, value]) => {
-    if (!cobaltFileMetadataKeys.includes(name) || !value) {
-      return [];
-    }
-
-    if (name === "sublanguage") {
-      return ["-metadata:s:s:0", `language=${stripMetadataControlCharacters(value)}`];
-    }
-
-    return ["-metadata", `${name}=${stripMetadataControlCharacters(value)}`];
-  });
-
-const makeAudioArgs = (plan: Extract<CobaltDownloadPlan, { status: "local-processing" }>) => {
-  const ffargs = ["-vn"];
-
-  ffargs.push(
-    ...(plan.audio.copy ? ["-c:a", "copy"] : ["-b:a", `${plan.audio.bitrate}k`]),
-    ...(plan.output.metadata ? ffmpegMetadataArgs(plan.output.metadata) : []),
-  );
-
-  if (plan.audio.format === "mp3" && plan.audio.bitrate === "8") {
-    ffargs.push("-ar", "12000");
-  }
-
-  if (plan.audio.format === "opus") {
-    ffargs.push("-vbr", "off");
-  }
-
-  ffargs.push("-f", plan.audio.format === "m4a" ? "ipod" : plan.audio.format);
-  return ffargs;
-};
 
 const fetchTunnelFile = async (
   url: string,
@@ -276,9 +271,7 @@ const fetchTunnelFile = async (
 };
 
 const runLocalProcessingWorker = async (
-  files: File[],
-  args: string[],
-  output: { type: string; format: string },
+  request: LocalAudioProcessingRequest,
   signal?: AbortSignal,
 ) =>
   new Promise<Blob>((resolve, reject) => {
@@ -320,13 +313,29 @@ const runLocalProcessingWorker = async (
     };
 
     worker.postMessage({
-      cobaltLocalProcessing: {
-        files,
-        args,
-        output,
-      },
+      cobaltLocalProcessing: request,
     });
   });
+
+export const validateLocalAudioPlan = (
+  plan: Extract<CobaltDownloadPlan, { status: "local-processing" }>,
+) => {
+  if (plan.type !== "audio") {
+    throw new Error("cobalt local processing response was not audio.");
+  }
+  if (!plan.audio) {
+    throw new Error("cobalt local processing response missing audio settings.");
+  }
+  if (plan.tunnel.length === 0) {
+    throw new Error("cobalt local processing response missing audio tunnel.");
+  }
+  if (plan.tunnel.length > 2) {
+    throw new Error("cobalt local processing response included unexpected tunnels.");
+  }
+  if (plan.audio.cover && plan.tunnel.length !== 2) {
+    throw new Error("cobalt local processing response missing cover tunnel.");
+  }
+};
 
 const processLocalAudio = async (
   plan: Extract<CobaltDownloadPlan, { status: "local-processing" }>,
@@ -334,27 +343,51 @@ const processLocalAudio = async (
   onLifecycle?: CobaltAudioDownloadLifecycleCallback,
   signal?: AbortSignal,
 ) => {
-  const inputFiles = await Promise.all(
-    plan.tunnel.map((url, index) =>
-      fetchTunnelFile(url, `input-${index}`, lastModified, onLifecycle, signal),
-    ),
-  );
-  const outputFormat = plan.output.filename.split(".").pop();
+  validateLocalAudioPlan(plan);
+
+  const outputFormat = plan.output.filename.split(".").pop()?.toLowerCase();
   if (!outputFormat) {
     throw new Error("cobalt local processing response missing output format.");
   }
 
-  const audioFile = inputFiles[0];
-  if (!audioFile) {
+  const audioTunnel = plan.tunnel[0];
+  if (!audioTunnel) {
     throw new Error("cobalt local processing response missing audio tunnel.");
   }
 
+  let audioFile: File;
+  let coverFile: File | undefined;
+  const shouldPostTagAsMp3 = outputFormat === "mp3";
+  const coverTunnel = shouldPostTagAsMp3 ? plan.tunnel[1] : undefined;
+  const audioFilePromise = fetchTunnelFile(
+    audioTunnel,
+    "input-0",
+    lastModified,
+    onLifecycle,
+    signal,
+  );
+  if (coverTunnel) {
+    [audioFile, coverFile] = await Promise.all([
+      audioFilePromise,
+      fetchTunnelFile(coverTunnel, "input-1", lastModified, onLifecycle, signal),
+    ]);
+  } else {
+    audioFile = await audioFilePromise;
+  }
+
   const blob = await runLocalProcessingWorker(
-    [audioFile],
-    makeAudioArgs(plan),
     {
-      type: plan.output.type,
-      format: outputFormat,
+      audioFile,
+      audio: {
+        copy: plan.audio.copy,
+        format: plan.audio.format,
+        bitrate: plan.audio.bitrate,
+      },
+      output: {
+        type: plan.output.type,
+        format: outputFormat,
+        metadata: plan.output.metadata,
+      },
     },
     signal,
   );
@@ -366,7 +399,11 @@ const processLocalAudio = async (
   });
 
   signal?.throwIfAborted();
-  return await tagCobaltAudioFile(file, plan, inputFiles[1], lastModified);
+  if (!shouldPostTagAsMp3) {
+    return file;
+  }
+
+  return await tagCobaltAudioFile(file, plan, coverFile, lastModified);
 };
 
 const tagCobaltAudioFile = async (
@@ -383,25 +420,7 @@ const tagCobaltAudioFile = async (
     throw new Error(mp3tag.error);
   }
 
-  const metadata = plan.output.metadata;
-  if (metadata?.title) {
-    mp3tag.tags.title = metadata.title;
-  }
-  if (metadata?.artist) {
-    mp3tag.tags.artist = metadata.artist;
-  }
-  if (metadata?.album) {
-    mp3tag.tags.album = metadata.album;
-  }
-  if (metadata?.date) {
-    mp3tag.tags.year = metadata.date;
-  }
-  if (metadata?.genre) {
-    mp3tag.tags.genre = metadata.genre;
-  }
-  if (metadata?.track) {
-    mp3tag.tags.track = metadata.track;
-  }
+  applyCobaltAudioMetadata(mp3tag, plan.output.metadata);
 
   if (coverFile) {
     mp3tag.tags.v2 ??= {};
@@ -424,6 +443,49 @@ const tagCobaltAudioFile = async (
     type: file.type,
     lastModified,
   });
+};
+
+export const applyCobaltAudioMetadata = (
+  mp3tag: Pick<MP3TagReader, "tags">,
+  metadata: Record<string, string | undefined> | undefined,
+) => {
+  if (!metadata) {
+    return;
+  }
+
+  if (metadata.title) {
+    mp3tag.tags.title = stripMetadataControlCharacters(metadata.title);
+  }
+  if (metadata.artist) {
+    mp3tag.tags.artist = stripMetadataControlCharacters(metadata.artist);
+  }
+  if (metadata.album) {
+    mp3tag.tags.album = stripMetadataControlCharacters(metadata.album);
+  }
+  if (metadata.date) {
+    mp3tag.tags.year = stripMetadataControlCharacters(metadata.date);
+  }
+  if (metadata.genre) {
+    mp3tag.tags.genre = stripMetadataControlCharacters(metadata.genre);
+  }
+  if (metadata.track) {
+    mp3tag.tags.track = stripMetadataControlCharacters(metadata.track);
+  }
+
+  const v2Frames = {
+    album_artist: "TPE2",
+    composer: "TCOM",
+    copyright: "TCOP",
+    sublanguage: "TLAN",
+  } as const;
+
+  for (const [metadataKey, frameName] of Object.entries(v2Frames)) {
+    const value = metadata[metadataKey];
+    if (value) {
+      mp3tag.tags.v2 ??= {};
+      mp3tag.tags.v2[frameName] = stripMetadataControlCharacters(value);
+    }
+  }
 };
 
 const runCobaltAudioDownload = async ({
