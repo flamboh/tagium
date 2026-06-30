@@ -28,6 +28,9 @@ const soundCloudPlaylistSchema = z.object({
   title: z.string(),
   genre: z.string().optional(),
   display_date: z.string().optional(),
+  release_date: z.string().optional(),
+  is_album: z.boolean().optional(),
+  set_type: z.string().optional(),
   artwork_url: z.string().nullable().optional(),
   user: z
     .object({
@@ -145,12 +148,18 @@ export default defineHandler(async (event) => {
   );
   const trackEntries = playlist.tracks.filter((track) => track !== undefined);
   const tracks = await resolveTracks(clientId, trackEntries);
+  const isAlbum = [playlist.is_album, playlist.set_type === "album"].includes(true);
+  let yearDate = playlist.display_date;
+  if (isAlbum && playlist.release_date) {
+    yearDate = playlist.release_date;
+  }
 
   return {
     title: playlist.title.trim(),
     artist: playlist.user?.username?.trim() ?? "",
     genre: playlist.genre?.trim() ?? "",
-    year: getYear(playlist.display_date),
+    year: getYear(yearDate),
+    isAlbum,
     coverUrl: getCoverUrl(playlist.artwork_url),
     tracks: tracks.map((track, index) => ({
       title: track.title.trim(),
