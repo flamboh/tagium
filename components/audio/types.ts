@@ -29,7 +29,7 @@ export interface TagiumFile {
   file?: File;
   originalFile?: File;
   status: "pending" | "saved" | "error";
-  downloadStatus: "downloading" | "ready" | "error";
+  downloadStatus: "downloading" | "ready" | "error" | "canceled";
   downloadError?: string;
   downloadRequest?: {
     sourceUrl: string;

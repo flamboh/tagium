@@ -162,6 +162,9 @@ export default function TrackMetadataEditor({
                   {!selectedFile.file &&
                     selectedFile.downloadStatus === "error" &&
                     "download failed"}
+                  {!selectedFile.file &&
+                    selectedFile.downloadStatus === "canceled" &&
+                    "download canceled"}
                 </div>
               </div>
               <div className="flex min-h-0 flex-1 items-center justify-center gap-2 pt-1 max-lg:[@media(max-height:700px)]:flex-none max-lg:[@media(max-height:700px)]:pt-0 lg:flex-none lg:justify-end lg:pt-2">
