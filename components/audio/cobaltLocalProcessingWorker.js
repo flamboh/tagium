@@ -8,6 +8,18 @@ import EncodeLibAV from "@imput/libav.js-encode-cli";
 const inputName = "tagium-audio-input";
 const outputName = (format) => `tagium-output.${format}`;
 const progressName = "tagium-progress.txt";
+const cobaltFileMetadataKeys = [
+  "album",
+  "composer",
+  "genre",
+  "copyright",
+  "title",
+  "artist",
+  "album_artist",
+  "track",
+  "date",
+  "sublanguage",
+];
 
 const postLocalProcessingMessage = (message) => {
   globalThis.self.postMessage({
@@ -72,6 +84,32 @@ export const createOutputSink = () => {
   };
 };
 
+const stripMetadataControlCharacters = (value) =>
+  Array.from(value)
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code > 31 && code !== 127;
+    })
+    .join("");
+
+const makeMetadataArgs = (metadata) => {
+  if (!metadata) {
+    return [];
+  }
+
+  return Object.entries(metadata).flatMap(([name, value]) => {
+    if (!cobaltFileMetadataKeys.includes(name) || !value) {
+      return [];
+    }
+
+    if (name === "sublanguage") {
+      return ["-metadata:s:s:0", `language=${stripMetadataControlCharacters(value)}`];
+    }
+
+    return ["-metadata", `${name}=${stripMetadataControlCharacters(value)}`];
+  });
+};
+
 const makeAudioFfmpegArgs = (request) => {
   const args = [
     "-nostdin",
@@ -90,6 +128,8 @@ const makeAudioFfmpegArgs = (request) => {
   } else {
     args.push("-b:a", `${request.audio.bitrate}k`);
   }
+
+  args.push(...makeMetadataArgs(request.output.metadata));
 
   if (request.audio.format === "mp3" && request.audio.bitrate === "8") {
     args.push("-ar", "12000");

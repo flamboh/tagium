@@ -6,6 +6,7 @@ import { env, exit } from "node:process";
 const proxyPort = 9000;
 const cobaltHost = "127.0.0.1";
 const cobaltPort = 9001;
+let nextRequestId = 0;
 
 if (!env.API_URL) {
   console.error("API_URL is required for Cobalt.");
@@ -23,7 +24,48 @@ const cobalt = spawn("node", ["src/cobalt"], {
 
 let shuttingDown = false;
 
+const getProxyRequestId = (clientRequest) => {
+  const header = clientRequest.headers["x-tagium-tunnel-request-id"];
+  if (Array.isArray(header)) {
+    const [firstHeader] = header;
+    if (firstHeader) return firstHeader;
+  }
+  if (header) return header;
+
+  nextRequestId += 1;
+  return `cobalt-proxy-${nextRequestId}`;
+};
+
+const getRequestContext = (clientRequest, requestId) => {
+  const requestUrl = new URL(clientRequest.url ?? "/", "http://tagium-cobalt.local");
+  const context = {
+    event: "cobalt_proxy_request",
+    requestId,
+    machineId: env.FLY_MACHINE_ID,
+    method: clientRequest.method,
+    path: requestUrl.pathname,
+  };
+  const tunnelId = requestUrl.searchParams.get("id");
+  if (tunnelId) {
+    context.tunnelId = tunnelId;
+  }
+
+  return context;
+};
+
+const logProxy = (message, context) => {
+  console.log(JSON.stringify({ message, ...context }));
+};
+
+const logProxyError = (message, context) => {
+  console.error(JSON.stringify({ message, ...context }));
+};
+
 const server = http.createServer((clientRequest, clientResponse) => {
+  const requestId = getProxyRequestId(clientRequest);
+  const startedAt = Date.now();
+  const context = getRequestContext(clientRequest, requestId);
+
   const upstreamRequest = http.request(
     {
       host: cobaltHost,
@@ -36,6 +78,37 @@ const server = http.createServer((clientRequest, clientResponse) => {
       },
     },
     (upstreamResponse) => {
+      let responseBytes = 0;
+      upstreamResponse.on("data", (chunk) => {
+        responseBytes += chunk.length;
+      });
+      upstreamResponse.on("end", () => {
+        logProxy("upstream response ended", {
+          ...context,
+          elapsedMs: Date.now() - startedAt,
+          status: upstreamResponse.statusCode,
+          responseBytes,
+        });
+      });
+      upstreamResponse.on("aborted", () => {
+        logProxyError("upstream response aborted", {
+          ...context,
+          elapsedMs: Date.now() - startedAt,
+          status: upstreamResponse.statusCode,
+          responseBytes,
+        });
+      });
+      upstreamResponse.on("error", (error) => {
+        logProxyError("upstream response error", {
+          ...context,
+          elapsedMs: Date.now() - startedAt,
+          status: upstreamResponse.statusCode,
+          responseBytes,
+          errorName: error.name,
+          errorMessage: error.message,
+        });
+      });
+
       const responseHeaders = { ...upstreamResponse.headers };
       if (env.FLY_MACHINE_ID) {
         responseHeaders["x-cobalt-machine-id"] = env.FLY_MACHINE_ID;
@@ -52,6 +125,13 @@ const server = http.createServer((clientRequest, clientResponse) => {
   );
 
   upstreamRequest.on("error", (error) => {
+    logProxyError("upstream request error", {
+      ...context,
+      elapsedMs: Date.now() - startedAt,
+      errorName: error.name,
+      errorMessage: error.message,
+    });
+
     if (clientResponse.headersSent) {
       clientResponse.destroy(error);
       return;
@@ -64,6 +144,10 @@ const server = http.createServer((clientRequest, clientResponse) => {
   });
 
   clientRequest.on("aborted", () => {
+    logProxyError("client request aborted", {
+      ...context,
+      elapsedMs: Date.now() - startedAt,
+    });
     upstreamRequest.destroy();
   });
 

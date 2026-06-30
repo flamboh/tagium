@@ -120,7 +120,9 @@ export default function AlbumSidebar({
 
   const isRetryableError = (track: TagiumFile) =>
     Boolean(track.downloadRequest) &&
-    (track.downloadStatus === "error" || track.status === "error");
+    (track.downloadStatus === "error" ||
+      track.downloadStatus === "canceled" ||
+      track.status === "error");
   const selectedTone = (trackId: string) => {
     if (selectedFileIds.has(trackId)) return "primary";
     if (selectedFileId === trackId) return "secondary";

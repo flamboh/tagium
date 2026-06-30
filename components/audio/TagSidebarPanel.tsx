@@ -5,6 +5,9 @@ import { useRef, useState } from "react";
 import { Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AlbumSidebar from "./AlbumSidebar";
+import PlaylistDownloadQueuePanel, {
+  type PlaylistDownloadQueuePanelState,
+} from "./PlaylistDownloadQueuePanel";
 import { AlbumGroup, TagiumFile } from "./types";
 import { Button } from "../ui/button";
 
@@ -41,8 +44,11 @@ interface TagSidebarPanelProps {
   ) => void;
   onPromptCreateAlbumFromLooseTracks: (sourceTrackId: string, targetTrackId: string) => void;
   onReorderAlbums: (albumId: string, targetIndex: number) => void;
+  playlistDownloadQueue?: PlaylistDownloadQueuePanelState | null;
   onDownloadAll: () => void;
   onOpenSettings: () => void;
+  onCancelPlaylistDownloadQueue?: () => void;
+  onRetryPlaylistDownloadQueue?: () => void;
 }
 
 export default function TagSidebarPanel({
@@ -69,8 +75,11 @@ export default function TagSidebarPanel({
   onMoveTrackToLoose,
   onPromptCreateAlbumFromLooseTracks,
   onReorderAlbums,
+  playlistDownloadQueue = null,
   onDownloadAll,
   onOpenSettings,
+  onCancelPlaylistDownloadQueue,
+  onRetryPlaylistDownloadQueue,
 }: TagSidebarPanelProps) {
   const dragCounterRef = useRef(0);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
@@ -158,6 +167,12 @@ export default function TagSidebarPanel({
         onPromptCreateAlbumFromLooseTracks={onPromptCreateAlbumFromLooseTracks}
         onReorderAlbums={onReorderAlbums}
         onAudioUpload={onAudioUpload}
+      />
+
+      <PlaylistDownloadQueuePanel
+        queue={playlistDownloadQueue}
+        onCancel={onCancelPlaylistDownloadQueue}
+        onRetry={onRetryPlaylistDownloadQueue}
       />
 
       <div className="px-3 py-3 border-t flex-shrink-0 flex flex-col gap-2">

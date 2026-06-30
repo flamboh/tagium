@@ -8,6 +8,7 @@ type LocalAudioProcessingRequest = {
   output: {
     format: string;
     type: string;
+    metadata?: Record<string, string | undefined>;
   };
 };
 

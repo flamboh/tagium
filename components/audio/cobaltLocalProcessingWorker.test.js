@@ -160,6 +160,50 @@ describe("cobalt local processing worker", () => {
     }
   });
 
+  it("passes sanitized metadata to ffmpeg", async () => {
+    const request = {
+      ...createRequest(),
+      output: {
+        format: "mp3",
+        type: "audio/mpeg",
+        metadata: {
+          title: "Ti\u0007t\nle",
+          artist: "Artist",
+          ignored: "Ignored",
+          sublanguage: "en\u001bg",
+        },
+      },
+    };
+    const { libav } = createLibav((instance, args) => {
+      expect(args).toEqual([
+        "-nostdin",
+        "-y",
+        "-loglevel",
+        "error",
+        "-progress",
+        "tagium-progress.txt",
+        "-i",
+        "tagium-audio-input",
+        "-vn",
+        "-b:a",
+        "128k",
+        "-metadata",
+        "title=Title",
+        "-metadata",
+        "artist=Artist",
+        "-metadata:s:s:0",
+        "language=eng",
+        "-f",
+        "mp3",
+        "tagium-output.mp3",
+      ]);
+
+      instance.onwrite?.("tagium-output.mp3", 0, Uint8Array.of(1));
+    });
+
+    await encodeWithLibAV(libav, request, () => {});
+  });
+
   it("writes output bytes at absolute positions", async () => {
     const outputSink = createOutputSink();
 
