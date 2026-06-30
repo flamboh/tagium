@@ -54,6 +54,8 @@ interface MP3TagReader {
   };
 }
 
+const MAX_CONCURRENT_COBALT_DOWNLOADS = 4;
+const COBALT_TUNNEL_START_INTERVAL_MS = 1_600;
 const cobaltFileMetadataKeys = [
   "album",
   "composer",
@@ -66,6 +68,63 @@ const cobaltFileMetadataKeys = [
   "date",
   "sublanguage",
 ];
+let activeCobaltDownloads = 0;
+const pendingCobaltDownloads: (() => void)[] = [];
+let nextCobaltTunnelStartAt = 0;
+let cobaltTunnelStartQueue = Promise.resolve();
+
+const delay = async (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+
+const reserveCobaltDownloadSlot = async () => {
+  if (activeCobaltDownloads < MAX_CONCURRENT_COBALT_DOWNLOADS) {
+    activeCobaltDownloads += 1;
+    return;
+  }
+
+  await new Promise<void>((resolve) => pendingCobaltDownloads.push(resolve));
+};
+
+const releaseCobaltDownloadSlot = () => {
+  const next = pendingCobaltDownloads.shift();
+  if (next) {
+    next();
+    return;
+  }
+
+  activeCobaltDownloads -= 1;
+};
+
+const withCobaltDownloadSlot = async <Value>(download: () => Promise<Value>) => {
+  await reserveCobaltDownloadSlot();
+
+  try {
+    return await download();
+  } finally {
+    releaseCobaltDownloadSlot();
+  }
+};
+
+const waitForCobaltTunnelStart = async () => {
+  let releaseQueue = () => {};
+  const previousQueue = cobaltTunnelStartQueue;
+  cobaltTunnelStartQueue = new Promise<void>((resolve) => {
+    releaseQueue = resolve;
+  });
+
+  await previousQueue;
+
+  try {
+    const waitMs = nextCobaltTunnelStartAt - Date.now();
+    if (waitMs > 0) {
+      await delay(waitMs);
+    }
+
+    nextCobaltTunnelStartAt = Date.now() + COBALT_TUNNEL_START_INTERVAL_MS;
+  } finally {
+    releaseQueue();
+  }
+};
 
 const getStableLastModified = (sourceUrl: string) =>
   Array.from(sourceUrl).reduce((hash, character) => {
@@ -111,6 +170,8 @@ const makeAudioArgs = (plan: Extract<CobaltDownloadPlan, { status: "local-proces
 };
 
 const fetchTunnelFile = async (url: string, filename: string, lastModified: number) => {
+  await waitForCobaltTunnelStart();
+
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(await response.text());
@@ -256,7 +317,7 @@ const tagCobaltAudioFile = async (
   });
 };
 
-export async function downloadCobaltAudio({ sourceUrl, audioBitrate }: CobaltAudioDownloadRequest) {
+const runCobaltAudioDownload = async ({ sourceUrl, audioBitrate }: CobaltAudioDownloadRequest) => {
   const response = await fetch("/api/cobalt/audio", {
     method: "POST",
     headers: {
@@ -281,4 +342,8 @@ export async function downloadCobaltAudio({ sourceUrl, audioBitrate }: CobaltAud
   }
 
   return await fetchTunnelFile(plan.url, plan.filename, lastModified);
+};
+
+export async function downloadCobaltAudio(request: CobaltAudioDownloadRequest) {
+  return await withCobaltDownloadSlot(() => runCobaltAudioDownload(request));
 }

@@ -51,6 +51,7 @@ const makeEvent = (request: RuntimeRequest) => {
 
 describe("cobalt tunnel endpoint", () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -92,6 +93,31 @@ describe("cobalt tunnel endpoint", () => {
 
     expect(response.status).toBe(200);
     expect(headers.get("Fly-Force-Instance-Id")).toBe("cobalt-machine-1");
+    expect(headers.get("X-Tagium-Tunnel-Request-Id")).toMatch(/^tagium-tunnel-/);
+  });
+
+  it("logs upstream tunnel failures with machine affinity context", async () => {
+    const warnMock = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response("missing tunnel", { status: 404 });
+      }),
+    );
+
+    const response = await handler(makeEvent(makeTunnelRequestForMachine()));
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe("Cobalt tunnel request failed (404).");
+    expect(warnMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(warnMock.mock.calls[0]?.[0] ?? "{}")).toMatchObject({
+      event: "cobalt_tunnel_failure",
+      message: "upstream non-ok",
+      machineId: "cobalt-machine-1",
+      tunnelId: "123456789012345678901",
+      status: 404,
+      body: "missing tunnel",
+    });
   });
 
   it("rejects tampered tunnel machine affinity", async () => {

@@ -53,6 +53,8 @@ const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
   year: undefined,
   cover: undefined,
 };
+const MAX_SOUND_CLOUD_SET_DOWNLOADS = 60;
+const DOWNLOAD_RATE_LIMIT_ERROR = "Download rate limit exceeded.";
 const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
 const getFileImportKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
 const filenameFromTitle = (title: string) => {
@@ -667,8 +669,8 @@ export default function AudioTagger() {
     bufferCurrentFormMetadata();
     setActiveView("editor");
     const albumId = crypto.randomUUID();
-    const pendingFiles = set.tracks.map((track) =>
-      createPendingDownloadTrack(
+    const pendingFiles = set.tracks.map((track, index) => {
+      const pendingFile = createPendingDownloadTrack(
         crypto.randomUUID(),
         createDownloadMetadata({
           title: track.title,
@@ -681,8 +683,19 @@ export default function AudioTagger() {
         }),
         true,
         { sourceUrl: track.url, audioBitrate: settings.audioBitrate },
-      ),
-    );
+      );
+
+      if (index < MAX_SOUND_CLOUD_SET_DOWNLOADS) {
+        return pendingFile;
+      }
+
+      return {
+        ...pendingFile,
+        status: "error" as const,
+        downloadStatus: "error" as const,
+        downloadError: DOWNLOAD_RATE_LIMIT_ERROR,
+      };
+    });
     const album: AlbumGroup = {
       id: albumId,
       title: set.title,
@@ -746,7 +759,7 @@ export default function AudioTagger() {
       })();
     }
 
-    pendingFiles.forEach((pendingFile, index) => {
+    pendingFiles.slice(0, MAX_SOUND_CLOUD_SET_DOWNLOADS).forEach((pendingFile, index) => {
       const track = set.tracks[index];
       if (!track) return;
       void (async () => {
