@@ -14,6 +14,7 @@ import {
   reorderAlbums,
 } from "./albumOps";
 import {
+  applyAlbumCoverToFiles,
   applyAlbumSharedTagsToFiles,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
@@ -1468,6 +1469,18 @@ export default function AudioTagger() {
   const closeAlbumDialog = () => {
     setAlbumDialogOpen(false);
   };
+  const applyAlbumDraftCoverToTracks = () => {
+    if (albumDialogMode !== "edit" || !editingAlbumId || !albumDraft.cover) return;
+    if (albumDraft.cover.length === 0) return;
+
+    const album = albumsRef.current.find((entry) => entry.id === editingAlbumId);
+    if (!album) return;
+
+    const bufferedFiles = applyCurrentFormMetadataToFiles(filesRef.current, album.trackIds);
+    const coveredFiles = applyAlbumCoverToFiles(bufferedFiles, album.trackIds, albumDraft.cover);
+    filesRef.current = coveredFiles;
+    setFiles(coveredFiles);
+  };
   const saveAlbumDialog = () => {
     const title = albumDraft.title.trim() || "untitled album";
     const artist = albumDraft.artist.trim();
@@ -1667,6 +1680,7 @@ export default function AudioTagger() {
         onChange={setAlbumDraft}
         onClose={closeAlbumDialog}
         onSave={saveAlbumDialog}
+        onApplyCover={applyAlbumDraftCoverToTracks}
         onDelete={
           albumDialogMode === "edit" && editingAlbumId
             ? () => {

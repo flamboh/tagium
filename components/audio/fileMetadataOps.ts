@@ -102,7 +102,30 @@ export function applyAlbumSharedTagsToFiles(files: TagiumFile[], album: AlbumGro
         album: album.title,
         genre: album.genre,
         year: album.year !== undefined ? album.year : file.metadata.year,
-        picture: album.cover && album.cover.length > 0 ? album.cover : file.metadata.picture,
+      },
+    };
+  });
+}
+
+export function applyAlbumCoverToFiles(
+  files: TagiumFile[],
+  trackIds: string[],
+  cover: AudioMetadata["picture"],
+) {
+  if (trackIds.length === 0 || cover.length === 0) return files;
+
+  const trackSet = new Set(trackIds);
+
+  return files.map((file) => {
+    if (!trackSet.has(file.id) || !file.metadata) return file;
+
+    return {
+      ...file,
+      status: file.status === "saved" ? "pending" : file.status,
+      hasBufferedChanges: true,
+      metadata: {
+        ...file.metadata,
+        picture: cover,
       },
     };
   });
