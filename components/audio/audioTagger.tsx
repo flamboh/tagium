@@ -14,7 +14,7 @@ import {
   reorderAlbums,
 } from "./albumOps";
 import {
-  applyAlbumCoverToFiles,
+  applyAlbumCoverToFilesWithSelectedMetadata,
   applyAlbumSharedTagsToFiles,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
@@ -1477,9 +1477,18 @@ export default function AudioTagger() {
     if (!album) return;
 
     const bufferedFiles = applyCurrentFormMetadataToFiles(filesRef.current, album.trackIds);
-    const coveredFiles = applyAlbumCoverToFiles(bufferedFiles, album.trackIds, albumDraft.cover);
+    const covered = applyAlbumCoverToFilesWithSelectedMetadata(
+      bufferedFiles,
+      album.trackIds,
+      albumDraft.cover,
+      selectedFileIdRef.current,
+    );
+    const coveredFiles = covered.files;
     filesRef.current = coveredFiles;
     setFiles(coveredFiles);
+    if (covered.selectedMetadata) {
+      reset(covered.selectedMetadata);
+    }
   };
   const saveAlbumDialog = () => {
     const title = albumDraft.title.trim() || "untitled album";

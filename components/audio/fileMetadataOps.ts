@@ -131,6 +131,27 @@ export function applyAlbumCoverToFiles(
   });
 }
 
+export function applyAlbumCoverToFilesWithSelectedMetadata(
+  files: TagiumFile[],
+  trackIds: string[],
+  cover: AudioMetadata["picture"],
+  selectedFileId: string | null,
+) {
+  const coveredFiles = applyAlbumCoverToFiles(files, trackIds, cover);
+  if (!selectedFileId) {
+    return { files: coveredFiles };
+  }
+  if (!trackIds.includes(selectedFileId)) {
+    return { files: coveredFiles };
+  }
+
+  const selectedFile = coveredFiles.find((file) => file.id === selectedFileId);
+  return {
+    files: coveredFiles,
+    selectedMetadata: selectedFile?.metadata,
+  };
+}
+
 export function prepareDownloadedTrackHydration(
   currentFile: TagiumFile,
   parsedFile: TagiumFile,
