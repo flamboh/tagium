@@ -26,11 +26,12 @@ const storedAppSettingsSchema = z
   })
   .catch(DEFAULT_APP_SETTINGS);
 
-export const loadAppSettings = (storage: Pick<Storage, "getItem"> = localStorage): AppSettings => {
-  const storedSettings = storage.getItem(APP_SETTINGS_STORAGE_KEY);
-  if (storedSettings === null) return DEFAULT_APP_SETTINGS;
-
+export const loadAppSettings = (storage?: Pick<Storage, "getItem">): AppSettings => {
   try {
+    const targetStorage = storage ?? localStorage;
+    const storedSettings = targetStorage.getItem(APP_SETTINGS_STORAGE_KEY);
+    if (storedSettings === null) return DEFAULT_APP_SETTINGS;
+
     return {
       ...DEFAULT_APP_SETTINGS,
       ...storedAppSettingsSchema.parse(JSON.parse(storedSettings)),
@@ -40,9 +41,11 @@ export const loadAppSettings = (storage: Pick<Storage, "getItem"> = localStorage
   }
 };
 
-export const saveAppSettings = (
-  settings: AppSettings,
-  storage: Pick<Storage, "setItem"> = localStorage,
-) => {
-  storage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+export const saveAppSettings = (settings: AppSettings, storage?: Pick<Storage, "setItem">) => {
+  try {
+    const targetStorage = storage ?? localStorage;
+    targetStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    return;
+  }
 };
