@@ -1,6 +1,10 @@
-type CobaltLocalProcessingRequest = {
-  files: File[];
-  args: string[];
+type LocalAudioProcessingRequest = {
+  audioFile: File;
+  audio: {
+    copy: boolean;
+    format: string;
+    bitrate: string;
+  };
   output: {
     format: string;
     type: string;
@@ -29,6 +33,6 @@ export function createOutputSink(): OutputSink;
 
 export function encodeWithLibAV(
   libav: LibAVLike,
-  request: CobaltLocalProcessingRequest,
+  request: LocalAudioProcessingRequest,
   postProgress: (progress: number | undefined) => void,
 ): Promise<Blob>;

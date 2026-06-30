@@ -1,6 +1,11 @@
+/*
+ * Adapted from imputnet/cobalt's browser LibAV local-processing path.
+ * Tagium keeps the single-audio-file workflow and streams output through
+ * LibAV writer devices instead of loading input/output through MEMFS.
+ */
 import EncodeLibAV from "@imput/libav.js-encode-cli";
 
-const inputName = (index) => `tagium-input-${index}`;
+const inputName = "tagium-audio-input";
 const outputName = (format) => `tagium-output.${format}`;
 const progressName = "tagium-progress.txt";
 
@@ -43,44 +48,78 @@ export const createProgressSink = (postProgress) => {
 };
 
 export const createOutputSink = () => {
-  const chunks = [];
+  const patches = [];
+  let size = 0;
 
   return {
     write(position, data) {
-      chunks.push({ position, data: new Uint8Array(data) });
+      const patch = Uint8Array.from(new Uint8Array(data));
+      const end = position + patch.length;
+      if (end > size) {
+        size = end;
+      }
+
+      patches.push({ position, data: patch });
     },
     toBlob(type) {
-      chunks.sort((a, b) => a.position - b.position);
-      return new Blob(
-        chunks.map((chunk) => chunk.data),
-        { type },
-      );
+      const bytes = new Uint8Array(size);
+      for (const patch of patches) {
+        bytes.set(patch.data, patch.position);
+      }
+
+      return new Blob([bytes], { type });
     },
   };
 };
 
-const makeFfmpegArgs = (request) => [
-  "-nostdin",
-  "-y",
-  "-loglevel",
-  "error",
-  "-progress",
-  progressName,
-  ...request.files.flatMap((_, index) => ["-i", inputName(index)]),
-  ...request.args,
-  outputName(request.output.format),
-];
+const makeAudioFfmpegArgs = (request) => {
+  const args = [
+    "-nostdin",
+    "-y",
+    "-loglevel",
+    "error",
+    "-progress",
+    progressName,
+    "-i",
+    inputName,
+    "-vn",
+  ];
 
-const unlinkCreatedFiles = async (libav, request, registeredInputNames) => {
+  if (request.audio.copy) {
+    args.push("-c:a", "copy");
+  } else {
+    args.push("-b:a", `${request.audio.bitrate}k`);
+  }
+
+  if (request.audio.format === "mp3" && request.audio.bitrate === "8") {
+    args.push("-ar", "12000");
+  }
+
+  if (request.audio.format === "opus") {
+    args.push("-vbr", "off");
+  }
+
+  if (request.audio.format === "m4a") {
+    args.push("-f", "ipod");
+  } else {
+    args.push("-f", request.audio.format);
+  }
+
+  args.push(outputName(request.output.format));
+
+  return args;
+};
+
+const unlinkCreatedFiles = async (libav, request, inputRegistered) => {
   await Promise.allSettled([
     libav.unlink(outputName(request.output.format)),
     libav.unlink(progressName),
-    ...registeredInputNames.map((name) => libav.unlinkreadaheadfile(name)),
+    inputRegistered ? libav.unlinkreadaheadfile(inputName) : Promise.resolve(),
   ]);
 };
 
 export const encodeWithLibAV = async (libav, request, postProgress) => {
-  const registeredInputNames = [];
+  let inputRegistered = false;
   const progressSink = createProgressSink(postProgress);
   const outputSink = createOutputSink();
 
@@ -96,24 +135,21 @@ export const encodeWithLibAV = async (libav, request, postProgress) => {
   };
 
   try {
-    for (const [index, file] of request.files.entries()) {
-      const name = inputName(index);
-      registeredInputNames.push(name);
-      await libav.mkreadaheadfile(name, file);
-    }
+    inputRegistered = true;
+    await libav.mkreadaheadfile(inputName, request.audioFile);
 
     await libav.mkwriterdev(outputName(request.output.format));
     await libav.mkwriterdev(progressName);
-    await libav.ffmpeg(makeFfmpegArgs(request));
+    await libav.ffmpeg(makeAudioFfmpegArgs(request));
 
     const blob = outputSink.toBlob(request.output.type);
     if (blob.size === 0) {
-      throw new Error("cobalt local processing produced an empty file.");
+      throw new Error("local audio processing produced an empty file.");
     }
 
     return blob;
   } finally {
-    await unlinkCreatedFiles(libav, request, registeredInputNames);
+    await unlinkCreatedFiles(libav, request, inputRegistered);
   }
 };
 
@@ -128,7 +164,7 @@ const errorMessage = (error) => {
     return error.message;
   }
 
-  return "cobalt local processing failed.";
+  return "local audio processing failed.";
 };
 
 export const processLocalAudio = async (request) => {
@@ -147,7 +183,6 @@ export const processLocalAudio = async (request) => {
   }
 };
 
-// Tagium owns this worker implementation; the envelope name stays for caller compatibility.
 if (globalThis.self) {
   globalThis.self.onmessage = async (event) => {
     const request = event.data.cobaltLocalProcessing;
