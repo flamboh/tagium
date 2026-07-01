@@ -31,6 +31,7 @@ interface AlbumMetadataDialogProps {
   onClose: () => void;
   onSave: () => void;
   onDelete?: () => void;
+  onApplyCover?: () => void;
 }
 
 export default function AlbumMetadataDialog({
@@ -42,9 +43,11 @@ export default function AlbumMetadataDialog({
   onClose,
   onSave,
   onDelete,
+  onApplyCover,
 }: AlbumMetadataDialogProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
+  const canApplyCover = mode === "edit" && draft.cover && draft.cover.length > 0 && onApplyCover;
 
   const handleCoverUpload = (file: File) => {
     const reader = new FileReader();
@@ -196,6 +199,11 @@ export default function AlbumMetadataDialog({
                     onClick={() => setShowDeleteConfirm(true)}
                   >
                     delete album
+                  </Button>
+                )}
+                {canApplyCover && (
+                  <Button type="button" variant="outline" onClick={onApplyCover}>
+                    apply cover to tracks
                   </Button>
                 )}
                 <Button type="button" variant="outline" onClick={onClose}>

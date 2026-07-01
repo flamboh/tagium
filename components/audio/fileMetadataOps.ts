@@ -102,10 +102,54 @@ export function applyAlbumSharedTagsToFiles(files: TagiumFile[], album: AlbumGro
         album: album.title,
         genre: album.genre,
         year: album.year !== undefined ? album.year : file.metadata.year,
-        picture: album.cover && album.cover.length > 0 ? album.cover : file.metadata.picture,
       },
     };
   });
+}
+
+export function applyAlbumCoverToFiles(
+  files: TagiumFile[],
+  trackIds: string[],
+  cover: AudioMetadata["picture"],
+) {
+  if (trackIds.length === 0 || cover.length === 0) return files;
+
+  const trackSet = new Set(trackIds);
+
+  return files.map((file) => {
+    if (!trackSet.has(file.id) || !file.metadata) return file;
+
+    return {
+      ...file,
+      status: file.status === "saved" ? "pending" : file.status,
+      hasBufferedChanges: true,
+      metadata: {
+        ...file.metadata,
+        picture: cover,
+      },
+    };
+  });
+}
+
+export function applyAlbumCoverToFilesWithSelectedMetadata(
+  files: TagiumFile[],
+  trackIds: string[],
+  cover: AudioMetadata["picture"],
+  selectedFileId: string | null,
+): { files: TagiumFile[]; selectedMetadata?: AudioMetadata } {
+  const coveredFiles = applyAlbumCoverToFiles(files, trackIds, cover);
+  if (!selectedFileId) {
+    return { files: coveredFiles };
+  }
+  if (!trackIds.includes(selectedFileId)) {
+    return { files: coveredFiles };
+  }
+
+  const selectedFile = coveredFiles.find((file) => file.id === selectedFileId);
+  return {
+    files: coveredFiles,
+    selectedMetadata: selectedFile?.metadata,
+  };
 }
 
 export function prepareDownloadedTrackHydration(

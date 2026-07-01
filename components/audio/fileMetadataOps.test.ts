@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
+  applyAlbumCoverToFiles,
+  applyAlbumCoverToFilesWithSelectedMetadata,
   applyAlbumSharedTagsToFiles,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
@@ -103,7 +105,7 @@ describe("fileMetadataOps", () => {
     expect(result[1].metadata?.trackNumber).toBe(1);
   });
 
-  it("applies shared album metadata and preserves existing cover when none is provided", () => {
+  it("applies shared album metadata without applying album cover", () => {
     const originalCover = [
       {
         format: "image/jpeg",
@@ -143,6 +145,14 @@ describe("fileMetadataOps", () => {
       title: "New Album",
       artist: "New Artist",
       genre: "Ambient",
+      cover: [
+        {
+          format: "image/png",
+          type: 3,
+          description: "album cover",
+          data: new Uint8Array([4, 5, 6]),
+        },
+      ],
       trackIds: ["track-1"],
     };
 
@@ -155,6 +165,99 @@ describe("fileMetadataOps", () => {
     expect(updatedFile.metadata?.genre).toBe("Ambient");
     expect(updatedFile.metadata?.trackNumber).toBe(9);
     expect(updatedFile.metadata?.picture).toEqual(originalCover);
+  });
+
+  it("explicitly applies album cover to album tracks", () => {
+    const albumCover = [
+      {
+        format: "image/jpeg",
+        type: 3,
+        description: "album cover",
+        data: new Uint8Array([1, 2, 3]),
+      },
+    ];
+    const files = [
+      readyFile({
+        id: "track-1",
+        status: "saved",
+        metadata: metadata({ picture: [] }),
+      }),
+      readyFile({
+        id: "track-2",
+        metadata: metadata({
+          picture: [
+            {
+              format: "image/png",
+              type: 3,
+              description: "old cover",
+              data: new Uint8Array([9]),
+            },
+          ],
+        }),
+      }),
+      readyFile({
+        id: "track-3",
+        metadata: metadata({ picture: [] }),
+      }),
+    ];
+
+    const result = applyAlbumCoverToFiles(files, ["track-1", "track-2"], albumCover);
+
+    expect(result[0].metadata?.picture).toEqual(albumCover);
+    expect(result[0].status).toBe("pending");
+    expect(result[0].hasBufferedChanges).toBe(true);
+    expect(result[1].metadata?.picture).toEqual(albumCover);
+    expect(result[1].hasBufferedChanges).toBe(true);
+    expect(result[2]).toBe(files[2]);
+  });
+
+  it("returns selected metadata with applied cover after buffering dirty form metadata", () => {
+    const oldFormCover = [
+      {
+        format: "image/png",
+        type: 3,
+        description: "old dirty form cover",
+        data: new Uint8Array([9]),
+      },
+    ];
+    const albumCover = [
+      {
+        format: "image/jpeg",
+        type: 3,
+        description: "album cover",
+        data: new Uint8Array([1, 2, 3]),
+      },
+    ];
+    const dirtySelectedMetadata = metadata({
+      filename: "dirty-title",
+      title: "Dirty Title",
+      picture: oldFormCover,
+    });
+    const files = [
+      readyFile({
+        id: "track-1",
+        filename: "dirty-title.mp3",
+        metadata: dirtySelectedMetadata,
+        hasBufferedChanges: true,
+      }),
+      readyFile({
+        id: "track-2",
+        metadata: metadata({ picture: [] }),
+      }),
+    ];
+
+    const result = applyAlbumCoverToFilesWithSelectedMetadata(
+      files,
+      ["track-1", "track-2"],
+      albumCover,
+      "track-1",
+    );
+
+    expect(result.files[0].metadata?.title).toBe("Dirty Title");
+    expect(result.files[0].metadata?.picture).toEqual(albumCover);
+    expect(result.selectedMetadata?.title).toBe("Dirty Title");
+    expect(result.selectedMetadata?.picture).toEqual(albumCover);
+    expect(result.files[1].metadata?.picture).toEqual(albumCover);
   });
 
   it("syncs filenames from titles across any tracks", () => {
