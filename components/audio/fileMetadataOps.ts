@@ -136,7 +136,7 @@ export function applyAlbumCoverToFilesWithSelectedMetadata(
   trackIds: string[],
   cover: AudioMetadata["picture"],
   selectedFileId: string | null,
-) {
+): { files: TagiumFile[]; selectedMetadata?: AudioMetadata } {
   const coveredFiles = applyAlbumCoverToFiles(files, trackIds, cover);
   if (!selectedFileId) {
     return { files: coveredFiles };
