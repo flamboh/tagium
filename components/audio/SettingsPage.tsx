@@ -97,6 +97,21 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
                 </PopoverContent>
               </Popover>
             </div>
+            <label className="flex cursor-pointer items-start gap-3 py-1">
+              <Checkbox
+                checked={settings.applySoundCloudAlbumCoverToTracks}
+                onCheckedChange={(checked) =>
+                  onChange({
+                    ...settings,
+                    applySoundCloudAlbumCoverToTracks: checked === true,
+                  })
+                }
+                className="mt-0.5"
+              />
+              <span className="text-sm font-medium">
+                automatically apply SoundCloud album cover to all tracks
+              </span>
+            </label>
           </section>
 
           <section className="flex flex-col gap-5">

@@ -131,6 +131,24 @@ export function getLibraryDownloadEntries({
     for (const track of albumTracks) {
       addTrackEntry(entries, usedPaths, albumFolder, track);
     }
+
+    const albumCover = album.cover?.[0];
+    if (albumCover) {
+      const coverFormat = albumCover.format.split(";")[0]?.trim().toLowerCase();
+      let coverFilename = "";
+      if (coverFormat === "image/jpeg" || coverFormat === "image/jpg") {
+        coverFilename = "cover.jpg";
+      }
+      if (coverFormat === "image/png") {
+        coverFilename = "cover.png";
+      }
+      if (coverFilename) {
+        entries.push({
+          path: uniquePath(`${albumFolder}/${coverFilename}`, usedPaths),
+          file: new File([albumCover.data], coverFilename, { type: coverFormat }),
+        });
+      }
+    }
   }
 
   for (const trackId of looseTrackIds) {

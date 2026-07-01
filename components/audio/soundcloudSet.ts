@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ImportedAlbumMetadata } from "./types";
+import type { ImportedAlbumMetadata } from "./types";
 
 const soundCloudSetSchema = z.object({
   title: z.string(),

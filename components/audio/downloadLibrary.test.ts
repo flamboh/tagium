@@ -57,6 +57,15 @@ const album = (id: string, title: string, trackIds: string[]): AlbumGroup => ({
   trackIds,
 });
 
+const cover: AudioMetadata["picture"] = [
+  {
+    format: "image/jpeg",
+    type: 3,
+    description: "album cover",
+    data: new Uint8Array([1, 2, 3]),
+  },
+];
+
 describe("downloadLibrary", () => {
   it("creates timestamped library download filenames", () => {
     expect(createLibraryDownloadFilename(new Date(2026, 0, 2, 3, 4, 5))).toBe(
@@ -85,14 +94,79 @@ describe("downloadLibrary", () => {
   });
 
   it("can nest a single album export at the zip root", () => {
+    const singleAlbum = {
+      ...album("album", "Single Track Album", ["track"]),
+      cover,
+    };
     const entries = getLibraryDownloadEntries({
-      albums: [album("album", "Single Track Album", ["track"])],
+      albums: [singleAlbum],
       looseTrackIds: [],
       files: [file("track", "song.mp3")],
       albumRoot: "",
     });
 
-    expect(entries.map((entry) => entry.path)).toEqual(["Single Track Album/song.mp3"]);
+    expect(entries.map((entry) => entry.path)).toEqual([
+      "Single Track Album/song.mp3",
+      "Single Track Album/cover.jpg",
+    ]);
+    expect(entries[1]?.file.type).toBe("image/jpeg");
+  });
+
+  it("bundles png album cover files with album folders", () => {
+    const pngCover: AudioMetadata["picture"] = [
+      {
+        format: "image/png",
+        type: 3,
+        description: "album cover",
+        data: new Uint8Array([4, 5, 6]),
+      },
+    ];
+    const entries = getLibraryDownloadEntries({
+      albums: [{ ...album("album", "Album One", ["track"]), cover: pngCover }],
+      looseTrackIds: [],
+      files: [file("track", "song.mp3")],
+    });
+
+    expect(entries.map((entry) => entry.path)).toEqual([
+      "albums/Album One/song.mp3",
+      "albums/Album One/cover.png",
+    ]);
+    expect(entries[1]?.file.type).toBe("image/png");
+  });
+
+  it("preserves cover-like track filenames when adding album cover files", () => {
+    const entries = getLibraryDownloadEntries({
+      albums: [{ ...album("album", "Album", ["track"]), cover }],
+      looseTrackIds: [],
+      files: [file("track", "cover.jpg")],
+    });
+
+    expect(entries.map((entry) => entry.path)).toEqual([
+      "albums/Album/cover.jpg",
+      "albums/Album/cover-2.jpg",
+    ]);
+  });
+
+  it("uses cover file extensions for image content types with parameters", () => {
+    const parameterizedCover: AudioMetadata["picture"] = [
+      {
+        format: "image/jpeg; charset=utf-8",
+        type: 3,
+        description: "album cover",
+        data: new Uint8Array([7, 8, 9]),
+      },
+    ];
+    const entries = getLibraryDownloadEntries({
+      albums: [{ ...album("album", "Album", ["track"]), cover: parameterizedCover }],
+      looseTrackIds: [],
+      files: [file("track", "song.mp3")],
+    });
+
+    expect(entries.map((entry) => entry.path)).toEqual([
+      "albums/Album/song.mp3",
+      "albums/Album/cover.jpg",
+    ]);
+    expect(entries[1]?.file.type).toBe("image/jpeg");
   });
 
   it("can scope a single album export without unrelated tracks", () => {

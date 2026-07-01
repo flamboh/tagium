@@ -14,6 +14,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   syncTrackNumbers: true,
   syncFilenames: true,
   audioBitrate: "320",
+  applySoundCloudAlbumCoverToTracks: true,
 };
 
 export const APP_SETTINGS_STORAGE_KEY = "tagium:app-settings";
@@ -23,6 +24,9 @@ const storedAppSettingsSchema = z
     syncTrackNumbers: z.boolean().catch(DEFAULT_APP_SETTINGS.syncTrackNumbers),
     syncFilenames: z.boolean().catch(DEFAULT_APP_SETTINGS.syncFilenames),
     audioBitrate: z.enum(AUDIO_BITRATE_OPTIONS).catch(DEFAULT_APP_SETTINGS.audioBitrate),
+    applySoundCloudAlbumCoverToTracks: z
+      .boolean()
+      .catch(DEFAULT_APP_SETTINGS.applySoundCloudAlbumCoverToTracks),
   })
   .catch(DEFAULT_APP_SETTINGS);
 

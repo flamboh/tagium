@@ -1,4 +1,5 @@
 import filenamify from "filenamify";
+import type { SoundCloudSet } from "./soundcloudSet";
 import { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
 
 export interface DownloadedTrackHydration {
@@ -149,6 +150,30 @@ export function applyAlbumCoverToFilesWithSelectedMetadata(
   return {
     files: coveredFiles,
     selectedMetadata: selectedFile?.metadata,
+  };
+}
+
+export function applySoundCloudSetImportedCover(
+  files: TagiumFile[],
+  albums: AlbumGroup[],
+  albumId: string,
+  trackIds: string[],
+  set: Pick<SoundCloudSet, "isAlbum">,
+  settings: { applySoundCloudAlbumCoverToTracks: boolean },
+  cover: AudioMetadata["picture"],
+  selectedFileId: string | null,
+) {
+  const coveredAlbums = albums.map((currentAlbum) =>
+    currentAlbum.id === albumId ? { ...currentAlbum, cover } : currentAlbum,
+  );
+
+  if (!set.isAlbum || !settings.applySoundCloudAlbumCoverToTracks) {
+    return { albums: coveredAlbums, files };
+  }
+
+  return {
+    albums: coveredAlbums,
+    ...applyAlbumCoverToFilesWithSelectedMetadata(files, trackIds, cover, selectedFileId),
   };
 }
 
