@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Music4, Link2, Download, Loader2, Upload } from "lucide-react";
+import { Music4, Link2, ArrowRight, Loader2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getDownloadErrorMessage } from "./downloadErrorMessage";
 import { isSoundCloudSetUrl, resolveSoundCloudSet, type SoundCloudSet } from "./soundcloudSet";
@@ -161,19 +161,19 @@ export default function LandingScreen({
                 }}
                 placeholder="soundcloud or youtube url"
                 disabled={downloading}
-                className="w-full h-10 rounded-lg border border-input bg-transparent pl-9 pr-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-ring transition-shadow disabled:opacity-50 placeholder:text-muted-foreground"
+                className="w-full h-10 rounded-lg border border-input bg-transparent pl-9 pr-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-ring transition-shadow disabled:opacity-50 placeholder:text-muted-foreground/45"
               />
             </div>
             <button
               type="submit"
               disabled={!url.trim() || downloading}
-              aria-label="download audio"
-              className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-primary/90 transition-colors"
+              aria-label="start media import"
+              className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 hover:bg-primary/90 transition-colors"
             >
               {downloading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Download className="h-4 w-4" />
+                <ArrowRight className="h-4 w-4" />
               )}
             </button>
           </div>

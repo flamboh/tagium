@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AUDIO_BITRATE_OPTIONS } from "./settings";
 import type { AppSettings } from "./types";
@@ -24,9 +25,10 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-xl flex flex-col gap-6">
           <section className="flex flex-col gap-3">
-            <h3 className="text-sm font-medium">metadata</h3>
-            <label className="flex cursor-pointer items-start gap-3 py-1">
+            <h3 className="text-base font-semibold">metadata</h3>
+            <div className="flex items-start gap-3 py-1">
               <Checkbox
+                id="sync-track-numbers"
                 checked={settings.syncTrackNumbers}
                 onCheckedChange={(checked) =>
                   onChange({
@@ -36,10 +38,11 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
                 }
                 className="mt-0.5"
               />
-              <span className="text-sm font-medium">use album sidebar order as track number</span>
-            </label>
-            <label className="flex cursor-pointer items-start gap-3 py-1">
+              <Label htmlFor="sync-track-numbers">use album sidebar order as track number</Label>
+            </div>
+            <div className="flex items-start gap-3 py-1">
               <Checkbox
+                id="sync-filenames"
                 checked={settings.syncFilenames}
                 onCheckedChange={(checked) =>
                   onChange({
@@ -49,12 +52,11 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
                 }
                 className="mt-0.5"
               />
-              <span className="text-sm font-medium">sync all filenames with track titles</span>
-            </label>
+              <Label htmlFor="sync-filenames">sync all filenames with track titles</Label>
+            </div>
           </section>
 
           <section className="flex flex-col gap-3">
-            <h3 className="text-sm font-medium">downloads</h3>
             <div className="flex flex-col gap-2">
               <span id="download-bitrate-label" className="text-sm font-medium">
                 download bitrate
@@ -116,21 +118,21 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
 
           <section className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
-              <h3 className="text-sm font-medium">about</h3>
+              <h3 className="text-base font-semibold">about</h3>
               <p className="text-sm leading-6 text-muted-foreground">
                 tagium exists to make device-local music more accessible to everyone.
               </p>
             </div>
 
             <div className="flex flex-col gap-2">
-              <h3 className="text-sm font-medium">acknowledgements</h3>
+              <h3 className="text-base font-semibold">acknowledgements</h3>
               <div className="flex flex-col gap-2 text-sm leading-6 text-muted-foreground">
                 <p>
                   <a
                     href="https://cobalt.tools/"
                     target="_blank"
                     rel="noreferrer"
-                    className="text-primary underline-offset-4 hover:underline"
+                    className="cursor-pointer text-primary underline-offset-4 hover:underline"
                   >
                     cobalt
                   </a>{" "}
@@ -139,7 +141,7 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
                     href="https://imput.net/"
                     target="_blank"
                     rel="noreferrer"
-                    className="text-primary underline-offset-4 hover:underline"
+                    className="cursor-pointer text-primary underline-offset-4 hover:underline"
                   >
                     imput
                   </a>
@@ -151,7 +153,7 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
                     href="https://mp3tag.js.org/"
                     target="_blank"
                     rel="noreferrer"
-                    className="text-primary underline-offset-4 hover:underline"
+                    className="cursor-pointer text-primary underline-offset-4 hover:underline"
                   >
                     mp3tag.js
                   </a>
@@ -167,7 +169,7 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
               target="_blank"
               rel="noreferrer"
               aria-label="GitHub"
-              className="inline-flex size-12 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+              className="inline-flex size-12 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -189,7 +191,7 @@ export default function SettingsPage({ settings, onChange }: SettingsPageProps) 
               target="_blank"
               rel="noreferrer"
               aria-label="Twitter"
-              className="inline-flex size-12 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+              className="inline-flex size-12 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
