@@ -6,6 +6,7 @@ const soundCloudSetSchema = z.object({
   artist: z.string(),
   genre: z.string(),
   year: z.number().optional(),
+  isAlbum: z.boolean(),
   coverUrl: z.string().optional(),
   tracks: z.array(
     z.object({
