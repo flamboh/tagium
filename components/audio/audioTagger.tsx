@@ -18,6 +18,7 @@ import {
   applyAlbumSharedTagsToFiles,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
+  applySoundCloudSetImportedCover,
   prepareDownloadedTrackHydration,
   resolveDownloadedTrackHydrationWrite,
   resolveDownloadedTrackHydrationWriteError,
