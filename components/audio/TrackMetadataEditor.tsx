@@ -39,9 +39,13 @@ export default function TrackMetadataEditor({
   syncFilenames,
   syncTrackNumbers,
 }: TrackMetadataEditorProps) {
-  const watchedTitle = useWatch({ control, name: "title" });
+  const watchedTitle = useWatch({ control, name: "title", defaultValue: "" });
+  const watchedFilename = useWatch({ control, name: "filename", defaultValue: "" });
   const inAlbum = !!selectedFileAlbum;
   const audioReady = Boolean(selectedFile?.file);
+  const filenameInputSize = Math.max(watchedFilename.length, "bangarang".length);
+  const placeholderClassName = "placeholder:text-muted-foreground/45";
+  const syncedInputClassName = "disabled:border-dashed disabled:bg-muted/10 disabled:opacity-100";
 
   if (!selectedFile || !selectedFile.metadata) {
     return (
@@ -88,34 +92,54 @@ export default function TrackMetadataEditor({
             <div className="flex flex-1 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3">
               <div>
                 <label className="mb-1 block text-xs font-medium md:text-sm">filename:</label>
-                <div
-                  className={`flex items-center h-9 w-full rounded-md border border-input bg-transparent dark:bg-input/30 px-3 py-1 text-base shadow-sm transition-colors md:text-sm ${syncFilenames ? "opacity-50 cursor-not-allowed pointer-events-none" : "focus-within:ring-1 focus-within:ring-ring"}`}
+                <label
+                  className={`flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors dark:bg-input/30 md:text-sm ${syncFilenames ? "cursor-not-allowed border-dashed bg-muted/10 text-muted-foreground dark:bg-muted/10" : "focus-within:ring-1 focus-within:ring-ring"}`}
                 >
                   {syncFilenames ? (
-                    <span className="flex-1 min-w-0 truncate text-muted-foreground">
-                      {filenamify(watchedTitle || "", { replacement: "-" })}
+                    <span className="inline-flex min-w-0 max-w-full items-center">
+                      <span className="min-w-0 truncate">
+                        {filenamify(watchedTitle, { replacement: "-" })}
+                      </span>
+                      <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
                     </span>
                   ) : (
-                    <input
-                      {...register("filename")}
-                      className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground min-w-0"
-                      placeholder="bangarang"
-                    />
+                    <span className="inline-flex min-w-0 flex-1 items-center">
+                      <input
+                        {...register("filename")}
+                        size={filenameInputSize}
+                        className="min-w-[1ch] max-w-[calc(100%-2.25rem)] bg-transparent outline-none placeholder:text-muted-foreground/45"
+                        placeholder="bangarang"
+                      />
+                      <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
+                    </span>
                   )}
-                  <span className="text-muted-foreground select-none">.mp3</span>
-                </div>
+                </label>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium md:text-sm">title:</label>
-                <Input {...register("title")} placeholder="Bangarang" />
+                <Input
+                  {...register("title")}
+                  placeholder="Bangarang"
+                  className={placeholderClassName}
+                />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium md:text-sm">artist:</label>
-                <Input {...register("artist")} placeholder="Skrillex" disabled={inAlbum} />
+                <Input
+                  {...register("artist")}
+                  placeholder="Skrillex"
+                  disabled={inAlbum}
+                  className={`${placeholderClassName} ${syncedInputClassName}`}
+                />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium md:text-sm">album:</label>
-                <Input {...register("album")} placeholder="Bangarang EP" disabled={inAlbum} />
+                <Input
+                  {...register("album")}
+                  placeholder="Bangarang EP"
+                  disabled={inAlbum}
+                  className={`${placeholderClassName} ${syncedInputClassName}`}
+                />
               </div>
               <div className="grid grid-cols-[minmax(4.5rem,0.8fr)_minmax(0,1.4fr)_minmax(4.5rem,0.8fr)] gap-2">
                 <div>
@@ -125,12 +149,17 @@ export default function TrackMetadataEditor({
                     {...register("year", { valueAsNumber: true })}
                     placeholder="2011"
                     disabled={inAlbum}
-                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                   />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium md:text-sm">genre:</label>
-                  <Input {...register("genre")} placeholder="Dubstep" disabled={inAlbum} />
+                  <Input
+                    {...register("genre")}
+                    placeholder="Dubstep"
+                    disabled={inAlbum}
+                    className={`${placeholderClassName} ${syncedInputClassName}`}
+                  />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium md:text-sm">track:</label>
@@ -139,7 +168,7 @@ export default function TrackMetadataEditor({
                     {...register("trackNumber", { valueAsNumber: true })}
                     placeholder="2"
                     disabled={inAlbum && syncTrackNumbers}
-                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                   />
                 </div>
               </div>
@@ -167,7 +196,7 @@ export default function TrackMetadataEditor({
                     "download canceled"}
                 </div>
               </div>
-              <div className="flex min-h-0 flex-1 items-center justify-center gap-2 pt-1 max-lg:[@media(max-height:700px)]:flex-none max-lg:[@media(max-height:700px)]:pt-0 lg:flex-none lg:justify-end lg:pt-2">
+              <div className="flex min-h-0 flex-1 items-center justify-end gap-2 pt-1 max-lg:[@media(max-height:700px)]:flex-none max-lg:[@media(max-height:700px)]:pt-0 lg:flex-none lg:pt-2">
                 <Button
                   type="button"
                   onClick={handleSubmit(onDownloadUpdatedFile)}
