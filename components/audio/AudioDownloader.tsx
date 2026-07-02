@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Loader2, Link } from "lucide-react";
+import { ArrowRight, Loader2, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getDownloadErrorMessage } from "./downloadErrorMessage";
@@ -75,7 +75,7 @@ export default function AudioDownloader({
               }
             }}
             placeholder="paste media url"
-            className="pl-9"
+            className="pl-9 placeholder:text-muted-foreground/45"
             disabled={downloading}
           />
         </div>
@@ -83,11 +83,11 @@ export default function AudioDownloader({
           type="button"
           size="icon"
           disabled={!canDownload}
-          aria-label="download audio"
+          aria-label="start media import"
           onClick={() => void handleDownload()}
         >
           {downloading && <Loader2 className="animate-spin" />}
-          {!downloading && <Download />}
+          {!downloading && <ArrowRight />}
         </Button>
       </div>
       {progress && (
