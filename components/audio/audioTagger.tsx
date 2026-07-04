@@ -1717,14 +1717,20 @@ export default function AudioTagger() {
           onReorderAlbums={handleReorderAlbums}
           playlistDownloadQueue={playlistSidebarQueue}
           onDownloadAll={handleDownloadAll}
-          onOpenSettings={() => setActiveView("settings")}
+          onOpenSettings={() =>
+            setActiveView((currentView) => (currentView === "settings" ? "editor" : "settings"))
+          }
           onCancelPlaylistDownloadQueue={handleCancelPlaylistDownloads}
           onRetryPlaylistDownloadQueue={handleRetryPlaylistDownloads}
         />
         <div className="relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1">
           <div className="h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1">
             {activeView === "settings" ? (
-              <SettingsPage settings={settings} onChange={handleSettingsChange} />
+              <SettingsPage
+                settings={settings}
+                onChange={handleSettingsChange}
+                onBack={() => setActiveView("editor")}
+              />
             ) : libraryIsEmpty ? (
               <LandingScreen
                 onAudioUpload={handleAudioUpload}

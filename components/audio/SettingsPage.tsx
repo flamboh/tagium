@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -12,15 +12,28 @@ import type { AppSettings } from "./types";
 interface SettingsPageProps {
   settings: AppSettings;
   onChange: (settings: AppSettings) => void;
+  onBack: () => void;
 }
 
-export default function SettingsPage({ settings, onChange }: SettingsPageProps) {
+export default function SettingsPage({ settings, onChange, onBack }: SettingsPageProps) {
   const [bitrateOpen, setBitrateOpen] = useState(false);
 
   return (
     <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
       <div className="p-6 h-[104px] border-b flex-shrink-0 flex flex-col justify-center gap-1">
-        <h2 className="text-lg font-semibold truncate">settings</h2>
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center text-primary/80 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            onClick={onBack}
+            aria-label="back to editor"
+          >
+            <ArrowLeft className="size-5" />
+          </button>
+          <h2 className="relative -top-px truncate text-lg font-semibold leading-tight">
+            settings
+          </h2>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-xl flex flex-col gap-6">
