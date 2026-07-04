@@ -5,6 +5,7 @@ import {
   applyAlbumSharedTagsToFiles,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
+  areAlbumTrackCoversSynced,
   prepareDownloadedTrackHydration,
   resolveDownloadedTrackHydrationWrite,
   resolveDownloadedTrackHydrationWriteError,
@@ -209,6 +210,85 @@ describe("fileMetadataOps", () => {
     expect(result[1].metadata?.picture).toEqual(albumCover);
     expect(result[1].hasBufferedChanges).toBe(true);
     expect(result[2]).toBe(files[2]);
+  });
+
+  it("detects album cover sync by comparing image format and bytes", () => {
+    const albumCover = [
+      {
+        format: "image/jpeg",
+        type: 3,
+        description: "album cover",
+        data: new Uint8Array([1, 2, 3]),
+      },
+    ];
+    const files = [
+      readyFile({
+        id: "track-1",
+        metadata: metadata({ picture: albumCover }),
+      }),
+      readyFile({
+        id: "track-2",
+        metadata: metadata({
+          picture: [
+            {
+              format: "image/jpeg",
+              type: 3,
+              description: "same bytes",
+              data: new Uint8Array([1, 2, 3]),
+            },
+          ],
+        }),
+      }),
+    ];
+
+    expect(areAlbumTrackCoversSynced(files, ["track-1", "track-2"], albumCover)).toBe(true);
+  });
+
+  it("treats divergent track cover bytes as not synced with the album cover", () => {
+    const albumCover = [
+      {
+        format: "image/jpeg",
+        type: 3,
+        description: "album cover",
+        data: new Uint8Array([1, 2, 3]),
+      },
+    ];
+    const files = [
+      readyFile({
+        id: "track-1",
+        metadata: metadata({ picture: albumCover }),
+      }),
+      readyFile({
+        id: "track-2",
+        metadata: metadata({
+          picture: [
+            {
+              format: "image/jpeg",
+              type: 3,
+              description: "custom cover",
+              data: new Uint8Array([1, 2, 4]),
+            },
+          ],
+        }),
+      }),
+    ];
+
+    expect(areAlbumTrackCoversSynced(files, ["track-1", "track-2"], albumCover)).toBe(false);
+  });
+
+  it("treats all missing track covers as synced with a missing album cover", () => {
+    const files = [
+      readyFile({
+        id: "track-1",
+        metadata: metadata({ picture: [] }),
+      }),
+      readyFile({
+        id: "track-2",
+        metadata: metadata({ picture: [] }),
+      }),
+    ];
+
+    expect(areAlbumTrackCoversSynced(files, ["track-1", "track-2"], undefined)).toBe(true);
   });
 
   it("returns selected metadata with applied cover after buffering dirty form metadata", () => {

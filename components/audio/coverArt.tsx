@@ -15,6 +15,7 @@ interface CoverArtProps {
     type?: number;
   }[];
   onCoverUpload?: (file: File) => void;
+  coverOverlay?: React.ReactNode;
   size?: "default" | "compact";
   resetKey?: string | null;
 }
@@ -22,6 +23,7 @@ interface CoverArtProps {
 export default function CoverArt({
   picture,
   onCoverUpload,
+  coverOverlay,
   size = "default",
   resetKey,
 }: CoverArtProps) {
@@ -165,11 +167,12 @@ export default function CoverArt({
             </PopoverContent>
           </Popover>
         )}
+        {coverSrc && coverOverlay}
       </div>
       <div
         className={
           isCompact
-            ? "flex min-w-0 flex-1 md:mt-auto md:block md:flex-none md:pt-2"
+            ? "flex min-w-0 flex-1"
             : "flex w-[min(80vw,clamp(7.5rem,calc(75svh-25.3125rem),19.25rem))] max-lg:[@media(max-height:700px)]:w-24 lg:w-auto lg:flex-none lg:flex-col lg:gap-2"
         }
       >
@@ -185,7 +188,7 @@ export default function CoverArt({
           variant="outline"
           className={
             isCompact
-              ? "h-24 w-full border-dashed border-2 flex flex-col items-center gap-1 px-2 hover:bg-accent/50 cursor-pointer md:h-10 md:w-44 md:flex-row md:gap-2 md:px-3"
+              ? "h-24 w-full border-dashed border-2 flex flex-col items-center gap-1 px-2 hover:bg-accent/50 cursor-pointer md:h-full md:min-h-12 md:w-44 md:px-3"
               : "h-10 w-full border-dashed border-2 flex gap-2 px-3 hover:bg-accent/50 cursor-pointer max-lg:[@media(max-height:700px)]:gap-1 lg:h-24 lg:w-64 lg:flex-col"
           }
           onClick={() => fileInputRef.current?.click()}

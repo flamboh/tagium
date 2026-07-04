@@ -1,5 +1,10 @@
 import AudioTagger from "@/components/audio/audioTagger";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export default function App() {
-  return <AudioTagger />;
+  return (
+    <TooltipProvider>
+      <AudioTagger />
+    </TooltipProvider>
+  );
 }

@@ -19,6 +19,7 @@ import {
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
   applySoundCloudSetImportedCover,
+  areAlbumTrackCoversSynced,
   prepareDownloadedTrackHydration,
   resolveDownloadedTrackHydrationWrite,
   resolveDownloadedTrackHydrationWriteError,
@@ -1409,7 +1410,7 @@ export default function AudioTagger() {
   const closeAlbumDialog = () => {
     setAlbumDialogOpen(false);
   };
-  const applyAlbumDraftCoverToTracks = () => {
+  const syncAlbumDraftCoverToTracks = () => {
     if (albumDialogMode !== "edit" || !editingAlbumId || !albumDraft.cover) return;
     if (albumDraft.cover.length === 0) return;
 
@@ -1442,17 +1443,40 @@ export default function AudioTagger() {
       year: albumDraft.year,
     };
     if (albumDialogMode === "edit" && editingAlbumId) {
-      const updatedAlbums = updateAlbumMetadata(albums, editingAlbumId, metadata);
+      const currentAlbum = albumsRef.current.find((album) => album.id === editingAlbumId);
+      const updatedAlbums = updateAlbumMetadata(albumsRef.current, editingAlbumId, metadata);
+      albumsRef.current = updatedAlbums;
       setAlbums(updatedAlbums);
       const updatedAlbum = updatedAlbums.find((album) => album.id === editingAlbumId) ?? null;
       if (updatedAlbum) {
-        setFiles((prevFiles) => {
-          const taggedFiles = applyAlbumSharedTagsToFiles(prevFiles, updatedAlbum);
-          if (settings.syncFilenames) {
-            return applySyncedFilenamesToFiles(taggedFiles, updatedAlbum.trackIds);
+        const bufferedFiles = applyCurrentFormMetadataToFiles(
+          filesRef.current,
+          updatedAlbum.trackIds,
+        );
+        const shouldSyncCover =
+          Boolean(updatedAlbum.cover && updatedAlbum.cover.length > 0) &&
+          areAlbumTrackCoversSynced(bufferedFiles, updatedAlbum.trackIds, currentAlbum?.cover);
+        let taggedFiles = applyAlbumSharedTagsToFiles(bufferedFiles, updatedAlbum);
+
+        if (settings.syncFilenames) {
+          taggedFiles = applySyncedFilenamesToFiles(taggedFiles, updatedAlbum.trackIds);
+        }
+
+        if (shouldSyncCover && updatedAlbum.cover) {
+          const covered = applyAlbumCoverToFilesWithSelectedMetadata(
+            taggedFiles,
+            updatedAlbum.trackIds,
+            updatedAlbum.cover,
+            selectedFileIdRef.current,
+          );
+          taggedFiles = covered.files;
+          if (covered.selectedMetadata) {
+            reset(covered.selectedMetadata);
           }
-          return taggedFiles;
-        });
+        }
+
+        filesRef.current = taggedFiles;
+        setFiles(taggedFiles);
       }
       closeAlbumDialog();
       return;
@@ -1629,7 +1653,7 @@ export default function AudioTagger() {
         onChange={setAlbumDraft}
         onClose={closeAlbumDialog}
         onSave={saveAlbumDialog}
-        onApplyCover={applyAlbumDraftCoverToTracks}
+        onSyncCoverToTracks={syncAlbumDraftCoverToTracks}
         onDelete={
           albumDialogMode === "edit" && editingAlbumId
             ? () => {

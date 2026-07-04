@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CoverArt from "./coverArt";
 import { AudioMetadata } from "./types";
 
@@ -31,7 +33,7 @@ interface AlbumMetadataDialogProps {
   onClose: () => void;
   onSave: () => void;
   onDelete?: () => void;
-  onApplyCover?: () => void;
+  onSyncCoverToTracks?: () => Promise<void> | void;
 }
 
 export default function AlbumMetadataDialog({
@@ -43,11 +45,31 @@ export default function AlbumMetadataDialog({
   onClose,
   onSave,
   onDelete,
-  onApplyCover,
+  onSyncCoverToTracks,
 }: AlbumMetadataDialogProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
-  const canApplyCover = mode === "edit" && draft.cover && draft.cover.length > 0 && onApplyCover;
+  const [isSyncingCover, setIsSyncingCover] = useState(false);
+  const [syncCoverRotation, setSyncCoverRotation] = useState(0);
+  const canSyncCoverToTracks =
+    mode === "edit" && draft.cover && draft.cover.length > 0 && onSyncCoverToTracks;
+  const syncCoverLabel = isSyncingCover ? "syncing cover to tracks" : "sync cover to tracks";
+
+  const handleSyncCoverToTracks = () => {
+    if (!onSyncCoverToTracks) return;
+    if (isSyncingCover) return;
+
+    const startedAt = performance.now();
+    setSyncCoverRotation((rotation) => rotation + 360);
+    setIsSyncingCover(true);
+    const result = onSyncCoverToTracks();
+
+    void Promise.resolve(result).finally(() => {
+      const elapsed = performance.now() - startedAt;
+      const remaining = Math.max(0, 650 - elapsed);
+      window.setTimeout(() => setIsSyncingCover(false), remaining);
+    });
+  };
 
   const handleCoverUpload = (file: File) => {
     const reader = new FileReader();
@@ -100,7 +122,38 @@ export default function AlbumMetadataDialog({
           </DialogHeader>
           <div className="p-5 overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-[11rem_minmax(0,1fr)] gap-4 md:min-h-[236px] items-stretch">
-              <CoverArt picture={draft.cover} onCoverUpload={handleCoverUpload} size="compact" />
+              <CoverArt
+                picture={draft.cover}
+                onCoverUpload={handleCoverUpload}
+                size="compact"
+                coverOverlay={
+                  canSyncCoverToTracks && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          aria-label={syncCoverLabel}
+                          aria-busy={isSyncingCover}
+                          className="absolute bottom-2 left-2 size-10 p-0 max-lg:[@media(max-height:700px)]:bottom-1.5 max-lg:[@media(max-height:700px)]:left-1.5"
+                          disabled={isSyncingCover}
+                          onClick={handleSyncCoverToTracks}
+                        >
+                          <RefreshCw
+                            data-icon="inline-start"
+                            style={{
+                              transform: `rotate(${syncCoverRotation}deg)`,
+                              transition: "transform 0.6s cubic-bezier(0.87, 0, 0.13, 1)",
+                            }}
+                          />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">{syncCoverLabel}</TooltipContent>
+                    </Tooltip>
+                  )
+                }
+              />
               <div className="min-w-0 h-full flex flex-col justify-between gap-3">
                 <div className="flex flex-col gap-3">
                   <div>
@@ -199,11 +252,6 @@ export default function AlbumMetadataDialog({
                     onClick={() => setShowDeleteConfirm(true)}
                   >
                     delete album
-                  </Button>
-                )}
-                {canApplyCover && (
-                  <Button type="button" variant="outline" onClick={onApplyCover}>
-                    apply cover to tracks
                   </Button>
                 )}
                 <Button type="button" variant="outline" onClick={onClose}>

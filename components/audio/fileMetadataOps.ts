@@ -153,6 +153,39 @@ export function applyAlbumCoverToFilesWithSelectedMetadata(
   };
 }
 
+function arePicturesEqual(
+  firstPicture: AudioMetadata["picture"] | undefined,
+  secondPicture: AudioMetadata["picture"] | undefined,
+) {
+  const [firstCover] = firstPicture ?? [];
+  const [secondCover] = secondPicture ?? [];
+
+  if (!firstCover || !secondCover) return !firstCover && !secondCover;
+  if (firstCover.format !== secondCover.format) return false;
+  if (firstCover.data.length !== secondCover.data.length) return false;
+
+  for (let index = 0; index < firstCover.data.length; index += 1) {
+    if (firstCover.data[index] !== secondCover.data[index]) return false;
+  }
+
+  return true;
+}
+
+export function areAlbumTrackCoversSynced(
+  files: TagiumFile[],
+  trackIds: string[],
+  albumCover: AudioMetadata["picture"] | undefined,
+) {
+  if (trackIds.length === 0) return false;
+
+  return trackIds.every((trackId) => {
+    const file = files.find((currentFile) => currentFile.id === trackId);
+    if (!file?.metadata) return false;
+
+    return arePicturesEqual(file.metadata.picture, albumCover);
+  });
+}
+
 export function applySoundCloudSetImportedCover(
   files: TagiumFile[],
   albums: AlbumGroup[],
