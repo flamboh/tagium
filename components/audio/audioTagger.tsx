@@ -68,6 +68,7 @@ import {
   createPendingDownloadTrack,
   fetchImportedCover,
 } from "./soundcloudSetImport";
+import { getSampleAlbum } from "./sampleMetadata";
 import type { SoundCloudSet } from "./soundcloudSet";
 import { AlbumGroup, AppSettings, AudioMetadata, ImportedAlbumMetadata, TagiumFile } from "./types";
 
@@ -145,6 +146,7 @@ export default function AudioTagger() {
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [albumDialogMode, setAlbumDialogMode] = useState<"create" | "edit">("create");
   const [albumDraft, setAlbumDraft] = useState<AlbumMetadataDraft>(EMPTY_ALBUM_DRAFT);
+  const [albumPlaceholderSeed, setAlbumPlaceholderSeed] = useState("new-album");
   const [editingAlbumId, setEditingAlbumId] = useState<string | null>(null);
   const [createSeedTrackIds, setCreateSeedTrackIds] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<ActiveView>("editor");
@@ -1393,6 +1395,7 @@ export default function AudioTagger() {
     setAlbumDialogMode("create");
     setEditingAlbumId(null);
     setCreateSeedTrackIds(uniqueSeedTrackIds);
+    setAlbumPlaceholderSeed(uniqueSeedTrackIds[0] ?? crypto.randomUUID());
     setAlbumDraft({
       title: "",
       artist: uniqueSeedTrackIds.length > 0 ? seedTrack?.metadata?.artist || "" : "",
@@ -1424,6 +1427,7 @@ export default function AudioTagger() {
     if (!album) return;
     setAlbumDialogMode("edit");
     setEditingAlbumId(albumId);
+    setAlbumPlaceholderSeed(albumId);
     setCreateSeedTrackIds([]);
     setAlbumDraft({
       title: album.title,
@@ -1672,6 +1676,7 @@ export default function AudioTagger() {
         open={albumDialogOpen}
         mode={albumDialogMode}
         draft={albumDraft}
+        placeholder={getSampleAlbum(albumPlaceholderSeed)}
         trackCount={
           albumDialogMode === "edit" && editingAlbumId
             ? (albums.find((a) => a.id === editingAlbumId)?.trackIds.length ?? 0)

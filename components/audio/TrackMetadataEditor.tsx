@@ -15,6 +15,7 @@ import { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { getSampleTrack } from "./sampleMetadata";
 
 interface TrackMetadataEditorProps {
   selectedFile: TagiumFile | null;
@@ -78,7 +79,6 @@ export default function TrackMetadataEditor({
   const titleRegistration = register("title", {
     onChange: (event) => onPreviewMetadataChange("title", event),
   });
-  const filenamePlaceholder = "Bangarang";
   const placeholderClassName = "placeholder:text-muted-foreground/45";
   const syncedInputClassName =
     "disabled:pointer-events-auto disabled:cursor-not-allowed disabled:border-dashed disabled:bg-muted/10 disabled:text-muted-foreground disabled:opacity-100 dark:disabled:bg-muted/10";
@@ -92,6 +92,9 @@ export default function TrackMetadataEditor({
       </div>
     );
   }
+
+  const placeholder = getSampleTrack(selectedFile.id);
+  const filenamePlaceholder = placeholder.filename;
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -156,7 +159,7 @@ export default function TrackMetadataEditor({
                 <label className="mb-1 block text-xs font-medium md:text-sm">title:</label>
                 <Input
                   {...titleRegistration}
-                  placeholder="Bangarang"
+                  placeholder={placeholder.title}
                   className={placeholderClassName}
                 />
               </div>
@@ -165,7 +168,7 @@ export default function TrackMetadataEditor({
                 <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
                   <Input
                     {...register("artist")}
-                    placeholder="Skrillex"
+                    placeholder={placeholder.artist}
                     disabled={inAlbum}
                     className={`${placeholderClassName} ${syncedInputClassName}`}
                   />
@@ -176,7 +179,7 @@ export default function TrackMetadataEditor({
                 <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
                   <Input
                     {...register("album")}
-                    placeholder="Bangarang EP"
+                    placeholder={placeholder.album}
                     disabled={inAlbum}
                     className={`${placeholderClassName} ${syncedInputClassName}`}
                   />
@@ -189,7 +192,7 @@ export default function TrackMetadataEditor({
                     <Input
                       type="number"
                       {...register("year", { valueAsNumber: true })}
-                      placeholder="2011"
+                      placeholder={placeholder.year}
                       disabled={inAlbum}
                       className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                     />
@@ -200,7 +203,7 @@ export default function TrackMetadataEditor({
                   <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
                     <Input
                       {...register("genre")}
-                      placeholder="Dubstep"
+                      placeholder={placeholder.genre}
                       disabled={inAlbum}
                       className={`${placeholderClassName} ${syncedInputClassName}`}
                     />
@@ -215,7 +218,7 @@ export default function TrackMetadataEditor({
                     <Input
                       type="number"
                       {...register("trackNumber", { valueAsNumber: true })}
-                      placeholder="2"
+                      placeholder={placeholder.trackNumber}
                       disabled={inAlbum && syncTrackNumbers}
                       className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                     />
