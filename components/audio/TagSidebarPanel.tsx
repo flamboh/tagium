@@ -10,6 +10,7 @@ import PlaylistDownloadQueuePanel, {
 } from "./PlaylistDownloadQueuePanel";
 import { AlbumGroup, TagiumFile } from "./types";
 import { Button } from "../ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 interface TagSidebarPanelProps {
   loading: boolean;
@@ -84,6 +85,11 @@ export default function TagSidebarPanel({
   const dragCounterRef = useRef(0);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const canDownloadAll = files.length > 0 && files.every((file) => file.file && file.metadata);
+  const downloadAllReason = loading
+    ? "download in progress"
+    : files.length === 0
+      ? "add tracks first"
+      : "tracks need files and metadata";
 
   const isFileDrag = (event: React.DragEvent<HTMLDivElement>) =>
     event.dataTransfer.types.includes("Files");
@@ -176,9 +182,22 @@ export default function TagSidebarPanel({
       />
 
       <div className="px-3 py-3 border-t flex-shrink-0 flex flex-col gap-2">
-        <Button className="w-full" onClick={onDownloadAll} disabled={!canDownloadAll || loading}>
-          {loading ? "downloading..." : "download all"}
-        </Button>
+        {canDownloadAll && !loading ? (
+          <Button className="w-full" onClick={onDownloadAll}>
+            download all
+          </Button>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="block">
+                <Button className="w-full" onClick={onDownloadAll} disabled>
+                  {loading ? "downloading..." : "download all"}
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{downloadAllReason}</TooltipContent>
+          </Tooltip>
+        )}
         <Button
           variant="outline"
           className={cn(

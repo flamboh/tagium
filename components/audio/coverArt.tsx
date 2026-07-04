@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import ImageCropper from "../ui/image-cropper";
 import { Crop, Upload } from "lucide-react";
 
@@ -133,25 +134,32 @@ export default function CoverArt({
         )}
         {coverSrc && (
           <Popover open={showCropper} onOpenChange={setShowCropper}>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                aria-label="crop cover art"
-                className="absolute top-2 right-2 size-10 p-0 max-lg:[@media(max-height:700px)]:top-1.5 max-lg:[@media(max-height:700px)]:right-1.5"
-                onClick={() => {
-                  if (tempImageForCropping) {
-                    URL.revokeObjectURL(tempImageForCropping);
-                  }
-                  // Use uploaded cover first, then fall back to original picture
-                  const imageUrl = uploadedCover ? URL.createObjectURL(uploadedCover) : coverSrc;
-                  setTempImageForCropping(imageUrl);
-                }}
-              >
-                <Crop className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
+            <Tooltip>
+              <PopoverTrigger asChild>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    aria-label="crop cover art"
+                    className="absolute top-2 right-2 size-10 p-0 max-lg:[@media(max-height:700px)]:top-1.5 max-lg:[@media(max-height:700px)]:right-1.5"
+                    onClick={() => {
+                      if (tempImageForCropping) {
+                        URL.revokeObjectURL(tempImageForCropping);
+                      }
+                      // Use uploaded cover first, then fall back to original picture
+                      const imageUrl = uploadedCover
+                        ? URL.createObjectURL(uploadedCover)
+                        : coverSrc;
+                      setTempImageForCropping(imageUrl);
+                    }}
+                  >
+                    <Crop className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+              </PopoverTrigger>
+              <TooltipContent>crop cover art</TooltipContent>
+            </Tooltip>
             <PopoverContent
               className="w-auto max-w-[calc(100svw-1rem)] p-3 md:p-4"
               side="bottom"

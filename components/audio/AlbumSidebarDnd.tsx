@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { AlbumCoverThumb } from "./AlbumCoverThumb";
 import type { AlbumGroup, TagiumFile } from "./types";
@@ -315,27 +316,41 @@ export function SortableAlbumCard({
             </div>
           </div>
         </button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={onDownload}
-          disabled={!canDownload}
-          aria-label={`download ${album.title}`}
-        >
-          <Download className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={onEdit}
-          aria-label={`edit ${album.title}`}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={onDownload}
+                disabled={!canDownload}
+                aria-label={`download ${album.title}`}
+              >
+                <Download className="h-3.5 w-3.5" />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            {canDownload ? "download album" : "album needs ready tracks"}
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={onEdit}
+              aria-label={`edit ${album.title}`}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>edit album</TooltipContent>
+        </Tooltip>
       </div>
       {children}
     </div>

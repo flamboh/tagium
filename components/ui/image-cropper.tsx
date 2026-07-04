@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from "react-image-crop";
 import { Button } from "./button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 import "react-image-crop/dist/ReactCrop.css";
 
 interface ImageCropperProps {
@@ -114,9 +115,20 @@ export default function ImageCropper({ src, onCrop, onCancel }: ImageCropperProp
         <Button variant="outline" onClick={onCancel}>
           cancel
         </Button>
-        <Button onClick={handleCrop} disabled={!completedCrop}>
-          apply crop
-        </Button>
+        {completedCrop ? (
+          <Button onClick={handleCrop}>apply crop</Button>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <Button onClick={handleCrop} disabled>
+                  apply crop
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>select a crop area first</TooltipContent>
+          </Tooltip>
+        )}
       </div>
     </div>
   );
