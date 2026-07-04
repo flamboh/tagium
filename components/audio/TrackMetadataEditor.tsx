@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import {
   Control,
   Controller,
@@ -14,6 +14,7 @@ import CoverArt from "./coverArt";
 import { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 interface TrackMetadataEditorProps {
   selectedFile: TagiumFile | null;
@@ -30,6 +31,27 @@ interface TrackMetadataEditorProps {
     field: "filename" | "title",
     event: ChangeEvent<HTMLInputElement>,
   ) => void;
+}
+
+function DisabledReason({
+  disabled,
+  reason,
+  children,
+}: {
+  disabled: boolean;
+  reason: string;
+  children: ReactNode;
+}) {
+  if (!disabled) return children;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="block">{children}</span>
+      </TooltipTrigger>
+      <TooltipContent>{reason}</TooltipContent>
+    </Tooltip>
+  );
 }
 
 export default function TrackMetadataEditor({
@@ -49,6 +71,7 @@ export default function TrackMetadataEditor({
   const watchedFilename = useWatch({ control, name: "filename", defaultValue: "" });
   const inAlbum = !!selectedFileAlbum;
   const audioReady = Boolean(selectedFile?.file);
+  const albumFieldReason = "controlled by the album";
   const filenameRegistration = register("filename", {
     onChange: (event) => onPreviewMetadataChange("filename", event),
   });
@@ -80,10 +103,15 @@ export default function TrackMetadataEditor({
       >
         <div className="h-16 border-b flex-shrink-0 flex flex-col justify-center gap-1 px-4 max-lg:[@media(max-height:700px)]:h-12 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:p-6">
           {syncFilenames ? (
-            <h2 className="inline-flex min-w-0 max-w-full items-center text-base font-semibold max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
-              <span className="min-w-0 truncate">
-                {filenamify(watchedTitle, { replacement: "-" })}
-              </span>
+            <h2 className="inline-flex min-w-0 max-w-full items-center text-base font-semibold text-muted-foreground max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="min-w-0 cursor-not-allowed truncate">
+                    {filenamify(watchedTitle, { replacement: "-" })}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>filename follows the title</TooltipContent>
+              </Tooltip>
               <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
             </h2>
           ) : (
@@ -134,51 +162,64 @@ export default function TrackMetadataEditor({
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium md:text-sm">artist:</label>
-                <Input
-                  {...register("artist")}
-                  placeholder="Skrillex"
-                  disabled={inAlbum}
-                  className={`${placeholderClassName} ${syncedInputClassName}`}
-                />
+                <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
+                  <Input
+                    {...register("artist")}
+                    placeholder="Skrillex"
+                    disabled={inAlbum}
+                    className={`${placeholderClassName} ${syncedInputClassName}`}
+                  />
+                </DisabledReason>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium md:text-sm">album:</label>
-                <Input
-                  {...register("album")}
-                  placeholder="Bangarang EP"
-                  disabled={inAlbum}
-                  className={`${placeholderClassName} ${syncedInputClassName}`}
-                />
+                <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
+                  <Input
+                    {...register("album")}
+                    placeholder="Bangarang EP"
+                    disabled={inAlbum}
+                    className={`${placeholderClassName} ${syncedInputClassName}`}
+                  />
+                </DisabledReason>
               </div>
               <div className="grid grid-cols-[minmax(4.5rem,0.8fr)_minmax(0,1.4fr)_minmax(4.5rem,0.8fr)] gap-2">
                 <div>
                   <label className="mb-1 block text-xs font-medium md:text-sm">year:</label>
-                  <Input
-                    type="number"
-                    {...register("year", { valueAsNumber: true })}
-                    placeholder="2011"
-                    disabled={inAlbum}
-                    className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-                  />
+                  <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
+                    <Input
+                      type="number"
+                      {...register("year", { valueAsNumber: true })}
+                      placeholder="2011"
+                      disabled={inAlbum}
+                      className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                    />
+                  </DisabledReason>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium md:text-sm">genre:</label>
-                  <Input
-                    {...register("genre")}
-                    placeholder="Dubstep"
-                    disabled={inAlbum}
-                    className={`${placeholderClassName} ${syncedInputClassName}`}
-                  />
+                  <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
+                    <Input
+                      {...register("genre")}
+                      placeholder="Dubstep"
+                      disabled={inAlbum}
+                      className={`${placeholderClassName} ${syncedInputClassName}`}
+                    />
+                  </DisabledReason>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium md:text-sm">track:</label>
-                  <Input
-                    type="number"
-                    {...register("trackNumber", { valueAsNumber: true })}
-                    placeholder="2"
+                  <DisabledReason
                     disabled={inAlbum && syncTrackNumbers}
-                    className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-                  />
+                    reason="follows album order"
+                  >
+                    <Input
+                      type="number"
+                      {...register("trackNumber", { valueAsNumber: true })}
+                      placeholder="2"
+                      disabled={inAlbum && syncTrackNumbers}
+                      className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                    />
+                  </DisabledReason>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs md:text-sm">
@@ -206,14 +247,16 @@ export default function TrackMetadataEditor({
                 </div>
               </div>
               <div className="flex min-h-0 flex-1 items-center justify-end gap-2 pt-1 max-lg:[@media(max-height:700px)]:flex-none max-lg:[@media(max-height:700px)]:pt-0 lg:flex-none lg:pt-2">
-                <Button
-                  type="button"
-                  onClick={handleSubmit(onDownloadUpdatedFile)}
-                  disabled={!audioReady}
-                  className="min-w-36 max-lg:[@media(max-height:700px)]:h-10 max-lg:[@media(max-height:700px)]:text-xs"
-                >
-                  download track
-                </Button>
+                <DisabledReason disabled={!audioReady} reason="track file is not ready">
+                  <Button
+                    type="button"
+                    onClick={handleSubmit(onDownloadUpdatedFile)}
+                    disabled={!audioReady}
+                    className="min-w-36 max-lg:[@media(max-height:700px)]:h-10 max-lg:[@media(max-height:700px)]:text-xs"
+                  >
+                    download track
+                  </Button>
+                </DisabledReason>
               </div>
             </div>
           </div>
