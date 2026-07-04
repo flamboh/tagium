@@ -1,5 +1,6 @@
 "use client";
 
+import type { ChangeEvent } from "react";
 import {
   Control,
   Controller,
@@ -25,6 +26,10 @@ interface TrackMetadataEditorProps {
   selectedFileAlbum: AlbumGroup | undefined;
   syncFilenames: boolean;
   syncTrackNumbers: boolean;
+  onPreviewMetadataChange: (
+    field: "filename" | "title",
+    event: ChangeEvent<HTMLInputElement>,
+  ) => void;
 }
 
 export default function TrackMetadataEditor({
@@ -38,12 +43,19 @@ export default function TrackMetadataEditor({
   selectedFileAlbum,
   syncFilenames,
   syncTrackNumbers,
+  onPreviewMetadataChange,
 }: TrackMetadataEditorProps) {
   const watchedTitle = useWatch({ control, name: "title", defaultValue: "" });
   const watchedFilename = useWatch({ control, name: "filename", defaultValue: "" });
   const inAlbum = !!selectedFileAlbum;
   const audioReady = Boolean(selectedFile?.file);
-  const filenameInputSize = Math.max(watchedFilename.length, "bangarang".length);
+  const filenameRegistration = register("filename", {
+    onChange: (event) => onPreviewMetadataChange("filename", event),
+  });
+  const titleRegistration = register("title", {
+    onChange: (event) => onPreviewMetadataChange("title", event),
+  });
+  const filenamePlaceholder = "Bangarang";
   const placeholderClassName = "placeholder:text-muted-foreground/45";
   const syncedInputClassName =
     "disabled:pointer-events-auto disabled:cursor-not-allowed disabled:border-dashed disabled:bg-muted/10 disabled:text-muted-foreground disabled:opacity-100 dark:disabled:bg-muted/10";
@@ -67,9 +79,30 @@ export default function TrackMetadataEditor({
         className="flex min-h-0 flex-col h-full"
       >
         <div className="h-16 border-b flex-shrink-0 flex flex-col justify-center gap-1 px-4 max-lg:[@media(max-height:700px)]:h-12 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:p-6">
-          <h2 className="truncate text-base font-semibold max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
-            {selectedFile.filename}
-          </h2>
+          {syncFilenames ? (
+            <h2 className="inline-flex min-w-0 max-w-full items-center text-base font-semibold max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
+              <span className="min-w-0 truncate">
+                {filenamify(watchedTitle, { replacement: "-" })}
+              </span>
+              <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
+            </h2>
+          ) : (
+            <label className="inline-flex min-w-0 max-w-full items-center text-base font-semibold max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
+              <span className="grid w-fit max-w-[calc(100%-2.25rem)] overflow-hidden">
+                <span className="invisible col-start-1 row-start-1 whitespace-pre" aria-hidden>
+                  {watchedFilename || filenamePlaceholder}
+                </span>
+                <input
+                  {...filenameRegistration}
+                  aria-label="filename"
+                  size={1}
+                  className="col-start-1 row-start-1 min-w-0 truncate bg-transparent outline-none placeholder:text-muted-foreground/45"
+                  placeholder={filenamePlaceholder}
+                />
+              </span>
+              <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
+            </label>
+          )}
           {(selectedFile.downloadStatus === "error" || selectedFile.status === "error") &&
             selectedFile.downloadError && (
               <p className="text-xs text-destructive truncate" aria-live="polite">
@@ -92,34 +125,9 @@ export default function TrackMetadataEditor({
             />
             <div className="flex flex-1 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium md:text-sm">filename:</label>
-                <label
-                  className={`flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors dark:bg-input/30 md:text-sm ${syncFilenames ? "cursor-not-allowed border-dashed bg-muted/10 text-muted-foreground dark:bg-muted/10" : "focus-within:ring-1 focus-within:ring-ring"}`}
-                >
-                  {syncFilenames ? (
-                    <span className="inline-flex min-w-0 max-w-full items-center">
-                      <span className="min-w-0 truncate">
-                        {filenamify(watchedTitle, { replacement: "-" })}
-                      </span>
-                      <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex min-w-0 flex-1 items-center">
-                      <input
-                        {...register("filename")}
-                        size={filenameInputSize}
-                        className="min-w-[1ch] max-w-[calc(100%-2.25rem)] bg-transparent outline-none placeholder:text-muted-foreground/45"
-                        placeholder="bangarang"
-                      />
-                      <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
-                    </span>
-                  )}
-                </label>
-              </div>
-              <div>
                 <label className="mb-1 block text-xs font-medium md:text-sm">title:</label>
                 <Input
-                  {...register("title")}
+                  {...titleRegistration}
                   placeholder="Bangarang"
                   className={placeholderClassName}
                 />
