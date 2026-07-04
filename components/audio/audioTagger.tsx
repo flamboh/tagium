@@ -352,6 +352,33 @@ export default function AudioTagger() {
     [getSubmittedMetadata, getValues],
   );
 
+  const handlePreviewMetadataChange = useCallback(
+    (field: "filename" | "title", value: string) => {
+      const selectedId = selectedFileIdRef.current;
+      if (!selectedId) return;
+
+      formDirtyRef.current = true;
+      const submittedData = getSubmittedMetadata({
+        ...getValues(),
+        [field]: value,
+      });
+      const nextFiles = filesRef.current.map((file) =>
+        file.id === selectedId
+          ? {
+              ...file,
+              filename: submittedData.filename ? `${submittedData.filename}.mp3` : file.filename,
+              metadata: submittedData,
+              status: file.status === "saved" ? "pending" : file.status,
+              hasBufferedChanges: true,
+            }
+          : file,
+      );
+      filesRef.current = nextFiles;
+      setFiles(nextFiles);
+    },
+    [getSubmittedMetadata, getValues],
+  );
+
   const bufferCurrentFormMetadata = useCallback(
     (trackIds?: string[]) => {
       const nextFiles = applyCurrentFormMetadataToFiles(filesRef.current, trackIds);
@@ -1716,6 +1743,9 @@ export default function AudioTagger() {
                 selectedFileAlbum={selectedFileAlbum}
                 syncFilenames={settings.syncFilenames}
                 syncTrackNumbers={settings.syncTrackNumbers}
+                onPreviewMetadataChange={(field, event) =>
+                  handlePreviewMetadataChange(field, event.target.value)
+                }
               />
             )}
           </div>
