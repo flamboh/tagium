@@ -19,6 +19,7 @@ interface CoverArtProps {
   coverOverlay?: React.ReactNode;
   size?: "default" | "compact";
   resetKey?: string | null;
+  className?: string;
 }
 
 export default function CoverArt({
@@ -27,6 +28,7 @@ export default function CoverArt({
   coverOverlay,
   size = "default",
   resetKey,
+  className,
 }: CoverArtProps) {
   const [uploadedCover, setUploadedCover] = useState<File | null>(null);
   const [tempImageForCropping, setTempImageForCropping] = useState<string | null>(null);
@@ -67,6 +69,9 @@ export default function CoverArt({
 
   const [coverSrc, setCoverSrc] = useState<string | null>(null);
   const isCompact = size === "compact";
+  const containerClassName = isCompact
+    ? "flex-shrink-0 flex gap-2 md:h-full md:flex-col"
+    : "flex-shrink-0 flex flex-col items-center gap-2 lg:grid lg:grid-rows-2 lg:items-start";
 
   useEffect(() => {
     setUploadedCover(null);
@@ -97,13 +102,7 @@ export default function CoverArt({
   }, [uploadedCover, picture]);
 
   return (
-    <div
-      className={
-        isCompact
-          ? "flex-shrink-0 flex gap-2 md:h-full md:flex-col"
-          : "flex-shrink-0 flex flex-col items-center gap-2 lg:grid lg:grid-rows-2 lg:items-start"
-      }
-    >
+    <div className={className ? `${containerClassName} ${className}` : containerClassName}>
       <div
         className={
           isCompact

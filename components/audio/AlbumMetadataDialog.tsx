@@ -57,6 +57,7 @@ export default function AlbumMetadataDialog({
   const canSyncCoverToTracks =
     mode === "edit" && draft.cover && draft.cover.length > 0 && onSyncCoverToTracks;
   const syncCoverLabel = isSyncingCover ? "syncing cover to tracks" : "sync cover to tracks";
+  const placeholderClassName = "placeholder:text-muted-foreground/45";
 
   const handleSyncCoverToTracks = () => {
     if (!onSyncCoverToTracks) return;
@@ -125,10 +126,80 @@ export default function AlbumMetadataDialog({
           </DialogHeader>
           <div className="p-5 overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-[11rem_minmax(0,1fr)] gap-4 md:min-h-[236px] items-stretch">
+              <div className="order-2 min-w-0 h-full flex flex-col justify-between gap-3 md:order-2">
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">album title:</label>
+                    <Input
+                      value={draft.title}
+                      onChange={(event) =>
+                        onChange({
+                          ...draft,
+                          title: event.target.value,
+                        })
+                      }
+                      placeholder={placeholder.title}
+                      aria-invalid={showErrors && !draft.title.trim()}
+                      className={placeholderClassName}
+                    />
+                    {showErrors && !draft.title.trim() && (
+                      <p className="text-xs text-destructive mt-1">album title is required</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">artist:</label>
+                    <Input
+                      value={draft.artist}
+                      onChange={(event) =>
+                        onChange({
+                          ...draft,
+                          artist: event.target.value,
+                        })
+                      }
+                      placeholder={placeholder.artist}
+                      aria-invalid={showErrors && !draft.artist.trim()}
+                      className={placeholderClassName}
+                    />
+                    {showErrors && !draft.artist.trim() && (
+                      <p className="text-xs text-destructive mt-1">artist is required</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">genre:</label>
+                    <Input
+                      value={draft.genre}
+                      onChange={(event) =>
+                        onChange({
+                          ...draft,
+                          genre: event.target.value,
+                        })
+                      }
+                      placeholder={placeholder.genre}
+                      className={placeholderClassName}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">year:</label>
+                    <Input
+                      type="number"
+                      value={draft.year ?? ""}
+                      onChange={(event) =>
+                        onChange({
+                          ...draft,
+                          year: event.target.value ? Number(event.target.value) : undefined,
+                        })
+                      }
+                      placeholder={placeholder.year}
+                      className={`${placeholderClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                    />
+                  </div>
+                </div>
+              </div>
               <CoverArt
                 picture={draft.cover}
                 onCoverUpload={handleCoverUpload}
                 size="compact"
+                className="order-1 md:order-1"
                 coverOverlay={
                   canSyncCoverToTracks && (
                     <Tooltip>
@@ -157,72 +228,6 @@ export default function AlbumMetadataDialog({
                   )
                 }
               />
-              <div className="min-w-0 h-full flex flex-col justify-between gap-3">
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">album title:</label>
-                    <Input
-                      value={draft.title}
-                      onChange={(event) =>
-                        onChange({
-                          ...draft,
-                          title: event.target.value,
-                        })
-                      }
-                      placeholder={placeholder.title}
-                      aria-invalid={showErrors && !draft.title.trim()}
-                    />
-                    {showErrors && !draft.title.trim() && (
-                      <p className="text-xs text-destructive mt-1">album title is required</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">artist:</label>
-                    <Input
-                      value={draft.artist}
-                      onChange={(event) =>
-                        onChange({
-                          ...draft,
-                          artist: event.target.value,
-                        })
-                      }
-                      placeholder={placeholder.artist}
-                      aria-invalid={showErrors && !draft.artist.trim()}
-                    />
-                    {showErrors && !draft.artist.trim() && (
-                      <p className="text-xs text-destructive mt-1">artist is required</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">genre:</label>
-                    <Input
-                      value={draft.genre}
-                      onChange={(event) =>
-                        onChange({
-                          ...draft,
-                          genre: event.target.value,
-                        })
-                      }
-                      placeholder={placeholder.genre}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">year:</label>
-                    <Input
-                      type="number"
-                      value={draft.year ?? ""}
-                      onChange={(event) =>
-                        onChange({
-                          ...draft,
-                          year: event.target.value ? Number(event.target.value) : undefined,
-                        })
-                      }
-                      placeholder={placeholder.year}
-                      className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
           <DialogFooter className="border-t p-5 flex items-center justify-end gap-2">

@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useRef } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
   Control,
@@ -79,9 +80,22 @@ export default function TrackMetadataEditor({
   const titleRegistration = register("title", {
     onChange: (event) => onPreviewMetadataChange("title", event),
   });
+  const { ref: titleRegistrationRef, ...titleInputRegistration } = titleRegistration;
   const placeholderClassName = "placeholder:text-muted-foreground/45";
   const syncedInputClassName =
     "disabled:pointer-events-auto disabled:cursor-not-allowed disabled:border-dashed disabled:bg-muted/10 disabled:text-muted-foreground disabled:opacity-100 dark:disabled:bg-muted/10";
+  const focusedTitleFileIdRef = useRef<string | null>(null);
+  const titleInputRef = useCallback(
+    (node: HTMLInputElement | null) => {
+      titleRegistrationRef(node);
+      if (!node || !selectedFileId) return;
+      if (focusedTitleFileIdRef.current === selectedFileId) return;
+
+      focusedTitleFileIdRef.current = selectedFileId;
+      node.focus({ preventScroll: true });
+    },
+    [selectedFileId, titleRegistrationRef],
+  );
 
   if (!selectedFile || !selectedFile.metadata) {
     return (
@@ -158,7 +172,8 @@ export default function TrackMetadataEditor({
               <div>
                 <label className="mb-1 block text-xs font-medium md:text-sm">title:</label>
                 <Input
-                  {...titleRegistration}
+                  {...titleInputRegistration}
+                  ref={titleInputRef}
                   placeholder={placeholder.title}
                   className={placeholderClassName}
                 />
