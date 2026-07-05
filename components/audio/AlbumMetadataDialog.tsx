@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CoverArt from "./coverArt";
 import { AudioMetadata } from "./types";
+import type { SampleAlbumMetadata } from "./sampleMetadata";
 
 export interface AlbumMetadataDraft {
   title: string;
@@ -34,6 +35,7 @@ interface AlbumMetadataDialogProps {
   onSave: () => void;
   onDelete?: () => void;
   onSyncCoverToTracks?: () => Promise<void> | void;
+  placeholder: SampleAlbumMetadata;
 }
 
 export default function AlbumMetadataDialog({
@@ -46,6 +48,7 @@ export default function AlbumMetadataDialog({
   onSave,
   onDelete,
   onSyncCoverToTracks,
+  placeholder,
 }: AlbumMetadataDialogProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
@@ -166,7 +169,7 @@ export default function AlbumMetadataDialog({
                           title: event.target.value,
                         })
                       }
-                      placeholder="My Album"
+                      placeholder={placeholder.title}
                       aria-invalid={showErrors && !draft.title.trim()}
                     />
                     {showErrors && !draft.title.trim() && (
@@ -183,7 +186,7 @@ export default function AlbumMetadataDialog({
                           artist: event.target.value,
                         })
                       }
-                      placeholder="Artist Name"
+                      placeholder={placeholder.artist}
                       aria-invalid={showErrors && !draft.artist.trim()}
                     />
                     {showErrors && !draft.artist.trim() && (
@@ -200,7 +203,7 @@ export default function AlbumMetadataDialog({
                           genre: event.target.value,
                         })
                       }
-                      placeholder="House"
+                      placeholder={placeholder.genre}
                     />
                   </div>
                   <div>
@@ -214,7 +217,7 @@ export default function AlbumMetadataDialog({
                           year: event.target.value ? Number(event.target.value) : undefined,
                         })
                       }
-                      placeholder="2024"
+                      placeholder={placeholder.year}
                       className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
