@@ -97,6 +97,46 @@ describe("cobalt audio endpoint", () => {
     });
   });
 
+  it("strips YouTube date metadata from local audio plans", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return Response.json({
+          status: "local-processing",
+          type: "audio",
+          service: "youtube",
+          tunnel: ["https://cobalt.test/tunnel?id=123456789012345678901"],
+          output: {
+            type: "audio/mpeg",
+            filename: "download.mp3",
+            metadata: {
+              title: "Download",
+              artist: "Artist",
+              date: "2024",
+            },
+          },
+          audio: {
+            copy: false,
+            format: "mp3",
+            bitrate: "128",
+          },
+        });
+      }),
+    );
+
+    const response = await handler(makeEvent(makeAudioRequest()));
+    const body = await response.json();
+
+    expect(body).toMatchObject({
+      output: {
+        metadata: {
+          title: "Download",
+          artist: "Artist",
+        },
+      },
+    });
+  });
+
   it("appends Cobalt machine ids to proxied tunnel URLs", async () => {
     const audioTunnel =
       "https://cobalt.test/tunnel?id=123456789012345678901&exp=1234567890123&sig=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&sec=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&iv=cccccccccccccccccccccc";

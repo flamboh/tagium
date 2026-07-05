@@ -294,13 +294,24 @@ const localProcessingResponse = (
   runtimeEnv: CobaltRuntimeEnv,
   response: Extract<CobaltResponse, { status: CobaltResponseType.LocalProcessing }>,
   machineId: string | undefined,
-) =>
-  Response.json({
+) => {
+  let output = response.output;
+  if (response.service === "youtube" && response.output.metadata) {
+    const { date: _date, ...metadata } = response.output.metadata;
+    output = {
+      ...response.output,
+      metadata,
+    };
+  }
+
+  return Response.json({
     ...response,
+    output,
     tunnel: response.tunnel.map((tunnelUrl) =>
       toTunnelProxyUrl(request, runtimeEnv, tunnelUrl, machineId),
     ),
   });
+};
 
 const parseAudioRequest = async (request: Request) => {
   try {
