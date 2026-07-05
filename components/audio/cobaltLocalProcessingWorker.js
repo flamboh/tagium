@@ -121,6 +121,8 @@ const makeAudioFfmpegArgs = (request) => {
     "-i",
     inputName,
     "-vn",
+    "-map_metadata",
+    "-1",
   ];
 
   if (request.audio.copy) {

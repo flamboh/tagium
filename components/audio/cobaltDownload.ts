@@ -462,9 +462,7 @@ export const applyCobaltAudioMetadata = (
   if (metadata.album) {
     mp3tag.tags.album = stripMetadataControlCharacters(metadata.album);
   }
-  if (metadata.date) {
-    mp3tag.tags.year = stripMetadataControlCharacters(metadata.date);
-  }
+  mp3tag.tags.year = metadata.date ? stripMetadataControlCharacters(metadata.date) : "";
   if (metadata.genre) {
     mp3tag.tags.genre = stripMetadataControlCharacters(metadata.genre);
   }

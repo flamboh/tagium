@@ -465,6 +465,16 @@ describe("downloadCobaltAudio", () => {
     });
   });
 
+  it("clears stale MP3 year when Cobalt omits date metadata", () => {
+    const mp3tag = { tags: { year: "2024" } };
+
+    applyCobaltAudioMetadata(mp3tag, {
+      title: "Track Without Date",
+    });
+
+    expect(mp3tag.tags.year).toBe("");
+  });
+
   it("accepts Cobalt cropCover as an advisory cover hint", () => {
     expect(() =>
       validateLocalAudioPlan(
