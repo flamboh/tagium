@@ -5,20 +5,14 @@ import { ArrowRight, Loader2, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getDownloadErrorMessage } from "./downloadErrorMessage";
-import { isSoundCloudSetUrl, resolveSoundCloudSet, type SoundCloudSet } from "./soundcloudSet";
 
 interface AudioDownloaderProps {
-  onAudioDownload: (sourceUrl: string) => void | Promise<void>;
-  onSoundCloudSetDownload: (set: SoundCloudSet) => void | Promise<void>;
+  onUrlImport: (sourceUrl: string) => void | Promise<void>;
 }
 
-export default function AudioDownloader({
-  onAudioDownload,
-  onSoundCloudSetDownload,
-}: AudioDownloaderProps) {
+export default function AudioDownloader({ onUrlImport }: AudioDownloaderProps) {
   const [sourceUrl, setSourceUrl] = useState("");
   const [downloading, setDownloading] = useState(false);
-  const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const canDownload = sourceUrl.trim().length > 0 && !downloading;
 
@@ -30,19 +24,10 @@ export default function AudioDownloader({
     const trimmedUrl = sourceUrl.trim();
 
     setDownloading(true);
-    setProgress(null);
     setError(null);
 
     try {
-      if (isSoundCloudSetUrl(trimmedUrl)) {
-        const set = await resolveSoundCloudSet(trimmedUrl);
-        setProgress(`${set.tracks.length} tracks`);
-        await onSoundCloudSetDownload(set);
-        setSourceUrl("");
-        return;
-      }
-
-      await onAudioDownload(trimmedUrl);
+      await onUrlImport(trimmedUrl);
       setSourceUrl("");
     } catch (caughtError) {
       let message = "download failed.";
@@ -51,7 +36,6 @@ export default function AudioDownloader({
       }
       setError(message);
     } finally {
-      setProgress(null);
       setDownloading(false);
     }
   };
@@ -90,11 +74,6 @@ export default function AudioDownloader({
           {!downloading && <ArrowRight />}
         </Button>
       </div>
-      {progress && (
-        <p className="text-xs text-muted-foreground" aria-live="polite">
-          downloading {progress}
-        </p>
-      )}
       {error && (
         <p className="text-xs text-destructive" aria-live="polite">
           {error}

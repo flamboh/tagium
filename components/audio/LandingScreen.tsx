@@ -4,25 +4,18 @@ import { useRef, useState } from "react";
 import { Music4, Link2, ArrowRight, Loader2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getDownloadErrorMessage } from "./downloadErrorMessage";
-import { isSoundCloudSetUrl, resolveSoundCloudSet, type SoundCloudSet } from "./soundcloudSet";
 
 interface LandingScreenProps {
   onAudioUpload: (files: File[]) => void | Promise<void>;
-  onAudioDownload: (sourceUrl: string) => void | Promise<void>;
-  onSoundCloudSetDownload: (set: SoundCloudSet) => void | Promise<void>;
+  onUrlImport: (sourceUrl: string) => void | Promise<void>;
 }
 
-export default function LandingScreen({
-  onAudioUpload,
-  onAudioDownload,
-  onSoundCloudSetDownload,
-}: LandingScreenProps) {
+export default function LandingScreen({ onAudioUpload, onUrlImport }: LandingScreenProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
   const [url, setUrl] = useState("");
   const [downloading, setDownloading] = useState(false);
-  const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleDragEnter = (e: React.DragEvent) => {
@@ -61,19 +54,10 @@ export default function LandingScreen({
     if (!trimmed || downloading) return;
 
     setDownloading(true);
-    setProgress(null);
     setError(null);
 
     try {
-      if (isSoundCloudSetUrl(trimmed)) {
-        const set = await resolveSoundCloudSet(trimmed);
-        setProgress(`${set.tracks.length} tracks`);
-        await onSoundCloudSetDownload(set);
-        setUrl("");
-        return;
-      }
-
-      await onAudioDownload(trimmed);
+      await onUrlImport(trimmed);
       setUrl("");
     } catch (err) {
       if (err instanceof Error) {
@@ -82,7 +66,6 @@ export default function LandingScreen({
         setError("download failed.");
       }
     } finally {
-      setProgress(null);
       setDownloading(false);
     }
   };
@@ -178,11 +161,6 @@ export default function LandingScreen({
             </button>
           </div>
 
-          {progress && (
-            <p className="text-xs text-muted-foreground text-center" aria-live="polite">
-              downloading track {progress}
-            </p>
-          )}
           {error && (
             <p className="text-xs text-destructive text-center" aria-live="polite">
               {error}
