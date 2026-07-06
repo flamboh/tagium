@@ -70,7 +70,9 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: {},
+  fmt: {
+    ignorePatterns: ["repos/effect"],
+  },
   lint: {
     plugins: ["oxc", "typescript", "unicorn", "react"],
     categories: {
@@ -79,7 +81,7 @@ export default defineConfig({
     env: {
       builtin: true,
     },
-    ignorePatterns: ["dist", "build", "coverage", "node_modules"],
+    ignorePatterns: ["dist", "build", "coverage", "node_modules", "repos/effect"],
     overrides: [
       {
         files: ["**/*.{ts,tsx}"],
