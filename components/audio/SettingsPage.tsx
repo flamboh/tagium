@@ -182,7 +182,7 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
               target="_blank"
               rel="noreferrer"
               aria-label="GitHub"
-              className="inline-flex size-12 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+              className="inline-flex size-12 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -204,7 +204,7 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
               target="_blank"
               rel="noreferrer"
               aria-label="Twitter"
-              className="inline-flex size-12 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+              className="inline-flex size-12 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"

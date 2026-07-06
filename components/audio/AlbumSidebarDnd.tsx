@@ -172,7 +172,7 @@ export function SortableTrackRow({
         ref={setActivatorNodeRef}
         variant="ghost"
         className={cn(
-          "justify-start h-auto py-2.5 px-4 pr-8 w-full text-left font-normal rounded-none hover:bg-accent/30",
+          "justify-start h-auto py-2.5 px-4 pr-8 w-full text-left font-normal hover:bg-accent/30",
           container === "loose" ? "py-3" : "",
           muted ? "opacity-65" : "",
           selectedTone === "primary" ? "bg-accent text-accent-foreground" : "",
@@ -228,7 +228,7 @@ export function SortableTrackRow({
             event.stopPropagation();
             onRetry();
           }}
-          className="absolute right-7 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-full cursor-pointer"
+          className="absolute right-7 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent cursor-pointer"
           title="retry download"
           aria-label={`retry download for ${track.filename}`}
         >
@@ -241,7 +241,7 @@ export function SortableTrackRow({
           event.stopPropagation();
           onRemove();
         }}
-        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
+        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 cursor-pointer"
         title="remove track"
       >
         <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
@@ -395,7 +395,7 @@ export function SidebarDragPreview({
 }) {
   if (active.type === "album" && album) {
     return (
-      <div className="flex w-64 max-w-[calc(100vw-2rem)] items-center gap-2 rounded-md border bg-card px-3 py-3 text-left shadow-lg">
+      <div className="flex w-64 max-w-[calc(100vw-2rem)] items-center gap-2 border bg-card px-3 py-3 text-left shadow-lg">
         <AlbumCoverThumb picture={album.cover} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium leading-tight">{album.title}</div>
@@ -410,7 +410,7 @@ export function SidebarDragPreview({
 
   if (active.type === "track" && track) {
     return (
-      <div className="flex w-64 max-w-[calc(100vw-2rem)] items-center gap-2 rounded-md border bg-card px-4 py-3 text-left shadow-lg">
+      <div className="flex w-64 max-w-[calc(100vw-2rem)] items-center gap-2 border bg-card px-4 py-3 text-left shadow-lg">
         <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate text-sm">{track.filename}</span>
       </div>

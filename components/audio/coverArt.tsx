@@ -116,16 +116,16 @@ export default function CoverArt({
             alt="album cover"
             className={
               isCompact
-                ? "size-24 object-cover rounded-lg border md:size-44"
-                : "size-full object-cover rounded-lg border lg:size-64"
+                ? "size-24 object-cover border md:size-44"
+                : "size-full object-cover border lg:size-64"
             }
           />
         ) : (
           <div
             className={
               isCompact
-                ? "size-24 bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs md:size-44"
-                : "size-full bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs lg:size-64"
+                ? "size-24 bg-gray-200 border flex items-center justify-center text-gray-500 text-xs md:size-44"
+                : "size-full bg-gray-200 border flex items-center justify-center text-gray-500 text-xs lg:size-64"
             }
           >
             no cover

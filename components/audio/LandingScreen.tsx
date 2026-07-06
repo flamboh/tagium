@@ -117,7 +117,7 @@ export default function LandingScreen({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           className={cn(
-            "w-full rounded-3xl border-2 border-dashed transition-all duration-200 cursor-pointer",
+            "w-full border-2 border-dashed transition-all duration-200 cursor-pointer",
             "flex flex-col items-center justify-center gap-5 py-16 px-8 outline-none max-lg:[@media(max-height:700px)]:gap-3 max-lg:[@media(max-height:700px)]:py-8",
             isDragging
               ? "border-primary bg-primary/10 scale-[1.015] shadow-xl shadow-primary/10"
@@ -127,7 +127,7 @@ export default function LandingScreen({
           {isDragging ? (
             <Music4 className="h-14 w-14 text-primary" />
           ) : (
-            <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center">
+            <div className="h-16 w-16 bg-muted flex items-center justify-center">
               <Upload className="h-7 w-7 text-muted-foreground" />
             </div>
           )}
@@ -161,14 +161,14 @@ export default function LandingScreen({
                 }}
                 placeholder="soundcloud or youtube url"
                 disabled={downloading}
-                className="w-full h-10 rounded-lg border border-input bg-transparent pl-9 pr-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-ring transition-shadow disabled:opacity-50 placeholder:text-muted-foreground/45"
+                className="w-full h-10 border border-input bg-transparent pl-9 pr-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-ring transition-shadow disabled:opacity-50 placeholder:text-muted-foreground/45"
               />
             </div>
             <button
               type="submit"
               disabled={!url.trim() || downloading}
               aria-label="start media import"
-              className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 hover:bg-primary/90 transition-colors"
+              className="h-10 w-10 bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 hover:bg-primary/90 transition-colors"
             >
               {downloading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

@@ -27,17 +27,13 @@ export function AlbumCoverThumb({ picture }: AlbumCoverThumbProps) {
 
   if (!src) {
     return (
-      <div className="w-9 h-9 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+      <div className="w-9 h-9 bg-muted flex items-center justify-center flex-shrink-0">
         <Music2 className="h-4 w-4 text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <img
-      src={src}
-      alt=""
-      className="w-9 h-9 rounded-md object-cover flex-shrink-0 ring-1 ring-border/50"
-    />
+    <img src={src} alt="" className="w-9 h-9 object-cover flex-shrink-0 ring-1 ring-border/50" />
   );
 }

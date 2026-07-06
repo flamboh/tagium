@@ -115,7 +115,7 @@ export default function PlaylistDownloadQueuePanel({
       )}
 
       <div
-        className="mt-2 h-1.5 overflow-hidden rounded-full bg-background"
+        className="mt-2 h-1.5 overflow-hidden bg-background"
         role="progressbar"
         aria-label="playlist download progress"
         aria-valuemin={0}

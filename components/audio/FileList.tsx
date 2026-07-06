@@ -61,7 +61,7 @@ export default function FileList({
                   e.stopPropagation();
                   onRemoveFile(file.id);
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 cursor-pointer"
                 title="remove file"
               >
                 <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
