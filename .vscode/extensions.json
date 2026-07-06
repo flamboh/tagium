@@ -1,3 +1,6 @@
 {
-  "recommendations": ["VoidZero.vite-plus-extension-pack"]
+  "recommendations": [
+    "oxc.oxc-vscode",
+    "dprint.dprint"
+  ]
 }

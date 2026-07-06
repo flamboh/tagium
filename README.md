@@ -1,7 +1,3 @@
-# Tagium
+<!-- shields.io badge used because pkg.pr.new/badge returns HTTP 404 status despite valid SVG content, causing GitHub's image proxy to fail -->
 
-mp3tag editing for music fans who want to save their favorite tracks locally.
-
-## Docs
-
-see `./docs`.
+[![pkg.pr.new](https://img.shields.io/badge/pkg.pr.new-Effect--TS%2Feffect--smol-black)](https://pkg.pr.new/~/Effect-TS/effect-smol)
