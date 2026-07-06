@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   createSingleUrlDownloadPlan,
   createSoundCloudSetDownloadPlan,
+  startDownloadTrackPlan,
   type QueuedDownloadTrack,
 } from "./downloadTrack";
 import { resolveSoundCloudSet } from "./soundcloudSet";
@@ -219,6 +220,72 @@ const createHarness = (settings: AppSettings = defaultSettings) => {
 };
 
 describe("download track plans", () => {
+  it("applies a single URL plan through the shared download workflow", () => {
+    let files: TagiumFile[] = [];
+    let activeView = "";
+    let selectedAlbumId: string | null = "album-before";
+    let selectedFileId: string | null = "file-before";
+    let selectedFileIds = new Set(["file-before"]);
+    let lastSelectedFileId: string | null = "file-before";
+    let bufferCount = 0;
+    let looseTrackIds = ["existing-track", "single-track"];
+    let queuedTracks: QueuedDownloadTrack[] = [];
+    let filesVisibleWhenQueued: string[] = [];
+
+    const plan = createSingleUrlDownloadPlan({
+      sourceUrl: "https://soundcloud.com/artist/direct-track",
+      audioBitrate: "320",
+      createId: () => "single-track",
+    });
+
+    startDownloadTrackPlan(plan, {
+      bufferCurrentFormMetadata: () => {
+        bufferCount++;
+      },
+      setActiveView: (view) => {
+        activeView = view;
+      },
+      getFiles: () => files,
+      setFiles: (nextFiles) => {
+        files = nextFiles;
+      },
+      setSelectedAlbumId: (albumId) => {
+        selectedAlbumId = albumId;
+      },
+      setSelectedFileId: (fileId) => {
+        selectedFileId = fileId;
+      },
+      setSelectedFileIds: (fileIds) => {
+        selectedFileIds = fileIds;
+      },
+      setLastSelectedFileId: (fileId) => {
+        lastSelectedFileId = fileId;
+      },
+      queueDownloadTracks: (tracks) => {
+        filesVisibleWhenQueued = files.map((file) => file.id);
+        queuedTracks = tracks;
+      },
+      addLooseTrackIds: (trackIds) => {
+        looseTrackIds = [...new Set([...looseTrackIds, ...trackIds])];
+      },
+    });
+
+    expect(bufferCount).toBe(1);
+    expect(activeView).toBe("editor");
+    expect(files.map((file) => file.id)).toEqual(["single-track"]);
+    expect(files[0].downloadRequest).toEqual({
+      sourceUrl: "https://soundcloud.com/artist/direct-track",
+      audioBitrate: "320",
+    });
+    expect(looseTrackIds).toEqual(["existing-track", "single-track"]);
+    expect(selectedAlbumId).toBeNull();
+    expect(selectedFileId).toBe("single-track");
+    expect([...selectedFileIds]).toEqual(["single-track"]);
+    expect(lastSelectedFileId).toBe("single-track");
+    expect(filesVisibleWhenQueued).toEqual(["single-track"]);
+    expect(queuedTracks).toEqual(plan.queuedTracks);
+  });
+
   it("creates the same queued track shape for single URL and SoundCloud set plans", () => {
     const singlePlan = createSingleUrlDownloadPlan({
       sourceUrl: "https://soundcloud.com/artist/direct-track",

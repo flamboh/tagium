@@ -18,7 +18,6 @@ import {
   applyAlbumSharedTagsToFiles,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
-  applySoundCloudSetImportedCover,
   areAlbumTrackCoversSynced,
 } from "./fileMetadataOps";
 import {
@@ -43,10 +42,11 @@ import TagSidebarPanel from "./TagSidebarPanel";
 import type { PlaylistDownloadQueuePanelState } from "./PlaylistDownloadQueuePanel";
 import {
   createSingleUrlDownloadPlan,
-  createSoundCloudSetDownloadPlan,
   fetchImportedCover,
+  startDownloadTrackPlan,
   type QueuedDownloadTrack,
 } from "./downloadTrack";
+import { startSoundCloudSetImport } from "./soundcloudSetImport";
 import {
   cancelActivePlaylistDownloadTracks,
   cancelPendingPlaylistDownloadTracks,
@@ -860,92 +860,58 @@ export default function AudioTagger() {
     };
   };
   const handleAudioDownload = (sourceUrl: string) => {
-    bufferCurrentFormMetadata();
-    setActiveView("editor");
     const plan = createSingleUrlDownloadPlan({
       sourceUrl,
       audioBitrate: settings.audioBitrate,
       createId: () => crypto.randomUUID(),
     });
-    const nextFiles = [...filesRef.current, ...plan.pendingFiles];
-    filesRef.current = nextFiles;
-    setFiles(nextFiles);
-    setLooseTrackIds((prevLooseTrackIds) =>
-      asUniqueTrackIds([...prevLooseTrackIds, ...plan.looseTrackIds]),
-    );
-    setSelectedAlbumId(plan.selection.selectedAlbumId);
-    setSelectedFileId(plan.selection.selectedFileId);
-    setSelectedFileIds(plan.selection.selectedFileIds);
-    setLastSelectedFileId(plan.selection.lastSelectedFileId);
-    queueDownloadTracks(plan.queuedTracks);
+    startDownloadTrackPlan(plan, {
+      bufferCurrentFormMetadata,
+      setActiveView,
+      getFiles: () => filesRef.current,
+      setFiles: (nextFiles) => {
+        filesRef.current = nextFiles;
+        setFiles(nextFiles);
+      },
+      setSelectedAlbumId,
+      setSelectedFileId,
+      setSelectedFileIds,
+      setLastSelectedFileId,
+      queueDownloadTracks,
+      addLooseTrackIds: (trackIds) => {
+        setLooseTrackIds((prevLooseTrackIds) =>
+          asUniqueTrackIds([...prevLooseTrackIds, ...trackIds]),
+        );
+      },
+    });
   };
   const handleSoundCloudSetDownload = (set: SoundCloudSet) => {
-    bufferCurrentFormMetadata();
-    setActiveView("editor");
-    const plan = createSoundCloudSetDownloadPlan({
-      set,
-      audioBitrate: settings.audioBitrate,
+    startSoundCloudSetImport(set, {
+      settings,
+      bufferCurrentFormMetadata,
+      setActiveView,
+      getFiles: () => filesRef.current,
+      setFiles: (nextFiles) => {
+        filesRef.current = nextFiles;
+        setFiles(nextFiles);
+      },
+      getAlbums: () => albumsRef.current,
+      setAlbums: (nextAlbums) => {
+        albumsRef.current = nextAlbums;
+        setAlbums(nextAlbums);
+      },
+      setSelectedAlbumId,
+      setSelectedFileId,
+      setSelectedFileIds,
+      setLastSelectedFileId,
+      queueDownloadTracks,
       createId: () => crypto.randomUUID(),
+      fetchImportedCover,
+      getSelectedFileId: () => selectedFileIdRef.current,
+      setSelectedMetadata: reset,
+      updateTags: handleTagUpdate,
+      warn: console.warn,
     });
-    const nextFiles = [...filesRef.current, ...plan.pendingFiles];
-    const nextAlbums = [...albumsRef.current, plan.album];
-    filesRef.current = nextFiles;
-    albumsRef.current = nextAlbums;
-    setFiles(nextFiles);
-    setAlbums(nextAlbums);
-    setSelectedAlbumId(plan.selection.selectedAlbumId);
-    setSelectedFileId(plan.selection.selectedFileId);
-    setSelectedFileIds(plan.selection.selectedFileIds);
-    setLastSelectedFileId(plan.selection.lastSelectedFileId);
-
-    const coverImport = plan.coverImport;
-    if (coverImport) {
-      void (async () => {
-        try {
-          const cover = await fetchImportedCover(coverImport.coverUrl);
-          const {
-            albums: coveredAlbums,
-            files: coveredFiles,
-            selectedMetadata,
-          } = applySoundCloudSetImportedCover(
-            filesRef.current,
-            albumsRef.current,
-            coverImport.albumId,
-            coverImport.trackIds,
-            coverImport.set,
-            settings,
-            cover,
-            selectedFileIdRef.current,
-          );
-          albumsRef.current = coveredAlbums;
-          setAlbums(coveredAlbums);
-          if (coveredFiles === filesRef.current) return;
-
-          filesRef.current = coveredFiles;
-          setFiles(coveredFiles);
-          if (selectedMetadata) {
-            reset(selectedMetadata);
-          }
-          const trackIdSet = new Set(coverImport.trackIds);
-          await Promise.all(
-            coveredFiles
-              .filter((file) => trackIdSet.has(file.id) && Boolean(file.file) && file.metadata)
-              .map(async (file) => {
-                if (!file.metadata) return;
-                try {
-                  await handleTagUpdate(file, file.metadata);
-                } catch {
-                  // handleTagUpdate records the per-track error state.
-                }
-              }),
-          );
-        } catch (error) {
-          console.warn("failed to import album cover:", error);
-        }
-      })();
-    }
-
-    queueDownloadTracks(plan.queuedTracks);
   };
   const handleRetryDownload = (fileId: string) => {
     const fileToRetry = filesRef.current.find((file) => file.id === fileId);
