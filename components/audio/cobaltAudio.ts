@@ -1,6 +1,5 @@
 import { Context, Effect, Layer } from "effect";
 import { AudioDecodeError, toPublicAudioError } from "./audioErrors";
-import { makeAudioRuntime } from "./audioRuntime";
 import { decodeCobaltDownloadPlanEffect, type CobaltDownloadPlan } from "./cobaltAudioSchemas";
 import { LocalAudioProcessor, LocalAudioProcessorLive } from "./localAudioProcessor";
 
@@ -306,10 +305,3 @@ export class CobaltAudio extends Context.Service<
 export const CobaltAudioLive = Layer.effect(CobaltAudio, makeCobaltAudio()).pipe(
   Layer.provide(LocalAudioProcessorLive),
 );
-
-const cobaltAudioRuntime = makeAudioRuntime(CobaltAudioLive);
-
-export async function downloadCobaltAudio(request: CobaltAudioDownloadRequest) {
-  const service = await cobaltAudioRuntime.runPromise(CobaltAudio);
-  return await cobaltAudioRuntime.runPromise(service.download(request));
-}

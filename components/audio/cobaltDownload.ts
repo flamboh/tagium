@@ -1,7 +1,13 @@
+import { downloadFromCobalt, runAudioBackendEffect } from "./audioBackend";
+import type { CobaltAudioDownloadRequest } from "./cobaltAudio";
+
+export async function downloadCobaltAudio(request: CobaltAudioDownloadRequest) {
+  return await runAudioBackendEffect(downloadFromCobalt(request));
+}
+
 export {
   CobaltAudio,
   CobaltAudioLive,
-  downloadCobaltAudio,
   type AudioDownloadBitrate,
   type CobaltAudioDownloadLifecycleCallback,
   type CobaltAudioDownloadLifecycleEvent,

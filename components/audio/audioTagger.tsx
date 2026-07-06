@@ -1,11 +1,17 @@
 "use client";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Effect } from "effect";
+import { Cause, Effect, Exit } from "effect";
 import { SubmitHandler, useForm } from "react-hook-form";
 import filenamify from "filenamify";
 import AlbumMetadataDialog, { AlbumMetadataDraft } from "./AlbumMetadataDialog";
-import { downloadCobaltAudio } from "./cobaltDownload";
+import {
+  downloadFromCobalt,
+  parseUploads,
+  provideAudioBackend,
+  runAudioBackendEffect,
+  writeTags,
+} from "./audioBackend";
 import {
   createAlbumFromTracks,
   mergeUploadedTracksIntoAlbums,
@@ -50,11 +56,9 @@ import TrackMetadataEditor from "./TrackMetadataEditor";
 import SettingsPage from "./SettingsPage";
 import AudioDownloader from "./AudioDownloader";
 import {
-  parseUploadedTracks,
   sortTrackIdsByTrackNumber,
   sortUploadedTracksByTrackNumber,
   toGenreString,
-  writeMetadataToFile,
 } from "./mp3Utils";
 import { loadAppSettings, saveAppSettings } from "./settings";
 import { getSampleAlbum } from "./sampleMetadata";
@@ -121,6 +125,13 @@ const getNullableNumericPatchValue = (value: AudioMetadata["year"]): MetadataPat
   value === undefined || Number.isNaN(value) ? null : value;
 const getPendingMetadataPatch = (file: TagiumFile): MetadataPatch | undefined =>
   file.pendingMetadataPatch;
+const firstCauseError = (cause: Cause.Cause<unknown>) => {
+  for (const reason of cause.reasons) {
+    if (Cause.isFailReason(reason)) return reason.error;
+    if (Cause.isDieReason(reason)) return reason.defect;
+  }
+  return cause;
+};
 const createSubmittedMetadataPatch = (metadata: AudioMetadata): MetadataPatch => ({
   filename: metadata.filename,
   title: metadata.title,
@@ -351,7 +362,7 @@ export default function AudioTagger() {
     }
 
     try {
-      const updatedFile = await writeMetadataToFile(latestFileToUpdate, newTags);
+      const updatedFile = await runAudioBackendEffect(writeTags(latestFileToUpdate, newTags));
       const metadata = {
         ...newTags,
         year: Number.isNaN(newTags.year as number) ? undefined : newTags.year,
@@ -561,7 +572,7 @@ export default function AudioTagger() {
 
       setLoading(true);
       try {
-        const parsedUploads = await parseUploadedTracks(uniqueUploadedFiles);
+        const parsedUploads = await runAudioBackendEffect(parseUploads(uniqueUploadedFiles));
         if (parsedUploads.length === 0) return;
         const orderedUploads = sortUploadedTracksByTrackNumber(parsedUploads);
 
@@ -710,94 +721,111 @@ export default function AudioTagger() {
     filesRef.current = nextFiles;
     setFiles(nextFiles);
   };
-  const hydrateDownloadedTrack = async (
-    fileId: string,
-    downloadedFile: File,
-    signal?: AbortSignal,
-  ) => {
-    signal?.throwIfAborted();
-    const [parsedUpload] = await parseUploadedTracks([downloadedFile]);
-    signal?.throwIfAborted();
-    if (!parsedUpload) {
-      throw new Error("downloaded track could not be parsed.");
-    }
-
-    const currentFile = filesRef.current.find((file) => file.id === fileId);
-    if (!currentFile) return;
-
-    const parsedFile = parsedUpload.file;
-    const formMetadata =
-      selectedFileIdRef.current === fileId && formDirtyRef.current && currentFile.metadata
-        ? getSubmittedMetadata(getValues())
-        : undefined;
-    const currentPendingPatch = formMetadata
-      ? createDirtyMetadataPatch(formMetadata, dirtyFields, settings.syncFilenames)
-      : getPendingMetadataPatch(currentFile);
-    const currentFileWithPendingPatch = currentPendingPatch
-      ? withPendingMetadataPatch(currentFile, currentPendingPatch)
-      : currentFile;
-    let { hydratedFile, metadataToWrite } = prepareDownloadedTrackHydration(
-      currentFileWithPendingPatch,
-      parsedFile,
-      currentPendingPatch,
-    );
-
-    if (metadataToWrite) {
-      try {
-        signal?.throwIfAborted();
-        const updatedFile = await writeMetadataToFile(hydratedFile, metadataToWrite);
-        signal?.throwIfAborted();
-        const latestFile = filesRef.current.find((file) => file.id === fileId);
-        if (!latestFile) return;
-        const latestFormMetadata =
-          selectedFileIdRef.current === fileId && formDirtyRef.current
-            ? getSubmittedMetadata(getValues())
-            : undefined;
-        const latestFormPatch = latestFormMetadata
-          ? createDirtyMetadataPatch(latestFormMetadata, dirtyFields, settings.syncFilenames)
-          : undefined;
-        const latestMetadataForResolve =
-          latestFormPatch && latestFile.metadata
-            ? applyMetadataPatch(latestFile.metadata, latestFormPatch)
-            : latestFormMetadata;
-        hydratedFile = resolveDownloadedTrackHydrationWrite(
-          currentFileWithPendingPatch,
-          latestFormPatch
-            ? withMergedPendingMetadataPatch(latestFile, latestFormPatch)
-            : latestFile,
-          parsedFile,
-          hydratedFile,
-          updatedFile,
-          metadataToWrite,
-          latestMetadataForResolve,
-        );
-      } catch (error) {
-        const latestFile = filesRef.current.find((file) => file.id === fileId);
-        if (!latestFile) return;
-        let message = "downloaded, but metadata could not be applied.";
-        if (error instanceof Error) {
-          message = error.message;
+  const hydrateDownloadedTrack = (fileId: string, downloadedFile: File) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const signal = yield* Effect.abortSignal;
+        yield* Effect.sync(() => signal.throwIfAborted());
+        const [parsedUpload] = yield* parseUploads([downloadedFile]);
+        yield* Effect.sync(() => signal.throwIfAborted());
+        if (!parsedUpload) {
+          return yield* Effect.fail(new Error("downloaded track could not be parsed."));
         }
-        hydratedFile = resolveDownloadedTrackHydrationWriteError(
-          currentFileWithPendingPatch,
-          latestFile,
-          parsedFile,
-          hydratedFile,
-          message,
-        );
-      }
-    }
 
-    signal?.throwIfAborted();
-    const hydratedPendingPatch =
-      metadataToWrite && hydratedFile.status !== "saved"
-        ? (getPendingMetadataPatch(hydratedFile) ??
-          (hydratedFile.metadata
-            ? createSubmittedMetadataPatch(hydratedFile.metadata)
-            : metadataToWrite))
-        : undefined;
-    replaceFileById(fileId, withPendingMetadataPatch(hydratedFile, hydratedPendingPatch));
-  };
+        const hydrationState = yield* Effect.sync(() => {
+          const currentFile = filesRef.current.find((file) => file.id === fileId);
+          if (!currentFile) return null;
+
+          const parsedFile = parsedUpload.file;
+          const formMetadata =
+            selectedFileIdRef.current === fileId && formDirtyRef.current && currentFile.metadata
+              ? getSubmittedMetadata(getValues())
+              : undefined;
+          const currentPendingPatch = formMetadata
+            ? createDirtyMetadataPatch(formMetadata, dirtyFields, settings.syncFilenames)
+            : getPendingMetadataPatch(currentFile);
+          const currentFileWithPendingPatch = currentPendingPatch
+            ? withPendingMetadataPatch(currentFile, currentPendingPatch)
+            : currentFile;
+          const hydration = prepareDownloadedTrackHydration(
+            currentFileWithPendingPatch,
+            parsedFile,
+            currentPendingPatch,
+          );
+
+          return {
+            ...hydration,
+            currentFileWithPendingPatch,
+            parsedFile,
+          };
+        });
+        if (!hydrationState) return;
+
+        let { hydratedFile } = hydrationState;
+        const { currentFileWithPendingPatch, metadataToWrite, parsedFile } = hydrationState;
+
+        if (metadataToWrite) {
+          const writeResult = yield* writeTags(hydratedFile, metadataToWrite).pipe(Effect.exit);
+          yield* Effect.sync(() => signal.throwIfAborted());
+          const nextHydratedFile = yield* Effect.sync(() => {
+            const latestFile = filesRef.current.find((file) => file.id === fileId);
+            if (!latestFile) return null;
+
+            if (Exit.isSuccess(writeResult)) {
+              const latestFormMetadata =
+                selectedFileIdRef.current === fileId && formDirtyRef.current
+                  ? getSubmittedMetadata(getValues())
+                  : undefined;
+              const latestFormPatch = latestFormMetadata
+                ? createDirtyMetadataPatch(latestFormMetadata, dirtyFields, settings.syncFilenames)
+                : undefined;
+              const latestMetadataForResolve =
+                latestFormPatch && latestFile.metadata
+                  ? applyMetadataPatch(latestFile.metadata, latestFormPatch)
+                  : latestFormMetadata;
+              return resolveDownloadedTrackHydrationWrite(
+                currentFileWithPendingPatch,
+                latestFormPatch
+                  ? withMergedPendingMetadataPatch(latestFile, latestFormPatch)
+                  : latestFile,
+                parsedFile,
+                hydratedFile,
+                writeResult.value,
+                metadataToWrite,
+                latestMetadataForResolve,
+              );
+            }
+
+            const error = firstCauseError(writeResult.cause);
+            const message =
+              error instanceof Error
+                ? error.message
+                : "downloaded, but metadata could not be applied.";
+            return resolveDownloadedTrackHydrationWriteError(
+              currentFileWithPendingPatch,
+              latestFile,
+              parsedFile,
+              hydratedFile,
+              message,
+            );
+          });
+          if (!nextHydratedFile) return;
+          hydratedFile = nextHydratedFile;
+        }
+
+        yield* Effect.sync(() => signal.throwIfAborted());
+        yield* Effect.sync(() => {
+          const hydratedPendingPatch =
+            metadataToWrite && hydratedFile.status !== "saved"
+              ? (getPendingMetadataPatch(hydratedFile) ??
+                (hydratedFile.metadata
+                  ? createSubmittedMetadataPatch(hydratedFile.metadata)
+                  : metadataToWrite))
+              : undefined;
+          replaceFileById(fileId, withPendingMetadataPatch(hydratedFile, hydratedPendingPatch));
+        });
+      }),
+    );
   const markDownloadsQueued = (tracks: ManagedDownloadTrack[]) => {
     const trackIds = new Set(tracks.map((track) => track.fileId));
     const nextFiles = filesRef.current.map((file) =>
@@ -832,20 +860,9 @@ export default function AudioTagger() {
 
     const controller = createPlaylistDownloadController<ManagedDownloadTrack>({
       createModelTrack: createPlaylistDownloadModelTrack,
-      downloadTrack: (track) =>
-        Effect.tryPromise({
-          try: (signal) =>
-            downloadCobaltAudio({
-              ...track.downloadRequest,
-              signal,
-            }),
-          catch: (error) => error,
-        }),
+      downloadTrack: (track) => provideAudioBackend(downloadFromCobalt(track.downloadRequest)),
       hydrateTrack: (track, downloadedFile) =>
-        Effect.tryPromise({
-          try: (signal) => hydrateDownloadedTrack(track.fileId, downloadedFile, signal),
-          catch: (error) => error,
-        }),
+        provideAudioBackend(hydrateDownloadedTrack(track.fileId, downloadedFile)),
       hasTrack: (trackId) => filesRef.current.some((file) => file.id === trackId),
       getFileErrorTrackIds: () =>
         new Set(filesRef.current.filter((file) => file.status === "error").map((file) => file.id)),
