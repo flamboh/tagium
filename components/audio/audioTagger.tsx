@@ -46,6 +46,14 @@ import {
   startDownloadTrackPlan,
   type QueuedDownloadTrack,
 } from "./downloadTrack";
+import {
+  clearSelection,
+  selectAlbum,
+  selectAlbumTrack,
+  selectAllFiles,
+  selectLooseTrack,
+  type TrackSelection,
+} from "./selectionOps";
 import { startSoundCloudSetImport } from "./soundcloudSetImport";
 import { createPlaylistDownloadController } from "./playlistDownloadController";
 import type {
@@ -904,133 +912,61 @@ export default function AudioTagger() {
       closeAlbumDialog();
     }
   };
+  const getCurrentSelection = useCallback(
+    (): TrackSelection => ({
+      selectedAlbumId,
+      selectedFileId,
+      selectedFileIds,
+      lastSelectedFileId,
+    }),
+    [lastSelectedFileId, selectedAlbumId, selectedFileId, selectedFileIds],
+  );
+  const applySelection = useCallback((selection: TrackSelection) => {
+    setSelectedAlbumId(selection.selectedAlbumId);
+    setSelectedFileId(selection.selectedFileId);
+    setSelectedFileIds(selection.selectedFileIds);
+    setLastSelectedFileId(selection.lastSelectedFileId);
+  }, []);
   const handleSelectAlbum = (albumId: string, event?: ReactMouseEvent) => {
     setActiveView("editor");
     bufferCurrentFormMetadata();
-    const isMultiSelect = event?.ctrlKey || event?.metaKey;
-
-    if (isMultiSelect) {
-      setSelectedAlbumId(albumId);
-      const album = albums.find((entry) => entry.id === albumId);
-      const firstTrackId = album?.trackIds[0];
-      if (firstTrackId) {
-        setSelectedFileIds((prev) => {
-          const next = new Set(prev);
-          if (next.has(firstTrackId)) {
-            next.delete(firstTrackId);
-          } else {
-            next.add(firstTrackId);
-          }
-          return next;
-        });
-        setSelectedFileId(firstTrackId);
-        setLastSelectedFileId(firstTrackId);
-      }
-    } else {
-      setSelectedAlbumId(albumId);
-      const album = albums.find((entry) => entry.id === albumId);
-      const firstTrackId = album?.trackIds[0] ?? null;
-      setSelectedFileId(firstTrackId);
-      setSelectedFileIds(firstTrackId ? new Set([firstTrackId]) : new Set());
-      setLastSelectedFileId(firstTrackId);
-    }
+    const album = albums.find((entry) => entry.id === albumId);
+    applySelection(
+      selectAlbum(getCurrentSelection(), albumId, album?.trackIds ?? [], {
+        multi: event?.ctrlKey || event?.metaKey,
+      }),
+    );
   };
 
   const handleSelectFile = (albumId: string, fileId: string, event?: ReactMouseEvent) => {
     setActiveView("editor");
     bufferCurrentFormMetadata();
-    const isMultiSelect = event?.ctrlKey || event?.metaKey;
-    const isRangeSelect = event?.shiftKey && lastSelectedFileId;
-
-    if (isRangeSelect) {
-      const album = albums.find((entry) => entry.id === albumId);
-      if (!album) return;
-      const trackIds = album.trackIds;
-      const startIndex = trackIds.indexOf(lastSelectedFileId);
-      const endIndex = trackIds.indexOf(fileId);
-      if (startIndex >= 0 && endIndex >= 0) {
-        const minIndex = Math.min(startIndex, endIndex);
-        const maxIndex = Math.max(startIndex, endIndex);
-        const rangeIds = trackIds.slice(minIndex, maxIndex + 1);
-        setSelectedFileIds((prev) => {
-          const next = new Set(prev);
-          rangeIds.forEach((id) => next.add(id));
-          return next;
-        });
-        setSelectedFileId(fileId);
-        setLastSelectedFileId(fileId);
-      }
-    } else if (isMultiSelect) {
-      setSelectedAlbumId(albumId);
-      setSelectedFileIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(fileId)) {
-          next.delete(fileId);
-        } else {
-          next.add(fileId);
-        }
-        return next;
-      });
-      setSelectedFileId(fileId);
-      setLastSelectedFileId(fileId);
-    } else {
-      setSelectedAlbumId(albumId);
-      setSelectedFileId(fileId);
-      setSelectedFileIds(new Set([fileId]));
-      setLastSelectedFileId(fileId);
-    }
+    const album = albums.find((entry) => entry.id === albumId);
+    if (!album) return;
+    applySelection(
+      selectAlbumTrack(getCurrentSelection(), albumId, fileId, album.trackIds, {
+        multi: event?.ctrlKey || event?.metaKey,
+        range: event?.shiftKey && !!lastSelectedFileId,
+      }),
+    );
   };
 
   const handleSelectLooseTrack = (fileId: string, event?: ReactMouseEvent) => {
     setActiveView("editor");
     bufferCurrentFormMetadata();
-    const isMultiSelect = event?.ctrlKey || event?.metaKey;
-    const isRangeSelect = event?.shiftKey && lastSelectedFileId;
-
-    if (isRangeSelect) {
-      const startIndex = looseTrackIds.indexOf(lastSelectedFileId);
-      const endIndex = looseTrackIds.indexOf(fileId);
-      if (startIndex >= 0 && endIndex >= 0) {
-        const minIndex = Math.min(startIndex, endIndex);
-        const maxIndex = Math.max(startIndex, endIndex);
-        const rangeIds = looseTrackIds.slice(minIndex, maxIndex + 1);
-        setSelectedFileIds((prev) => {
-          const next = new Set(prev);
-          rangeIds.forEach((id) => next.add(id));
-          return next;
-        });
-        setSelectedFileId(fileId);
-        setLastSelectedFileId(fileId);
-      }
-    } else if (isMultiSelect) {
-      setSelectedAlbumId(null);
-      setSelectedFileIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(fileId)) {
-          next.delete(fileId);
-        } else {
-          next.add(fileId);
-        }
-        return next;
-      });
-      setSelectedFileId(fileId);
-      setLastSelectedFileId(fileId);
-    } else {
-      setSelectedAlbumId(null);
-      setSelectedFileId(fileId);
-      setSelectedFileIds(new Set([fileId]));
-      setLastSelectedFileId(fileId);
-    }
+    applySelection(
+      selectLooseTrack(getCurrentSelection(), fileId, looseTrackIds, {
+        multi: event?.ctrlKey || event?.metaKey,
+        range: event?.shiftKey && !!lastSelectedFileId,
+      }),
+    );
   };
 
   const handleClearSelection = useCallback(() => {
     setActiveView("editor");
     bufferCurrentFormMetadata();
-    setSelectedAlbumId(null);
-    setSelectedFileId(null);
-    setSelectedFileIds(new Set());
-    setLastSelectedFileId(null);
-  }, [bufferCurrentFormMetadata]);
+    applySelection(clearSelection());
+  }, [applySelection, bufferCurrentFormMetadata]);
 
   const handleRemoveSelectedFiles = useCallback(() => {
     const idsToRemove = Array.from(selectedFileIds);
@@ -1060,13 +996,13 @@ export default function AudioTagger() {
 
   const handleSelectAllFiles = useCallback(() => {
     bufferCurrentFormMetadata();
-    const allFileIds = new Set(files.map((file) => file.id));
-    setSelectedFileIds(allFileIds);
-    if (files.length > 0) {
-      setSelectedFileId(files[0].id);
-      setLastSelectedFileId(files[0].id);
-    }
-  }, [files, bufferCurrentFormMetadata]);
+    applySelection(
+      selectAllFiles(
+        getCurrentSelection(),
+        files.map((file) => file.id),
+      ),
+    );
+  }, [applySelection, bufferCurrentFormMetadata, files, getCurrentSelection]);
 
   const handleReorderAlbums = (albumId: string, targetIndex: number) => {
     setAlbums((prevAlbums) => reorderAlbums(prevAlbums, albumId, targetIndex));
