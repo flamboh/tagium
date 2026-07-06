@@ -34,6 +34,12 @@ import {
 import TagSidebarPanel from "./TagSidebarPanel";
 import type { PlaylistDownloadQueuePanelState } from "./PlaylistDownloadQueuePanel";
 import {
+  createSingleUrlDownloadPlan,
+  createSoundCloudSetDownloadPlan,
+  fetchImportedCover,
+  type QueuedDownloadTrack,
+} from "./downloadTrack";
+import {
   cancelActivePlaylistDownloadTracks,
   cancelPendingPlaylistDownloadTracks,
   createPlaylistDownloadQueueRun,
@@ -63,22 +69,19 @@ import {
   writeMetadataToFile,
 } from "./mp3Utils";
 import { loadAppSettings, saveAppSettings } from "./settings";
-import {
-  createDownloadMetadata,
-  createPendingDownloadTrack,
-  fetchImportedCover,
-} from "./soundcloudSetImport";
 import { getSampleAlbum } from "./sampleMetadata";
 import type { SoundCloudSet } from "./soundcloudSet";
-import { AlbumGroup, AppSettings, AudioMetadata, ImportedAlbumMetadata, TagiumFile } from "./types";
+import {
+  AlbumGroup,
+  AppSettings,
+  AudioMetadata,
+  ImportedAlbumMetadata,
+  MetadataPatch,
+  TagiumFile,
+} from "./types";
 
 type ActiveView = "editor" | "settings";
-type DownloadRequest = NonNullable<TagiumFile["downloadRequest"]>;
-type ManagedDownloadTrack = {
-  fileId: string;
-  title: string;
-  downloadRequest: DownloadRequest;
-};
+type ManagedDownloadTrack = QueuedDownloadTrack;
 type PlaylistDownloadQueueState = PlaylistDownloadQueueRuntimeSnapshot;
 type PlaylistDownloadQueueRun = PlaylistDownloadQueueRuntimeRun<ManagedDownloadTrack> & {
   budgetWakeTimeout?: ReturnType<typeof setTimeout>;
@@ -102,16 +105,6 @@ const isPlaylistDownloadAbort = (error: unknown) => {
 };
 const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
 const getFileImportKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
-const titleFromSourceUrl = (sourceUrl: string) => {
-  try {
-    const url = new URL(sourceUrl);
-    const [lastPathPart] = url.pathname.split("/").filter(Boolean).slice(-1);
-    if (lastPathPart) return decodeURIComponent(lastPathPart).replaceAll("-", " ");
-    return url.hostname;
-  } catch {
-    return "downloading audio";
-  }
-};
 const getManagedDownloadTrackTitle = (file: TagiumFile) => {
   if (file.metadata?.title) return file.metadata.title;
   return file.filename;
@@ -133,6 +126,123 @@ const createPlaylistDownloadModelTrack = (track: ManagedDownloadTrack) => ({
   title: track.title,
   sourceUrl: track.downloadRequest.sourceUrl,
 });
+type MetadataPatchField = keyof MetadataPatch;
+type DirtyMetadataFields = Partial<Record<keyof AudioMetadata, unknown>>;
+
+const metadataPatchFields = [
+  "filename",
+  "title",
+  "artist",
+  "album",
+  "year",
+  "genre",
+  "picture",
+  "trackNumber",
+] as const satisfies readonly MetadataPatchField[];
+const hasOwn = <Key extends PropertyKey>(object: object, key: Key) =>
+  Object.prototype.hasOwnProperty.call(object, key);
+const getNullableNumericPatchValue = (value: AudioMetadata["year"]): MetadataPatch["year"] =>
+  value === undefined || Number.isNaN(value) ? null : value;
+const getPendingMetadataPatch = (file: TagiumFile): MetadataPatch | undefined =>
+  file.pendingMetadataPatch;
+const createSubmittedMetadataPatch = (metadata: AudioMetadata): MetadataPatch => ({
+  filename: metadata.filename,
+  title: metadata.title,
+  artist: metadata.artist,
+  album: metadata.album,
+  year: getNullableNumericPatchValue(metadata.year),
+  genre: metadata.genre,
+  picture: metadata.picture,
+  trackNumber: getNullableNumericPatchValue(metadata.trackNumber),
+});
+export const getSubmittedAudioMetadata = (
+  data: AudioMetadata,
+  syncFilenames: boolean,
+): AudioMetadata =>
+  syncFilenames ? { ...data, filename: filenamify(data.title, { replacement: "-" }) } : data;
+export const createSparseMetadataPatch = (
+  metadata: AudioMetadata,
+  fields: Iterable<MetadataPatchField>,
+  syncFilenames: boolean,
+): MetadataPatch | undefined => {
+  const patchFields = new Set(fields);
+  if (syncFilenames && patchFields.has("title")) {
+    patchFields.add("filename");
+  }
+
+  const patch: MetadataPatch = {};
+  for (const field of metadataPatchFields) {
+    if (!patchFields.has(field)) continue;
+
+    switch (field) {
+      case "filename":
+        patch.filename = metadata.filename;
+        break;
+      case "title":
+        patch.title = metadata.title;
+        break;
+      case "artist":
+        patch.artist = metadata.artist;
+        break;
+      case "album":
+        patch.album = metadata.album;
+        break;
+      case "year":
+        patch.year = getNullableNumericPatchValue(metadata.year);
+        break;
+      case "genre":
+        patch.genre = metadata.genre;
+        break;
+      case "picture":
+        patch.picture = metadata.picture;
+        break;
+      case "trackNumber":
+        patch.trackNumber = getNullableNumericPatchValue(metadata.trackNumber);
+        break;
+    }
+  }
+
+  return Object.keys(patch).length > 0 ? patch : undefined;
+};
+export const createDirtyMetadataPatch = (
+  metadata: AudioMetadata,
+  dirtyFields: DirtyMetadataFields,
+  syncFilenames: boolean,
+  extraFields: Iterable<MetadataPatchField> = [],
+): MetadataPatch | undefined => {
+  const fields = new Set<MetadataPatchField>(extraFields);
+  for (const field of metadataPatchFields) {
+    if (dirtyFields[field]) {
+      fields.add(field);
+    }
+  }
+
+  return createSparseMetadataPatch(metadata, fields, syncFilenames);
+};
+const applyMetadataPatch = (metadata: AudioMetadata, patch: MetadataPatch): AudioMetadata => ({
+  ...metadata,
+  ...(hasOwn(patch, "filename") ? { filename: patch.filename } : {}),
+  ...(hasOwn(patch, "title") ? { title: patch.title } : {}),
+  ...(hasOwn(patch, "artist") ? { artist: patch.artist } : {}),
+  ...(hasOwn(patch, "album") ? { album: patch.album } : {}),
+  ...(hasOwn(patch, "year") ? { year: patch.year } : {}),
+  ...(hasOwn(patch, "genre") ? { genre: patch.genre } : {}),
+  ...(hasOwn(patch, "picture") ? { picture: patch.picture } : {}),
+  ...(hasOwn(patch, "trackNumber") ? { trackNumber: patch.trackNumber } : {}),
+});
+const getFilenameFromPatch = (file: TagiumFile, patch: MetadataPatch) =>
+  hasOwn(patch, "filename") && patch.filename ? `${patch.filename}.mp3` : file.filename;
+const withPendingMetadataPatch = (
+  file: TagiumFile,
+  pendingMetadataPatch: MetadataPatch | undefined,
+) => ({
+  ...file,
+  pendingMetadataPatch,
+  hasBufferedChanges: Boolean(pendingMetadataPatch),
+});
+const withMergedPendingMetadataPatch = (file: TagiumFile, patch: MetadataPatch | undefined) =>
+  patch ? withPendingMetadataPatch(file, { ...file.pendingMetadataPatch, ...patch }) : file;
+const clearPendingMetadataPatch = (file: TagiumFile) => withPendingMetadataPatch(file, undefined);
 
 export default function AudioTagger() {
   const [files, setFiles] = useState<TagiumFile[]>([]);
@@ -245,13 +355,15 @@ export default function AudioTagger() {
       };
       const nextFiles = filesRef.current.map((file) =>
         file.id === fileToUpdate.id
-          ? {
-              ...file,
-              filename: newTags.filename ? `${newTags.filename}.mp3` : file.filename,
-              metadata,
-              status: "pending" as const,
-              hasBufferedChanges: true,
-            }
+          ? withPendingMetadataPatch(
+              {
+                ...file,
+                filename: newTags.filename ? `${newTags.filename}.mp3` : file.filename,
+                metadata,
+                status: "pending" as const,
+              },
+              createSubmittedMetadataPatch(metadata),
+            )
           : file,
       );
       filesRef.current = nextFiles;
@@ -275,7 +387,7 @@ export default function AudioTagger() {
       };
       const nextFiles = filesRef.current.map((file) =>
         file.id === fileToUpdate.id
-          ? {
+          ? clearPendingMetadataPatch({
               ...file,
               file: updatedFile,
               filename: updatedFile.name,
@@ -283,8 +395,7 @@ export default function AudioTagger() {
               status: "saved" as const,
               downloadStatus: "ready" as const,
               downloadError: undefined,
-              hasBufferedChanges: false,
-            }
+            })
           : file,
       );
       filesRef.current = nextFiles;
@@ -299,24 +410,26 @@ export default function AudioTagger() {
       }
       const nextFiles = filesRef.current.map((file) =>
         file.id === fileToUpdate.id
-          ? {
-              ...file,
-              status: "error" as const,
-              metadata: {
-                ...newTags,
-                year: Number.isNaN(newTags.year as number) ? undefined : newTags.year,
-                trackNumber: Number.isNaN(newTags.trackNumber as number)
-                  ? undefined
-                  : newTags.trackNumber,
-                duration: file.metadata?.duration || 0,
-                bitrate: file.metadata?.bitrate || 0,
-                sampleRate: file.metadata?.sampleRate || 0,
-                picture: newTags.picture || [],
+          ? withPendingMetadataPatch(
+              {
+                ...file,
+                status: "error" as const,
+                metadata: {
+                  ...newTags,
+                  year: Number.isNaN(newTags.year as number) ? undefined : newTags.year,
+                  trackNumber: Number.isNaN(newTags.trackNumber as number)
+                    ? undefined
+                    : newTags.trackNumber,
+                  duration: file.metadata?.duration || 0,
+                  bitrate: file.metadata?.bitrate || 0,
+                  sampleRate: file.metadata?.sampleRate || 0,
+                  picture: newTags.picture || [],
+                },
+                filename: newTags.filename ? `${newTags.filename}.mp3` : file.filename,
+                downloadError: message,
               },
-              filename: newTags.filename ? `${newTags.filename}.mp3` : file.filename,
-              downloadError: message,
-              hasBufferedChanges: true,
-            }
+              createSubmittedMetadataPatch(newTags),
+            )
           : file,
       );
       filesRef.current = nextFiles;
@@ -325,10 +438,7 @@ export default function AudioTagger() {
     }
   };
   const getSubmittedMetadata = useCallback(
-    (data: AudioMetadata) =>
-      settings.syncFilenames
-        ? { ...data, filename: filenamify(data.title, { replacement: "-" }) }
-        : data,
+    (data: AudioMetadata) => getSubmittedAudioMetadata(data, settings.syncFilenames),
     [settings.syncFilenames],
   );
 
@@ -339,19 +449,29 @@ export default function AudioTagger() {
       if (trackIds && !trackIds.includes(selectedId)) return filesToSync;
 
       const submittedData = getSubmittedMetadata(getValues());
+      const metadataPatch = createDirtyMetadataPatch(
+        submittedData,
+        dirtyFields,
+        settings.syncFilenames,
+      );
+      if (!metadataPatch) return filesToSync;
       return filesToSync.map((file) =>
         file.id === selectedId
-          ? {
-              ...file,
-              filename: submittedData.filename ? `${submittedData.filename}.mp3` : file.filename,
-              metadata: submittedData,
-              status: file.status === "saved" ? "pending" : file.status,
-              hasBufferedChanges: true,
-            }
+          ? withMergedPendingMetadataPatch(
+              {
+                ...file,
+                filename: getFilenameFromPatch(file, metadataPatch),
+                metadata: file.metadata
+                  ? applyMetadataPatch(file.metadata, metadataPatch)
+                  : submittedData,
+                status: file.status === "saved" ? "pending" : file.status,
+              },
+              metadataPatch,
+            )
           : file,
       );
     },
-    [getSubmittedMetadata, getValues],
+    [dirtyFields, getSubmittedMetadata, getValues, settings.syncFilenames],
   );
 
   const handlePreviewMetadataChange = useCallback(
@@ -364,21 +484,32 @@ export default function AudioTagger() {
         ...getValues(),
         [field]: value,
       });
+      const metadataPatch = createDirtyMetadataPatch(
+        submittedData,
+        dirtyFields,
+        settings.syncFilenames,
+        [field],
+      );
+      if (!metadataPatch) return;
       const nextFiles = filesRef.current.map((file) =>
         file.id === selectedId
-          ? {
-              ...file,
-              filename: submittedData.filename ? `${submittedData.filename}.mp3` : file.filename,
-              metadata: submittedData,
-              status: file.status === "saved" ? "pending" : file.status,
-              hasBufferedChanges: true,
-            }
+          ? withMergedPendingMetadataPatch(
+              {
+                ...file,
+                filename: getFilenameFromPatch(file, metadataPatch),
+                metadata: file.metadata
+                  ? applyMetadataPatch(file.metadata, metadataPatch)
+                  : submittedData,
+                status: file.status === "saved" ? "pending" : file.status,
+              },
+              metadataPatch,
+            )
           : file,
       );
       filesRef.current = nextFiles;
       setFiles(nextFiles);
     },
-    [getSubmittedMetadata, getValues],
+    [dirtyFields, getSubmittedMetadata, getValues, settings.syncFilenames],
   );
 
   const bufferCurrentFormMetadata = useCallback(
@@ -621,12 +752,18 @@ export default function AudioTagger() {
     const parsedFile = parsedUpload.file;
     const formMetadata =
       selectedFileIdRef.current === fileId && formDirtyRef.current && currentFile.metadata
-        ? getValues()
+        ? getSubmittedMetadata(getValues())
         : undefined;
+    const currentPendingPatch = formMetadata
+      ? createDirtyMetadataPatch(formMetadata, dirtyFields, settings.syncFilenames)
+      : getPendingMetadataPatch(currentFile);
+    const currentFileWithPendingPatch = currentPendingPatch
+      ? withPendingMetadataPatch(currentFile, currentPendingPatch)
+      : currentFile;
     let { hydratedFile, metadataToWrite } = prepareDownloadedTrackHydration(
-      currentFile,
+      currentFileWithPendingPatch,
       parsedFile,
-      formMetadata,
+      currentPendingPatch,
     );
 
     if (metadataToWrite) {
@@ -637,15 +774,26 @@ export default function AudioTagger() {
         const latestFile = filesRef.current.find((file) => file.id === fileId);
         if (!latestFile) return;
         const latestFormMetadata =
-          selectedFileIdRef.current === fileId && formDirtyRef.current ? getValues() : undefined;
+          selectedFileIdRef.current === fileId && formDirtyRef.current
+            ? getSubmittedMetadata(getValues())
+            : undefined;
+        const latestFormPatch = latestFormMetadata
+          ? createDirtyMetadataPatch(latestFormMetadata, dirtyFields, settings.syncFilenames)
+          : undefined;
+        const latestMetadataForResolve =
+          latestFormPatch && latestFile.metadata
+            ? applyMetadataPatch(latestFile.metadata, latestFormPatch)
+            : latestFormMetadata;
         hydratedFile = resolveDownloadedTrackHydrationWrite(
-          currentFile,
-          latestFile,
+          currentFileWithPendingPatch,
+          latestFormPatch
+            ? withMergedPendingMetadataPatch(latestFile, latestFormPatch)
+            : latestFile,
           parsedFile,
           hydratedFile,
           updatedFile,
           metadataToWrite,
-          latestFormMetadata,
+          latestMetadataForResolve,
         );
       } catch (error) {
         const latestFile = filesRef.current.find((file) => file.id === fileId);
@@ -655,7 +803,7 @@ export default function AudioTagger() {
           message = error.message;
         }
         hydratedFile = resolveDownloadedTrackHydrationWriteError(
-          currentFile,
+          currentFileWithPendingPatch,
           latestFile,
           parsedFile,
           hydratedFile,
@@ -665,7 +813,14 @@ export default function AudioTagger() {
     }
 
     signal?.throwIfAborted();
-    replaceFileById(fileId, hydratedFile);
+    const hydratedPendingPatch =
+      metadataToWrite && hydratedFile.status !== "saved"
+        ? (getPendingMetadataPatch(hydratedFile) ??
+          (hydratedFile.metadata
+            ? createSubmittedMetadataPatch(hydratedFile.metadata)
+            : metadataToWrite))
+        : undefined;
+    replaceFileById(fileId, withPendingMetadataPatch(hydratedFile, hydratedPendingPatch));
   };
   const replacePlaylistQueueState = (nextQueue: PlaylistDownloadQueueState) => {
     playlistDownloadQueueRef.current = nextQueue;
@@ -886,79 +1041,47 @@ export default function AudioTagger() {
   const handleAudioDownload = (sourceUrl: string) => {
     bufferCurrentFormMetadata();
     setActiveView("editor");
-    const id = crypto.randomUUID();
-    const title = titleFromSourceUrl(sourceUrl);
-    const pendingFile = createPendingDownloadTrack(
-      id,
-      createDownloadMetadata({
-        title,
-        artist: "",
-        album: "",
-        genre: "",
-      }),
-      false,
-      { sourceUrl, audioBitrate: settings.audioBitrate },
-    );
-    const nextFiles = [...filesRef.current, pendingFile];
+    const plan = createSingleUrlDownloadPlan({
+      sourceUrl,
+      audioBitrate: settings.audioBitrate,
+      createId: () => crypto.randomUUID(),
+    });
+    const nextFiles = [...filesRef.current, ...plan.pendingFiles];
     filesRef.current = nextFiles;
     setFiles(nextFiles);
-    setLooseTrackIds((prevLooseTrackIds) => asUniqueTrackIds([...prevLooseTrackIds, id]));
-    setSelectedAlbumId(null);
-    setSelectedFileId(id);
-    setSelectedFileIds(new Set([id]));
-    setLastSelectedFileId(id);
-    queueDownloadTracks([
-      {
-        fileId: id,
-        title,
-        downloadRequest: { sourceUrl, audioBitrate: settings.audioBitrate },
-      },
-    ]);
+    setLooseTrackIds((prevLooseTrackIds) =>
+      asUniqueTrackIds([...prevLooseTrackIds, ...plan.looseTrackIds]),
+    );
+    setSelectedAlbumId(plan.selection.selectedAlbumId);
+    setSelectedFileId(plan.selection.selectedFileId);
+    setSelectedFileIds(plan.selection.selectedFileIds);
+    setLastSelectedFileId(plan.selection.lastSelectedFileId);
+    queueDownloadTracks(plan.queuedTracks);
   };
   const handleSoundCloudSetDownload = (set: SoundCloudSet) => {
     bufferCurrentFormMetadata();
     setActiveView("editor");
-    const albumId = crypto.randomUUID();
-    const pendingFiles = set.tracks.map((track) =>
-      createPendingDownloadTrack(
-        crypto.randomUUID(),
-        createDownloadMetadata({
-          title: track.title,
-          artist: set.artist,
-          album: set.title,
-          genre: set.genre,
-          year: set.year,
-          duration: track.duration,
-          trackNumber: track.trackNumber,
-        }),
-        true,
-        { sourceUrl: track.url, audioBitrate: settings.audioBitrate },
-      ),
-    );
-    const album: AlbumGroup = {
-      id: albumId,
-      title: set.title,
-      artist: set.artist,
-      genre: set.genre,
-      trackIds: pendingFiles.map((file) => file.id),
-      year: set.year,
-    };
-    const nextFiles = [...filesRef.current, ...pendingFiles];
-    const nextAlbums = [...albumsRef.current, album];
+    const plan = createSoundCloudSetDownloadPlan({
+      set,
+      audioBitrate: settings.audioBitrate,
+      createId: () => crypto.randomUUID(),
+    });
+    const nextFiles = [...filesRef.current, ...plan.pendingFiles];
+    const nextAlbums = [...albumsRef.current, plan.album];
     filesRef.current = nextFiles;
     albumsRef.current = nextAlbums;
     setFiles(nextFiles);
     setAlbums(nextAlbums);
-    setSelectedAlbumId(albumId);
-    setSelectedFileId(pendingFiles[0]?.id ?? null);
-    setSelectedFileIds(new Set(pendingFiles[0] ? [pendingFiles[0].id] : []));
-    setLastSelectedFileId(pendingFiles[0]?.id ?? null);
+    setSelectedAlbumId(plan.selection.selectedAlbumId);
+    setSelectedFileId(plan.selection.selectedFileId);
+    setSelectedFileIds(plan.selection.selectedFileIds);
+    setLastSelectedFileId(plan.selection.lastSelectedFileId);
 
-    const coverUrl = set.coverUrl;
-    if (coverUrl) {
+    const coverImport = plan.coverImport;
+    if (coverImport) {
       void (async () => {
         try {
-          const cover = await fetchImportedCover(coverUrl);
+          const cover = await fetchImportedCover(coverImport.coverUrl);
           const {
             albums: coveredAlbums,
             files: coveredFiles,
@@ -966,9 +1089,9 @@ export default function AudioTagger() {
           } = applySoundCloudSetImportedCover(
             filesRef.current,
             albumsRef.current,
-            albumId,
-            album.trackIds,
-            set,
+            coverImport.albumId,
+            coverImport.trackIds,
+            coverImport.set,
             settings,
             cover,
             selectedFileIdRef.current,
@@ -982,7 +1105,7 @@ export default function AudioTagger() {
           if (selectedMetadata) {
             reset(selectedMetadata);
           }
-          const trackIdSet = new Set(album.trackIds);
+          const trackIdSet = new Set(coverImport.trackIds);
           await Promise.all(
             coveredFiles
               .filter((file) => trackIdSet.has(file.id) && Boolean(file.file) && file.metadata)
@@ -1001,10 +1124,7 @@ export default function AudioTagger() {
       })();
     }
 
-    const tracksToDownload = pendingFiles
-      .map((pendingFile) => managedDownloadTrackFromFile(pendingFile))
-      .filter((track): track is ManagedDownloadTrack => Boolean(track));
-    queueDownloadTracks(tracksToDownload);
+    queueDownloadTracks(plan.queuedTracks);
   };
   const handleRetryDownload = (fileId: string) => {
     const fileToRetry = filesRef.current.find((file) => file.id === fileId);

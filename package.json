@@ -24,6 +24,7 @@
     "@radix-ui/react-slot": "^1.2.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "effect": "^4.0.0-beta.93",
     "fflate": "^0.8.2",
     "filenamify": "^7.0.1",
     "lucide-react": "^0.542.0",

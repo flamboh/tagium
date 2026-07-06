@@ -1,4 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
+import {
+  createSingleUrlDownloadPlan,
+  createSoundCloudSetDownloadPlan,
+  type QueuedDownloadTrack,
+} from "./downloadTrack";
 import { startSoundCloudSetImport } from "./soundcloudSetImport";
 import type { SoundCloudSet } from "./soundcloudSet";
 import type { AlbumGroup, AppSettings, AudioMetadata, TagiumFile } from "./types";
@@ -75,10 +80,9 @@ const createHarness = (settings: AppSettings = defaultSettings) => {
   let lastSelectedFileId: string | null = null;
   let bufferCount = 0;
   const events: string[] = [];
-  const hydratedPictures: Array<AudioMetadata["picture"] | undefined> = [];
+  const queuedTracks: QueuedDownloadTrack[] = [];
   const updateTagsCalls: string[] = [];
   const coverRequest = deferred<AudioMetadata["picture"]>();
-  const downloads = new Map<string, Deferred<File>>();
   const ids = ["album-1", "track-1", "track-2"];
 
   const start = (set: SoundCloudSet) =>
@@ -119,33 +123,29 @@ const createHarness = (settings: AppSettings = defaultSettings) => {
         events.push(`cover:${coverUrl}`);
         return coverRequest.promise;
       },
-      downloadCobaltAudio: (request) => {
-        events.push(`download:${request.sourceUrl}:${request.audioBitrate}`);
-        const download = deferred<File>();
-        downloads.set(request.sourceUrl, download);
-        return download.promise;
+      queueDownloadTracks: (tracks) => {
+        queuedTracks.push(...tracks);
       },
-      hydrateDownloadedTrack: async (fileId, downloadedFile) => {
-        const currentFile = files.find((file) => file.id === fileId);
-        hydratedPictures.push(currentFile?.metadata?.picture);
-        files = files.map((file) =>
-          file.id === fileId
-            ? {
-                ...file,
-                file: downloadedFile,
-                originalFile: downloadedFile,
-                status: file.hasBufferedChanges ? "pending" : "saved",
-                downloadStatus: "ready",
-              }
-            : file,
-        );
-      },
-      markDownloadError: () => {},
       updateTags: async (file) => {
         updateTagsCalls.push(file.id);
       },
       warn: () => {},
     });
+
+  const markDownloaded = (fileId: string) => {
+    const downloadedFile = new File([fileId], `${fileId}.mp3`, { type: "audio/mpeg" });
+    files = files.map((file) =>
+      file.id === fileId
+        ? {
+            ...file,
+            file: downloadedFile,
+            originalFile: downloadedFile,
+            status: file.hasBufferedChanges ? "pending" : "saved",
+            downloadStatus: "ready",
+          }
+        : file,
+    );
+  };
 
   return {
     get activeView() {
@@ -158,16 +158,16 @@ const createHarness = (settings: AppSettings = defaultSettings) => {
       return bufferCount;
     },
     coverRequest,
-    downloads,
     events,
     get files() {
       return files;
     },
-    get hydratedPictures() {
-      return hydratedPictures;
-    },
     get lastSelectedFileId() {
       return lastSelectedFileId;
+    },
+    markDownloaded,
+    get queuedTracks() {
+      return queuedTracks;
     },
     get selectedAlbumId() {
       return selectedAlbumId;
@@ -183,8 +183,80 @@ const createHarness = (settings: AppSettings = defaultSettings) => {
   };
 };
 
+describe("download track plans", () => {
+  it("creates the same queued track shape for single URL and SoundCloud set plans", () => {
+    const singlePlan = createSingleUrlDownloadPlan({
+      sourceUrl: "https://soundcloud.com/artist/direct-track",
+      audioBitrate: "320",
+      createId: () => "single-track",
+    });
+    const ids = ["album-1", "set-track-1", "set-track-2"];
+    const setPlan = createSoundCloudSetDownloadPlan({
+      set: soundCloudSet(),
+      audioBitrate: "320",
+      createId: () => {
+        const id = ids.shift();
+        if (!id) throw new Error("missing test id");
+        return id;
+      },
+    });
+
+    expect(singlePlan.queuedTracks).toEqual([
+      {
+        fileId: "single-track",
+        title: "direct track",
+        downloadRequest: {
+          sourceUrl: "https://soundcloud.com/artist/direct-track",
+          audioBitrate: "320",
+        },
+      },
+    ]);
+    expect(singlePlan.pendingFiles[0].hasBufferedChanges).toBe(false);
+    expect(singlePlan.pendingFiles[0].pendingMetadataPatch).toBeUndefined();
+    expect(Object.keys(singlePlan.queuedTracks[0]).sort()).toEqual(
+      Object.keys(setPlan.queuedTracks[0]).sort(),
+    );
+    expect(setPlan.pendingFiles.map((file) => file.pendingMetadataPatch)).toEqual([
+      {
+        title: "First Track",
+        artist: "Set Artist",
+        album: "Imported Set",
+        genre: "Electronic",
+        year: 2024,
+        trackNumber: 1,
+      },
+      {
+        title: "Second Track",
+        artist: "Set Artist",
+        album: "Imported Set",
+        genre: "Electronic",
+        year: 2024,
+        trackNumber: 2,
+      },
+    ]);
+    expect(setPlan.queuedTracks).toEqual([
+      {
+        fileId: "set-track-1",
+        title: "First Track",
+        downloadRequest: {
+          sourceUrl: "https://soundcloud.com/artist/first-track",
+          audioBitrate: "320",
+        },
+      },
+      {
+        fileId: "set-track-2",
+        title: "Second Track",
+        downloadRequest: {
+          sourceUrl: "https://soundcloud.com/artist/second-track",
+          audioBitrate: "320",
+        },
+      },
+    ]);
+  });
+});
+
 describe("soundcloud set import", () => {
-  it("imports an album through the shipped operation across cover and hydration ordering", async () => {
+  it("imports an album plan, queues shared download tracks, and applies cover to downloaded files", async () => {
     const harness = createHarness();
 
     harness.start(soundCloudSet());
@@ -209,19 +281,45 @@ describe("soundcloud set import", () => {
       { sourceUrl: "https://soundcloud.com/artist/first-track", audioBitrate: "320" },
       { sourceUrl: "https://soundcloud.com/artist/second-track", audioBitrate: "320" },
     ]);
-    expect(harness.events).toEqual([
-      "cover:https://img.example/cover.jpg",
-      "download:https://soundcloud.com/artist/first-track:320",
-      "download:https://soundcloud.com/artist/second-track:320",
+    expect(harness.files.map((file) => file.pendingMetadataPatch)).toEqual([
+      {
+        title: "First Track",
+        artist: "Set Artist",
+        album: "Imported Set",
+        genre: "Electronic",
+        year: 2024,
+        trackNumber: 1,
+      },
+      {
+        title: "Second Track",
+        artist: "Set Artist",
+        album: "Imported Set",
+        genre: "Electronic",
+        year: 2024,
+        trackNumber: 2,
+      },
     ]);
+    expect(harness.queuedTracks).toEqual([
+      {
+        fileId: "track-1",
+        title: "First Track",
+        downloadRequest: {
+          sourceUrl: "https://soundcloud.com/artist/first-track",
+          audioBitrate: "320",
+        },
+      },
+      {
+        fileId: "track-2",
+        title: "Second Track",
+        downloadRequest: {
+          sourceUrl: "https://soundcloud.com/artist/second-track",
+          audioBitrate: "320",
+        },
+      },
+    ]);
+    expect(harness.events).toEqual(["cover:https://img.example/cover.jpg"]);
 
-    harness.downloads
-      .get("https://soundcloud.com/artist/first-track")
-      ?.resolve(new File(["first"], "first.mp3", { type: "audio/mpeg" }));
-    await settle();
-
-    expect(harness.hydratedPictures).toEqual([[]]);
-
+    harness.markDownloaded("track-1");
     harness.coverRequest.resolve(cover);
     await settle();
 
@@ -229,32 +327,19 @@ describe("soundcloud set import", () => {
     expect(harness.files.map((file) => file.metadata?.picture)).toEqual([cover, cover]);
     expect(harness.files.map((file) => file.hasBufferedChanges)).toEqual([true, true]);
     expect(harness.updateTagsCalls).toEqual(["track-1"]);
-
-    harness.downloads
-      .get("https://soundcloud.com/artist/second-track")
-      ?.resolve(new File(["second"], "second.mp3", { type: "audio/mpeg" }));
-    await settle();
-
-    expect(harness.hydratedPictures).toEqual([[], cover]);
   });
 
   it("keeps SoundCloud playlist cover off track metadata even when setting is enabled", async () => {
     const harness = createHarness();
 
     harness.start(soundCloudSet({ isAlbum: false }));
+    harness.markDownloaded("track-1");
     harness.coverRequest.resolve(cover);
     await settle();
 
     expect(harness.albums[0].cover).toEqual(cover);
     expect(harness.files.map((file) => file.metadata?.picture)).toEqual([[], []]);
     expect(harness.updateTagsCalls).toEqual([]);
-
-    harness.downloads
-      .get("https://soundcloud.com/artist/first-track")
-      ?.resolve(new File(["first"], "first.mp3", { type: "audio/mpeg" }));
-    await settle();
-
-    expect(harness.hydratedPictures).toEqual([[]]);
   });
 
   it("keeps SoundCloud album cover off track metadata when the setting is disabled", async () => {
@@ -264,6 +349,7 @@ describe("soundcloud set import", () => {
     });
 
     harness.start(soundCloudSet());
+    harness.markDownloaded("track-1");
     harness.coverRequest.resolve(cover);
     await settle();
 
