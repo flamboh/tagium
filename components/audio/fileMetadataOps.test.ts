@@ -23,7 +23,7 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   bitrate: 0,
   sampleRate: 0,
   picture: [],
-  trackNumber: undefined,
+  trackNumber: null,
   ...overrides,
 });
 
@@ -61,7 +61,7 @@ describe("fileMetadataOps", () => {
           bitrate: 0,
           sampleRate: 0,
           picture: [],
-          trackNumber: undefined,
+          trackNumber: null,
         },
       },
       {
@@ -83,7 +83,7 @@ describe("fileMetadataOps", () => {
           bitrate: 0,
           sampleRate: 0,
           picture: [],
-          trackNumber: undefined,
+          trackNumber: null,
         },
       },
     ];
@@ -506,8 +506,8 @@ describe("fileMetadataOps", () => {
       metadata: metadata({
         filename: "parsed-title",
         title: "Parsed Title",
-        year: undefined,
-        trackNumber: undefined,
+        year: null,
+        trackNumber: null,
       }),
     });
 
@@ -517,10 +517,10 @@ describe("fileMetadataOps", () => {
     );
 
     expect(hydratedFile.metadata?.title).toBe("Provider Title");
-    expect(hydratedFile.metadata?.year).toBeUndefined();
-    expect(hydratedFile.metadata?.trackNumber).toBeUndefined();
-    expect(metadataToWrite?.year).toBeUndefined();
-    expect(metadataToWrite?.trackNumber).toBeUndefined();
+    expect(hydratedFile.metadata?.year).toBeNull();
+    expect(hydratedFile.metadata?.trackNumber).toBeNull();
+    expect(metadataToWrite?.year).toBeNull();
+    expect(metadataToWrite?.trackNumber).toBeNull();
     expect(hydratedFile.pendingMetadataPatch?.title).toBe("Provider Title");
     expect(
       Object.prototype.hasOwnProperty.call(hydratedFile.pendingMetadataPatch ?? {}, "year"),
@@ -543,8 +543,8 @@ describe("fileMetadataOps", () => {
       metadata: metadata({
         filename: "parsed-title",
         title: "Parsed Title",
-        year: undefined,
-        trackNumber: undefined,
+        year: null,
+        trackNumber: null,
       }),
     });
 
@@ -596,8 +596,8 @@ describe("fileMetadataOps", () => {
         artist: "Parsed Artist",
         album: "Parsed Album",
         genre: "Parsed Genre",
-        year: undefined,
-        trackNumber: undefined,
+        year: null,
+        trackNumber: null,
         duration: 123,
         bitrate: 320,
         sampleRate: 44100,
@@ -953,7 +953,7 @@ describe("fileMetadataOps", () => {
       metadata: metadata({
         filename: "new-download",
         title: "New Download",
-        year: undefined,
+        year: null,
       }),
     });
     const parsedFile = readyFile({
@@ -962,7 +962,7 @@ describe("fileMetadataOps", () => {
       metadata: metadata({
         filename: "new-download",
         title: "New Download",
-        year: undefined,
+        year: null,
         duration: 64,
         bitrate: 320,
         sampleRate: 44100,
@@ -980,7 +980,7 @@ describe("fileMetadataOps", () => {
     );
 
     expect(metadataToWrite?.year).toBeUndefined();
-    expect(hydratedFile.metadata?.year).toBeUndefined();
+    expect(hydratedFile.metadata?.year).toBeNull();
     expect(hydratedFile.metadata?.duration).toBe(64);
     expect(hydratedFile.metadata?.bitrate).toBe(320);
     expect(hydratedFile.metadata?.sampleRate).toBe(44100);
@@ -1003,7 +1003,7 @@ describe("fileMetadataOps", () => {
       metadata: metadata({
         filename: "parsed-download",
         title: "Parsed Download",
-        year: undefined,
+        year: null,
         duration: 71,
       }),
     });

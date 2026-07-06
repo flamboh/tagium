@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { downloadFromCobalt, runAudioBackendEffect } from "./audioBackend";
 import { runAudioEffectWithoutServices } from "./audioRuntime";
+import type { CobaltAudioDownloadRequest } from "./cobaltAudio";
+import type { CobaltDownloadPlan } from "./cobaltAudioSchemas";
 import { decodeCobaltDownloadPlanEffect } from "./cobaltAudioSchemas";
-import {
-  applyCobaltAudioMetadata,
-  downloadCobaltAudio,
-  validateLocalAudioPlan,
-} from "./cobaltDownload";
-import type { CobaltDownloadPlan } from "./cobaltDownload";
+import { applyCobaltAudioMetadata, validateLocalAudioPlan } from "./localAudioProcessor";
+
+const runCobaltDownload = (request: CobaltAudioDownloadRequest) =>
+  runAudioBackendEffect(downloadFromCobalt(request));
 
 interface FakeMP3TagInstance {
   buffer?: ArrayBuffer;
@@ -65,7 +66,7 @@ const localAudioPlan = (overrides: Partial<LocalAudioPlan> = {}): LocalAudioPlan
   ...overrides,
 });
 
-describe("downloadCobaltAudio", () => {
+describe("CobaltAudio download", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
@@ -101,7 +102,7 @@ describe("downloadCobaltAudio", () => {
 
     const downloads = Promise.all(
       Array.from({ length: 4 }, (_value, index) =>
-        downloadCobaltAudio({
+        runCobaltDownload({
           sourceUrl: `https://soundcloud.com/artist/track-${index}`,
           audioBitrate: "128",
         }),
@@ -142,7 +143,7 @@ describe("downloadCobaltAudio", () => {
 
     const downloads = Promise.all(
       Array.from({ length: 2 }, (_value, downloadIndex) =>
-        downloadCobaltAudio({
+        runCobaltDownload({
           sourceUrl: `https://soundcloud.com/artist/wait-${downloadIndex}`,
           audioBitrate: "128",
           onLifecycle: (event) => {
@@ -198,19 +199,19 @@ describe("downloadCobaltAudio", () => {
       }),
     );
 
-    await downloadCobaltAudio({
+    await runCobaltDownload({
       sourceUrl: "https://soundcloud.com/artist/prime",
       audioBitrate: "128",
     });
 
-    const delayedDownload = downloadCobaltAudio({
+    const delayedDownload = runCobaltDownload({
       sourceUrl: "https://soundcloud.com/artist/delayed",
       audioBitrate: "128",
     });
     await vi.advanceTimersByTimeAsync(0);
 
     const controller = new AbortController();
-    const abortedDownload = downloadCobaltAudio({
+    const abortedDownload = runCobaltDownload({
       sourceUrl: "https://soundcloud.com/artist/aborted",
       audioBitrate: "128",
       signal: controller.signal,
@@ -248,7 +249,7 @@ describe("downloadCobaltAudio", () => {
     );
 
     await expect(
-      downloadCobaltAudio({
+      runCobaltDownload({
         sourceUrl: "https://soundcloud.com/artist/malformed",
         audioBitrate: "128",
       }),
@@ -338,7 +339,7 @@ describe("downloadCobaltAudio", () => {
       },
     );
 
-    const file = await downloadCobaltAudio({
+    const file = await runCobaltDownload({
       sourceUrl: "https://soundcloud.com/artist/track",
       audioBitrate: "128",
     });
@@ -397,7 +398,7 @@ describe("downloadCobaltAudio", () => {
     );
 
     await expect(
-      downloadCobaltAudio({
+      runCobaltDownload({
         sourceUrl: "https://soundcloud.com/artist/track",
         audioBitrate: "128",
       }),
@@ -463,7 +464,7 @@ describe("downloadCobaltAudio", () => {
       },
     );
 
-    const file = await downloadCobaltAudio({
+    const file = await runCobaltDownload({
       sourceUrl: "https://soundcloud.com/artist/track",
       audioBitrate: "128",
     });
@@ -579,7 +580,7 @@ describe("downloadCobaltAudio", () => {
       },
     );
 
-    const file = await downloadCobaltAudio({
+    const file = await runCobaltDownload({
       sourceUrl: "https://soundcloud.com/artist/track",
       audioBitrate: "256",
     });

@@ -1,11 +1,9 @@
 import { Context, Effect, Layer } from "effect";
 import { AudioDecodeError, toPublicAudioError } from "./audioErrors";
-import { makeAudioRuntime } from "./audioRuntime";
-import { decodeCobaltDownloadPlanEffect, type CobaltDownloadPlan } from "./cobaltAudioSchemas";
+import { decodeCobaltDownloadPlanEffect } from "./cobaltAudioSchemas";
 import { LocalAudioProcessor, LocalAudioProcessorLive } from "./localAudioProcessor";
 
 export type AudioDownloadBitrate = "320" | "256" | "128" | "96" | "64";
-export type { CobaltDownloadPlan } from "./cobaltAudioSchemas";
 
 export type CobaltAudioDownloadLifecycleEvent =
   | {
@@ -277,8 +275,6 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
     });
 
   return CobaltAudio.of({
-    fetchPlan,
-    fetchTunnelFile,
     download: (request) =>
       withCobaltDownloadSlot(runDownload(request), request.signal).pipe(
         Effect.mapError(toPublicAudioError),
@@ -289,16 +285,6 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
 export class CobaltAudio extends Context.Service<
   CobaltAudio,
   {
-    readonly fetchPlan: (
-      request: CobaltAudioDownloadRequest,
-    ) => Effect.Effect<CobaltDownloadPlan, Error>;
-    readonly fetchTunnelFile: (
-      url: string,
-      filename: string,
-      lastModified: number,
-      onLifecycle?: CobaltAudioDownloadLifecycleCallback,
-      signal?: AbortSignal,
-    ) => Effect.Effect<File, Error>;
     readonly download: (request: CobaltAudioDownloadRequest) => Effect.Effect<File, Error>;
   }
 >()("CobaltAudio") {}
@@ -306,10 +292,3 @@ export class CobaltAudio extends Context.Service<
 export const CobaltAudioLive = Layer.effect(CobaltAudio, makeCobaltAudio()).pipe(
   Layer.provide(LocalAudioProcessorLive),
 );
-
-const cobaltAudioRuntime = makeAudioRuntime(CobaltAudioLive);
-
-export async function downloadCobaltAudio(request: CobaltAudioDownloadRequest) {
-  const service = await cobaltAudioRuntime.runPromise(CobaltAudio);
-  return await cobaltAudioRuntime.runPromise(service.download(request));
-}

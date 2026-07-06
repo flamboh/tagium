@@ -1,8 +1,7 @@
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import {
-  parseUploadedTracksWithMetadataIO,
-  writeMetadataToFileWithMetadataIO,
-} from "./audioMetadataIO";
+import { AudioMetadataIO, AudioMetadataIOLive } from "./audioMetadataIO";
+import { makeAudioRuntime } from "./audioRuntime";
 import type { AudioMetadata, TagiumFile } from "./types";
 
 const mp3tagMock = vi.hoisted(() => ({
@@ -74,7 +73,7 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   bitrate: 0,
   sampleRate: 0,
   picture: [],
-  trackNumber: undefined,
+  trackNumber: null,
   ...overrides,
 });
 
@@ -89,6 +88,27 @@ const tagiumFile = (overrides: Partial<TagiumFile> = {}): TagiumFile => ({
   metadata: metadata(),
   ...overrides,
 });
+
+const audioMetadataRuntime = makeAudioRuntime(AudioMetadataIOLive);
+
+const runAudioMetadataIO = <A, E>(effect: Effect.Effect<A, E, AudioMetadataIO>) =>
+  audioMetadataRuntime.runPromise(effect);
+
+const parseUploadedTracks = (uploadedFiles: File[]) =>
+  runAudioMetadataIO(
+    Effect.gen(function* () {
+      const service = yield* AudioMetadataIO;
+      return yield* service.parseUploadedTracks(uploadedFiles);
+    }),
+  );
+
+const writeMetadataToFile = (fileToUpdate: TagiumFile, newTags: AudioMetadata) =>
+  runAudioMetadataIO(
+    Effect.gen(function* () {
+      const service = yield* AudioMetadataIO;
+      return yield* service.writeMetadataToFile(fileToUpdate, newTags);
+    }),
+  );
 
 beforeEach(() => {
   mp3tagMock.instances = [];
@@ -118,7 +138,7 @@ afterEach(() => {
 
 describe("AudioMetadataIO", () => {
   it("parses uploaded tracks through mp3tag and converts APIC bytes", async () => {
-    const [upload] = await parseUploadedTracksWithMetadataIO([
+    const [upload] = await parseUploadedTracks([
       new File(["audio"], "artist.track.mp3", { type: "audio/mpeg" }),
     ]);
 
@@ -138,10 +158,27 @@ describe("AudioMetadataIO", () => {
     expect(upload.albumSeed.cover).toBe(upload.file.metadata?.picture);
   });
 
+  it("normalizes missing numeric tags to null in parsed metadata snapshots", async () => {
+    const originalTags = structuredClone(mp3tagMock.nextTags);
+    const nextTags = mp3tagMock.nextTags as Partial<typeof mp3tagMock.nextTags>;
+    delete nextTags.year;
+    delete nextTags.track;
+
+    const [upload] = await parseUploadedTracks([
+      new File(["audio"], "untagged.mp3", { type: "audio/mpeg" }),
+    ]);
+
+    mp3tagMock.nextTags = originalTags;
+
+    expect(upload.file.status).toBe("pending");
+    expect(upload.file.metadata?.year).toBeNull();
+    expect(upload.file.metadata?.trackNumber).toBeNull();
+  });
+
   it("returns an error upload when metadata read fails", async () => {
     mp3tagMock.nextReadError = "Invalid ID3 tag";
 
-    const [upload] = await parseUploadedTracksWithMetadataIO([
+    const [upload] = await parseUploadedTracks([
       new File(["audio"], "broken.mp3", { type: "audio/mpeg" }),
     ]);
 
@@ -158,7 +195,7 @@ describe("AudioMetadataIO", () => {
       revokeObjectURL: vi.fn(),
     });
 
-    const [upload] = await parseUploadedTracksWithMetadataIO([
+    const [upload] = await parseUploadedTracks([
       new File(["audio"], "duration-failure.mp3", { type: "audio/mpeg" }),
     ]);
 
@@ -168,7 +205,7 @@ describe("AudioMetadataIO", () => {
   });
 
   it("writes cleared numeric metadata as empty strings and cover bytes as arrays", async () => {
-    const updatedFile = await writeMetadataToFileWithMetadataIO(
+    const updatedFile = await writeMetadataToFile(
       tagiumFile(),
       metadata({
         filename: "written",
@@ -206,8 +243,8 @@ describe("AudioMetadataIO", () => {
   });
 
   it("rejects writes while the audio file is still downloading", async () => {
-    await expect(
-      writeMetadataToFileWithMetadataIO(tagiumFile({ file: undefined }), metadata()),
-    ).rejects.toThrow("audio file is still downloading.");
+    await expect(writeMetadataToFile(tagiumFile({ file: undefined }), metadata())).rejects.toThrow(
+      "audio file is still downloading.",
+    );
   });
 });
