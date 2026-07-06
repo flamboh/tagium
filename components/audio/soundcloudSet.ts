@@ -1,24 +1,37 @@
-import { z } from "zod";
+import { Schema } from "effect";
 import type { ImportedAlbumMetadata } from "./types";
 
-const soundCloudSetSchema = z.object({
-  title: z.string(),
-  artist: z.string(),
-  genre: z.string(),
-  year: z.number().optional(),
-  isAlbum: z.boolean(),
-  coverUrl: z.string().optional(),
-  tracks: z.array(
-    z.object({
-      title: z.string(),
-      url: z.string().url(),
-      duration: z.number().optional(),
-      trackNumber: z.number(),
-    }),
-  ),
+const urlStringSchema = Schema.String.pipe(
+  Schema.refine((value): value is string => {
+    try {
+      new URL(value);
+      return true;
+    } catch {
+      return false;
+    }
+  }),
+);
+
+const soundCloudSetTrackSchema = Schema.Struct({
+  title: Schema.String,
+  url: urlStringSchema,
+  duration: Schema.optionalKey(Schema.Number),
+  trackNumber: Schema.Number,
 });
 
-export type SoundCloudSet = z.infer<typeof soundCloudSetSchema>;
+const soundCloudSetSchema = Schema.Struct({
+  title: Schema.String,
+  artist: Schema.String,
+  genre: Schema.String,
+  year: Schema.optionalKey(Schema.Number),
+  isAlbum: Schema.Boolean,
+  coverUrl: Schema.optionalKey(Schema.String),
+  tracks: Schema.Array(soundCloudSetTrackSchema),
+});
+
+const decodeSoundCloudSet = Schema.decodeUnknownSync(soundCloudSetSchema);
+
+export type SoundCloudSet = Schema.Schema.Type<typeof soundCloudSetSchema>;
 
 export const isSoundCloudSetUrl = (url: string) => {
   try {
@@ -45,7 +58,7 @@ export const resolveSoundCloudSet = async (url: string) => {
     throw new Error("soundcloud set route returned non-json. restart tagium dev server.");
   }
 
-  return soundCloudSetSchema.parse(await response.json());
+  return decodeSoundCloudSet(await response.json());
 };
 
 export const toImportedAlbumMetadata = (set: SoundCloudSet): ImportedAlbumMetadata => ({

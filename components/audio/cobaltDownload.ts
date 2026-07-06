@@ -1,3 +1,5 @@
+import { decodeCobaltDownloadPlan, decodeCobaltLocalProcessingMessage } from "./cobaltAudioSchemas";
+
 export type AudioDownloadBitrate = "320" | "256" | "128" | "96" | "64";
 
 export type CobaltDownloadPlan =
@@ -291,15 +293,21 @@ const runLocalProcessingWorker = async (
     signal?.addEventListener("abort", onAbort, { once: true });
 
     worker.onmessage = (event: MessageEvent) => {
-      const message = event.data.cobaltLocalProcessing;
-      if (message?.blob) {
+      let message;
+      try {
+        message = decodeCobaltLocalProcessingMessage(event.data).cobaltLocalProcessing;
+      } catch {
+        return;
+      }
+
+      if ("blob" in message) {
         worker.terminate();
         cleanup();
         resolve(message.blob);
         return;
       }
 
-      if (message?.error) {
+      if ("error" in message) {
         worker.terminate();
         cleanup();
         reject(new Error(message.error));
@@ -511,7 +519,7 @@ const runCobaltAudioDownload = async ({
     throw new Error(await response.text());
   }
 
-  const plan = (await response.json()) as CobaltDownloadPlan;
+  const plan = decodeCobaltDownloadPlan(await response.json()) as CobaltDownloadPlan;
   const lastModified = getStableLastModified(sourceUrl);
 
   if (plan.status === "local-processing") {

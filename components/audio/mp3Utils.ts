@@ -1,3 +1,5 @@
+import { Schema } from "effect";
+import { audioMetadataSchema } from "./metadata";
 import { AudioMetadata, TagiumFile } from "./types";
 
 interface MP3TagPicture {
@@ -24,6 +26,8 @@ interface MP3TagReader {
     };
   };
 }
+
+const decodeAudioMetadata = Schema.decodeUnknownSync(audioMetadataSchema);
 
 export interface UploadedTrack {
   file: TagiumFile;
@@ -132,7 +136,7 @@ export async function parseUploadedTracks(uploadedFiles: File[]) {
           data: new Uint8Array(picture.data),
         })) ?? [];
 
-      const metadata: AudioMetadata = {
+      const metadata = decodeAudioMetadata({
         filename: file.name.split(".").slice(0, -1).join("."),
         title: mp3tag.tags.title || "",
         artist: mp3tag.tags.artist || "",
@@ -144,7 +148,7 @@ export async function parseUploadedTracks(uploadedFiles: File[]) {
         sampleRate: 0,
         picture: pictureData,
         trackNumber: parseTrackTagNumber(mp3tag.tags.track),
-      };
+      });
 
       parsedUploads.push({
         file: {
@@ -194,6 +198,7 @@ export async function writeMetadataToFile(fileToUpdate: TagiumFile, newTags: Aud
     throw new Error("audio file is still downloading.");
   }
 
+  const metadataToWrite = decodeAudioMetadata(newTags);
   const MP3Tag = (await import("mp3tag.js")).default;
   const arrayBuffer = await fileToUpdate.file.arrayBuffer();
   const mp3tag = new MP3Tag(arrayBuffer, true) as unknown as MP3TagReader;
@@ -203,23 +208,25 @@ export async function writeMetadataToFile(fileToUpdate: TagiumFile, newTags: Aud
     throw new Error(mp3tag.error);
   }
 
-  mp3tag.tags.title = newTags.title || "";
-  mp3tag.tags.artist = newTags.artist || "";
-  mp3tag.tags.album = newTags.album || "";
+  mp3tag.tags.title = metadataToWrite.title || "";
+  mp3tag.tags.artist = metadataToWrite.artist || "";
+  mp3tag.tags.album = metadataToWrite.album || "";
   mp3tag.tags.year =
-    newTags.year !== null && newTags.year !== undefined && !Number.isNaN(newTags.year)
-      ? newTags.year.toString()
+    metadataToWrite.year !== null &&
+    metadataToWrite.year !== undefined &&
+    !Number.isNaN(metadataToWrite.year)
+      ? metadataToWrite.year.toString()
       : "";
-  mp3tag.tags.genre = toGenreString(newTags.genre);
+  mp3tag.tags.genre = toGenreString(metadataToWrite.genre);
   mp3tag.tags.track =
-    newTags.trackNumber !== null &&
-    newTags.trackNumber !== undefined &&
-    !Number.isNaN(newTags.trackNumber)
-      ? newTags.trackNumber.toString()
+    metadataToWrite.trackNumber !== null &&
+    metadataToWrite.trackNumber !== undefined &&
+    !Number.isNaN(metadataToWrite.trackNumber)
+      ? metadataToWrite.trackNumber.toString()
       : "";
 
-  if (newTags.picture && newTags.picture.length > 0 && mp3tag.tags.v2) {
-    mp3tag.tags.v2.APIC = newTags.picture.map((picture) => ({
+  if (metadataToWrite.picture && metadataToWrite.picture.length > 0 && mp3tag.tags.v2) {
+    mp3tag.tags.v2.APIC = metadataToWrite.picture.map((picture) => ({
       format: picture.format || "image/jpeg",
       type: typeof picture.type === "number" ? picture.type : 3,
       description: picture.description || "",
@@ -234,7 +241,7 @@ export async function writeMetadataToFile(fileToUpdate: TagiumFile, newTags: Aud
 
   return new File(
     [new Uint8Array(mp3tag.buffer)],
-    newTags.filename ? `${newTags.filename}.mp3` : fileToUpdate.filename,
+    metadataToWrite.filename ? `${metadataToWrite.filename}.mp3` : fileToUpdate.filename,
     {
       type: fileToUpdate.file.type,
     },
