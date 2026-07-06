@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AudioDownloadBitrate } from "./cobaltDownload";
+import type { AudioDownloadBitrate } from "./cobaltAudio";
 import type { AppSettings } from "./types";
 
 export const AUDIO_BITRATE_OPTIONS = [

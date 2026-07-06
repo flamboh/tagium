@@ -61,13 +61,3 @@ export const sortTrackIdsByTrackNumber = (trackIds: string[], files: TagiumFile[
     );
   });
 };
-
-export async function parseUploadedTracks(uploadedFiles: File[]) {
-  const { parseUploadedTracksWithMetadataIO } = await import("./audioMetadataIO");
-  return parseUploadedTracksWithMetadataIO(uploadedFiles);
-}
-
-export async function writeMetadataToFile(fileToUpdate: TagiumFile, newTags: AudioMetadata) {
-  const { writeMetadataToFileWithMetadataIO } = await import("./audioMetadataIO");
-  return writeMetadataToFileWithMetadataIO(fileToUpdate, newTags);
-}

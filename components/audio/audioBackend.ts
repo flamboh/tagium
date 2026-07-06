@@ -5,7 +5,7 @@ import { makeAudioRuntime } from "./audioRuntime";
 import type { AudioMetadata, TagiumFile } from "./types";
 import type { UploadedTrack } from "./mp3Utils";
 
-export interface AudioBackendService {
+interface AudioBackendService {
   readonly downloadFromCobalt: (request: CobaltAudioDownloadRequest) => Effect.Effect<File, Error>;
   readonly parseUploads: (uploadedFiles: File[]) => Effect.Effect<UploadedTrack[], never>;
   readonly writeTags: (
@@ -29,9 +29,9 @@ export class AudioBackend extends Context.Service<AudioBackend, AudioBackendServ
   "AudioBackend",
 ) {}
 
-export const AudioBackendLayer = Layer.effect(AudioBackend, makeAudioBackend);
+const AudioBackendLayer = Layer.effect(AudioBackend, makeAudioBackend);
 
-export const AudioBackendLive = AudioBackendLayer.pipe(
+const AudioBackendLive = AudioBackendLayer.pipe(
   Layer.provide(Layer.merge(CobaltAudioLive, AudioMetadataIOLive)),
 );
 

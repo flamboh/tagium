@@ -1,4 +1,4 @@
-import type { AudioDownloadBitrate } from "./cobaltDownload";
+import type { AudioDownloadBitrate } from "./cobaltAudio";
 import type { AudioMetadata, MetadataPatch } from "./metadata";
 
 export {

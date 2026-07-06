@@ -51,8 +51,3 @@ export const decodeCobaltDownloadPlanEffect = Schema.decodeUnknownEffect(cobaltD
 export const decodeCobaltLocalProcessingMessageEffect = Schema.decodeUnknownEffect(
   cobaltLocalProcessingMessageSchema,
 );
-
-export const decodeCobaltDownloadPlan = Schema.decodeUnknownSync(cobaltDownloadPlanSchema);
-export const decodeCobaltLocalProcessingMessage = Schema.decodeUnknownSync(
-  cobaltLocalProcessingMessageSchema,
-);

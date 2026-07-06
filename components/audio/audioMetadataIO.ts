@@ -1,6 +1,5 @@
 import { Context, Effect, Layer, Schema } from "effect";
 import { AudioMetadataReadError, AudioMetadataWriteError, toPublicAudioError } from "./audioErrors";
-import { makeAudioRuntime } from "./audioRuntime";
 import { audioMetadataSchema } from "./metadata";
 import { parseTrackTagNumber, toGenreString, type UploadedTrack } from "./mp3Utils";
 import type { AudioMetadata, TagiumFile } from "./types";
@@ -308,20 +307,3 @@ export const AudioMetadataIOLive = Layer.succeed(
     writeMetadataToFile: writeMetadata,
   }),
 );
-
-const audioMetadataRuntime = makeAudioRuntime(AudioMetadataIOLive);
-
-export async function parseUploadedTracksWithMetadataIO(uploadedFiles: File[]) {
-  const service = await audioMetadataRuntime.runPromise(AudioMetadataIO);
-  return await audioMetadataRuntime.runPromise(service.parseUploadedTracks(uploadedFiles));
-}
-
-export async function writeMetadataToFileWithMetadataIO(
-  fileToUpdate: TagiumFile,
-  newTags: AudioMetadata,
-) {
-  const service = await audioMetadataRuntime.runPromise(AudioMetadataIO);
-  return await audioMetadataRuntime.runPromise(
-    service.writeMetadataToFile(fileToUpdate, newTags).pipe(Effect.mapError(toPublicAudioError)),
-  );
-}
