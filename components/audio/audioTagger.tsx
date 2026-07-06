@@ -20,10 +20,18 @@ import {
   applyTrackOrderNumbersToFiles,
   applySoundCloudSetImportedCover,
   areAlbumTrackCoversSynced,
-  prepareDownloadedTrackHydration,
-  resolveDownloadedTrackHydrationWrite,
-  resolveDownloadedTrackHydrationWriteError,
 } from "./fileMetadataOps";
+import {
+  applyMetadataPatch,
+  clearPendingMetadataPatch,
+  createDirtyMetadataPatch,
+  createMetadataWriteCoordinator,
+  createSubmittedMetadataPatch,
+  getFilenameFromPatch,
+  getSubmittedAudioMetadata,
+  withMergedPendingMetadataPatch,
+  withPendingMetadataPatch,
+} from "./metadataWriteCoordinator";
 import {
   allTracksReadyForDownload,
   createLibraryDownloadFilename,
@@ -71,14 +79,9 @@ import {
 import { loadAppSettings, saveAppSettings } from "./settings";
 import { getSampleAlbum } from "./sampleMetadata";
 import type { SoundCloudSet } from "./soundcloudSet";
-import {
-  AlbumGroup,
-  AppSettings,
-  AudioMetadata,
-  ImportedAlbumMetadata,
-  MetadataPatch,
-  TagiumFile,
-} from "./types";
+import { AlbumGroup, AppSettings, AudioMetadata, ImportedAlbumMetadata, TagiumFile } from "./types";
+
+export { createDirtyMetadataPatch, getSubmittedAudioMetadata } from "./metadataWriteCoordinator";
 
 type ActiveView = "editor" | "settings";
 type ManagedDownloadTrack = QueuedDownloadTrack;
@@ -126,123 +129,6 @@ const createPlaylistDownloadModelTrack = (track: ManagedDownloadTrack) => ({
   title: track.title,
   sourceUrl: track.downloadRequest.sourceUrl,
 });
-type MetadataPatchField = keyof MetadataPatch;
-type DirtyMetadataFields = Partial<Record<keyof AudioMetadata, unknown>>;
-
-const metadataPatchFields = [
-  "filename",
-  "title",
-  "artist",
-  "album",
-  "year",
-  "genre",
-  "picture",
-  "trackNumber",
-] as const satisfies readonly MetadataPatchField[];
-const hasOwn = <Key extends PropertyKey>(object: object, key: Key) =>
-  Object.prototype.hasOwnProperty.call(object, key);
-const getNullableNumericPatchValue = (value: AudioMetadata["year"]): MetadataPatch["year"] =>
-  value === undefined || Number.isNaN(value) ? null : value;
-const getPendingMetadataPatch = (file: TagiumFile): MetadataPatch | undefined =>
-  file.pendingMetadataPatch;
-const createSubmittedMetadataPatch = (metadata: AudioMetadata): MetadataPatch => ({
-  filename: metadata.filename,
-  title: metadata.title,
-  artist: metadata.artist,
-  album: metadata.album,
-  year: getNullableNumericPatchValue(metadata.year),
-  genre: metadata.genre,
-  picture: metadata.picture,
-  trackNumber: getNullableNumericPatchValue(metadata.trackNumber),
-});
-export const getSubmittedAudioMetadata = (
-  data: AudioMetadata,
-  syncFilenames: boolean,
-): AudioMetadata =>
-  syncFilenames ? { ...data, filename: filenamify(data.title, { replacement: "-" }) } : data;
-export const createSparseMetadataPatch = (
-  metadata: AudioMetadata,
-  fields: Iterable<MetadataPatchField>,
-  syncFilenames: boolean,
-): MetadataPatch | undefined => {
-  const patchFields = new Set(fields);
-  if (syncFilenames && patchFields.has("title")) {
-    patchFields.add("filename");
-  }
-
-  const patch: MetadataPatch = {};
-  for (const field of metadataPatchFields) {
-    if (!patchFields.has(field)) continue;
-
-    switch (field) {
-      case "filename":
-        patch.filename = metadata.filename;
-        break;
-      case "title":
-        patch.title = metadata.title;
-        break;
-      case "artist":
-        patch.artist = metadata.artist;
-        break;
-      case "album":
-        patch.album = metadata.album;
-        break;
-      case "year":
-        patch.year = getNullableNumericPatchValue(metadata.year);
-        break;
-      case "genre":
-        patch.genre = metadata.genre;
-        break;
-      case "picture":
-        patch.picture = metadata.picture;
-        break;
-      case "trackNumber":
-        patch.trackNumber = getNullableNumericPatchValue(metadata.trackNumber);
-        break;
-    }
-  }
-
-  return Object.keys(patch).length > 0 ? patch : undefined;
-};
-export const createDirtyMetadataPatch = (
-  metadata: AudioMetadata,
-  dirtyFields: DirtyMetadataFields,
-  syncFilenames: boolean,
-  extraFields: Iterable<MetadataPatchField> = [],
-): MetadataPatch | undefined => {
-  const fields = new Set<MetadataPatchField>(extraFields);
-  for (const field of metadataPatchFields) {
-    if (dirtyFields[field]) {
-      fields.add(field);
-    }
-  }
-
-  return createSparseMetadataPatch(metadata, fields, syncFilenames);
-};
-const applyMetadataPatch = (metadata: AudioMetadata, patch: MetadataPatch): AudioMetadata => ({
-  ...metadata,
-  ...(hasOwn(patch, "filename") ? { filename: patch.filename } : {}),
-  ...(hasOwn(patch, "title") ? { title: patch.title } : {}),
-  ...(hasOwn(patch, "artist") ? { artist: patch.artist } : {}),
-  ...(hasOwn(patch, "album") ? { album: patch.album } : {}),
-  ...(hasOwn(patch, "year") ? { year: patch.year } : {}),
-  ...(hasOwn(patch, "genre") ? { genre: patch.genre } : {}),
-  ...(hasOwn(patch, "picture") ? { picture: patch.picture } : {}),
-  ...(hasOwn(patch, "trackNumber") ? { trackNumber: patch.trackNumber } : {}),
-});
-const getFilenameFromPatch = (file: TagiumFile, patch: MetadataPatch) =>
-  hasOwn(patch, "filename") && patch.filename ? `${patch.filename}.mp3` : file.filename;
-const withPendingMetadataPatch = (
-  file: TagiumFile,
-  pendingMetadataPatch: MetadataPatch | undefined,
-) => ({
-  ...file,
-  pendingMetadataPatch,
-  hasBufferedChanges: Boolean(pendingMetadataPatch),
-});
-const withMergedPendingMetadataPatch = (file: TagiumFile, patch: MetadataPatch | undefined) =>
-  patch ? withPendingMetadataPatch(file, { ...file.pendingMetadataPatch, ...patch }) : file;
-const clearPendingMetadataPatch = (file: TagiumFile) => withPendingMetadataPatch(file, undefined);
 
 export default function AudioTagger() {
   const [files, setFiles] = useState<TagiumFile[]>([]);
@@ -739,88 +625,23 @@ export default function AudioTagger() {
     downloadedFile: File,
     signal?: AbortSignal,
   ) => {
-    signal?.throwIfAborted();
-    const [parsedUpload] = await parseUploadedTracks([downloadedFile]);
-    signal?.throwIfAborted();
-    if (!parsedUpload) {
-      throw new Error("downloaded track could not be parsed.");
-    }
+    const coordinator = createMetadataWriteCoordinator({
+      parseDownloadedFile: async (file) => {
+        const [parsedUpload] = await parseUploadedTracks([file]);
+        return parsedUpload;
+      },
+      writeMetadata: writeMetadataToFile,
+      getLatestFile: (latestFileId) => filesRef.current.find((file) => file.id === latestFileId),
+      getSelectedDirtyFormMetadata: (latestFileId) =>
+        selectedFileIdRef.current === latestFileId && formDirtyRef.current
+          ? getSubmittedMetadata(getValues())
+          : undefined,
+      getDirtyMetadataFields: () => dirtyFields,
+      getSyncFilenames: () => settings.syncFilenames,
+      commitHydratedFile: replaceFileById,
+    });
 
-    const currentFile = filesRef.current.find((file) => file.id === fileId);
-    if (!currentFile) return;
-
-    const parsedFile = parsedUpload.file;
-    const formMetadata =
-      selectedFileIdRef.current === fileId && formDirtyRef.current && currentFile.metadata
-        ? getSubmittedMetadata(getValues())
-        : undefined;
-    const currentPendingPatch = formMetadata
-      ? createDirtyMetadataPatch(formMetadata, dirtyFields, settings.syncFilenames)
-      : getPendingMetadataPatch(currentFile);
-    const currentFileWithPendingPatch = currentPendingPatch
-      ? withPendingMetadataPatch(currentFile, currentPendingPatch)
-      : currentFile;
-    let { hydratedFile, metadataToWrite } = prepareDownloadedTrackHydration(
-      currentFileWithPendingPatch,
-      parsedFile,
-      currentPendingPatch,
-    );
-
-    if (metadataToWrite) {
-      try {
-        signal?.throwIfAborted();
-        const updatedFile = await writeMetadataToFile(hydratedFile, metadataToWrite);
-        signal?.throwIfAborted();
-        const latestFile = filesRef.current.find((file) => file.id === fileId);
-        if (!latestFile) return;
-        const latestFormMetadata =
-          selectedFileIdRef.current === fileId && formDirtyRef.current
-            ? getSubmittedMetadata(getValues())
-            : undefined;
-        const latestFormPatch = latestFormMetadata
-          ? createDirtyMetadataPatch(latestFormMetadata, dirtyFields, settings.syncFilenames)
-          : undefined;
-        const latestMetadataForResolve =
-          latestFormPatch && latestFile.metadata
-            ? applyMetadataPatch(latestFile.metadata, latestFormPatch)
-            : latestFormMetadata;
-        hydratedFile = resolveDownloadedTrackHydrationWrite(
-          currentFileWithPendingPatch,
-          latestFormPatch
-            ? withMergedPendingMetadataPatch(latestFile, latestFormPatch)
-            : latestFile,
-          parsedFile,
-          hydratedFile,
-          updatedFile,
-          metadataToWrite,
-          latestMetadataForResolve,
-        );
-      } catch (error) {
-        const latestFile = filesRef.current.find((file) => file.id === fileId);
-        if (!latestFile) return;
-        let message = "downloaded, but metadata could not be applied.";
-        if (error instanceof Error) {
-          message = error.message;
-        }
-        hydratedFile = resolveDownloadedTrackHydrationWriteError(
-          currentFileWithPendingPatch,
-          latestFile,
-          parsedFile,
-          hydratedFile,
-          message,
-        );
-      }
-    }
-
-    signal?.throwIfAborted();
-    const hydratedPendingPatch =
-      metadataToWrite && hydratedFile.status !== "saved"
-        ? (getPendingMetadataPatch(hydratedFile) ??
-          (hydratedFile.metadata
-            ? createSubmittedMetadataPatch(hydratedFile.metadata)
-            : metadataToWrite))
-        : undefined;
-    replaceFileById(fileId, withPendingMetadataPatch(hydratedFile, hydratedPendingPatch));
+    await coordinator.hydrateDownloadedTrack({ fileId, downloadedFile, signal });
   };
   const replacePlaylistQueueState = (nextQueue: PlaylistDownloadQueueState) => {
     playlistDownloadQueueRef.current = nextQueue;
