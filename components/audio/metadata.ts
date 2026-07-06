@@ -28,13 +28,13 @@ export const metadataSnapshotSchema = Schema.Struct({
   title: Schema.mutableKey(Schema.String),
   artist: Schema.mutableKey(Schema.String),
   album: Schema.mutableKey(Schema.String),
-  year: optionalMutableKey(Schema.NullOr(Schema.Number)),
+  year: Schema.mutableKey(Schema.NullOr(Schema.Number)),
   genre: Schema.mutableKey(metadataGenreSchema),
   duration: Schema.mutableKey(Schema.Number),
   bitrate: Schema.mutableKey(Schema.Number),
   sampleRate: Schema.mutableKey(Schema.Number),
   picture: Schema.mutableKey(metadataPictureArraySchema),
-  trackNumber: optionalMutableKey(Schema.NullOr(Schema.Number)),
+  trackNumber: Schema.mutableKey(Schema.NullOr(Schema.Number)),
 });
 
 export const metadataPatchSchema = Schema.Struct({

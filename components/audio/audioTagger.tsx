@@ -121,8 +121,12 @@ const metadataPatchFields = [
 ] as const satisfies readonly MetadataPatchField[];
 const hasOwn = <Key extends PropertyKey>(object: object, key: Key) =>
   Object.prototype.hasOwnProperty.call(object, key);
-const getNullableNumericPatchValue = (value: AudioMetadata["year"]): MetadataPatch["year"] =>
-  value === undefined || Number.isNaN(value) ? null : value;
+const getNullableNumericMetadataValue = (
+  value: AudioMetadata["year"] | undefined,
+): AudioMetadata["year"] => (value === undefined || Number.isNaN(value) ? null : value);
+const getNullableNumericPatchValue = (
+  value: AudioMetadata["year"] | undefined,
+): MetadataPatch["year"] => (value === undefined || Number.isNaN(value) ? null : value);
 const getPendingMetadataPatch = (file: TagiumFile): MetadataPatch | undefined =>
   file.pendingMetadataPatch;
 const firstCauseError = (cause: Cause.Cause<unknown>) => {
@@ -145,8 +149,12 @@ const createSubmittedMetadataPatch = (metadata: AudioMetadata): MetadataPatch =>
 export const getSubmittedAudioMetadata = (
   data: AudioMetadata,
   syncFilenames: boolean,
-): AudioMetadata =>
-  syncFilenames ? { ...data, filename: filenamify(data.title, { replacement: "-" }) } : data;
+): AudioMetadata => ({
+  ...data,
+  filename: syncFilenames ? filenamify(data.title, { replacement: "-" }) : data.filename,
+  year: getNullableNumericMetadataValue(data.year),
+  trackNumber: getNullableNumericMetadataValue(data.trackNumber),
+});
 export const createSparseMetadataPatch = (
   metadata: AudioMetadata,
   fields: Iterable<MetadataPatchField>,
@@ -212,10 +220,12 @@ const applyMetadataPatch = (metadata: AudioMetadata, patch: MetadataPatch): Audi
   ...(hasOwn(patch, "title") ? { title: patch.title } : {}),
   ...(hasOwn(patch, "artist") ? { artist: patch.artist } : {}),
   ...(hasOwn(patch, "album") ? { album: patch.album } : {}),
-  ...(hasOwn(patch, "year") ? { year: patch.year } : {}),
+  ...(hasOwn(patch, "year") ? { year: getNullableNumericMetadataValue(patch.year) } : {}),
   ...(hasOwn(patch, "genre") ? { genre: patch.genre } : {}),
   ...(hasOwn(patch, "picture") ? { picture: patch.picture } : {}),
-  ...(hasOwn(patch, "trackNumber") ? { trackNumber: patch.trackNumber } : {}),
+  ...(hasOwn(patch, "trackNumber")
+    ? { trackNumber: getNullableNumericMetadataValue(patch.trackNumber) }
+    : {}),
 });
 const getFilenameFromPatch = (file: TagiumFile, patch: MetadataPatch) =>
   hasOwn(patch, "filename") && patch.filename ? `${patch.filename}.mp3` : file.filename;
@@ -333,8 +343,8 @@ export default function AudioTagger() {
     if (!latestFileToUpdate.file) {
       const metadata = {
         ...newTags,
-        year: Number.isNaN(newTags.year as number) ? undefined : newTags.year,
-        trackNumber: Number.isNaN(newTags.trackNumber as number) ? undefined : newTags.trackNumber,
+        year: getNullableNumericMetadataValue(newTags.year),
+        trackNumber: getNullableNumericMetadataValue(newTags.trackNumber),
         duration: latestFileToUpdate.metadata?.duration || 0,
         bitrate: latestFileToUpdate.metadata?.bitrate || 0,
         sampleRate: latestFileToUpdate.metadata?.sampleRate || 0,
@@ -365,8 +375,8 @@ export default function AudioTagger() {
       const updatedFile = await runAudioBackendEffect(writeTags(latestFileToUpdate, newTags));
       const metadata = {
         ...newTags,
-        year: Number.isNaN(newTags.year as number) ? undefined : newTags.year,
-        trackNumber: Number.isNaN(newTags.trackNumber as number) ? undefined : newTags.trackNumber,
+        year: getNullableNumericMetadataValue(newTags.year),
+        trackNumber: getNullableNumericMetadataValue(newTags.trackNumber),
         duration: latestFileToUpdate.metadata?.duration || 0,
         bitrate: latestFileToUpdate.metadata?.bitrate || 0,
         sampleRate: latestFileToUpdate.metadata?.sampleRate || 0,
@@ -403,10 +413,8 @@ export default function AudioTagger() {
                 status: "error" as const,
                 metadata: {
                   ...newTags,
-                  year: Number.isNaN(newTags.year as number) ? undefined : newTags.year,
-                  trackNumber: Number.isNaN(newTags.trackNumber as number)
-                    ? undefined
-                    : newTags.trackNumber,
+                  year: getNullableNumericMetadataValue(newTags.year),
+                  trackNumber: getNullableNumericMetadataValue(newTags.trackNumber),
                   duration: file.metadata?.duration || 0,
                   bitrate: file.metadata?.bitrate || 0,
                   sampleRate: file.metadata?.sampleRate || 0,

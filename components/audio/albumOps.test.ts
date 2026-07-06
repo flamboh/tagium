@@ -14,7 +14,7 @@ const metadata = (trackNumber?: number): AudioMetadata => ({
   bitrate: 0,
   sampleRate: 0,
   picture: [],
-  trackNumber,
+  trackNumber: trackNumber ?? null,
 });
 
 const upload = (

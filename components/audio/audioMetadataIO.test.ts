@@ -74,7 +74,7 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   bitrate: 0,
   sampleRate: 0,
   picture: [],
-  trackNumber: undefined,
+  trackNumber: null,
   ...overrides,
 });
 
@@ -136,6 +136,23 @@ describe("AudioMetadataIO", () => {
     expect(upload.file.metadata?.picture[0]?.data).toBeInstanceOf(Uint8Array);
     expect(Array.from(upload.file.metadata?.picture[0]?.data ?? [])).toEqual([1, 2, 3]);
     expect(upload.albumSeed.cover).toBe(upload.file.metadata?.picture);
+  });
+
+  it("normalizes missing numeric tags to null in parsed metadata snapshots", async () => {
+    const originalTags = structuredClone(mp3tagMock.nextTags);
+    const nextTags = mp3tagMock.nextTags as Partial<typeof mp3tagMock.nextTags>;
+    delete nextTags.year;
+    delete nextTags.track;
+
+    const [upload] = await parseUploadedTracksWithMetadataIO([
+      new File(["audio"], "untagged.mp3", { type: "audio/mpeg" }),
+    ]);
+
+    mp3tagMock.nextTags = originalTags;
+
+    expect(upload.file.status).toBe("pending");
+    expect(upload.file.metadata?.year).toBeNull();
+    expect(upload.file.metadata?.trackNumber).toBeNull();
   });
 
   it("returns an error upload when metadata read fails", async () => {

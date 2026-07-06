@@ -25,7 +25,7 @@ export const toGenreString = (genre: AudioMetadata["genre"] | undefined) => {
   return Array.isArray(genre) ? genre.join(", ") : genre;
 };
 
-const getValidTrackNumber = (trackNumber: AudioMetadata["trackNumber"]) => {
+const getValidTrackNumber = (trackNumber: AudioMetadata["trackNumber"] | undefined) => {
   if (!trackNumber) return undefined;
   if (!Number.isInteger(trackNumber)) return undefined;
   if (trackNumber < 1) return undefined;
@@ -33,8 +33,8 @@ const getValidTrackNumber = (trackNumber: AudioMetadata["trackNumber"]) => {
 };
 
 const compareTrackNumbers = (
-  leftTrackNumber: AudioMetadata["trackNumber"],
-  rightTrackNumber: AudioMetadata["trackNumber"],
+  leftTrackNumber: AudioMetadata["trackNumber"] | undefined,
+  rightTrackNumber: AudioMetadata["trackNumber"] | undefined,
 ) => {
   const leftValidTrackNumber = getValidTrackNumber(leftTrackNumber);
   const rightValidTrackNumber = getValidTrackNumber(rightTrackNumber);

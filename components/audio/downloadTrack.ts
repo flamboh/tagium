@@ -118,13 +118,13 @@ export const createDownloadMetadata = ({
   title,
   artist,
   album,
-  year,
   genre,
   duration: duration ?? 0,
   bitrate: 0,
   sampleRate: 0,
   picture: [],
-  trackNumber,
+  year: year ?? null,
+  trackNumber: trackNumber ?? null,
 });
 
 export const createPendingDownloadTrack = (

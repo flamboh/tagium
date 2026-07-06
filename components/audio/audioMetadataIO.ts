@@ -159,13 +159,13 @@ const parseUploadedTrack = (file: File) =>
         title: mp3tag.tags.title || "",
         artist: mp3tag.tags.artist || "",
         album: mp3tag.tags.album || "",
-        year: parseTagNumber(mp3tag.tags.year),
+        year: parseTagNumber(mp3tag.tags.year) ?? null,
         genre: mp3tag.tags.genre || "",
         duration,
         bitrate: 0,
         sampleRate: 0,
         picture: pictureData,
-        trackNumber: parseTrackTagNumber(mp3tag.tags.track),
+        trackNumber: parseTrackTagNumber(mp3tag.tags.track) ?? null,
       });
 
       return {
