@@ -1,6 +1,7 @@
 "use client";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import { Effect } from "effect";
 import { SubmitHandler, useForm } from "react-hook-form";
 import filenamify from "filenamify";
 import AlbumMetadataDialog, { AlbumMetadataDraft } from "./AlbumMetadataDialog";
@@ -40,23 +41,10 @@ import {
   type QueuedDownloadTrack,
 } from "./downloadTrack";
 import {
-  cancelActivePlaylistDownloadTracks,
-  cancelPendingPlaylistDownloadTracks,
-  createPlaylistDownloadQueueRun,
-  derivePlaylistDownloadQueueState,
-  enqueuePlaylistDownloadQueueTracks,
-  finishPlaylistDownloadQueueRunIfIdle,
-  markPlaylistDownloadTrackActive,
-  markPlaylistDownloadTrackCanceled,
-  markPlaylistDownloadTrackCompleted,
-  markPlaylistDownloadTrackFailed,
-  removeActivePlaylistDownloadTrack,
-  reserveNextPlaylistDownloadTrack,
-} from "./playlistDownloadQueueRuntime";
-import type {
-  PlaylistDownloadQueueRun as PlaylistDownloadQueueRuntimeRun,
-  PlaylistDownloadQueueRuntimeSnapshot,
-} from "./playlistDownloadQueueRuntime";
+  createPlaylistDownloadController,
+  type PlaylistDownloadController,
+  type PlaylistDownloadControllerSnapshot,
+} from "./playlistDownloadController";
 import LandingScreen from "./LandingScreen";
 import TrackMetadataEditor from "./TrackMetadataEditor";
 import SettingsPage from "./SettingsPage";
@@ -82,11 +70,7 @@ import {
 
 type ActiveView = "editor" | "settings";
 type ManagedDownloadTrack = QueuedDownloadTrack;
-type PlaylistDownloadQueueState = PlaylistDownloadQueueRuntimeSnapshot;
-type PlaylistDownloadQueueRun = PlaylistDownloadQueueRuntimeRun<ManagedDownloadTrack> & {
-  budgetWakeTimeout?: ReturnType<typeof setTimeout>;
-  abortControllers: Map<string, AbortController>;
-};
+type PlaylistDownloadQueueState = PlaylistDownloadControllerSnapshot;
 
 const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
   title: "",
@@ -94,14 +78,6 @@ const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
   genre: "",
   year: undefined,
   cover: undefined,
-};
-const PLAYLIST_DOWNLOAD_CONCURRENCY = 3;
-const createPlaylistDownloadAbortReason = () =>
-  new DOMException("playlist download canceled.", "AbortError");
-const isPlaylistDownloadAbort = (error: unknown) => {
-  if (error instanceof DOMException && error.name === "AbortError") return true;
-  if (error instanceof Error && error.name === "AbortError") return true;
-  return false;
 };
 const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
 const getFileImportKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
@@ -271,8 +247,8 @@ export default function AudioTagger() {
   const importQueueRef = useRef(Promise.resolve());
   const pendingImportKeysRef = useRef(new Set<string>());
   const playlistDownloadQueueRef = useRef<PlaylistDownloadQueueState | null>(null);
-  const playlistDownloadQueueRunRef = useRef<PlaylistDownloadQueueRun | null>(null);
-  const playlistDownloadQueueIdRef = useRef(0);
+  const playlistDownloadControllerRef =
+    useRef<PlaylistDownloadController<ManagedDownloadTrack> | null>(null);
   filesRef.current = files;
   albumsRef.current = albums;
   selectedFileIdRef.current = selectedFileId;
@@ -822,42 +798,6 @@ export default function AudioTagger() {
         : undefined;
     replaceFileById(fileId, withPendingMetadataPatch(hydratedFile, hydratedPendingPatch));
   };
-  const replacePlaylistQueueState = (nextQueue: PlaylistDownloadQueueState) => {
-    playlistDownloadQueueRef.current = nextQueue;
-    setPlaylistDownloadQueue(nextQueue);
-  };
-  const updatePlaylistQueueState = (
-    queueId: number,
-    update: (queue: PlaylistDownloadQueueState) => PlaylistDownloadQueueState,
-  ) => {
-    setPlaylistDownloadQueue((currentQueue) => {
-      if (!currentQueue) return currentQueue;
-      if (currentQueue.id !== queueId) return currentQueue;
-
-      const nextQueue = update(currentQueue);
-      playlistDownloadQueueRef.current = nextQueue;
-      return nextQueue;
-    });
-  };
-  const createPlaylistQueueState = (run: PlaylistDownloadQueueRun): PlaylistDownloadQueueState => {
-    return derivePlaylistDownloadQueueState(run, Date.now());
-  };
-  const publishPlaylistQueueRun = (run: PlaylistDownloadQueueRun) => {
-    updatePlaylistQueueState(run.id, () => createPlaylistQueueState(run));
-  };
-  const clearPlaylistBudgetWake = (run: PlaylistDownloadQueueRun) => {
-    if (run.budgetWakeTimeout === undefined) return;
-
-    clearTimeout(run.budgetWakeTimeout);
-    run.budgetWakeTimeout = undefined;
-  };
-  const schedulePlaylistBudgetWake = (run: PlaylistDownloadQueueRun, waitMs: number) => {
-    clearPlaylistBudgetWake(run);
-    run.budgetWakeTimeout = setTimeout(() => {
-      run.budgetWakeTimeout = undefined;
-      pumpPlaylistDownloadQueue(run);
-    }, waitMs);
-  };
   const markDownloadsQueued = (tracks: ManagedDownloadTrack[]) => {
     const trackIds = new Set(tracks.map((track) => track.fileId));
     const nextFiles = filesRef.current.map((file) =>
@@ -887,147 +827,42 @@ export default function AudioTagger() {
     filesRef.current = nextFiles;
     setFiles(nextFiles);
   };
-  const cancelPendingPlaylistDownloads = (run: PlaylistDownloadQueueRun) => {
-    if (run.pending.length === 0) return;
+  const getPlaylistDownloadController = () => {
+    if (playlistDownloadControllerRef.current) return playlistDownloadControllerRef.current;
 
-    const canceledTrackIds = cancelPendingPlaylistDownloadTracks(run, Date.now());
-    markDownloadsCanceled(canceledTrackIds);
-  };
-  const cancelActivePlaylistDownloads = (run: PlaylistDownloadQueueRun) => {
-    if (run.active.length === 0) return;
-
-    const canceledTrackIds = cancelActivePlaylistDownloadTracks(run, Date.now());
-    for (const trackId of canceledTrackIds) {
-      run.abortControllers.get(trackId)?.abort(createPlaylistDownloadAbortReason());
-    }
-    markDownloadsCanceled(canceledTrackIds);
-  };
-  const finishPlaylistQueueRunIfIdle = (run: PlaylistDownloadQueueRun) => {
-    if (!finishPlaylistDownloadQueueRunIfIdle(run)) return false;
-
-    clearPlaylistBudgetWake(run);
-    publishPlaylistQueueRun(run);
-    return true;
-  };
-  const startManagedDownload = (run: PlaylistDownloadQueueRun, track: ManagedDownloadTrack) => {
-    const startedAt = Date.now();
-    const abortController = new AbortController();
-    run.abortControllers.set(track.fileId, abortController);
-    markPlaylistDownloadTrackActive(run, track, startedAt);
-    publishPlaylistQueueRun(run);
-
-    void (async () => {
-      try {
-        const currentFile = filesRef.current.find((file) => file.id === track.fileId);
-        if (!currentFile) {
-          markPlaylistDownloadTrackCompleted(run, track.fileId, Date.now());
-          return;
-        }
-
-        const downloadedFile = await downloadCobaltAudio({
-          ...track.downloadRequest,
-          signal: abortController.signal,
-        });
-        abortController.signal.throwIfAborted();
-        if (playlistDownloadQueueRunRef.current !== run) return;
-
-        await hydrateDownloadedTrack(track.fileId, downloadedFile, abortController.signal);
-        abortController.signal.throwIfAborted();
-        if (playlistDownloadQueueRunRef.current !== run) return;
-
-        markPlaylistDownloadTrackCompleted(run, track.fileId, Date.now());
-      } catch (error) {
-        if (isPlaylistDownloadAbort(error)) {
-          markPlaylistDownloadTrackCanceled(run, track.fileId, Date.now());
-          if (playlistDownloadQueueRunRef.current === run) {
-            markDownloadsCanceled([track.fileId]);
-          }
-          return;
-        }
-
-        let message = "download failed.";
-        if (error instanceof Error) {
-          message = error.message;
-        }
-        markPlaylistDownloadTrackFailed(run, track.fileId, message, Date.now());
-        if (playlistDownloadQueueRunRef.current === run) {
-          markDownloadError(track.fileId, error);
-        }
-      } finally {
-        run.abortControllers.delete(track.fileId);
-        removeActivePlaylistDownloadTrack(run, track.fileId);
-        publishPlaylistQueueRun(run);
-        pumpPlaylistDownloadQueue(run);
-      }
-    })();
-  };
-  const pumpPlaylistDownloadQueue = (run: PlaylistDownloadQueueRun) => {
-    if (playlistDownloadQueueRunRef.current !== run) return;
-    if (run.done) return;
-
-    if (run.canceled) {
-      clearPlaylistBudgetWake(run);
-      cancelPendingPlaylistDownloads(run);
-      cancelActivePlaylistDownloads(run);
-      publishPlaylistQueueRun(run);
-      finishPlaylistQueueRunIfIdle(run);
-      return;
-    }
-
-    clearPlaylistBudgetWake(run);
-    while (run.active.length < PLAYLIST_DOWNLOAD_CONCURRENCY && run.pending.length > 0) {
-      const budget = reserveNextPlaylistDownloadTrack(run, Date.now());
-
-      if (budget.status === "waiting-for-tunnel-budget") {
-        schedulePlaylistBudgetWake(run, budget.waitMs);
-        publishPlaylistQueueRun(run);
-        return;
-      }
-
-      if (budget.status === "reserved") {
-        startManagedDownload(run, budget.track);
-      }
-    }
-
-    finishPlaylistQueueRunIfIdle(run);
+    const controller = createPlaylistDownloadController<ManagedDownloadTrack>({
+      createModelTrack: createPlaylistDownloadModelTrack,
+      downloadTrack: (track) =>
+        Effect.tryPromise({
+          try: (signal) =>
+            downloadCobaltAudio({
+              ...track.downloadRequest,
+              signal,
+            }),
+          catch: (error) => error,
+        }),
+      hydrateTrack: (track, downloadedFile) =>
+        Effect.tryPromise({
+          try: (signal) => hydrateDownloadedTrack(track.fileId, downloadedFile, signal),
+          catch: (error) => error,
+        }),
+      hasTrack: (trackId) => filesRef.current.some((file) => file.id === trackId),
+      getFileErrorTrackIds: () =>
+        new Set(filesRef.current.filter((file) => file.status === "error").map((file) => file.id)),
+      markQueued: markDownloadsQueued,
+      markCanceled: markDownloadsCanceled,
+      markFailed: markDownloadError,
+      emitSnapshot: (snapshot) => {
+        playlistDownloadQueueRef.current = snapshot;
+        setPlaylistDownloadQueue(snapshot);
+      },
+    });
+    playlistDownloadControllerRef.current = controller;
+    return controller;
   };
   const queueDownloadTracks = (tracks: ManagedDownloadTrack[]) => {
     if (tracks.length === 0) return;
-
-    const currentRun = playlistDownloadQueueRunRef.current;
-    if (currentRun && !currentRun.done && !currentRun.canceled) {
-      const fileErrorTrackIds = new Set(
-        filesRef.current.filter((file) => file.status === "error").map((file) => file.id),
-      );
-      const queuedTracks = enqueuePlaylistDownloadQueueTracks(
-        currentRun,
-        tracks,
-        Date.now(),
-        fileErrorTrackIds,
-        createPlaylistDownloadModelTrack,
-      );
-      if (queuedTracks.length === 0) return;
-
-      markDownloadsQueued(queuedTracks);
-      publishPlaylistQueueRun(currentRun);
-      pumpPlaylistDownloadQueue(currentRun);
-      return;
-    }
-
-    const run: PlaylistDownloadQueueRun = {
-      ...createPlaylistDownloadQueueRun(
-        playlistDownloadQueueIdRef.current + 1,
-        tracks,
-        Date.now(),
-        createPlaylistDownloadModelTrack,
-      ),
-      abortControllers: new Map(),
-    };
-    playlistDownloadQueueIdRef.current = run.id;
-    playlistDownloadQueueRunRef.current = run;
-    markDownloadsQueued(tracks);
-    replacePlaylistQueueState(createPlaylistQueueState(run));
-    pumpPlaylistDownloadQueue(run);
+    getPlaylistDownloadController().enqueue(tracks);
   };
   const managedDownloadTrackFromFile = (file: TagiumFile): ManagedDownloadTrack | null => {
     if (!file.downloadRequest) return null;
@@ -1136,14 +971,7 @@ export default function AudioTagger() {
     queueDownloadTracks([trackToRetry]);
   };
   const handleCancelPlaylistDownloads = () => {
-    const currentRun = playlistDownloadQueueRunRef.current;
-    if (!currentRun) return;
-    if (currentRun.done) return;
-
-    currentRun.canceled = true;
-    cancelActivePlaylistDownloads(currentRun);
-    publishPlaylistQueueRun(currentRun);
-    pumpPlaylistDownloadQueue(currentRun);
+    getPlaylistDownloadController().cancel();
   };
   const handleRetryPlaylistDownloads = () => {
     const currentQueue = playlistDownloadQueueRef.current;
@@ -1155,7 +983,7 @@ export default function AudioTagger() {
       .filter((file) => trackIdSet.has(file.id) && !file.file)
       .map((file) => managedDownloadTrackFromFile(file))
       .filter((track): track is ManagedDownloadTrack => Boolean(track));
-    queueDownloadTracks(tracksToRetry);
+    getPlaylistDownloadController().retry(tracksToRetry);
   };
   const handleDownloadAll = async () => {
     if (files.length === 0) return;
