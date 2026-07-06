@@ -58,7 +58,7 @@ import {
 } from "./mp3Utils";
 import { loadAppSettings, saveAppSettings } from "./settings";
 import { getSampleAlbum } from "./sampleMetadata";
-import type { SoundCloudSet } from "./soundcloudSet";
+import { isSoundCloudSetUrl, resolveSoundCloudSet, type SoundCloudSet } from "./soundcloudSet";
 import {
   AlbumGroup,
   AppSettings,
@@ -961,6 +961,18 @@ export default function AudioTagger() {
 
     queueDownloadTracks(plan.queuedTracks);
   };
+  const handleUrlImport = async (sourceUrl: string) => {
+    const trimmedUrl = sourceUrl.trim();
+    if (!trimmedUrl) return;
+
+    if (isSoundCloudSetUrl(trimmedUrl)) {
+      const set = await resolveSoundCloudSet(trimmedUrl);
+      handleSoundCloudSetDownload(set);
+      return;
+    }
+
+    handleAudioDownload(trimmedUrl);
+  };
   const handleRetryDownload = (fileId: string) => {
     const fileToRetry = filesRef.current.find((file) => file.id === fileId);
     if (!fileToRetry) return;
@@ -1685,11 +1697,7 @@ export default function AudioTagger() {
                 onBack={() => setActiveView("editor")}
               />
             ) : libraryIsEmpty ? (
-              <LandingScreen
-                onAudioUpload={handleAudioUpload}
-                onAudioDownload={handleAudioDownload}
-                onSoundCloudSetDownload={handleSoundCloudSetDownload}
-              />
+              <LandingScreen onAudioUpload={handleAudioUpload} onUrlImport={handleUrlImport} />
             ) : (
               <TrackMetadataEditor
                 selectedFile={selectedFile}
@@ -1711,10 +1719,7 @@ export default function AudioTagger() {
           {!libraryIsEmpty && activeView === "editor" && (
             <div className="flex-shrink-0 border-t bg-background/95 p-3 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-4 lg:z-10 lg:flex lg:justify-center lg:border-t-0 lg:bg-transparent lg:px-4 lg:p-0">
               <div className="pointer-events-auto flex w-full max-w-3xl flex-col gap-2">
-                <AudioDownloader
-                  onAudioDownload={handleAudioDownload}
-                  onSoundCloudSetDownload={handleSoundCloudSetDownload}
-                />
+                <AudioDownloader onUrlImport={handleUrlImport} />
               </div>
             </div>
           )}
