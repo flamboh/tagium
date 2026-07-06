@@ -71,7 +71,7 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   fmt: {
-    ignorePatterns: ["repos/effect"],
+    ignorePatterns: ["repos/*"],
   },
   lint: {
     plugins: ["oxc", "typescript", "unicorn", "react"],
@@ -81,7 +81,7 @@ export default defineConfig({
     env: {
       builtin: true,
     },
-    ignorePatterns: ["dist", "build", "coverage", "node_modules", "repos/effect"],
+    ignorePatterns: ["dist", "build", "coverage", "node_modules", "repos/*"],
     overrides: [
       {
         files: ["**/*.{ts,tsx}"],
@@ -178,6 +178,9 @@ export default defineConfig({
       typeAware: true,
       typeCheck: true,
     },
+  },
+  test: {
+    exclude: ["**/node_modules/**", "**/.git/**", "**/repos/**"],
   },
   plugins: [react(), libavAssets(), ...(isTest ? [] : [nitro()])],
   resolve: {
