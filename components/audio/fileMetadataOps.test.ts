@@ -102,8 +102,10 @@ describe("fileMetadataOps", () => {
 
     expect(result[0].status).toBe("pending");
     expect(result[0].hasBufferedChanges).toBe(true);
+    expect(result[0].pendingMetadataPatch?.trackNumber).toBe(2);
     expect(result[0].metadata?.trackNumber).toBe(2);
     expect(result[1].metadata?.trackNumber).toBe(1);
+    expect(result[1].pendingMetadataPatch?.trackNumber).toBe(1);
   });
 
   it("applies shared album metadata without applying album cover", () => {
@@ -166,6 +168,14 @@ describe("fileMetadataOps", () => {
     expect(updatedFile.metadata?.genre).toBe("Ambient");
     expect(updatedFile.metadata?.trackNumber).toBe(9);
     expect(updatedFile.metadata?.picture).toEqual(originalCover);
+    expect(updatedFile.pendingMetadataPatch).toMatchObject({
+      artist: "New Artist",
+      album: "New Album",
+      genre: "Ambient",
+    });
+    expect(
+      Object.prototype.hasOwnProperty.call(updatedFile.pendingMetadataPatch ?? {}, "year"),
+    ).toBe(false);
   });
 
   it("explicitly applies album cover to album tracks", () => {
@@ -207,6 +217,7 @@ describe("fileMetadataOps", () => {
     expect(result[0].metadata?.picture).toEqual(albumCover);
     expect(result[0].status).toBe("pending");
     expect(result[0].hasBufferedChanges).toBe(true);
+    expect(result[0].pendingMetadataPatch?.picture).toEqual(albumCover);
     expect(result[1].metadata?.picture).toEqual(albumCover);
     expect(result[1].hasBufferedChanges).toBe(true);
     expect(result[2]).toBe(files[2]);
@@ -362,6 +373,7 @@ describe("fileMetadataOps", () => {
     expect(result[0].metadata?.filename).toBe("New Track Title");
     expect(result[0].status).toBe("pending");
     expect(result[0].hasBufferedChanges).toBe(true);
+    expect(result[0].pendingMetadataPatch?.filename).toBe("New Track Title");
     expect(result[1].filename).toBe("Same.mp3");
     expect(result[1].metadata?.filename).toBe("Same");
   });
@@ -430,6 +442,234 @@ describe("fileMetadataOps", () => {
     expect(result.hydratedFile.metadata?.picture).toEqual(parsedCover);
     expect(result.hydratedFile.status).toBe("pending");
     expect(result.hydratedFile.downloadStatus).toBe("ready");
+  });
+
+  it("keeps parsed metadata for an unedited single URL placeholder", () => {
+    const currentFile = readyFile({
+      file: undefined,
+      originalFile: undefined,
+      filename: "download-slug.mp3",
+      downloadStatus: "downloading",
+      hasBufferedChanges: false,
+      pendingMetadataPatch: undefined,
+      metadata: metadata({
+        filename: "download-slug",
+        title: "download slug",
+        artist: "",
+        album: "",
+      }),
+    });
+    const parsedFile = readyFile({
+      filename: "parsed-file.mp3",
+      metadata: metadata({
+        filename: "parsed-file",
+        title: "Parsed ID3 Title",
+        artist: "Parsed Artist",
+        album: "Parsed Album",
+        duration: 123,
+        bitrate: 320,
+        sampleRate: 44100,
+      }),
+    });
+
+    const { hydratedFile, metadataToWrite } = prepareDownloadedTrackHydration(
+      currentFile,
+      parsedFile,
+    );
+
+    expect(metadataToWrite).toBeUndefined();
+    expect(hydratedFile.filename).toBe("parsed-file.mp3");
+    expect(hydratedFile.metadata?.title).toBe("Parsed ID3 Title");
+    expect(hydratedFile.metadata?.artist).toBe("Parsed Artist");
+    expect(hydratedFile.metadata?.album).toBe("Parsed Album");
+    expect(hydratedFile.hasBufferedChanges).toBe(false);
+    expect(hydratedFile.pendingMetadataPatch).toBeUndefined();
+  });
+
+  it("does not inherit provider year or track number when parsed download has none", () => {
+    const currentFile = readyFile({
+      file: undefined,
+      originalFile: undefined,
+      filename: "provider-title.mp3",
+      downloadStatus: "downloading",
+      hasBufferedChanges: true,
+      pendingMetadataPatch: { title: "Provider Title" },
+      metadata: metadata({
+        filename: "provider-title",
+        title: "Provider Title",
+        year: 2024,
+        trackNumber: 7,
+      }),
+    });
+    const parsedFile = readyFile({
+      filename: "parsed-title.mp3",
+      metadata: metadata({
+        filename: "parsed-title",
+        title: "Parsed Title",
+        year: undefined,
+        trackNumber: undefined,
+      }),
+    });
+
+    const { hydratedFile, metadataToWrite } = prepareDownloadedTrackHydration(
+      currentFile,
+      parsedFile,
+    );
+
+    expect(hydratedFile.metadata?.title).toBe("Provider Title");
+    expect(hydratedFile.metadata?.year).toBeUndefined();
+    expect(hydratedFile.metadata?.trackNumber).toBeUndefined();
+    expect(metadataToWrite?.year).toBeUndefined();
+    expect(metadataToWrite?.trackNumber).toBeUndefined();
+    expect(hydratedFile.pendingMetadataPatch?.title).toBe("Provider Title");
+    expect(
+      Object.prototype.hasOwnProperty.call(hydratedFile.pendingMetadataPatch ?? {}, "year"),
+    ).toBe(false);
+  });
+
+  it("applies explicit pending patch year and track number during hydration", () => {
+    const currentFile = readyFile({
+      file: undefined,
+      originalFile: undefined,
+      downloadStatus: "downloading",
+      metadata: metadata({
+        filename: "provider-title",
+        title: "Provider Title",
+        year: 2024,
+        trackNumber: 7,
+      }),
+    });
+    const parsedFile = readyFile({
+      metadata: metadata({
+        filename: "parsed-title",
+        title: "Parsed Title",
+        year: undefined,
+        trackNumber: undefined,
+      }),
+    });
+
+    const { hydratedFile, metadataToWrite } = prepareDownloadedTrackHydration(
+      currentFile,
+      parsedFile,
+      {
+        year: 2025,
+        trackNumber: 3,
+      },
+    );
+
+    expect(hydratedFile.metadata?.year).toBe(2025);
+    expect(hydratedFile.metadata?.trackNumber).toBe(3);
+    expect(metadataToWrite?.year).toBe(2025);
+    expect(metadataToWrite?.trackNumber).toBe(3);
+  });
+
+  it("preserves sparse SoundCloud set intent while hydrating parsed downloads", () => {
+    const currentFile = readyFile({
+      file: undefined,
+      originalFile: undefined,
+      filename: "first-track.mp3",
+      downloadStatus: "downloading",
+      hasBufferedChanges: true,
+      pendingMetadataPatch: {
+        title: "First Track",
+        artist: "Set Artist",
+        album: "Imported Set",
+        genre: "Electronic",
+        year: 2024,
+        trackNumber: 1,
+      },
+      metadata: metadata({
+        filename: "first-track",
+        title: "First Track",
+        artist: "Set Artist",
+        album: "Imported Set",
+        genre: "Electronic",
+        year: 2024,
+        trackNumber: 1,
+      }),
+    });
+    const parsedFile = readyFile({
+      filename: "parsed-file.mp3",
+      metadata: metadata({
+        filename: "parsed-file",
+        title: "Parsed ID3 Title",
+        artist: "Parsed Artist",
+        album: "Parsed Album",
+        genre: "Parsed Genre",
+        year: undefined,
+        trackNumber: undefined,
+        duration: 123,
+        bitrate: 320,
+        sampleRate: 44100,
+      }),
+    });
+
+    const { hydratedFile, metadataToWrite } = prepareDownloadedTrackHydration(
+      currentFile,
+      parsedFile,
+    );
+
+    expect(metadataToWrite).toMatchObject({
+      title: "First Track",
+      artist: "Set Artist",
+      album: "Imported Set",
+      genre: "Electronic",
+      year: 2024,
+      trackNumber: 1,
+    });
+    expect(hydratedFile.metadata).toMatchObject({
+      title: "First Track",
+      artist: "Set Artist",
+      album: "Imported Set",
+      genre: "Electronic",
+      year: 2024,
+      trackNumber: 1,
+      duration: 123,
+      bitrate: 320,
+      sampleRate: 44100,
+    });
+    expect(hydratedFile.pendingMetadataPatch).toEqual({
+      title: "First Track",
+      artist: "Set Artist",
+      album: "Imported Set",
+      genre: "Electronic",
+      year: 2024,
+      trackNumber: 1,
+    });
+  });
+
+  it("clears parsed year and track number when pending patch sets them to null", () => {
+    const currentFile = readyFile({
+      file: undefined,
+      originalFile: undefined,
+      downloadStatus: "downloading",
+      metadata: metadata({
+        filename: "provider-title",
+        title: "Provider Title",
+      }),
+    });
+    const parsedFile = readyFile({
+      metadata: metadata({
+        filename: "parsed-title",
+        title: "Parsed Title",
+        year: 2024,
+        trackNumber: 9,
+      }),
+    });
+
+    const { hydratedFile, metadataToWrite } = prepareDownloadedTrackHydration(
+      currentFile,
+      parsedFile,
+      {
+        year: null,
+        trackNumber: null,
+      },
+    );
+
+    expect(hydratedFile.metadata?.year).toBeNull();
+    expect(hydratedFile.metadata?.trackNumber).toBeNull();
+    expect(metadataToWrite?.year).toBeNull();
+    expect(metadataToWrite?.trackNumber).toBeNull();
   });
 
   it("keeps later buffered edits when stale hydration write resolves", () => {
@@ -526,6 +766,7 @@ describe("fileMetadataOps", () => {
     expect(result.metadata?.duration).toBe(101);
     expect(result.status).toBe("saved");
     expect(result.hasBufferedChanges).toBe(false);
+    expect(result.pendingMetadataPatch).toBeUndefined();
   });
 
   it("keeps latest dirty form metadata when hydration write resolves", () => {
@@ -619,6 +860,7 @@ describe("fileMetadataOps", () => {
     expect(result.downloadStatus).toBe("ready");
     expect(result.downloadError).toBe("Unable to save metadata");
     expect(result.hasBufferedChanges).toBe(true);
+    expect(result.pendingMetadataPatch?.title).toBe("Edited Title");
   });
 
   it("keeps later edits when stale hydration write fails", () => {
@@ -663,6 +905,7 @@ describe("fileMetadataOps", () => {
     expect(result.metadata?.sampleRate).toBe(32000);
     expect(result.status).toBe("error");
     expect(result.downloadError).toBe("Unable to save metadata");
+    expect(result.pendingMetadataPatch?.title).toBe("New Edit");
   });
 
   it("uses dirty form metadata during hydration while preserving parsed technical fields", () => {
@@ -697,6 +940,83 @@ describe("fileMetadataOps", () => {
     expect(hydratedFile.metadata?.bitrate).toBe(256);
     expect(hydratedFile.metadata?.sampleRate).toBe(48000);
     expect(hydratedFile.hasBufferedChanges).toBe(true);
+  });
+
+  it("does not leak a stale form year into a newly downloaded track with no parsed year", () => {
+    const currentFile = readyFile({
+      id: "new-download",
+      file: undefined,
+      originalFile: undefined,
+      filename: "new-download.mp3",
+      downloadStatus: "downloading",
+      hasBufferedChanges: false,
+      metadata: metadata({
+        filename: "new-download",
+        title: "New Download",
+        year: undefined,
+      }),
+    });
+    const parsedFile = readyFile({
+      id: "new-download",
+      filename: "new-download.mp3",
+      metadata: metadata({
+        filename: "new-download",
+        title: "New Download",
+        year: undefined,
+        duration: 64,
+        bitrate: 320,
+        sampleRate: 44100,
+      }),
+    });
+    const pendingMetadataPatch = {
+      filename: "new-download",
+      title: "New Download",
+    };
+
+    const { hydratedFile, metadataToWrite } = prepareDownloadedTrackHydration(
+      currentFile,
+      parsedFile,
+      pendingMetadataPatch,
+    );
+
+    expect(metadataToWrite?.year).toBeUndefined();
+    expect(hydratedFile.metadata?.year).toBeUndefined();
+    expect(hydratedFile.metadata?.duration).toBe(64);
+    expect(hydratedFile.metadata?.bitrate).toBe(320);
+    expect(hydratedFile.metadata?.sampleRate).toBe(44100);
+  });
+
+  it("keeps an explicitly buffered form year while hydrating a downloaded track", () => {
+    const currentFile = readyFile({
+      file: undefined,
+      originalFile: undefined,
+      downloadStatus: "downloading",
+      hasBufferedChanges: true,
+      pendingMetadataPatch: { year: 2026 },
+      metadata: metadata({
+        filename: "edited-download",
+        title: "Edited Download",
+        year: 2026,
+      }),
+    });
+    const parsedFile = readyFile({
+      metadata: metadata({
+        filename: "parsed-download",
+        title: "Parsed Download",
+        year: undefined,
+        duration: 71,
+      }),
+    });
+
+    const { hydratedFile, metadataToWrite } = prepareDownloadedTrackHydration(
+      currentFile,
+      parsedFile,
+    );
+
+    expect(metadataToWrite?.year).toBe(2026);
+    expect(hydratedFile.metadata?.year).toBe(2026);
+    expect(hydratedFile.metadata?.duration).toBe(71);
+    expect(hydratedFile.pendingMetadataPatch?.year).toBe(2026);
   });
 
   it("uses dirty form cover during hydration", () => {

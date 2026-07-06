@@ -1,11 +1,60 @@
 import filenamify from "filenamify";
 import type { SoundCloudSet } from "./soundcloudSet";
-import { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
+import type { AlbumGroup, AudioMetadata, MetadataPatch, TagiumFile } from "./types";
 
 export interface DownloadedTrackHydration {
   hydratedFile: TagiumFile;
   metadataToWrite?: AudioMetadata;
 }
+
+type DownloadedTrackWritableMetadataField = keyof MetadataPatch;
+
+export type DownloadedTrackMetadataPatch = MetadataPatch;
+
+interface ReconciledDownloadedTrackMetadata {
+  metadata?: AudioMetadata;
+  metadataToWrite?: AudioMetadata;
+}
+
+const patchFields = [
+  "filename",
+  "title",
+  "artist",
+  "album",
+  "year",
+  "genre",
+  "picture",
+  "trackNumber",
+] as const satisfies readonly DownloadedTrackWritableMetadataField[];
+
+const nullableNumericPatchFields = ["year", "trackNumber"] as const;
+
+const markPendingMetadataPatch = (
+  file: TagiumFile,
+  patch: DownloadedTrackMetadataPatch,
+): TagiumFile => {
+  const pendingMetadataPatch = {
+    ...file.pendingMetadataPatch,
+    ...patch,
+  };
+
+  return {
+    ...file,
+    pendingMetadataPatch,
+    hasBufferedChanges: true,
+  };
+};
+
+const createMetadataPatch = (metadata: AudioMetadata): DownloadedTrackMetadataPatch => ({
+  filename: metadata.filename,
+  title: metadata.title,
+  artist: metadata.artist,
+  album: metadata.album,
+  year: metadata.year,
+  genre: metadata.genre,
+  picture: metadata.picture,
+  trackNumber: metadata.trackNumber,
+});
 
 const mergeLatestMetadataWithHydratedTechnicalFields = (
   latestFile: TagiumFile,
@@ -25,6 +74,120 @@ const mergeLatestMetadataWithHydratedTechnicalFields = (
         : hydratedFile.metadata.picture,
   };
 };
+
+const hasOwn = <Key extends PropertyKey>(object: object, key: Key) =>
+  Object.prototype.hasOwnProperty.call(object, key);
+
+const areGenresEqual = (
+  firstGenre: AudioMetadata["genre"],
+  secondGenre: AudioMetadata["genre"],
+) => {
+  if (Array.isArray(firstGenre) || Array.isArray(secondGenre)) {
+    if (!Array.isArray(firstGenre) || !Array.isArray(secondGenre)) return false;
+    if (firstGenre.length !== secondGenre.length) return false;
+    return firstGenre.every((genre, index) => genre === secondGenre[index]);
+  }
+
+  return firstGenre === secondGenre;
+};
+
+const areWritableMetadataFieldsEqual = (
+  firstMetadata: AudioMetadata,
+  secondMetadata: AudioMetadata,
+) =>
+  firstMetadata.filename === secondMetadata.filename &&
+  firstMetadata.title === secondMetadata.title &&
+  firstMetadata.artist === secondMetadata.artist &&
+  firstMetadata.album === secondMetadata.album &&
+  firstMetadata.year === secondMetadata.year &&
+  areGenresEqual(firstMetadata.genre, secondMetadata.genre) &&
+  arePicturesEqual(firstMetadata.picture, secondMetadata.picture) &&
+  firstMetadata.trackNumber === secondMetadata.trackNumber;
+
+const applyProviderDisplayMetadata = (
+  parsedMetadata: AudioMetadata,
+  providerMetadata?: AudioMetadata,
+): AudioMetadata => {
+  if (!providerMetadata) return parsedMetadata;
+
+  return {
+    ...parsedMetadata,
+    filename: providerMetadata.filename || parsedMetadata.filename,
+    title: providerMetadata.title || parsedMetadata.title,
+    artist: providerMetadata.artist || parsedMetadata.artist,
+    album: providerMetadata.album || parsedMetadata.album,
+    genre: providerMetadata.genre || parsedMetadata.genre,
+    picture:
+      providerMetadata.picture.length > 0 ? providerMetadata.picture : parsedMetadata.picture,
+  };
+};
+
+const applyPendingMetadataPatch = (
+  metadata: AudioMetadata,
+  pendingPatch?: DownloadedTrackMetadataPatch,
+): AudioMetadata => {
+  if (!pendingPatch) return metadata;
+
+  return patchFields.reduce<AudioMetadata>((nextMetadata, field) => {
+    if (!hasOwn(pendingPatch, field)) return nextMetadata;
+
+    const value = pendingPatch[field];
+    if (value === undefined) return nextMetadata;
+
+    return {
+      ...nextMetadata,
+      [field]: value,
+    };
+  }, metadata);
+};
+
+const normalizePendingMetadataPatch = (
+  pendingPatch?: DownloadedTrackMetadataPatch,
+): DownloadedTrackMetadataPatch | undefined => {
+  if (!pendingPatch) return undefined;
+  if (
+    !hasOwn(pendingPatch, "duration") &&
+    !hasOwn(pendingPatch, "bitrate") &&
+    !hasOwn(pendingPatch, "sampleRate")
+  ) {
+    return pendingPatch;
+  }
+
+  return patchFields.reduce<DownloadedTrackMetadataPatch>((nextPatch, field) => {
+    if (!hasOwn(pendingPatch, field)) return nextPatch;
+    if (nullableNumericPatchFields.includes(field as (typeof nullableNumericPatchFields)[number])) {
+      return nextPatch;
+    }
+
+    return {
+      ...nextPatch,
+      [field]: pendingPatch[field],
+    };
+  }, {});
+};
+
+export function reconcileDownloadedTrackMetadata(
+  parsedMetadata: AudioMetadata | undefined,
+  providerMetadata?: AudioMetadata,
+  pendingPatch?: DownloadedTrackMetadataPatch,
+): ReconciledDownloadedTrackMetadata {
+  if (!parsedMetadata) {
+    return { metadata: providerMetadata };
+  }
+
+  const providerDisplayMetadata = applyProviderDisplayMetadata(parsedMetadata, providerMetadata);
+  const metadata = applyPendingMetadataPatch(
+    providerDisplayMetadata,
+    normalizePendingMetadataPatch(pendingPatch),
+  );
+
+  return {
+    metadata,
+    metadataToWrite: areWritableMetadataFieldsEqual(parsedMetadata, metadata)
+      ? undefined
+      : metadata,
+  };
+}
 
 export function applyTrackOrderNumbersToFiles(
   files: TagiumFile[],
@@ -47,15 +210,17 @@ export function applyTrackOrderNumbersToFiles(
     const trackNumber = numbersByTrackId.get(file.id);
     if (trackNumber === undefined || !file.metadata) return file;
 
-    return {
-      ...file,
-      status: file.status === "saved" ? "pending" : file.status,
-      hasBufferedChanges: true,
-      metadata: {
-        ...file.metadata,
-        trackNumber,
+    return markPendingMetadataPatch(
+      {
+        ...file,
+        status: file.status === "saved" ? "pending" : file.status,
+        metadata: {
+          ...file.metadata,
+          trackNumber,
+        },
       },
-    };
+      { trackNumber },
+    );
   });
 }
 
@@ -72,16 +237,18 @@ export function applySyncedFilenamesToFiles(files: TagiumFile[], trackIds?: stri
       return file;
     }
 
-    return {
-      ...file,
-      filename: `${syncedFilename}.mp3`,
-      status: file.status === "saved" ? "pending" : file.status,
-      hasBufferedChanges: true,
-      metadata: {
-        ...file.metadata,
-        filename: syncedFilename,
+    return markPendingMetadataPatch(
+      {
+        ...file,
+        filename: `${syncedFilename}.mp3`,
+        status: file.status === "saved" ? "pending" : file.status,
+        metadata: {
+          ...file.metadata,
+          filename: syncedFilename,
+        },
       },
-    };
+      { filename: syncedFilename },
+    );
   });
 }
 
@@ -93,18 +260,27 @@ export function applyAlbumSharedTagsToFiles(files: TagiumFile[], album: AlbumGro
   return files.map((file) => {
     if (!trackSet.has(file.id) || !file.metadata) return file;
 
-    return {
-      ...file,
-      status: file.status === "saved" ? "pending" : file.status,
-      hasBufferedChanges: true,
-      metadata: {
-        ...file.metadata,
+    const yearPatch = album.year !== undefined ? { year: album.year } : {};
+
+    return markPendingMetadataPatch(
+      {
+        ...file,
+        status: file.status === "saved" ? "pending" : file.status,
+        metadata: {
+          ...file.metadata,
+          artist: album.artist,
+          album: album.title,
+          genre: album.genre,
+          year: album.year !== undefined ? album.year : file.metadata.year,
+        },
+      },
+      {
         artist: album.artist,
         album: album.title,
         genre: album.genre,
-        year: album.year !== undefined ? album.year : file.metadata.year,
+        ...yearPatch,
       },
-    };
+    );
   });
 }
 
@@ -120,15 +296,17 @@ export function applyAlbumCoverToFiles(
   return files.map((file) => {
     if (!trackSet.has(file.id) || !file.metadata) return file;
 
-    return {
-      ...file,
-      status: file.status === "saved" ? "pending" : file.status,
-      hasBufferedChanges: true,
-      metadata: {
-        ...file.metadata,
-        picture: cover,
+    return markPendingMetadataPatch(
+      {
+        ...file,
+        status: file.status === "saved" ? "pending" : file.status,
+        metadata: {
+          ...file.metadata,
+          picture: cover,
+        },
       },
-    };
+      { picture: cover },
+    );
   });
 }
 
@@ -213,43 +391,37 @@ export function applySoundCloudSetImportedCover(
 export function prepareDownloadedTrackHydration(
   currentFile: TagiumFile,
   parsedFile: TagiumFile,
-  formMetadata?: AudioMetadata,
+  pendingMetadataPatch?: DownloadedTrackMetadataPatch,
 ): DownloadedTrackHydration {
   const parsedMetadata = parsedFile.metadata;
-  const bufferedMetadata = formMetadata ?? currentFile.metadata;
-  const shouldApplyBufferedMetadata = currentFile.hasBufferedChanges || Boolean(formMetadata);
-  const nextMetadata =
-    shouldApplyBufferedMetadata && bufferedMetadata
-      ? {
-          ...bufferedMetadata,
-          duration: parsedMetadata?.duration ?? bufferedMetadata.duration,
-          bitrate: parsedMetadata?.bitrate ?? bufferedMetadata.bitrate,
-          sampleRate: parsedMetadata?.sampleRate ?? bufferedMetadata.sampleRate,
-          picture:
-            bufferedMetadata.picture.length > 0
-              ? bufferedMetadata.picture
-              : (parsedMetadata?.picture ?? []),
-        }
-      : (parsedMetadata ?? currentFile.metadata);
+  const pendingPatch = pendingMetadataPatch ?? currentFile.pendingMetadataPatch;
+  const shouldApplyProviderDisplayMetadata =
+    currentFile.hasBufferedChanges || Boolean(pendingPatch);
+  const { metadata: nextMetadata, metadataToWrite } = reconcileDownloadedTrackMetadata(
+    parsedMetadata,
+    shouldApplyProviderDisplayMetadata ? currentFile.metadata : undefined,
+    pendingPatch,
+  );
+  const shouldWriteMetadata = Boolean(metadataToWrite);
 
   const hydratedFile: TagiumFile = {
     ...currentFile,
     file: parsedFile.file,
     originalFile: parsedFile.originalFile,
-    filename:
-      shouldApplyBufferedMetadata && nextMetadata?.filename
-        ? `${nextMetadata.filename}.mp3`
-        : parsedFile.filename,
+    filename: nextMetadata?.filename ? `${nextMetadata.filename}.mp3` : parsedFile.filename,
     metadata: nextMetadata,
     downloadStatus: "ready",
     downloadError: parsedFile.downloadError,
-    status: shouldApplyBufferedMetadata ? "pending" : parsedFile.status,
-    hasBufferedChanges: shouldApplyBufferedMetadata,
+    status: shouldWriteMetadata ? "pending" : parsedFile.status,
+    hasBufferedChanges: shouldWriteMetadata,
+    pendingMetadataPatch: shouldWriteMetadata
+      ? normalizePendingMetadataPatch(pendingPatch)
+      : undefined,
   };
 
   return {
     hydratedFile,
-    metadataToWrite: shouldApplyBufferedMetadata ? nextMetadata : undefined,
+    metadataToWrite,
   };
 }
 
@@ -280,6 +452,11 @@ export function resolveDownloadedTrackHydrationWrite(
       downloadError: undefined,
       status: "pending" as const,
       hasBufferedChanges: true,
+      pendingMetadataPatch:
+        nextFile.pendingMetadataPatch ??
+        (latestFormMetadata
+          ? createMetadataPatch(latestFormMetadata)
+          : hydratedFile.pendingMetadataPatch),
     };
   }
 
@@ -293,6 +470,7 @@ export function resolveDownloadedTrackHydrationWrite(
     },
     status: "saved" as const,
     hasBufferedChanges: false,
+    pendingMetadataPatch: undefined,
   };
 }
 
@@ -304,15 +482,20 @@ export function resolveDownloadedTrackHydrationWriteError(
   errorMessage: string,
 ) {
   const nextFile = latestFile !== currentFile ? latestFile : hydratedFile;
+  const metadata = mergeLatestMetadataWithHydratedTechnicalFields(nextFile, hydratedFile);
 
   return {
     ...nextFile,
     file: parsedFile.file,
     originalFile: parsedFile.originalFile,
-    metadata: mergeLatestMetadataWithHydratedTechnicalFields(nextFile, hydratedFile),
+    metadata,
     downloadStatus: "ready" as const,
     downloadError: errorMessage,
     status: "error" as const,
     hasBufferedChanges: true,
+    pendingMetadataPatch:
+      nextFile.pendingMetadataPatch ??
+      hydratedFile.pendingMetadataPatch ??
+      (metadata ? createMetadataPatch(metadata) : undefined),
   };
 }
