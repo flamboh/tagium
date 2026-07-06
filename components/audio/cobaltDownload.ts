@@ -1,28 +1,14 @@
-export type AudioDownloadBitrate = "320" | "256" | "128" | "96" | "64";
+import { Effect } from "effect";
+import { AudioDecodeError, AudioWorkerError, toPublicAudioError } from "./audioErrors";
+import { runAudioEffectWithoutServices } from "./audioRuntime";
+import {
+  decodeCobaltDownloadPlanEffect,
+  decodeCobaltLocalProcessingMessageEffect,
+  type CobaltDownloadPlan,
+} from "./cobaltAudioSchemas";
 
-export type CobaltDownloadPlan =
-  | {
-      status: "tunnel";
-      url: string;
-      filename: string;
-    }
-  | {
-      status: "local-processing";
-      type: "audio";
-      tunnel: string[];
-      output: {
-        type: string;
-        filename: string;
-        metadata?: Record<string, string | undefined>;
-      };
-      audio: {
-        copy: boolean;
-        format: string;
-        bitrate: string;
-        cover?: boolean;
-        cropCover?: boolean;
-      };
-    };
+export type AudioDownloadBitrate = "320" | "256" | "128" | "96" | "64";
+export type { CobaltDownloadPlan } from "./cobaltAudioSchemas";
 
 export type CobaltAudioDownloadLifecycleEvent =
   | {
@@ -241,6 +227,43 @@ const stripMetadataControlCharacters = (value: string) =>
     })
     .join("");
 
+const decodeCobaltDownloadPlan = Effect.fn("decodeCobaltDownloadPlan")(function* (input: unknown) {
+  return yield* decodeCobaltDownloadPlanEffect(input).pipe(
+    Effect.mapError(
+      (cause) =>
+        new AudioDecodeError({
+          message: "malformed Cobalt audio plan.",
+          cause,
+        }),
+    ),
+  );
+});
+
+const decodeCobaltLocalProcessingMessage = Effect.fn("decodeCobaltLocalProcessingMessage")(
+  function* (input: unknown) {
+    return yield* decodeCobaltLocalProcessingMessageEffect(input).pipe(
+      Effect.mapError(
+        (cause) =>
+          new AudioDecodeError({
+            message: "malformed Cobalt local processing message.",
+            cause,
+          }),
+      ),
+    );
+  },
+);
+
+const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const isMalformedTerminalLocalProcessingMessage = (data: unknown) => {
+  if (!isObjectRecord(data) || !isObjectRecord(data.cobaltLocalProcessing)) {
+    return false;
+  }
+
+  return "blob" in data.cobaltLocalProcessing || "error" in data.cobaltLocalProcessing;
+};
+
 const fetchTunnelFile = async (
   url: string,
   filename: string,
@@ -290,19 +313,39 @@ const runLocalProcessingWorker = async (
     };
     signal?.addEventListener("abort", onAbort, { once: true });
 
-    worker.onmessage = (event: MessageEvent) => {
-      const message = event.data.cobaltLocalProcessing;
-      if (message?.blob) {
+    worker.onmessage = async (event: MessageEvent) => {
+      let message;
+      try {
+        message = (
+          await runAudioEffectWithoutServices(decodeCobaltLocalProcessingMessage(event.data))
+        ).cobaltLocalProcessing;
+      } catch (error) {
+        if (isMalformedTerminalLocalProcessingMessage(event.data)) {
+          worker.terminate();
+          cleanup();
+          reject(toPublicAudioError(error));
+        }
+        return;
+      }
+
+      if ("blob" in message) {
         worker.terminate();
         cleanup();
         resolve(message.blob);
         return;
       }
 
-      if (message?.error) {
+      if ("error" in message) {
         worker.terminate();
         cleanup();
-        reject(new Error(message.error));
+        reject(
+          toPublicAudioError(
+            new AudioWorkerError({
+              message: message.error,
+              cause: event.data,
+            }),
+          ),
+        );
       }
     };
 
@@ -511,7 +554,11 @@ const runCobaltAudioDownload = async ({
     throw new Error(await response.text());
   }
 
-  const plan = (await response.json()) as CobaltDownloadPlan;
+  const plan = await runAudioEffectWithoutServices(
+    decodeCobaltDownloadPlan(await response.json()),
+  ).catch((error) => {
+    throw toPublicAudioError(error);
+  });
   const lastModified = getStableLastModified(sourceUrl);
 
   if (plan.status === "local-processing") {

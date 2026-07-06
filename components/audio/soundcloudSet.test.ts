@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vite-plus/test";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   createSingleUrlDownloadPlan,
   createSoundCloudSetDownloadPlan,
   type QueuedDownloadTrack,
 } from "./downloadTrack";
+import { resolveSoundCloudSet } from "./soundcloudSet";
 import { startSoundCloudSetImport } from "./soundcloudSetImport";
 import type { SoundCloudSet } from "./soundcloudSet";
 import type { AlbumGroup, AppSettings, AudioMetadata, TagiumFile } from "./types";
@@ -68,6 +69,40 @@ const soundCloudSet = (overrides: Partial<SoundCloudSet> = {}): SoundCloudSet =>
     },
   ],
   ...overrides,
+});
+
+describe("resolveSoundCloudSet", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects decoded tracks with malformed URLs", async () => {
+    vi.stubGlobal("window", {
+      location: {
+        origin: "https://tagium.test",
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          title: "Imported Set",
+          artist: "Set Artist",
+          genre: "Electronic",
+          isAlbum: true,
+          tracks: [
+            {
+              title: "Broken Track",
+              url: "not-a-url",
+              trackNumber: 1,
+            },
+          ],
+        }),
+      ),
+    );
+
+    await expect(resolveSoundCloudSet("https://soundcloud.com/artist/sets/set")).rejects.toThrow();
+  });
 });
 
 const createHarness = (settings: AppSettings = defaultSettings) => {

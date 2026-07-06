@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { runAudioEffectWithoutServices } from "./audioRuntime";
+import { decodeCobaltDownloadPlanEffect } from "./cobaltAudioSchemas";
 import {
   applyCobaltAudioMetadata,
   downloadCobaltAudio,
@@ -228,6 +230,178 @@ describe("downloadCobaltAudio", () => {
 
     await vi.advanceTimersByTimeAsync(2_000);
     await delayedDownload;
+  });
+
+  it("rejects malformed Cobalt audio plans before tunnel fetch", async () => {
+    const fetchedUrls: string[] = [];
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        fetchedUrls.push(url);
+        return Response.json({
+          status: "tunnel",
+          url: 123,
+          filename: "track.mp3",
+        });
+      }),
+    );
+
+    await expect(
+      downloadCobaltAudio({
+        sourceUrl: "https://soundcloud.com/artist/malformed",
+        audioBitrate: "128",
+      }),
+    ).rejects.toThrow();
+    expect(fetchedUrls).toEqual(["/api/cobalt/audio"]);
+  });
+
+  it("decodes Cobalt audio plans from the schema-derived Effect decoder", async () => {
+    const plan = await runAudioEffectWithoutServices(
+      decodeCobaltDownloadPlanEffect({
+        status: "local-processing",
+        type: "audio",
+        tunnel: ["/api/cobalt/tunnel?url=audio"],
+        output: {
+          type: "audio/mp4",
+          filename: "track.m4a",
+        },
+        audio: {
+          copy: false,
+          format: "m4a",
+          bitrate: "128",
+        },
+      }),
+    );
+
+    expect(plan).toMatchObject({
+      status: "local-processing",
+      output: {
+        filename: "track.m4a",
+      },
+    });
+  });
+
+  it("ignores unknown local worker messages until a valid result arrives", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === "/api/cobalt/audio") {
+          return Response.json({
+            status: "local-processing",
+            type: "audio",
+            tunnel: ["/api/cobalt/tunnel?url=audio"],
+            output: {
+              type: "audio/mp4",
+              filename: "track.m4a",
+            },
+            audio: {
+              copy: false,
+              format: "m4a",
+              bitrate: "128",
+            },
+          });
+        }
+
+        return new Response("audio-bytes", {
+          headers: {
+            "Content-Type": "audio/mpeg",
+          },
+        });
+      }),
+    );
+    vi.stubGlobal(
+      "Worker",
+      class FakeWorker {
+        onmessage?: (event: MessageEvent) => void;
+
+        postMessage() {
+          queueMicrotask(() => {
+            this.onmessage?.({
+              data: {
+                cobaltLocalProcessing: {
+                  progress: 0.5,
+                },
+              },
+            } as MessageEvent);
+            this.onmessage?.({
+              data: {
+                cobaltLocalProcessing: {
+                  blob: new Blob(["processed-audio"], { type: "audio/mp4" }),
+                },
+              },
+            } as MessageEvent);
+          });
+        }
+
+        terminate() {}
+      },
+    );
+
+    const file = await downloadCobaltAudio({
+      sourceUrl: "https://soundcloud.com/artist/track",
+      audioBitrate: "128",
+    });
+
+    expect(file.name).toBe("track.m4a");
+    expect(new TextDecoder().decode(await file.arrayBuffer())).toBe("processed-audio");
+  });
+
+  it("rejects malformed terminal local worker messages", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === "/api/cobalt/audio") {
+          return Response.json({
+            status: "local-processing",
+            type: "audio",
+            tunnel: ["/api/cobalt/tunnel?url=audio"],
+            output: {
+              type: "audio/mp4",
+              filename: "track.m4a",
+            },
+            audio: {
+              copy: false,
+              format: "m4a",
+              bitrate: "128",
+            },
+          });
+        }
+
+        return new Response("audio-bytes", {
+          headers: {
+            "Content-Type": "audio/mpeg",
+          },
+        });
+      }),
+    );
+    vi.stubGlobal(
+      "Worker",
+      class FakeWorker {
+        onmessage?: (event: MessageEvent) => void;
+
+        postMessage() {
+          queueMicrotask(() => {
+            this.onmessage?.({
+              data: {
+                cobaltLocalProcessing: {
+                  error: 500,
+                },
+              },
+            } as MessageEvent);
+          });
+        }
+
+        terminate() {}
+      },
+    );
+
+    await expect(
+      downloadCobaltAudio({
+        sourceUrl: "https://soundcloud.com/artist/track",
+        audioBitrate: "128",
+      }),
+    ).rejects.toThrow("malformed Cobalt local processing message.");
   });
 
   it("processes local audio with cover art through the worker and mp3tag", async () => {
