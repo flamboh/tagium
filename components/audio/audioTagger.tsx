@@ -63,6 +63,7 @@ import {
 import { loadAppSettings, saveAppSettings } from "./settings";
 import { getSampleAlbum } from "./sampleMetadata";
 import { isSoundCloudSetUrl, resolveSoundCloudSet, type SoundCloudSet } from "./soundcloudSet";
+import { getDownloadErrorMessage, notifyDownloadError } from "./downloadErrorMessage";
 import {
   AlbumGroup,
   AppSettings,
@@ -714,7 +715,8 @@ export default function AudioTagger() {
   const markDownloadError = (fileId: string, error: unknown) => {
     let message = "download failed.";
     if (error instanceof Error) {
-      message = error.message;
+      message = getDownloadErrorMessage(error);
+      notifyDownloadError(error);
     }
     const nextFiles = filesRef.current.map((file) =>
       file.id === fileId

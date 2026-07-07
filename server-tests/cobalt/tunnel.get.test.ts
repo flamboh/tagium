@@ -120,6 +120,48 @@ describe("cobalt tunnel endpoint", () => {
     });
   });
 
+  it("preserves Cobalt tunnel capacity overload responses", async () => {
+    const warnMock = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return Response.json(
+          {
+            status: "error",
+            error: {
+              code: "error.api.capacity_exceeded",
+            },
+          },
+          {
+            status: 503,
+            headers: {
+              "Retry-After": "2",
+            },
+          },
+        );
+      }),
+    );
+
+    const response = await handler(makeEvent(makeTunnelRequestForMachine()));
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("2");
+    expect(await response.json()).toEqual({
+      status: "error",
+      error: {
+        code: "error.api.capacity_exceeded",
+      },
+    });
+    expect(JSON.parse(warnMock.mock.calls[0]?.[0] ?? "{}")).toMatchObject({
+      event: "cobalt_tunnel_failure",
+      message: "upstream capacity exceeded",
+      machineId: "cobalt-machine-1",
+      tunnelId: "123456789012345678901",
+      status: 503,
+      retryAfter: "2",
+    });
+  });
+
   it("rejects tampered tunnel machine affinity", async () => {
     const request = makeTunnelRequestForMachine();
     const url = new URL(request.url);
