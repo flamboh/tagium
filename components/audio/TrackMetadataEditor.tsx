@@ -16,6 +16,7 @@ import { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { getDownloadErrorDisplay } from "./downloadErrorMessage";
 import { getSampleTrack } from "./sampleMetadata";
 
 interface TrackMetadataEditorProps {
@@ -109,6 +110,9 @@ export default function TrackMetadataEditor({
 
   const placeholder = getSampleTrack(selectedFile.id);
   const filenamePlaceholder = placeholder.filename;
+  const downloadErrorDisplay = selectedFile.downloadError
+    ? getDownloadErrorDisplay(selectedFile.downloadError)
+    : null;
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -149,10 +153,11 @@ export default function TrackMetadataEditor({
             </label>
           )}
           {(selectedFile.downloadStatus === "error" || selectedFile.status === "error") &&
-            selectedFile.downloadError && (
-              <p className="text-xs text-destructive truncate" aria-live="polite">
-                error: {selectedFile.downloadError}
-              </p>
+            downloadErrorDisplay && (
+              <div className="min-w-0 text-xs text-destructive" aria-live="polite">
+                <p className="font-medium leading-tight">{downloadErrorDisplay.title}</p>
+                <p className="truncate leading-tight">{downloadErrorDisplay.description}</p>
+              </div>
             )}
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 max-lg:[@media(max-height:700px)]:p-2 lg:p-6 lg:pb-28">

@@ -210,3 +210,29 @@
     letter-spacing: var(--tracking-normal);
   }
 }
+
+@layer components {
+  @media (min-width: 768px) {
+    [data-sonner-toaster].tagium-toaster {
+      --width: 28rem;
+    }
+
+    [data-sonner-toaster].tagium-toaster [data-sonner-toast][data-styled="true"] {
+      padding: 18px;
+      font-size: 14px;
+      gap: 10px;
+    }
+
+    [data-sonner-toaster].tagium-toaster [data-sonner-toast][data-styled="true"] [data-title] {
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    [data-sonner-toaster].tagium-toaster
+      [data-sonner-toast][data-styled="true"]
+      [data-description] {
+      font-size: 13px;
+      line-height: 1.45;
+    }
+  }
+}
