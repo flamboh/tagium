@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Music4, Link2, ArrowRight, Loader2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getDownloadErrorMessage } from "./downloadErrorMessage";
+import { getDownloadErrorMessage, notifyDownloadError } from "./downloadErrorMessage";
 
 interface LandingScreenProps {
   onAudioUpload: (files: File[]) => void | Promise<void>;
@@ -62,6 +62,7 @@ export default function LandingScreen({ onAudioUpload, onUrlImport }: LandingScr
     } catch (err) {
       if (err instanceof Error) {
         setError(getDownloadErrorMessage(err));
+        notifyDownloadError(err);
       } else {
         setError("download failed.");
       }

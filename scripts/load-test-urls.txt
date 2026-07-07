@@ -1,0 +1,27 @@
+# Default source URLs for scripts/load-test-cobalt.ts.
+#
+# Chosen for load testing because they're stable, openly licensed, and safe to fetch
+# repeatedly without provider/legal risk. Lines starting with # and blank lines are ignored.
+# Add more with --urls-file <path> or --url <comma,separated,list>; mix lengths and
+# providers so a burst of test traffic doesn't look like repeated hits on one video.
+
+# "Me at the zoo" - first YouTube video, 19s, CC-BY 3.0.
+https://www.youtube.com/watch?v=jNQXAC9IVRw
+
+# Big Buck Bunny - official Blender Foundation short film, 9:57, CC-BY.
+https://www.youtube.com/watch?v=YE7VzlLtp-4
+
+# NoCopyrightSounds releases on YouTube - explicitly free to use, ~2-3 min each.
+https://www.youtube.com/watch?v=1TJsN58hv74
+https://www.youtube.com/watch?v=_T5AccWyBqE
+
+# NoCopyrightSounds releases on SoundCloud - same free-use catalogue.
+https://soundcloud.com/nocopyrightsounds/closer
+https://soundcloud.com/nocopyrightsounds/running
+https://soundcloud.com/nocopyrightsounds/mercury
+
+# NOTE: SoundCloud set/playlist URLs are NOT valid direct Cobalt input - Cobalt returns
+# error.api.link.unsupported for them. Tagium resolves sets into individual track URLs
+# itself via /api/soundcloud-set (using SoundCloud's public API, not Cobalt) before ever
+# calling Cobalt. Don't add set URLs here; if you want to load-test set imports
+# specifically, drive it through Tagium's own API instead of hitting Cobalt directly.

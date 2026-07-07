@@ -74,6 +74,7 @@ type CobaltResponse = z.infer<typeof cobaltResponseSchema>;
 type CobaltAudioResult = {
   response: CobaltResponse;
   machineId: string | undefined;
+  retryAfter: string | undefined;
 };
 type CobaltRuntimeEnv = {
   COBALT_ALLOWED_ORIGIN?: string;
@@ -193,6 +194,10 @@ const parseCobaltJson = async (response: Response) => {
   return cobaltResponseSchema.parse(await response.json());
 };
 
+const isCobaltCapacityError = (response: CobaltResponse) =>
+  response.status === CobaltResponseType.Error &&
+  response.error.code === "error.api.capacity_exceeded";
+
 const requestCobaltAudio = async (
   runtimeEnv: CobaltRuntimeEnv,
   url: string,
@@ -230,6 +235,7 @@ const requestCobaltAudio = async (
         error: { code },
       },
       machineId: undefined,
+      retryAfter: undefined,
     };
   }
 
@@ -237,6 +243,7 @@ const requestCobaltAudio = async (
     return {
       response: await parseCobaltJson(response),
       machineId: parseCobaltMachineId(response.headers.get("X-Cobalt-Machine-Id")),
+      retryAfter: response.headers.get("Retry-After") ?? undefined,
     };
   } catch (error) {
     let code = "error.api.invalid_response";
@@ -250,6 +257,7 @@ const requestCobaltAudio = async (
         error: { code },
       },
       machineId: undefined,
+      retryAfter: undefined,
     };
   }
 };
@@ -261,6 +269,18 @@ const cobaltErrorResponse = (message: string) =>
       "Content-Type": "text/plain;charset=UTF-8",
     },
   });
+
+const cobaltCapacityErrorResponse = (response: CobaltResponse, retryAfter: string | undefined) => {
+  const headers = new Headers({ "Content-Type": "application/json" });
+  if (retryAfter) {
+    headers.set("Retry-After", retryAfter);
+  }
+
+  return new Response(JSON.stringify(response), {
+    status: 503,
+    headers,
+  });
+};
 
 const toTunnelProxyUrl = (
   request: Request,
@@ -330,6 +350,10 @@ export default defineHandler(async (event) => {
 
     const cobaltResult = await requestCobaltAudio(runtimeEnv, body.url, body.audioBitrate);
     const cobaltResponse = cobaltResult.response;
+
+    if (isCobaltCapacityError(cobaltResponse)) {
+      return cobaltCapacityErrorResponse(cobaltResponse, cobaltResult.retryAfter);
+    }
 
     if (cobaltResponse.status === CobaltResponseType.Error) {
       return cobaltErrorResponse(cobaltResponse.error.code);

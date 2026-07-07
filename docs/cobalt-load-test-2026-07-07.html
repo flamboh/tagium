@@ -1,0 +1,1017 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tagium Cobalt Load Test Results — 2026-07-07</title>
+    <style>
+      :root {
+        --ink: #17202a;
+        --muted: #5d6874;
+        --line: #c8d1da;
+        --bg: #eef3f5;
+        --panel: #ffffff;
+        --good: #24745a;
+        --warn: #a87800;
+        --bad: #b3402f;
+        --accent: #0f8b8d;
+        --p50: #0f8b8d;
+        --p95: #bfe3e3;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        line-height: 1.5;
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 34px 0 52px;
+      }
+
+      header {
+        margin-bottom: 22px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 900px;
+        font-size: clamp(1.8rem, 3.6vw, 3rem);
+        line-height: 1.05;
+      }
+
+      .subtitle {
+        max-width: 840px;
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 1.05rem;
+      }
+
+      .meta {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      section {
+        background: var(--panel);
+        border: 1px solid #d8e0e7;
+        border-radius: 8px;
+        box-shadow: 0 18px 46px rgb(31 45 58 / 9%);
+        padding: 20px 22px;
+      }
+
+      main > section + section,
+      main > .grid {
+        margin-top: 18px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .wide {
+        grid-column: 1 / -1;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+        font-size: 1.24rem;
+      }
+
+      h3 {
+        margin: 16px 0 8px;
+        font-size: 1rem;
+      }
+
+      ul,
+      ol {
+        margin: 0;
+        padding-left: 1.2rem;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      code {
+        padding: 2px 5px;
+        border-radius: 5px;
+        background: #eef3f5;
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 0.92em;
+      }
+
+      .callout {
+        border-left: 4px solid var(--accent);
+        background: #eefaf9;
+        border-radius: 8px;
+        padding: 4px 4px 4px 14px;
+      }
+
+      .callout.bad {
+        border-left-color: var(--bad);
+        background: #fdf1ee;
+      }
+
+      .callout.good {
+        border-left-color: var(--good);
+        background: #eef8f3;
+      }
+
+      .callout ol,
+      .callout ul {
+        padding-left: 1.4rem;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 2px 9px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      .badge.good {
+        background: #e2f3ec;
+        color: var(--good);
+      }
+
+      .badge.warn {
+        background: #fbeed7;
+        color: var(--warn);
+      }
+
+      .badge.bad {
+        background: #fbe4df;
+        color: var(--bad);
+      }
+
+      .table {
+        display: grid;
+        overflow-x: auto;
+        border: 1px solid #d9e0e7;
+        border-radius: 8px;
+        font-size: 0.88rem;
+      }
+
+      .results-table {
+        grid-template-columns: 90px 90px 100px 100px 100px 90px 100px 100px 90px;
+      }
+
+      .table > div {
+        padding: 9px 10px;
+        border-bottom: 1px solid #d9e0e7;
+        border-right: 1px solid #d9e0e7;
+        white-space: nowrap;
+      }
+
+      .table > div:nth-last-child(-n + 9) {
+        border-bottom: 0;
+      }
+
+      .results-table > div:nth-child(9n) {
+        border-right: 0;
+      }
+
+      .table .head {
+        background: #f3f6f8;
+        font-weight: 750;
+      }
+
+      .table .num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .row-note {
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+
+      .chart {
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+        height: 280px;
+        padding: 12px 8px 0;
+        border-bottom: 1px solid var(--line);
+        overflow-x: auto;
+      }
+
+      .chart-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        min-width: 56px;
+        height: 100%;
+      }
+
+      .bars {
+        display: flex;
+        align-items: flex-end;
+        gap: 3px;
+        height: 240px;
+      }
+
+      .bar {
+        width: 16px;
+        border-radius: 3px 3px 0 0;
+      }
+
+      .bar.p95 {
+        background: var(--p95);
+      }
+
+      .bar.p50 {
+        background: var(--p50);
+      }
+
+      .chart-label {
+        margin-top: 8px;
+        font-size: 0.78rem;
+        color: var(--muted);
+        text-align: center;
+        line-height: 1.5;
+      }
+
+      .chart-label strong {
+        display: block;
+        color: var(--ink);
+        font-size: 0.85rem;
+      }
+
+      .chart-label .err {
+        font-weight: 700;
+      }
+
+      .err-0 {
+        color: var(--good);
+      }
+
+      .err-low {
+        color: var(--warn);
+      }
+
+      .err-high {
+        color: var(--bad);
+      }
+
+      .chart-legend {
+        display: flex;
+        gap: 18px;
+        margin-top: 12px;
+        font-size: 0.82rem;
+        color: var(--muted);
+      }
+
+      .chart-legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .swatch {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        display: inline-block;
+      }
+
+      .quote {
+        border-left: 4px solid var(--line);
+        padding-left: 14px;
+        color: #33404b;
+        font-size: 0.94rem;
+      }
+
+      .quote h4 {
+        margin: 14px 0 4px;
+        font-size: 0.86rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .quote h4:first-child {
+        margin-top: 0;
+      }
+
+      .quote p {
+        margin-top: 4px;
+      }
+
+      .zones {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .zone-card {
+        border-radius: 8px;
+        padding: 12px 14px;
+        border: 1px solid #d9e0e7;
+      }
+
+      .zone-card.good {
+        background: #eef8f3;
+        border-color: #cfe9dc;
+      }
+
+      .zone-card.ok {
+        background: #f5f8ec;
+        border-color: #e0e9c9;
+      }
+
+      .zone-card.warn {
+        background: #fbf3e2;
+        border-color: #f0dfb4;
+      }
+
+      .zone-card.bad {
+        background: #fdf1ee;
+        border-color: #f3d2ca;
+      }
+
+      .zone-card strong {
+        display: block;
+        font-size: 1rem;
+        margin-bottom: 4px;
+      }
+
+      .zone-card span {
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+
+      footer {
+        margin-top: 24px;
+        color: var(--muted);
+        font-size: 0.82rem;
+        text-align: center;
+      }
+
+      @media (max-width: 860px) {
+        main {
+          width: min(100vw - 20px, 1180px);
+        }
+        .grid,
+        .zones {
+          grid-template-columns: 1fr;
+        }
+        .results-table {
+          font-size: 0.78rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Cobalt Fly Machine — Load Test Results</h1>
+        <p class="subtitle">
+          Where the current single-Machine Cobalt setup actually breaks, measured directly against a
+          disposable clone of production infrastructure — not estimated.
+        </p>
+        <p class="meta">
+          2026-07-07 · target:
+          <code>tagium-cobalt-loadtest.fly.dev</code> (disposable clone of
+          <code>tagium-cobalt</code>) · region: <code>lax</code> · torn down after testing
+        </p>
+      </header>
+
+      <section class="callout">
+        <h2>TL;DR</h2>
+        <ol>
+          <li>
+            <strong
+              >The real ceiling today isn't Fly hardware — it's Cobalt's own default rate
+              limiter.</strong
+            >
+            Cobalt ships with a built-in cap of
+            <strong>20 resolve requests/60s</strong> and <strong>40 tunnel requests/60s</strong>,
+            keyed per client IP, unrelated to Machine size. We hit real <code>429</code>s at
+            concurrency as low as 4.
+          </li>
+          <li>
+            With that limiter raised, the single <code>shared-cpu-1x</code> / 1GB Machine handles
+            roughly <strong>30–64 concurrent active downloads comfortably</strong>, starts showing
+            cracks around <strong>96–150</strong>, and
+            <strong>collapses past ~200</strong>
+            (60% error rate, most requests hitting our 120s client timeout).
+          </li>
+          <li>
+            The failure mode is <strong>queueing, not crashing</strong>. Memory stayed healthy
+            throughout; the Machine never restarted. It just fell behind and kept draining the
+            backlog for minutes after the client gave up.
+          </li>
+          <li>
+            Total cost of this entire test session:
+            <strong>about $0.05</strong>.
+          </li>
+        </ol>
+      </section>
+
+      <div class="grid">
+        <section class="wide">
+          <h2>Methodology</h2>
+          <ul>
+            <li>
+              Cloned <code>fly.cobalt.toml</code> to a disposable app,
+              <code>tagium-cobalt-loadtest</code>, scaled to exactly
+              <strong>one Machine</strong>
+              to match production's actual footprint (checked live — production
+              <code>tagium-cobalt</code> also runs exactly one Machine today).
+            </li>
+            <li>
+              Overrode <code>API_URL</code> at deploy time so Cobalt's generated tunnel URLs pointed
+              back at the clone, never at production. Verified this before any load test ran.
+            </li>
+            <li>
+              Hit the Cobalt Fly Machine <strong>directly</strong>, bypassing Tagium's own
+              Cloudflare Worker layer, to isolate the Machine's own ceiling from the (already known
+              to be non-bottleneck) Worker layer.
+            </li>
+            <li>
+              Used <code>scripts/load-test-cobalt.ts</code> with the curated
+              <code>scripts/load-test-urls.txt</code> list — 7 real, openly-licensed source URLs
+              (Big Buck Bunny, "Me at the zoo", NoCopyrightSounds tracks on YouTube and SoundCloud)
+              cycled across requests at increasing concurrency.
+            </li>
+            <li>
+              Sampled <code>/proc/loadavg</code> and <code>/proc/meminfo</code> on the Machine via
+              <code>flyctl machine exec</code> after each wave, and cross-referenced the proxy's own
+              structured request logs (<code>cobalt-machine-proxy.mjs</code>) via
+              <code>flyctl logs</code>.
+            </li>
+            <li>
+              Got a second opinion from GPT-5.5 (via <code>codex exec</code>) on the raw results and
+              methodology before writing conclusions — see below.
+            </li>
+            <li>Destroyed the disposable app immediately after testing finished.</li>
+          </ul>
+        </section>
+      </div>
+
+      <div class="grid">
+        <section class="wide">
+          <h2>
+            Finding 1 — Cobalt's default rate limiter is the real bottleneck
+            <span class="badge bad" style="margin-left: 8px">highest priority</span>
+          </h2>
+          <p>
+            At concurrency 4, two of twelve requests failed with
+            <code>HTTP 429</code>. Response headers gave it away immediately:
+          </p>
+          <p><code>ratelimit-policy: 20;w=60</code> — 20 requests per 60 seconds, per client IP.</p>
+          <p>
+            This comes straight from Cobalt's default config
+            (<code>repos/cobalt/api/src/core/env.js</code>), via
+            <code>express-rate-limit</code>:
+          </p>
+          <ul>
+            <li>
+              <code>RATELIMIT_MAX</code> = 20 per <code>RATELIMIT_WINDOW</code> = 60s on
+              <code>POST /</code> (resolving a download plan)
+            </li>
+            <li>
+              <code>TUNNEL_RATELIMIT_MAX</code> = 40 per <code>TUNNEL_RATELIMIT_WINDOW</code> = 60s
+              on
+              <code>GET /tunnel</code>
+            </li>
+            <li>
+              Keyed by a hashed client IP address, stored
+              <strong>in-memory</strong> (no <code>REDIS_URL</code> is configured, so each Machine
+              tracks its own counter independently)
+            </li>
+            <li>
+              Can be raised via those four env vars, or bypassed per-caller with a Cobalt API key
+              that has a custom <code>limit</code> (including <code>"unlimited"</code>) configured
+              in Cobalt's key file
+            </li>
+          </ul>
+          <p class="callout bad" style="margin-top: 12px">
+            <strong>Why this matters more than it looks:</strong> the browser never calls Cobalt
+            directly — Tagium's own Cloudflare Worker does, on every user's behalf. That means every
+            simultaneous Tagium user's resolve calls funnel through Cobalt's rate limiter keyed by
+            whatever IP the Worker's outbound request presents. If that's a single IP or a small
+            pool (plausible for a serverless platform's egress), this 20/60s budget is likely shared
+            across your <em>entire user base</em> at once, not per user. We couldn't confirm this
+            from outside — it needs a look at what IP Cobalt actually sees from production traffic
+            (see Open Questions).
+          </p>
+          <p>
+            We disabled this limiter on the clone (env vars set to 100000/60s) to isolate the
+            Machine's actual hardware ceiling, which is Finding 2.
+          </p>
+        </section>
+      </div>
+
+      <div class="grid">
+        <section class="wide">
+          <h2>Finding 2 — Hardware ceiling, with the rate limiter out of the way</h2>
+          <p>
+            Each "concurrency" level below is that many simultaneous download flows (one resolve
+            call + one or two tunnel fetches each), sustained for a batch of requests per wave.
+          </p>
+
+          <div class="chart" role="img" aria-label="Latency by concurrency, log-scaled">
+            <div class="chart-col">
+              <div class="bars">
+                <div class="bar p95" style="height: 8%"></div>
+                <div class="bar p50" style="height: 8%"></div>
+              </div>
+              <div class="chart-label">
+                <strong>1–2</strong>resolve ~400ms<br /><span class="err err-0">0%</span>
+              </div>
+            </div>
+            <div class="chart-col">
+              <div class="bars">
+                <div class="bar p95" style="height: 28%"></div>
+                <div class="bar p50" style="height: 22%"></div>
+              </div>
+              <div class="chart-label">
+                <strong>8</strong>p50 982ms<br /><span class="err err-0">0%</span>
+              </div>
+            </div>
+            <div class="chart-col">
+              <div class="bars">
+                <div class="bar p95" style="height: 34%"></div>
+                <div class="bar p50" style="height: 26%"></div>
+              </div>
+              <div class="chart-label">
+                <strong>16</strong>p50 1.3s<br /><span class="err err-0">0%</span>
+              </div>
+            </div>
+            <div class="chart-col">
+              <div class="bars">
+                <div class="bar p95" style="height: 38%"></div>
+                <div class="bar p50" style="height: 30%"></div>
+              </div>
+              <div class="chart-label">
+                <strong>32</strong>p50 1.6s<br /><span class="err err-0">0%</span>
+              </div>
+            </div>
+            <div class="chart-col">
+              <div class="bars">
+                <div class="bar p95" style="height: 49%"></div>
+                <div class="bar p50" style="height: 35%"></div>
+              </div>
+              <div class="chart-label">
+                <strong>48</strong>p50 2.2s<br /><span class="err err-0">0%</span>
+              </div>
+            </div>
+            <div class="chart-col">
+              <div class="bars">
+                <div class="bar p95" style="height: 50%"></div>
+                <div class="bar p50" style="height: 36%"></div>
+              </div>
+              <div class="chart-label">
+                <strong>64</strong>p50 2.4s<br /><span class="err err-0">0%</span>
+              </div>
+            </div>
+            <div class="chart-col">
+              <div class="bars">
+                <div class="bar p95" style="height: 59%"></div>
+                <div class="bar p50" style="height: 44%"></div>
+              </div>
+              <div class="chart-label">
+                <strong>96</strong>p50 3.8s<br /><span class="err err-low">1%</span>
+              </div>
+            </div>
+            <div class="chart-col">
+              <div class="bars">
+                <div class="bar p95" style="height: 90%"></div>
+                <div class="bar p50" style="height: 53%"></div>
+              </div>
+              <div class="chart-label">
+                <strong>150</strong>p95 66.6s<br /><span class="err err-low">2%</span>
+              </div>
+            </div>
+            <div class="chart-col">
+              <div class="bars">
+                <div class="bar p95" style="height: 99%"></div>
+                <div class="bar p50" style="height: 99%"></div>
+              </div>
+              <div class="chart-label">
+                <strong>220</strong>p50 120s (timeout)<br /><span class="err err-high">60%</span>
+              </div>
+            </div>
+          </div>
+          <div class="chart-legend">
+            <span
+              ><span class="swatch" style="background: var(--p50)"></span>resolve p50 (log
+              scale)</span
+            >
+            <span
+              ><span class="swatch" style="background: var(--p95)"></span>resolve p95 (log
+              scale)</span
+            >
+            <span>error rate labeled per column</span>
+          </div>
+
+          <div class="zones">
+            <div class="zone-card good">
+              <strong>1–64</strong>
+              <span
+                >Comfortable. 0% errors. Latency climbs from ~400ms to ~2.4s median but stays
+                predictable.</span
+              >
+            </div>
+            <div class="zone-card ok">
+              <strong>96</strong>
+              <span>First cracks. 1% error rate, p95 already at 10s.</span>
+            </div>
+            <div class="zone-card warn">
+              <strong>150</strong>
+              <span
+                >Overloaded. 2% errors, p95 66.6s — unacceptable for real users even though "only"
+                2% hard-fail.</span
+              >
+            </div>
+            <div class="zone-card bad">
+              <strong>220+</strong>
+              <span>Collapse. 60% error rate, median resolve time hits the full 120s timeout.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="wide">
+          <h3 style="margin-top: 0">Raw results</h3>
+          <div
+            class="table results-table"
+            role="table"
+            aria-label="Load test results by concurrency"
+          >
+            <div class="head">Concurrency</div>
+            <div class="head">Requests</div>
+            <div class="head">Errors</div>
+            <div class="head">Resolve p50</div>
+            <div class="head">Resolve p95</div>
+            <div class="head">Resolve max</div>
+            <div class="head">Stream p50</div>
+            <div class="head">Stream max</div>
+            <div class="head">Wave time</div>
+
+            <div>1</div>
+            <div class="num">10</div>
+            <div class="num">10%*</div>
+            <div class="num">428ms</div>
+            <div class="num">1029ms</div>
+            <div class="num">1029ms</div>
+            <div class="num">395ms</div>
+            <div class="num">1053ms</div>
+            <div class="num">9.9s</div>
+
+            <div>2</div>
+            <div class="num">10</div>
+            <div class="num">0%</div>
+            <div class="num">390ms</div>
+            <div class="num">1205ms</div>
+            <div class="num">1205ms</div>
+            <div class="num">218ms</div>
+            <div class="num">515ms</div>
+            <div class="num">4.3s</div>
+
+            <div>4</div>
+            <div class="num">12</div>
+            <div class="num">17%**</div>
+            <div class="num">473ms</div>
+            <div class="num">1085ms</div>
+            <div class="num">1085ms</div>
+            <div class="num">360ms</div>
+            <div class="num">635ms</div>
+            <div class="num">2.4s</div>
+
+            <div>8</div>
+            <div class="num">16</div>
+            <div class="num">0%</div>
+            <div class="num">982ms</div>
+            <div class="num">1464ms</div>
+            <div class="num">1464ms</div>
+            <div class="num">444ms</div>
+            <div class="num">1239ms</div>
+            <div class="num">3.6s</div>
+
+            <div>16</div>
+            <div class="num">24</div>
+            <div class="num">0%</div>
+            <div class="num">1.26s</div>
+            <div class="num">2.12s</div>
+            <div class="num">2.43s</div>
+            <div class="num">980ms</div>
+            <div class="num">1999ms</div>
+            <div class="num">3.8s</div>
+
+            <div>32</div>
+            <div class="num">40</div>
+            <div class="num">0%</div>
+            <div class="num">1.58s</div>
+            <div class="num">2.65s</div>
+            <div class="num">3.57s</div>
+            <div class="num">1.31s</div>
+            <div class="num">5.36s</div>
+            <div class="num">7.1s</div>
+
+            <div>48</div>
+            <div class="num">60</div>
+            <div class="num">0%</div>
+            <div class="num">2.19s</div>
+            <div class="num">5.22s</div>
+            <div class="num">5.28s</div>
+            <div class="num">2.16s</div>
+            <div class="num">6.95s</div>
+            <div class="num">10.0s</div>
+
+            <div>64</div>
+            <div class="num">80</div>
+            <div class="num">0%</div>
+            <div class="num">2.40s</div>
+            <div class="num">5.75s</div>
+            <div class="num">6.70s</div>
+            <div class="num">2.58s</div>
+            <div class="num">9.81s</div>
+            <div class="num">12.3s</div>
+
+            <div>96</div>
+            <div class="num">120</div>
+            <div class="num">1%</div>
+            <div class="num">3.83s</div>
+            <div class="num">10.0s</div>
+            <div class="num">10.9s</div>
+            <div class="num">2.03s</div>
+            <div class="num">18.3s</div>
+            <div class="num">23.6s</div>
+
+            <div>150</div>
+            <div class="num">150</div>
+            <div class="num">2%</div>
+            <div class="num">6.86s</div>
+            <div class="num">66.6s</div>
+            <div class="num">84.8s</div>
+            <div class="num">4.92s</div>
+            <div class="num">50.6s</div>
+            <div class="num">92.3s</div>
+
+            <div>220</div>
+            <div class="num">220</div>
+            <div class="num">60%</div>
+            <div class="num">120.0s†</div>
+            <div class="num">120.0s†</div>
+            <div class="num">120.0s†</div>
+            <div class="num">61.9s</div>
+            <div class="num">118.4s</div>
+            <div class="num">187.8s</div>
+          </div>
+          <p class="row-note" style="margin-top: 10px">
+            * This one failure was a test methodology bug, not a capacity signal — a SoundCloud
+            <em>set/playlist</em> URL sent directly to Cobalt, which Cobalt doesn't support (Tagium
+            resolves sets into individual track URLs itself before ever calling Cobalt). Fixed
+            before continuing.<br />
+            ** These two failures were Cobalt's default rate limiter (<code>429</code>), not a
+            hardware limit — see Finding 1. Rate limiter was disabled for all waves from concurrency
+            8 onward.<br />
+            † Resolve time is dominated by our script's 120s client timeout at this concurrency —
+            the true resolve time was likely higher; requests kept completing successfully on the
+            server for minutes after the client gave up (see below).
+          </p>
+        </section>
+
+        <section class="wide">
+          <h3 style="margin-top: 0">What kind of failure is this?</h3>
+          <p>
+            Not a crash. Across the entire test — including the 220-concurrency wave that pushed 60%
+            of requests to failure — the Machine's state never changed from
+            <code>started</code>, and free memory only dropped from ~700MB to ~570MB of 985MB total
+            (never close to OOM). The 1-minute load average, on a Machine with exactly one shared
+            vCPU, climbed steadily and predictably with concurrency:
+          </p>
+          <div class="table" style="grid-template-columns: repeat(5, 1fr); margin-top: 8px">
+            <div class="head">Concurrency</div>
+            <div class="head">8</div>
+            <div class="head">48–64</div>
+            <div class="head">150</div>
+            <div class="head">220</div>
+            <div>Load average (1m)</div>
+            <div class="num">0.73</div>
+            <div class="num">~1.0</div>
+            <div class="num">2.82</div>
+            <div class="num">4.11</div>
+          </div>
+          <p style="margin-top: 10px">
+            That's the signature of CPU/event-loop saturation on a single-threaded Node process, not
+            memory or network exhaustion. After the 220-concurrency wave ended (client-side), server
+            logs kept logging successful <code>200</code> completions for
+            <strong>minutes</strong> afterward — one request finished in
+            <code>204449ms</code>
+            (204 seconds) against our 120s client timeout. The Machine was still grinding through
+            the backlog long after every client had already given up and moved on. It eventually
+            drained fully and auto-suspended cleanly on its own — no manual intervention needed.
+          </p>
+        </section>
+      </div>
+
+      <div class="grid">
+        <section class="wide">
+          <h2>Second opinion — GPT-5.5, via <code>codex exec</code></h2>
+          <p class="row-note">
+            Asked to critique the methodology and conclusions independently, without reading this
+            write-up, from the raw numbers alone.
+          </p>
+          <div class="quote">
+            <h4>On the interpretation</h4>
+            <p>
+              "Default Cobalt limits imply roughly 20 resolve/min/IP and 40 tunnel/min/IP. If
+              Cloudflare Worker egress collapses many users onto one or a few IPs, Tagium hits this
+              before hardware matters... I would call 30–60 active downloads acceptable, 100+
+              overloaded, 200+ unusable."
+            </p>
+            <h4>On the failure signature</h4>
+            <p>
+              "Load rising without memory pressure strongly points away from OOM and toward
+              CPU/event-loop/scheduler saturation... Cobalt may do synchronous or CPU-heavy source
+              resolution work: signature deciphering, crypto, parsing, redirects... The strongest
+              evidence for saturation is the post-timeout drain: the machine did not die; it
+              accumulated more work than one CPU/event loop could retire within client deadlines."
+            </p>
+            <h4>Biggest blind spot flagged</h4>
+            <p>
+              "The test bypassed the real production path... What IP does Cobalt actually see in
+              production for POST /? ... Does Cloudflare Worker egress use one IP, a small regional
+              pool, or broad per-colo diversity? ... Only 7 source URLs — that may under-sample
+              source variability."
+            </p>
+            <h4>Recommended fix order</h4>
+            <p>
+              "Fix rate limiting intentionally first... Measure production caller identity... Add
+              queue/backpressure... Set timeouts and abort propagation... Scale before tuning
+              internals [only] for this workload... Re-test through the real app path."
+            </p>
+          </div>
+        </section>
+      </div>
+
+      <div class="grid">
+        <section class="wide">
+          <h2>Recommendations, in order</h2>
+          <ol>
+            <li>
+              <strong>Configure Cobalt's rate limits intentionally.</strong>
+              Either raise
+              <code>RATELIMIT_MAX</code
+              >/<code>RATELIMIT_WINDOW</code>/<code>TUNNEL_RATELIMIT_MAX</code>/<code
+                >TUNNEL_RATELIMIT_WINDOW</code
+              >
+              to a value chosen on purpose, or configure a Cobalt API key with an explicit
+              <code>limit</code> and have Tagium authenticate with it. This is a five-minute,
+              zero-cost fix and is almost certainly the single highest-leverage change available
+              right now.
+            </li>
+            <li>
+              <strong>Find out what IP Cobalt actually sees from production.</strong>
+              Log the client IP (or hashed rate-limit key) Cobalt observes on real Tagium Worker
+              traffic. This determines whether the current 20/60s default is a per-user annoyance or
+              a whole-app-wide ceiling.
+            </li>
+            <li>
+              <strong>Add an explicit concurrency cap in front of Cobalt</strong>, tuned to roughly
+              30–60 in-flight downloads (the zone that stayed fast and error-free here), with a
+              friendly "please wait" / queued response beyond that — rather than letting requests
+              pile up past the point where Cobalt itself falls over.
+            </li>
+            <li>
+              <strong>Propagate client aborts upstream.</strong> When a browser gives up waiting,
+              cancel the corresponding Cobalt request instead of letting it keep consuming the
+              Machine's one CPU core in the background — this is exactly what caused the
+              multi-minute backlog drain after the 220-concurrency wave.
+            </li>
+            <li>
+              <strong>Don't reach for multi-Machine scaling yet.</strong> The machine-affinity
+              plumbing already exists in this codebase if it's ever needed, but real sustained
+              traffic would need to approach the 30–60 concurrent range before that's the right
+              lever to pull. Fixing #1–#4 buys much more headroom for much less effort.
+            </li>
+            <li>
+              <strong>Re-run this test through the real path</strong> (browser → Tagium Worker →
+              Cobalt) once the above changes land, to confirm the same knee shows up and that
+              Tagium's own per-IP limiter is doing its job before requests ever reach Cobalt.
+            </li>
+          </ol>
+        </section>
+      </div>
+
+      <div class="grid">
+        <section>
+          <h2>Open questions / methodology caveats</h2>
+          <ul>
+            <li>
+              This test bypassed Tagium's Cloudflare Worker entirely to isolate the Cobalt Machine's
+              own ceiling. Real end-to-end latency will be higher, and the Worker's own 60/min
+              per-IP limiter and same-origin check add behavior this test didn't exercise.
+            </li>
+            <li>
+              Only 7 source URLs were used, all openly licensed and chosen for repeatability. This
+              was deliberate (to avoid provider rate-limiting or ban risk), but it doesn't rule out
+              YouTube/SoundCloud-side throttling showing up differently under more diverse,
+              higher-volume, sustained real traffic.
+            </li>
+            <li>
+              The exact response bodies for the <code>http-500</code> errors at concurrency 96/150
+              weren't captured — only status code and byte count.
+              <code>scripts/load-test-cobalt.ts</code>
+              currently doesn't retain response bodies on non-2xx tunnel/resolve failures; worth
+              adding if this test gets re-run.
+            </li>
+            <li>
+              Single test session, single region (<code>lax</code>), no sustained soak test (this
+              was concurrency ramps of seconds-to-minutes each, not sustained load over hours).
+            </li>
+            <li>
+              This connects back to the earlier scaling-plan review: the plan proposed an async job
+              queue + R2 cache to solve Cobalt's process-local tunnel state. That's still true as a
+              scaling concern for later, but it's not the current bottleneck — the rate limiter is a
+              much cheaper and more urgent fix than any of that infrastructure work.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Cost &amp; cleanup</h2>
+          <ul>
+            <li>
+              Total data transferred across all waves: ~2GB (≈ $0.04 at Fly's ~$0.02/GB egress).
+            </li>
+            <li>
+              Machine compute time: ~15 minutes total across the whole session at
+              <code>shared-cpu-1x</code>/1GB ($0.0000022/s) ≈ $0.002.
+            </li>
+            <li><strong>Total: about $0.05.</strong></li>
+            <li>
+              <code>tagium-cobalt-loadtest</code> was fully destroyed (<code
+                >flyctl apps destroy</code
+              >) immediately after testing. Production <code>tagium-cobalt</code> was never touched
+              — confirmed untouched throughout via its own machine list and suspended state.
+            </li>
+          </ul>
+        </section>
+      </div>
+
+      <div class="grid">
+        <section class="wide">
+          <h2>Addendum — cover art doubles tunnel load, and the queue works</h2>
+          <p class="row-note">
+            Follow-up testing done the same day, after a real question surfaced a gap in the
+            original methodology.
+          </p>
+
+          <h3 style="margin-top: 0">The original test undercounted real downloads</h3>
+          <p>
+            The first pass of this test only fetched
+            <code>tunnel[0]</code> (audio) per simulated download. Real downloads fetch
+            <strong>every</strong> tunnel Cobalt returns concurrently — audio plus cover art, when
+            present (see <code>components/audio/localAudioProcessor.ts</code>'s
+            <code>Effect.all([audio, cover], { concurrency: 2 })</code>). Cover art is the norm for
+            music tracks, not the exception. Fixed the script and re-ran the same concurrency levels
+            with the corrected behavior.
+          </p>
+        </section>
+      </div>
+
+      <footer>
+        Generated 2026-07-07. Testing tools:
+        <code>scripts/load-test-cobalt.ts</code>, <code>flyctl</code>,
+        <code>codex exec</code> (GPT-5.5) for independent review.
+      </footer>
+    </main>
+  </body>
+</html>

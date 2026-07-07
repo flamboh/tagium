@@ -91,6 +91,42 @@ const logTunnelFailure = (
   console.warn(JSON.stringify({ event: "cobalt_tunnel_failure", message, ...context }));
 };
 
+const tryParseCobaltCapacityError = (responseText: string) => {
+  try {
+    const body = JSON.parse(responseText) as unknown;
+
+    if (
+      body &&
+      typeof body === "object" &&
+      "status" in body &&
+      body.status === "error" &&
+      "error" in body &&
+      body.error &&
+      typeof body.error === "object" &&
+      "code" in body.error &&
+      body.error.code === "error.api.capacity_exceeded"
+    ) {
+      return body;
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+};
+
+const cobaltCapacityErrorResponse = (body: unknown, retryAfter: string | null) => {
+  const headers = new Headers({ "Content-Type": "application/json" });
+  if (retryAfter) {
+    headers.set("Retry-After", retryAfter);
+  }
+
+  return new Response(JSON.stringify(body), {
+    status: 503,
+    headers,
+  });
+};
+
 const parseTunnelRequest = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
   const requestUrl = new URL(request.url);
   const tunnelUrlParam = requestUrl.searchParams.get("url");
@@ -160,6 +196,18 @@ export default defineHandler(async (event) => {
 
     if (!response.ok) {
       const responseText = await response.text();
+      const capacityError =
+        response.status === 503 ? tryParseCobaltCapacityError(responseText) : undefined;
+      if (capacityError) {
+        logTunnelFailure("upstream capacity exceeded", {
+          ...getTunnelLogContext(requestId, tunnelUrl, machineId),
+          elapsedMs: Date.now() - startedAt,
+          status: response.status,
+          retryAfter: response.headers.get("Retry-After") ?? undefined,
+        });
+        return cobaltCapacityErrorResponse(capacityError, response.headers.get("Retry-After"));
+      }
+
       logTunnelFailure("upstream non-ok", {
         ...getTunnelLogContext(requestId, tunnelUrl, machineId),
         elapsedMs: Date.now() - startedAt,

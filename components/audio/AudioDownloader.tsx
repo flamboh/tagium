@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ArrowRight, Loader2, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getDownloadErrorMessage } from "./downloadErrorMessage";
+import { getDownloadErrorMessage, notifyDownloadError } from "./downloadErrorMessage";
 
 interface AudioDownloaderProps {
   onUrlImport: (sourceUrl: string) => void | Promise<void>;
@@ -33,6 +33,7 @@ export default function AudioDownloader({ onUrlImport }: AudioDownloaderProps) {
       let message = "download failed.";
       if (caughtError instanceof Error) {
         message = getDownloadErrorMessage(caughtError);
+        notifyDownloadError(caughtError);
       }
       setError(message);
     } finally {

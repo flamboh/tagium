@@ -211,4 +211,37 @@ describe("cobalt audio endpoint", () => {
     expect(response.status).toBe(502);
     expect(await response.text()).toBe("error.api.fetch.fail");
   });
+
+  it("preserves Cobalt capacity overload responses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return Response.json(
+          {
+            status: "error",
+            error: {
+              code: "error.api.capacity_exceeded",
+            },
+          },
+          {
+            status: 503,
+            headers: {
+              "Retry-After": "2",
+            },
+          },
+        );
+      }),
+    );
+
+    const response = await handler(makeEvent(makeAudioRequest()));
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("2");
+    expect(await response.json()).toEqual({
+      status: "error",
+      error: {
+        code: "error.api.capacity_exceeded",
+      },
+    });
+  });
 });
