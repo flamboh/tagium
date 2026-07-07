@@ -198,6 +198,7 @@ export function SortableTrackRow({
             )}
             {(track.downloadStatus === "error" || track.status === "error") && (
               <AlertCircle
+                aria-label="track has an error"
                 className={cn(
                   "h-3 w-3 text-red-500 flex-shrink-0",
                   retryable ? "group-hover:opacity-0" : "",
@@ -213,12 +214,6 @@ export function SortableTrackRow({
               canceled
             </span>
           )}
-          {(track.downloadStatus === "error" || track.status === "error") &&
-            track.downloadError && (
-              <span className="pl-7 text-xs text-destructive truncate" aria-live="polite">
-                error: {track.downloadError}
-              </span>
-            )}
         </div>
       </Button>
       {retryable && (

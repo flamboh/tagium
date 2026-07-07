@@ -2,11 +2,13 @@
 
 import type { CSSProperties } from "react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
+import { cn } from "@/lib/utils";
 
-const Toaster = ({ ...props }: ToasterProps) => (
+const Toaster = ({ className, ...props }: ToasterProps) => (
   <Sonner
     theme="system"
-    className="toaster group"
+    duration={12_000}
+    className={cn("toaster tagium-toaster group", className)}
     style={
       {
         "--normal-bg": "var(--popover)",
