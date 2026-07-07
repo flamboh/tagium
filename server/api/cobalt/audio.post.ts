@@ -10,6 +10,11 @@ import { defineHandler } from "nitro";
 import { env as processEnv } from "node:process";
 import { z } from "zod";
 import { parseCobaltMachineId, signCobaltMachine } from "../../utils/cobalt-machine-affinity";
+import {
+  consumeAudioDevFault,
+  enforceRateLimit,
+  type CobaltRuntimeEnv as DevControlRuntimeEnv,
+} from "../../utils/dev-controls";
 
 enum CobaltResponseType {
   Error = "error",
@@ -81,7 +86,7 @@ type CobaltRuntimeEnv = {
   COBALT_API_KEY?: string;
   COBALT_API_URL?: string;
   COBALT_MACHINE_AFFINITY_SECRET?: string;
-};
+} & DevControlRuntimeEnv;
 type CloudflareRequest = Request & {
   runtime?: {
     cloudflare?: {
@@ -90,10 +95,7 @@ type CloudflareRequest = Request & {
   };
 };
 
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX_REQUESTS = 60;
 const COBALT_REQUEST_TIMEOUT_MS = 300_000;
-const rateLimitBuckets = new Map<string, { startedAt: number; count: number }>();
 
 const getRuntimeEnv = (request: Request): CobaltRuntimeEnv => ({
   ...processEnv,
@@ -143,15 +145,6 @@ const getAllowedOrigin = (
   return new URL(request.url, requestOrigin).origin;
 };
 
-const getClientKey = (request: Request) => {
-  const cloudflareIp = request.headers.get("cf-connecting-ip");
-  if (cloudflareIp) {
-    return cloudflareIp;
-  }
-
-  return "unknown";
-};
-
 const enforceSameOrigin = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
   const requestOrigin = getRequestOrigin(request);
   if (!requestOrigin) {
@@ -163,24 +156,6 @@ const enforceSameOrigin = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
     return new Response("Download origin is not allowed.", { status: 403 });
   }
 
-  return undefined;
-};
-
-const enforceRateLimit = (request: Request) => {
-  const clientKey = getClientKey(request);
-  const now = Date.now();
-  const bucket = rateLimitBuckets.get(clientKey);
-
-  if (!bucket || now - bucket.startedAt >= RATE_LIMIT_WINDOW_MS) {
-    rateLimitBuckets.set(clientKey, { startedAt: now, count: 1 });
-    return undefined;
-  }
-
-  if (bucket.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return new Response("Download rate limit exceeded.", { status: 429 });
-  }
-
-  bucket.count += 1;
   return undefined;
 };
 
@@ -282,6 +257,39 @@ const cobaltCapacityErrorResponse = (response: CobaltResponse, retryAfter: strin
   });
 };
 
+const cobaltDevCapacityResponse = () =>
+  cobaltCapacityErrorResponse(
+    {
+      status: CobaltResponseType.Error,
+      error: { code: "error.api.capacity_exceeded" },
+    },
+    "2",
+  );
+
+const cobaltDevFaultResponse = (fault: ReturnType<typeof consumeAudioDevFault>) => {
+  if (fault === "rate-limit") {
+    return new Response("Download rate limit exceeded.", { status: 429 });
+  }
+
+  if (fault === "capacity") {
+    return cobaltDevCapacityResponse();
+  }
+
+  if (fault === "timeout") {
+    return cobaltErrorResponse("error.api.timed_out");
+  }
+
+  if (fault === "unreachable") {
+    return cobaltErrorResponse("error.api.unreachable");
+  }
+
+  if (fault === "malformed") {
+    return Response.json({ status: "dev.malformed" });
+  }
+
+  return undefined;
+};
+
 const toTunnelProxyUrl = (
   request: Request,
   runtimeEnv: CobaltRuntimeEnv,
@@ -336,6 +344,12 @@ export default defineHandler(async (event) => {
     const forbidden = enforceSameOrigin(event.req, runtimeEnv);
     if (forbidden) {
       return forbidden;
+    }
+
+    const devFault = consumeAudioDevFault(event.req, runtimeEnv);
+    const devFaultResponse = cobaltDevFaultResponse(devFault);
+    if (devFaultResponse) {
+      return devFaultResponse;
     }
 
     const limited = enforceRateLimit(event.req);

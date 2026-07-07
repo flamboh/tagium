@@ -4,11 +4,15 @@ import {
   isCobaltMachineId,
   isValidCobaltMachineSignature,
 } from "../../utils/cobalt-machine-affinity";
+import {
+  consumeTunnelDevFault,
+  type CobaltRuntimeEnv as DevControlRuntimeEnv,
+} from "../../utils/dev-controls";
 
 type CobaltRuntimeEnv = {
   COBALT_API_URL?: string;
   COBALT_MACHINE_AFFINITY_SECRET?: string;
-};
+} & DevControlRuntimeEnv;
 
 type CloudflareRequest = Request & {
   runtime?: {
@@ -127,6 +131,32 @@ const cobaltCapacityErrorResponse = (body: unknown, retryAfter: string | null) =
   });
 };
 
+const cobaltDevTunnelFaultResponse = (fault: ReturnType<typeof consumeTunnelDevFault>) => {
+  if (fault === "rate-limit") {
+    return new Response("Cobalt tunnel request failed (429).", { status: 502 });
+  }
+
+  if (fault === "capacity") {
+    return cobaltCapacityErrorResponse(
+      {
+        status: "error",
+        error: { code: "error.api.capacity_exceeded" },
+      },
+      "2",
+    );
+  }
+
+  if (fault === "timeout") {
+    return new Response("Cobalt tunnel request timed out.", { status: 502 });
+  }
+
+  if (fault === "empty-body") {
+    return new Response("Cobalt tunnel response was empty.", { status: 502 });
+  }
+
+  return undefined;
+};
+
 const parseTunnelRequest = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
   const requestUrl = new URL(request.url);
   const tunnelUrlParam = requestUrl.searchParams.get("url");
@@ -175,6 +205,12 @@ export default defineHandler(async (event) => {
 
   try {
     const runtimeEnv = getRuntimeEnv(event.req);
+    const devFault = consumeTunnelDevFault(event.req, runtimeEnv);
+    const devFaultResponse = cobaltDevTunnelFaultResponse(devFault);
+    if (devFaultResponse) {
+      return devFaultResponse;
+    }
+
     const tunnelRequest = parseTunnelRequest(event.req, runtimeEnv);
     if (!tunnelRequest) {
       logTunnelFailure("invalid tunnel url", { requestId, elapsedMs: Date.now() - startedAt });
