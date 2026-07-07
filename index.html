@@ -20,7 +20,42 @@
       name="twitter:description"
       content="save your favorite music and edit mp3 tags all on the web."
     />
-    <link rel="icon" href="public/favicon.ico" />
+    <link rel="icon" href="/favicon.ico" />
+    <script>
+      (() => {
+        const faviconByDeployEnv = {
+          local: "/favicon-dev.png",
+          preview: "/favicon-preview.png",
+          production: "/favicon.ico",
+        };
+        const favicon = document.querySelector('link[rel="icon"]');
+        const setDeployEnvFavicon = (deployEnv) => {
+          if (favicon && Object.hasOwn(faviconByDeployEnv, deployEnv)) {
+            favicon.href = faviconByDeployEnv[deployEnv];
+          }
+        };
+        const normalizedHostname = window.location.hostname.toLowerCase();
+        const isLocalDev =
+          normalizedHostname === "localhost" ||
+          normalizedHostname === "127.0.0.1" ||
+          normalizedHostname === "0.0.0.0" ||
+          normalizedHostname === "::1" ||
+          normalizedHostname.endsWith(".local");
+
+        if (isLocalDev) {
+          setDeployEnvFavicon("local");
+        }
+
+        fetch("/api/dev/config", { headers: { Accept: "application/json" } })
+          .then((response) => (response.ok ? response.json() : null))
+          .then((config) => {
+            if (config?.deployEnv) {
+              setDeployEnvFavicon(config.deployEnv);
+            }
+          })
+          .catch(() => {});
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
