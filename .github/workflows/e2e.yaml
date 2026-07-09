@@ -1,4 +1,4 @@
-name: E2E after merge
+name: E2E and deploy after merge
 
 on:
   pull_request:
@@ -36,3 +36,29 @@ jobs:
           path: test-results
           if-no-files-found: ignore
           retention-days: 7
+
+  deploy:
+    name: Deploy production
+    needs: browser
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
+
+      - run: vp install
+      - run: vp build
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config .output/server/wrangler.json
+          packageManager: bun
