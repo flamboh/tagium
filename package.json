@@ -16,6 +16,7 @@
     "typecheck": "tsc -b",
     "prepare": "vp config",
     "deploy:preview": "bun run scripts/deploy-preview.ts",
+    "deploy:production": "bun run scripts/deploy-production.ts",
     "load-test:cobalt": "bun run scripts/load-test-cobalt.ts"
   },
   "dependencies": {
