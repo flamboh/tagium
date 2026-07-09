@@ -259,6 +259,7 @@ export default function AudioTagger() {
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [albumDialogMode, setAlbumDialogMode] = useState<"create" | "edit">("create");
   const [pendingTrackRemoval, setPendingTrackRemoval] = useState<string[] | null>(null);
+  const [isTrackCoverProcessing, setIsTrackCoverProcessing] = useState(false);
   const [albumDraft, setAlbumDraft] = useState<AlbumMetadataDraft>(EMPTY_ALBUM_DRAFT);
   const [albumPlaceholderSeed, setAlbumPlaceholderSeed] = useState("new-album");
   const [editingAlbumId, setEditingAlbumId] = useState<string | null>(null);
@@ -1091,25 +1092,12 @@ export default function AudioTagger() {
       setFiles(syncedFiles);
     }
   };
-  const handleTrackCoverUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const arrayBuffer = reader.result as ArrayBuffer;
-      const uint8Array = new Uint8Array(arrayBuffer);
-      setValue(
-        "picture",
-        [
-          {
-            format: file.type,
-            type: 3,
-            data: uint8Array,
-            description: "uploaded cover",
-          },
-        ],
-        { shouldDirty: true },
-      );
-    };
-    reader.readAsArrayBuffer(file);
+  const handleTrackCoverUpload = (
+    picture: NonNullable<AudioMetadata["picture"]>,
+    sourceFileId?: string | null,
+  ) => {
+    if (!sourceFileId || sourceFileId !== selectedFileIdRef.current) return;
+    setValue("picture", picture, { shouldDirty: true });
   };
   const handleDownloadAlbum = async (albumId: string) => {
     const album = albumsRef.current.find((a) => a.id === albumId);
@@ -1193,7 +1181,10 @@ export default function AudioTagger() {
     },
     [settings.syncTrackNumbers],
   );
-  const requestRemoveFile = (idToRemove: string) => setPendingTrackRemoval([idToRemove]);
+  const requestRemoveFile = (idToRemove: string) => {
+    if (isTrackCoverProcessing) return;
+    setPendingTrackRemoval([idToRemove]);
+  };
   const handleRemoveAlbum = (albumId: string) => {
     const albumToRemove = albums.find((album) => album.id === albumId);
     if (!albumToRemove) return;
@@ -1208,6 +1199,7 @@ export default function AudioTagger() {
     }
   };
   const handleSelectAlbum = (albumId: string, event?: ReactMouseEvent) => {
+    if (isTrackCoverProcessing) return;
     setActiveView("editor");
     bufferCurrentFormMetadata();
     const isMultiSelect = event?.ctrlKey || event?.metaKey;
@@ -1240,6 +1232,7 @@ export default function AudioTagger() {
   };
 
   const handleSelectFile = (albumId: string, fileId: string, event?: ReactMouseEvent) => {
+    if (isTrackCoverProcessing) return;
     setActiveView("editor");
     bufferCurrentFormMetadata();
     const isMultiSelect = event?.ctrlKey || event?.metaKey;
@@ -1285,6 +1278,7 @@ export default function AudioTagger() {
   };
 
   const handleSelectLooseTrack = (fileId: string, event?: ReactMouseEvent) => {
+    if (isTrackCoverProcessing) return;
     setActiveView("editor");
     bufferCurrentFormMetadata();
     const isMultiSelect = event?.ctrlKey || event?.metaKey;
@@ -1327,20 +1321,23 @@ export default function AudioTagger() {
   };
 
   const handleClearSelection = useCallback(() => {
+    if (isTrackCoverProcessing) return;
     setActiveView("editor");
     bufferCurrentFormMetadata();
     setSelectedAlbumId(null);
     setSelectedFileId(null);
     setSelectedFileIds(new Set());
     setLastSelectedFileId(null);
-  }, [bufferCurrentFormMetadata]);
+  }, [bufferCurrentFormMetadata, isTrackCoverProcessing]);
 
   const requestRemoveSelectedFiles = useCallback(() => {
+    if (isTrackCoverProcessing) return;
     if (selectedFileIds.size === 0) return;
     setPendingTrackRemoval(Array.from(selectedFileIds));
-  }, [selectedFileIds]);
+  }, [isTrackCoverProcessing, selectedFileIds]);
 
   const handleSelectAllFiles = useCallback(() => {
+    if (isTrackCoverProcessing) return;
     bufferCurrentFormMetadata();
     const allFileIds = new Set(files.map((file) => file.id));
     setSelectedFileIds(allFileIds);
@@ -1348,7 +1345,7 @@ export default function AudioTagger() {
       setSelectedFileId(files[0].id);
       setLastSelectedFileId(files[0].id);
     }
-  }, [files, bufferCurrentFormMetadata]);
+  }, [files, bufferCurrentFormMetadata, isTrackCoverProcessing]);
 
   const handleReorderAlbums = (albumId: string, targetIndex: number) => {
     setAlbums((prevAlbums) => reorderAlbums(prevAlbums, albumId, targetIndex));
@@ -1550,6 +1547,7 @@ export default function AudioTagger() {
     placement: "before" | "after" | "append",
     referenceTrackId?: string,
   ) => {
+    if (isTrackCoverProcessing) return;
     setActiveView("editor");
     bufferCurrentFormMetadata();
     const moved = moveTrackInSidebar(
@@ -1585,6 +1583,7 @@ export default function AudioTagger() {
     placement: "before" | "after" | "append",
     referenceTrackId?: string,
   ) => {
+    if (isTrackCoverProcessing) return;
     setActiveView("editor");
     bufferCurrentFormMetadata();
     const moved = moveTrackInSidebar(
@@ -1732,9 +1731,10 @@ export default function AudioTagger() {
           onReorderAlbums={handleReorderAlbums}
           playlistDownloadQueue={playlistSidebarQueue}
           onDownloadAll={handleDownloadAll}
-          onOpenSettings={() =>
-            setActiveView((currentView) => (currentView === "settings" ? "editor" : "settings"))
-          }
+          onOpenSettings={() => {
+            if (isTrackCoverProcessing) return;
+            setActiveView((currentView) => (currentView === "settings" ? "editor" : "settings"));
+          }}
           onCancelPlaylistDownloadQueue={handleCancelPlaylistDownloads}
           onRetryPlaylistDownloadQueue={handleRetryPlaylistDownloads}
         />
@@ -1756,6 +1756,8 @@ export default function AudioTagger() {
                 control={control}
                 handleSubmit={handleSubmit}
                 onTrackCoverUpload={handleTrackCoverUpload}
+                onTrackCoverProcessingChange={setIsTrackCoverProcessing}
+                isTrackCoverProcessing={isTrackCoverProcessing}
                 onDownloadUpdatedFile={handleDownloadUpdatedFile}
                 selectedFileAlbum={selectedFileAlbum}
                 syncFilenames={settings.syncFilenames}

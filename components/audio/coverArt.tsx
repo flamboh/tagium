@@ -8,7 +8,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import ImageCropper from "../ui/image-cropper";
 import { Crop, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { optimizeCoverArt } from "./coverArtProcessing";
+import { runCoverArtUploadTransaction } from "./coverArtProcessing";
+import type { AudioMetadata } from "./types";
 
 interface CoverArtProps {
   picture?: {
@@ -17,7 +18,11 @@ interface CoverArtProps {
     description?: string;
     type?: number;
   }[];
-  onCoverUpload?: (file: File) => void;
+  onCoverUpload?: (
+    picture: NonNullable<AudioMetadata["picture"]>,
+    resetKey?: string | null,
+  ) => void;
+  onProcessingChange?: (processing: boolean) => void;
   coverOverlay?: React.ReactNode;
   size?: "default" | "compact";
   resetKey?: string | null;
@@ -27,6 +32,7 @@ interface CoverArtProps {
 export default function CoverArt({
   picture,
   onCoverUpload,
+  onProcessingChange,
   coverOverlay,
   size = "default",
   resetKey,
@@ -35,32 +41,49 @@ export default function CoverArt({
   const [uploadedCover, setUploadedCover] = useState<File | null>(null);
   const [tempImageForCropping, setTempImageForCropping] = useState<string | null>(null);
   const [showCropper, setShowCropper] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverUploadIdRef = useRef(0);
+  const processingChangeRef = useRef(onProcessingChange);
+  processingChangeRef.current = onProcessingChange;
 
-  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const reportProcessing = (processing: boolean) => {
+    setIsProcessing(processing);
+    processingChangeRef.current?.(processing);
+  };
+
+  const processCover = async (file: File, uploadId: number) => {
+    reportProcessing(true);
+
+    try {
+      const optimizedFile = await runCoverArtUploadTransaction(file, {
+        isCurrent: () => uploadId === coverUploadIdRef.current,
+        commit: (picture) => onCoverUpload?.(picture, resetKey),
+      });
+      if (!optimizedFile || uploadId !== coverUploadIdRef.current) return;
+      setUploadedCover(optimizedFile);
+    } catch (error) {
+      if (uploadId !== coverUploadIdRef.current) return;
+      toast.error(error instanceof Error ? error.message : "could not load cover art.");
+    } finally {
+      if (uploadId === coverUploadIdRef.current) reportProcessing(false);
+    }
+  };
+
+  const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
     const uploadId = ++coverUploadIdRef.current;
-
-    try {
-      const optimizedFile = await optimizeCoverArt(file);
-      if (uploadId !== coverUploadIdRef.current) return;
-      setUploadedCover(optimizedFile);
-      onCoverUpload?.(optimizedFile);
-    } catch (error) {
-      if (uploadId !== coverUploadIdRef.current) return;
-      toast.error(error instanceof Error ? error.message : "could not load cover art.");
-    }
+    void processCover(file, uploadId);
   };
 
   const handleCropComplete = (croppedBlob: Blob) => {
     const croppedFile = new File([croppedBlob], "cropped-cover.jpg", {
       type: "image/jpeg",
     });
-    setUploadedCover(croppedFile);
-    onCoverUpload?.(croppedFile);
+    const uploadId = ++coverUploadIdRef.current;
+    void processCover(croppedFile, uploadId);
     setShowCropper(false);
     if (tempImageForCropping) {
       URL.revokeObjectURL(tempImageForCropping);
@@ -84,6 +107,7 @@ export default function CoverArt({
 
   useEffect(() => {
     coverUploadIdRef.current += 1;
+    reportProcessing(false);
     setUploadedCover(null);
     setShowCropper(false);
     setTempImageForCropping((previous) => {
@@ -97,6 +121,7 @@ export default function CoverArt({
   useEffect(
     () => () => {
       coverUploadIdRef.current += 1;
+      processingChangeRef.current?.(false);
     },
     [],
   );
@@ -158,6 +183,7 @@ export default function CoverArt({
                     size="sm"
                     variant="secondary"
                     aria-label="crop cover art"
+                    disabled={isProcessing}
                     className="absolute top-2 right-2 size-10 p-0 max-lg:[@media(max-height:700px)]:top-1.5 max-lg:[@media(max-height:700px)]:right-1.5"
                     onClick={() => {
                       if (tempImageForCropping) {
@@ -210,6 +236,8 @@ export default function CoverArt({
         <Button
           type="button"
           variant="outline"
+          disabled={isProcessing}
+          aria-busy={isProcessing}
           className={
             isCompact
               ? "h-24 w-full border-dashed border-2 flex flex-col items-center gap-1 px-2 hover:bg-accent/50 cursor-pointer md:h-full md:min-h-12 md:w-44 md:px-3"
@@ -225,7 +253,7 @@ export default function CoverArt({
             }
           />
           <span className="text-muted-foreground whitespace-nowrap text-[10px] md:text-xs">
-            upload cover
+            {isProcessing ? "processing cover" : "upload cover"}
           </span>
         </Button>
       </div>

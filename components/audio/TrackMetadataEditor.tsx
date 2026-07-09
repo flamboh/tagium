@@ -25,7 +25,12 @@ interface TrackMetadataEditorProps {
   register: UseFormRegister<AudioMetadata>;
   control: Control<AudioMetadata>;
   handleSubmit: UseFormHandleSubmit<AudioMetadata>;
-  onTrackCoverUpload: (file: File) => void;
+  onTrackCoverUpload: (
+    picture: NonNullable<AudioMetadata["picture"]>,
+    resetKey?: string | null,
+  ) => void;
+  onTrackCoverProcessingChange: (processing: boolean) => void;
+  isTrackCoverProcessing: boolean;
   onDownloadUpdatedFile: SubmitHandler<AudioMetadata>;
   selectedFileAlbum: AlbumGroup | undefined;
   syncFilenames: boolean;
@@ -64,6 +69,8 @@ export default function TrackMetadataEditor({
   control,
   handleSubmit,
   onTrackCoverUpload,
+  onTrackCoverProcessingChange,
+  isTrackCoverProcessing,
   onDownloadUpdatedFile,
   selectedFileAlbum,
   syncFilenames,
@@ -170,6 +177,7 @@ export default function TrackMetadataEditor({
                   resetKey={selectedFileId}
                   picture={field.value}
                   onCoverUpload={onTrackCoverUpload}
+                  onProcessingChange={onTrackCoverProcessingChange}
                 />
               )}
             />
@@ -270,11 +278,18 @@ export default function TrackMetadataEditor({
                 </div>
               </div>
               <div className="flex min-h-0 flex-1 items-center justify-end gap-2 pt-1 max-lg:[@media(max-height:700px)]:flex-none max-lg:[@media(max-height:700px)]:pt-0 lg:flex-none lg:pt-2">
-                <DisabledReason disabled={!audioReady} reason="track file is not ready">
+                <DisabledReason
+                  disabled={!audioReady || isTrackCoverProcessing}
+                  reason={
+                    isTrackCoverProcessing
+                      ? "cover art is still processing"
+                      : "track file is not ready"
+                  }
+                >
                   <Button
                     type="button"
                     onClick={handleSubmit(onDownloadUpdatedFile)}
-                    disabled={!audioReady}
+                    disabled={!audioReady || isTrackCoverProcessing}
                     className="min-w-36 max-lg:[@media(max-height:700px)]:h-10 max-lg:[@media(max-height:700px)]:text-xs"
                   >
                     download track

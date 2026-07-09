@@ -33,6 +33,8 @@ jobs:
           cache: true
 
       - run: vp install
+      - run: vp check
+      - run: vp test run
       - run: vp build
       - run: vp exec playwright install --with-deps
       - run: vp exec playwright test

@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import {
   MAX_COVER_ART_EDGE,
   MAX_COVER_ART_PIXELS,
   MAX_COVER_ART_UPLOAD_BYTES,
   getCoverArtTargetSize,
   readCoverArtDimensions,
+  runCoverArtUploadTransaction,
   validateCoverArtUpload,
   validateCoverArtDimensions,
 } from "./coverArtProcessing";
@@ -69,5 +70,45 @@ describe("cover art processing", () => {
     expect(() => validateCoverArtDimensions(4_000, 4_000)).not.toThrow();
     expect(MAX_COVER_ART_PIXELS).toBe(16_000_000);
     expect(() => validateCoverArtDimensions(8_000, 8_000)).toThrow("16 megapixels");
+  });
+
+  it("does not read or commit optimized cover bytes after the upload identity changes", async () => {
+    const source = new File(["source"], "cover.jpg", { type: "image/jpeg" });
+    const optimized = new File(["optimized"], "cover.jpg", { type: "image/jpeg" });
+    const readBytes = vi.spyOn(optimized, "arrayBuffer");
+    const commit = vi.fn();
+
+    const result = await runCoverArtUploadTransaction(source, {
+      optimize: async () => optimized,
+      isCurrent: () => false,
+      commit,
+    });
+
+    expect(result).toBeNull();
+    expect(readBytes).not.toHaveBeenCalled();
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("does not commit cover bytes when the identity changes during the byte read", async () => {
+    let resolveBytes!: (bytes: ArrayBuffer) => void;
+    const bytes = new Promise<ArrayBuffer>((resolve) => {
+      resolveBytes = resolve;
+    });
+    const optimized = new File(["optimized"], "cover.jpg", { type: "image/jpeg" });
+    vi.spyOn(optimized, "arrayBuffer").mockReturnValue(bytes);
+    let current = true;
+    const commit = vi.fn();
+
+    const transaction = runCoverArtUploadTransaction(optimized, {
+      optimize: async () => optimized,
+      isCurrent: () => current,
+      commit,
+    });
+    await Promise.resolve();
+    current = false;
+    resolveBytes(Uint8Array.of(1, 2, 3).buffer);
+
+    await expect(transaction).resolves.toBeNull();
+    expect(commit).not.toHaveBeenCalled();
   });
 });

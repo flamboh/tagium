@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { argv, exit } from "node:process";
 
 const WRANGLER_CONFIG_PATH = ".output/server/wrangler.json";
+const WRANGLER_VERSION = "wrangler@4.110.0";
 
 type WranglerConfig = {
   vars?: Record<string, string>;
@@ -18,7 +19,7 @@ if (config.vars?.TAGIUM_DEPLOY_ENV !== "production") {
 
 const deploy = spawnSync(
   "npx",
-  ["wrangler", "deploy", "--config", WRANGLER_CONFIG_PATH, ...argv.slice(2)],
+  [WRANGLER_VERSION, "deploy", "--config", WRANGLER_CONFIG_PATH, ...argv.slice(2)],
   { stdio: "inherit" },
 );
 

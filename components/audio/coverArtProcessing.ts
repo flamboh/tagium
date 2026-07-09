@@ -1,3 +1,5 @@
+import type { AudioMetadata } from "./types";
+
 export const MAX_COVER_ART_EDGE = 1_600;
 export const MAX_COVER_ART_PIXELS = 16_000_000;
 export const MAX_COVER_ART_UPLOAD_BYTES = 25 * 1024 * 1024;
@@ -27,6 +29,14 @@ export const validateCoverArtUpload = (file: File) => {
   if (file.size > MAX_COVER_ART_UPLOAD_BYTES) {
     throw new Error("cover art must be 25 MB or smaller.");
   }
+};
+
+export const normalizeCoverArtType = (contentType: string) => {
+  const normalized = contentType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  if (!supportedCoverArtTypes.has(normalized)) {
+    throw new Error("cover art image must be a JPEG or PNG.");
+  }
+  return normalized === "image/jpg" ? "image/jpeg" : normalized;
 };
 
 export const validateCoverArtDimensions = (width: number, height: number) => {
@@ -124,4 +134,46 @@ export const optimizeCoverArt = async (file: File) => {
   } finally {
     image.close();
   }
+};
+
+export const coverArtFileToPicture = async (
+  file: File,
+  description = "uploaded cover",
+): Promise<NonNullable<AudioMetadata["picture"]>> => [
+  {
+    format: normalizeCoverArtType(file.type),
+    type: 3,
+    data: new Uint8Array(await file.arrayBuffer()),
+    description,
+  },
+];
+
+interface CoverArtUploadTransactionOptions {
+  isCurrent: () => boolean;
+  commit: (picture: NonNullable<AudioMetadata["picture"]>) => void;
+  optimize?: (file: File) => Promise<File>;
+  description?: string;
+}
+
+/**
+ * Keeps optimization, byte conversion, and the parent commit in one identity-checked operation.
+ * A reset or selection change can invalidate the operation at either await boundary.
+ */
+export const runCoverArtUploadTransaction = async (
+  file: File,
+  {
+    isCurrent,
+    commit,
+    optimize = optimizeCoverArt,
+    description = "uploaded cover",
+  }: CoverArtUploadTransactionOptions,
+) => {
+  const optimizedFile = await optimize(file);
+  if (!isCurrent()) return null;
+
+  const picture = await coverArtFileToPicture(optimizedFile, description);
+  if (!isCurrent()) return null;
+
+  commit(picture);
+  return optimizedFile;
 };
