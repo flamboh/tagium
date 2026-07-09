@@ -712,6 +712,7 @@ describe("fileMetadataOps", () => {
     );
 
     expect(result.file).toBe(updatedFile);
+    expect(result.originalFile).toBe(updatedFile);
     expect(result.filename).toBe("new-edit.mp3");
     expect(result.metadata?.title).toBe("New Edit");
     expect(result.metadata?.duration).toBe(88);

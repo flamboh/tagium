@@ -12,6 +12,7 @@
     "lint:fix": "vp lint . --fix",
     "preview": "vp preview",
     "test": "vp test run",
+    "test:e2e": "vp exec playwright test",
     "typecheck": "tsc -b",
     "prepare": "vp config",
     "deploy:preview": "bun run scripts/deploy-preview.ts",
@@ -44,6 +45,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.12.2",
     "@types/react": "^19",

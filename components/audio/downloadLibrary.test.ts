@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import {
   allTracksReadyForDownload,
   createLibraryDownloadFilename,
+  createZipBlob,
   getLibraryDownloadEntries,
 } from "./downloadLibrary";
 import type { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
@@ -67,6 +68,20 @@ const cover: AudioMetadata["picture"] = [
 ];
 
 describe("downloadLibrary", () => {
+  it("streams file data into exports without whole-file arrayBuffer reads", async () => {
+    const track = new File(["streamed audio"], "track.mp3", { type: "audio/mpeg" });
+    const arrayBuffer = vi
+      .spyOn(track, "arrayBuffer")
+      .mockRejectedValue(new Error("whole-file read is not allowed"));
+
+    const archive = await createZipBlob([{ path: "track.mp3", file: track }]);
+    const { unzipSync } = await import("fflate");
+    const files = unzipSync(new Uint8Array(await archive.arrayBuffer()));
+
+    expect(new TextDecoder().decode(files["track.mp3"])).toBe("streamed audio");
+    expect(arrayBuffer).not.toHaveBeenCalled();
+  });
+
   it("creates timestamped library download filenames", () => {
     expect(createLibraryDownloadFilename(new Date(2026, 0, 2, 3, 4, 5))).toBe(
       "tagium-download-20260102-030405.zip",

@@ -428,7 +428,7 @@ export function prepareDownloadedTrackHydration(
 export function resolveDownloadedTrackHydrationWrite(
   currentFile: TagiumFile,
   latestFile: TagiumFile,
-  parsedFile: TagiumFile,
+  _parsedFile: TagiumFile,
   hydratedFile: TagiumFile,
   updatedFile: File,
   metadataToWrite: AudioMetadata,
@@ -446,7 +446,7 @@ export function resolveDownloadedTrackHydrationWrite(
     return {
       ...nextFile,
       file: updatedFile,
-      originalFile: parsedFile.originalFile,
+      originalFile: updatedFile,
       metadata: mergeLatestMetadataWithHydratedTechnicalFields(nextFile, hydratedFile),
       downloadStatus: "ready" as const,
       downloadError: undefined,
@@ -463,6 +463,7 @@ export function resolveDownloadedTrackHydrationWrite(
   return {
     ...hydratedFile,
     file: updatedFile,
+    originalFile: updatedFile,
     filename: updatedFile.name,
     metadata: {
       ...metadataToWrite,

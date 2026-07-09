@@ -7,6 +7,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import ImageCropper from "../ui/image-cropper";
 import { Crop, Upload } from "lucide-react";
+import { toast } from "sonner";
+import { optimizeCoverArt } from "./coverArtProcessing";
 
 interface CoverArtProps {
   picture?: {
@@ -34,15 +36,22 @@ export default function CoverArt({
   const [tempImageForCropping, setTempImageForCropping] = useState<string | null>(null);
   const [showCropper, setShowCropper] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverUploadIdRef = useRef(0);
 
-  const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && file.type.startsWith("image/")) {
-      setUploadedCover(file);
-      onCoverUpload?.(file);
+    e.target.value = "";
+    if (!file) return;
+    const uploadId = ++coverUploadIdRef.current;
 
-      // Reset the input value to allow uploading the same file again
-      e.target.value = "";
+    try {
+      const optimizedFile = await optimizeCoverArt(file);
+      if (uploadId !== coverUploadIdRef.current) return;
+      setUploadedCover(optimizedFile);
+      onCoverUpload?.(optimizedFile);
+    } catch (error) {
+      if (uploadId !== coverUploadIdRef.current) return;
+      toast.error(error instanceof Error ? error.message : "could not load cover art.");
     }
   };
 
@@ -74,6 +83,7 @@ export default function CoverArt({
     : "flex-shrink-0 flex flex-col items-center gap-2 lg:grid lg:grid-rows-2 lg:items-start";
 
   useEffect(() => {
+    coverUploadIdRef.current += 1;
     setUploadedCover(null);
     setShowCropper(false);
     setTempImageForCropping((previous) => {
@@ -83,6 +93,13 @@ export default function CoverArt({
       return null;
     });
   }, [resetKey]);
+
+  useEffect(
+    () => () => {
+      coverUploadIdRef.current += 1;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (uploadedCover) {
@@ -185,7 +202,7 @@ export default function CoverArt({
       >
         <Input
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png"
           onChange={handleCoverUpload}
           className="hidden"
           ref={fileInputRef}

@@ -1,7 +1,12 @@
 import http from "node:http";
 import { once } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { createCobaltProxyServer } from "../cobalt-machine-proxy.mjs";
+import {
+  createCobaltProxyServer,
+  createGate,
+  drainCobaltProxyServer,
+  getDrainTimeoutMs,
+} from "../cobalt-machine-proxy.mjs";
 
 const listen = async (server) => {
   server.listen(0, "127.0.0.1");
@@ -50,12 +55,13 @@ const createControlledUpstream = () => {
   };
 };
 
-const createProxy = async (upstreamPort, proxyConfig) => {
+const createProxy = async (upstreamPort, proxyConfig, lifecycle) => {
   const server = createCobaltProxyServer({
     cobaltHost: "127.0.0.1",
     cobaltPort: upstreamPort,
     runtimeEnv: { FLY_MACHINE_ID: "test-machine" },
     proxyConfig,
+    lifecycle,
   });
   const port = await listen(server);
   return { server, origin: `http://127.0.0.1:${port}` };
@@ -69,6 +75,141 @@ const complete = (entry, body = "ok") => {
 describe("cobalt machine proxy", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("validates the graceful drain deadline", () => {
+    expect(getDrainTimeoutMs({})).toBe(270_000);
+    expect(getDrainTimeoutMs({ PROXY_DRAIN_TIMEOUT_MS: "120000" })).toBe(120_000);
+    expect(() => getDrainTimeoutMs({ PROXY_DRAIN_TIMEOUT_MS: "nope" })).toThrow(
+      "PROXY_DRAIN_TIMEOUT_MS",
+    );
+    expect(() => getDrainTimeoutMs({ PROXY_DRAIN_TIMEOUT_MS: "280000" })).toThrow(
+      "PROXY_DRAIN_TIMEOUT_MS",
+    );
+  });
+
+  it("rejects queued work when draining without granting it later", () => {
+    const gate = createGate("resolve", 1, 1, 1_000);
+    const queuedGrant = vi.fn();
+    const queuedReject = vi.fn();
+
+    gate.acquire({ onGranted: vi.fn(), onRejected: vi.fn() });
+    gate.acquire({ onGranted: queuedGrant, onRejected: queuedReject });
+    gate.drain();
+    gate.release();
+
+    expect(queuedReject).toHaveBeenCalledWith("draining");
+    expect(queuedGrant).not.toHaveBeenCalled();
+    expect(gate.active).toBe(0);
+    expect(gate.queued).toBe(0);
+  });
+
+  it("forces connections closed when graceful draining reaches its deadline", async () => {
+    vi.useFakeTimers();
+    const lifecycle = { draining: false };
+    const cobalt = { kill: vi.fn() };
+    const server = {
+      listening: true,
+      beginDraining: vi.fn(),
+      close: vi.fn(),
+      closeIdleConnections: vi.fn(),
+      closeAllConnections: vi.fn(),
+    };
+
+    try {
+      const shutdown = drainCobaltProxyServer({
+        server,
+        cobalt,
+        lifecycle,
+        drainTimeoutMs: 50,
+      });
+      await vi.advanceTimersByTimeAsync(50);
+      await shutdown;
+
+      expect(server.closeAllConnections).toHaveBeenCalledOnce();
+      expect(cobalt.kill).toHaveBeenCalledWith("SIGTERM");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("serves health and readiness without forwarding to Cobalt", async () => {
+    const upstream = createControlledUpstream();
+    const upstreamPort = await listen(upstream.server);
+    const lifecycle = { draining: false };
+    const proxy = await createProxy(
+      upstreamPort,
+      {
+        maxConcurrentResolve: 1,
+        maxConcurrentTunnel: 1,
+        maxQueuedResolve: 0,
+        maxQueuedTunnel: 0,
+        maxQueueWaitMs: 1_000,
+      },
+      lifecycle,
+    );
+
+    try {
+      const health = await fetch(`${proxy.origin}/healthz`);
+      const ready = await fetch(`${proxy.origin}/readyz`);
+
+      expect(health.status).toBe(200);
+      expect(ready.status).toBe(200);
+      expect(upstream.requestCount).toBe(0);
+
+      lifecycle.draining = true;
+      const drainingReady = await fetch(`${proxy.origin}/readyz`);
+      const rejectedWork = await fetch(`${proxy.origin}/`, { method: "POST" });
+      expect(drainingReady.status).toBe(503);
+      expect(rejectedWork.status).toBe(503);
+      expect(rejectedWork.headers.get("connection")).toBe("close");
+      expect(upstream.requestCount).toBe(0);
+    } finally {
+      await closeServer(proxy.server);
+      await closeServer(upstream.server);
+    }
+  });
+
+  it("waits for active responses before stopping Cobalt", async () => {
+    const upstream = createControlledUpstream();
+    const upstreamPort = await listen(upstream.server);
+    const lifecycle = { draining: false };
+    const proxy = await createProxy(
+      upstreamPort,
+      {
+        maxConcurrentResolve: 1,
+        maxConcurrentTunnel: 1,
+        maxQueuedResolve: 0,
+        maxQueuedTunnel: 0,
+        maxQueueWaitMs: 1_000,
+      },
+      lifecycle,
+    );
+    const cobalt = { kill: vi.fn() };
+    const activeFetch = fetch(`${proxy.origin}/`, { method: "POST", body: "active" });
+
+    try {
+      const activeUpstream = await upstream.waitForRequest();
+      const shutdown = drainCobaltProxyServer({
+        server: proxy.server,
+        cobalt,
+        lifecycle,
+        signal: "SIGTERM",
+        drainTimeoutMs: 1_000,
+      });
+
+      expect(lifecycle.draining).toBe(true);
+      expect(cobalt.kill).not.toHaveBeenCalled();
+
+      complete(activeUpstream, "finished");
+      await expect(activeFetch.then((response) => response.text())).resolves.toBe("finished");
+      await shutdown;
+      expect(cobalt.kill).toHaveBeenCalledOnce();
+      expect(cobalt.kill).toHaveBeenCalledWith("SIGTERM");
+    } finally {
+      await closeServer(proxy.server);
+      await closeServer(upstream.server);
+    }
   });
 
   it("returns 503 when the resolve queue is full", async () => {

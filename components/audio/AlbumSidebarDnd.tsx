@@ -232,6 +232,7 @@ export function SortableTrackRow({
       )}
       <button
         type="button"
+        aria-label="remove track"
         onClick={(event) => {
           event.stopPropagation();
           onRemove();

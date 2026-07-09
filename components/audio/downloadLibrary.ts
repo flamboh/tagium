@@ -26,28 +26,56 @@ export const downloadBlob = (blob: Blob, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
-const createZipData = async (entries: Record<string, [Uint8Array, { level: 0 }]>) => {
-  const { zip } = await import("fflate");
-  return new Promise<Uint8Array>((resolve, reject) => {
-    zip(entries, (error, data) => {
+export async function createZipBlob(entries: DownloadZipEntry[]) {
+  const { Zip, ZipPassThrough } = await import("fflate");
+
+  return new Promise<Blob>((resolve, reject) => {
+    const chunks: Uint8Array<ArrayBuffer>[] = [];
+    let settled = false;
+    const settleWithError = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      archive.terminate();
+      reject(error);
+    };
+    const archive = new Zip((error, chunk, final) => {
       if (error) {
-        reject(error);
+        settleWithError(error);
         return;
       }
-      resolve(data);
+      if (chunk.length > 0) chunks.push(Uint8Array.from(chunk));
+      if (final && !settled) {
+        settled = true;
+        resolve(new Blob(chunks, { type: "application/zip" }));
+      }
     });
-  });
-};
 
-export async function createZipBlob(entries: DownloadZipEntry[]) {
-  const zipEntries: Record<string, [Uint8Array, { level: 0 }]> = {};
-  await Promise.all(
-    entries.map(async (entry) => {
-      zipEntries[entry.path] = [new Uint8Array(await entry.file.arrayBuffer()), { level: 0 }];
-    }),
-  );
-  const data = await createZipData(zipEntries);
-  return new Blob([data.buffer as ArrayBuffer], { type: "application/zip" });
+    void (async () => {
+      try {
+        for (const entry of entries) {
+          const zipEntry = new ZipPassThrough(entry.path);
+          archive.add(zipEntry);
+          const reader = entry.file.stream().getReader();
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                zipEntry.push(new Uint8Array(), true);
+                break;
+              }
+              zipEntry.push(value);
+            }
+          } finally {
+            reader.releaseLock();
+          }
+        }
+        archive.end();
+      } catch (error) {
+        settleWithError(error);
+      }
+    })();
+  });
 }
 
 const cleanPathPart = (value: string, fallback: string) => {

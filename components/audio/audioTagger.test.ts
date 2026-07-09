@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
-import { createDirtyMetadataPatch, getSubmittedAudioMetadata } from "./audioTagger";
+import {
+  createDirtyMetadataPatch,
+  getFileImportKey,
+  getSubmittedAudioMetadata,
+  getTagiumFileImportKey,
+} from "./audioTagger";
 import type { AudioMetadata } from "./types";
 
 const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
@@ -18,6 +23,24 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
 });
 
 describe("audioTagger metadata patches", () => {
+  it("keeps a lightweight source identity after releasing the original file", () => {
+    const original = new File(["original"], "track.mp3", { lastModified: 123 });
+    const edited = new File(["edited audio"], "renamed.mp3", { lastModified: 456 });
+    const sourceImportKey = getFileImportKey(original);
+
+    expect(
+      getTagiumFileImportKey({
+        id: "track",
+        filename: edited.name,
+        file: edited,
+        originalFile: edited,
+        sourceImportKey,
+        status: "saved",
+        downloadStatus: "ready",
+      }),
+    ).toBe(sourceImportKey);
+  });
+
   it("creates title-only preview patches without stale numeric fields", () => {
     const patch = createDirtyMetadataPatch(
       metadata({ title: "New Title", year: 1999, trackNumber: 3 }),

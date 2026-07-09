@@ -5,6 +5,7 @@ import { Cause, Effect, Exit } from "effect";
 import { SubmitHandler, useForm } from "react-hook-form";
 import filenamify from "filenamify";
 import AlbumMetadataDialog, { AlbumMetadataDraft } from "./AlbumMetadataDialog";
+import DestructiveActionDialog from "./DestructiveActionDialog";
 import {
   downloadFromCobalt,
   parseUploads,
@@ -62,6 +63,7 @@ import {
 } from "./mp3Utils";
 import { loadAppSettings, saveAppSettings } from "./settings";
 import { getSampleAlbum } from "./sampleMetadata";
+import { hasRecoverableSessionWork, useBeforeUnloadProtection } from "./sessionSafety";
 import { isSoundCloudSetUrl, resolveSoundCloudSet, type SoundCloudSet } from "./soundcloudSet";
 import { getDownloadErrorMessage, notifyDownloadError } from "./downloadErrorMessage";
 import {
@@ -85,7 +87,9 @@ const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
   cover: undefined,
 };
 const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
-const getFileImportKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
+export const getFileImportKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
+export const getTagiumFileImportKey = (file: TagiumFile) =>
+  file.sourceImportKey ?? (file.originalFile ? getFileImportKey(file.originalFile) : undefined);
 const getManagedDownloadTrackTitle = (file: TagiumFile) => {
   if (file.metadata?.title) return file.metadata.title;
   return file.filename;
@@ -251,8 +255,10 @@ export default function AudioTagger() {
   const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
   const [lastSelectedFileId, setLastSelectedFileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [urlImporting, setUrlImporting] = useState(false);
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [albumDialogMode, setAlbumDialogMode] = useState<"create" | "edit">("create");
+  const [pendingTrackRemoval, setPendingTrackRemoval] = useState<string[] | null>(null);
   const [albumDraft, setAlbumDraft] = useState<AlbumMetadataDraft>(EMPTY_ALBUM_DRAFT);
   const [albumPlaceholderSeed, setAlbumPlaceholderSeed] = useState("new-album");
   const [editingAlbumId, setEditingAlbumId] = useState<string | null>(null);
@@ -261,6 +267,12 @@ export default function AudioTagger() {
   const [settings, setSettings] = useState<AppSettings>(loadAppSettings);
   const [playlistDownloadQueue, setPlaylistDownloadQueue] =
     useState<PlaylistDownloadQueueState | null>(null);
+  const hasRecoverableWork = hasRecoverableSessionWork({
+    fileCount: files.length,
+    albumCount: albums.length,
+    importing: loading || urlImporting,
+  });
+  useBeforeUnloadProtection(hasRecoverableWork);
   const filesRef = useRef<TagiumFile[]>(files);
   const albumsRef = useRef<AlbumGroup[]>(albums);
   const selectedFileIdRef = useRef<string | null>(selectedFileId);
@@ -388,6 +400,7 @@ export default function AudioTagger() {
           ? clearPendingMetadataPatch({
               ...file,
               file: updatedFile,
+              originalFile: updatedFile,
               filename: updatedFile.name,
               metadata,
               status: "saved" as const,
@@ -561,9 +574,8 @@ export default function AudioTagger() {
       setActiveView("editor");
       const existingImportKeys = new Set(
         filesRef.current
-          .map((file) => file.originalFile)
-          .filter((file): file is File => Boolean(file))
-          .map((file) => getFileImportKey(file)),
+          .map(getTagiumFileImportKey)
+          .filter((importKey): importKey is string => Boolean(importKey)),
       );
       const reservedImportKeys: string[] = [];
       const uniqueUploadedFiles = uploadedFiles.filter((file) => {
@@ -585,7 +597,15 @@ export default function AudioTagger() {
         if (parsedUploads.length === 0) return;
         const orderedUploads = sortUploadedTracksByTrackNumber(parsedUploads);
 
-        const nextFiles = [...filesRef.current, ...orderedUploads.map((upload) => upload.file)];
+        const nextFiles = [
+          ...filesRef.current,
+          ...orderedUploads.map((upload) => ({
+            ...upload.file,
+            sourceImportKey: upload.file.originalFile
+              ? getFileImportKey(upload.file.originalFile)
+              : undefined,
+          })),
+        ];
         filesRef.current = nextFiles;
         setFiles(nextFiles);
 
@@ -992,13 +1012,18 @@ export default function AudioTagger() {
     const trimmedUrl = sourceUrl.trim();
     if (!trimmedUrl) return;
 
-    if (isSoundCloudSetUrl(trimmedUrl)) {
-      const set = await resolveSoundCloudSet(trimmedUrl);
-      handleSoundCloudSetDownload(set);
-      return;
-    }
+    setUrlImporting(true);
+    try {
+      if (isSoundCloudSetUrl(trimmedUrl)) {
+        const set = await resolveSoundCloudSet(trimmedUrl);
+        handleSoundCloudSetDownload(set);
+        return;
+      }
 
-    handleAudioDownload(trimmedUrl);
+      handleAudioDownload(trimmedUrl);
+    } finally {
+      setUrlImporting(false);
+    }
   };
   const handleRetryDownload = (fileId: string) => {
     const fileToRetry = filesRef.current.find((file) => file.id === fileId);
@@ -1135,31 +1160,40 @@ export default function AudioTagger() {
       console.error("failed to update tags before download:", error);
     }
   };
-  const handleRemoveFile = (idToRemove: string) => {
-    const affectedAlbumIds = albumsRef.current
-      .filter((album) => album.trackIds.includes(idToRemove))
-      .map((album) => album.id);
-    const nextAlbums = removeTrackFromAlbums(albumsRef.current, idToRemove);
-    let nextFiles = filesRef.current.filter((file) => file.id !== idToRemove);
-    if (settings.syncTrackNumbers && affectedAlbumIds.length > 0) {
-      nextFiles = applyTrackOrderNumbersToFiles(nextFiles, nextAlbums, affectedAlbumIds);
-    }
-    filesRef.current = nextFiles;
-    albumsRef.current = nextAlbums;
-    setFiles(nextFiles);
-    setAlbums(nextAlbums);
-    setLooseTrackIds((prevLooseTrackIds) =>
-      prevLooseTrackIds.filter((trackId) => trackId !== idToRemove),
-    );
-    setSelectedFileIds((prev) => {
-      const next = new Set(prev);
-      next.delete(idToRemove);
-      return next;
-    });
-    if (selectedFileId === idToRemove) {
-      setSelectedFileId(null);
-    }
-  };
+  const removeFiles = useCallback(
+    (idsToRemove: string[]) => {
+      const idSet = new Set(idsToRemove);
+      const affectedAlbumIds = albumsRef.current
+        .filter((album) => album.trackIds.some((trackId) => idSet.has(trackId)))
+        .map((album) => album.id);
+      const nextAlbums = idsToRemove.reduce(
+        (currentAlbums, fileId) => removeTrackFromAlbums(currentAlbums, fileId),
+        albumsRef.current,
+      );
+      let nextFiles = filesRef.current.filter((file) => !idSet.has(file.id));
+      if (settings.syncTrackNumbers && affectedAlbumIds.length > 0) {
+        nextFiles = applyTrackOrderNumbersToFiles(nextFiles, nextAlbums, affectedAlbumIds);
+      }
+      filesRef.current = nextFiles;
+      albumsRef.current = nextAlbums;
+      setFiles(nextFiles);
+      setAlbums(nextAlbums);
+      setLooseTrackIds((prevLooseTrackIds) =>
+        prevLooseTrackIds.filter((trackId) => !idSet.has(trackId)),
+      );
+      setSelectedFileIds((prev) => {
+        return new Set(Array.from(prev).filter((fileId) => !idSet.has(fileId)));
+      });
+      setSelectedFileId((currentFileId) =>
+        currentFileId && idSet.has(currentFileId) ? null : currentFileId,
+      );
+      setLastSelectedFileId((currentFileId) =>
+        currentFileId && idSet.has(currentFileId) ? null : currentFileId,
+      );
+    },
+    [settings.syncTrackNumbers],
+  );
+  const requestRemoveFile = (idToRemove: string) => setPendingTrackRemoval([idToRemove]);
   const handleRemoveAlbum = (albumId: string) => {
     const albumToRemove = albums.find((album) => album.id === albumId);
     if (!albumToRemove) return;
@@ -1301,31 +1335,10 @@ export default function AudioTagger() {
     setLastSelectedFileId(null);
   }, [bufferCurrentFormMetadata]);
 
-  const handleRemoveSelectedFiles = useCallback(() => {
-    const idsToRemove = Array.from(selectedFileIds);
-    const idSet = new Set(idsToRemove);
-    const affectedAlbumIds = albumsRef.current
-      .filter((album) => album.trackIds.some((trackId) => idSet.has(trackId)))
-      .map((album) => album.id);
-    const nextAlbums = idsToRemove.reduce(
-      (currentAlbums, fileId) => removeTrackFromAlbums(currentAlbums, fileId),
-      albumsRef.current,
-    );
-    let nextFiles = filesRef.current.filter((file) => !idSet.has(file.id));
-    if (settings.syncTrackNumbers && affectedAlbumIds.length > 0) {
-      nextFiles = applyTrackOrderNumbersToFiles(nextFiles, nextAlbums, affectedAlbumIds);
-    }
-    filesRef.current = nextFiles;
-    albumsRef.current = nextAlbums;
-    setFiles(nextFiles);
-    setAlbums(nextAlbums);
-    setLooseTrackIds((prevLooseTrackIds) =>
-      prevLooseTrackIds.filter((trackId) => !idSet.has(trackId)),
-    );
-    setSelectedFileIds(new Set());
-    setSelectedFileId(null);
-    setLastSelectedFileId(null);
-  }, [selectedFileIds, settings.syncTrackNumbers]);
+  const requestRemoveSelectedFiles = useCallback(() => {
+    if (selectedFileIds.size === 0) return;
+    setPendingTrackRemoval(Array.from(selectedFileIds));
+  }, [selectedFileIds]);
 
   const handleSelectAllFiles = useCallback(() => {
     bufferCurrentFormMetadata();
@@ -1361,7 +1374,7 @@ export default function AudioTagger() {
       if (event.key === "Delete" || event.key === "Backspace") {
         if (selectedFileIds.size > 0) {
           event.preventDefault();
-          handleRemoveSelectedFiles();
+          requestRemoveSelectedFiles();
           return;
         }
       }
@@ -1374,7 +1387,7 @@ export default function AudioTagger() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedFileIds, handleSelectAllFiles, handleRemoveSelectedFiles, handleClearSelection]);
+  }, [selectedFileIds, handleSelectAllFiles, requestRemoveSelectedFiles, handleClearSelection]);
 
   const openCreateAlbumDialog = (seedTrackIds: string[]) => {
     const uniqueSeedTrackIds = asUniqueTrackIds(seedTrackIds);
@@ -1659,6 +1672,16 @@ export default function AudioTagger() {
 
   return (
     <>
+      <DestructiveActionDialog
+        open={pendingTrackRemoval !== null}
+        itemCount={pendingTrackRemoval?.length ?? 0}
+        onCancel={() => setPendingTrackRemoval(null)}
+        onConfirm={() => {
+          const trackIds = pendingTrackRemoval;
+          setPendingTrackRemoval(null);
+          if (trackIds) removeFiles(trackIds);
+        }}
+      />
       <AlbumMetadataDialog
         open={albumDialogOpen}
         mode={albumDialogMode}
@@ -1697,7 +1720,7 @@ export default function AudioTagger() {
           onSelectFile={handleSelectFile}
           onSelectLooseTrack={handleSelectLooseTrack}
           onClearSelection={handleClearSelection}
-          onRemoveFile={handleRemoveFile}
+          onRemoveFile={requestRemoveFile}
           onRetryDownload={handleRetryDownload}
           onAddAlbum={handleOpenCreateAlbumDialog}
           onEditAlbum={handleOpenEditAlbumDialog}
