@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tagium-production
+  cancel-in-progress: true
+
 jobs:
   browser:
     name: Cross-browser E2E
@@ -17,6 +21,11 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Confirm merge is still the latest main commit
+        run: |
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "${{ github.event.pull_request.merge_commit_sha }}"
 
       - uses: voidzero-dev/setup-vp@v1
         with:
@@ -46,6 +55,11 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Confirm merge is still the latest main commit
+        run: |
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "${{ github.event.pull_request.merge_commit_sha }}"
 
       - uses: voidzero-dev/setup-vp@v1
         with:
