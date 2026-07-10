@@ -10,6 +10,7 @@ import {
   markPlaylistDownloadTrackCompleted,
   markPlaylistDownloadTrackFailed,
   removeActivePlaylistDownloadTrack,
+  removePlaylistDownloadTracks,
   reserveNextPlaylistDownloadTrack,
 } from "./playlistDownloadQueueRuntime";
 import type { PlaylistDownloadRuntimeTrack } from "./playlistDownloadQueueRuntime";
@@ -156,5 +157,32 @@ describe("playlistDownloadQueueRuntime", () => {
       "canceled",
     ]);
     expect(derivePlaylistDownloadQueueState(run, 1_000).canceledCount).toBe(3);
+  });
+
+  it("removes deleted tracks from totals while retaining active work until it settles", () => {
+    const run = createRun(5);
+    const firstTrack = reserve(run, 0);
+    const secondTrack = reserve(run, 0);
+    markPlaylistDownloadTrackActive(run, firstTrack, 0);
+    markPlaylistDownloadTrackActive(run, secondTrack, 0);
+    markPlaylistDownloadTrackCompleted(run, firstTrack.fileId, 1_000);
+    removeActivePlaylistDownloadTrack(run, firstTrack.fileId);
+
+    const result = removePlaylistDownloadTracks(run, ["track-1", "track-2", "track-5"]);
+
+    expect(result).toEqual({
+      removedTrackIds: ["track-1", "track-2", "track-5"],
+      pendingTracks: [expect.objectContaining({ fileId: "track-5" })],
+      activeTrackIds: ["track-2"],
+    });
+    expect(run.active.map((track) => track.fileId)).toEqual(["track-2"]);
+    expect(run.pending.map((track) => track.fileId)).toEqual(["track-3", "track-4"]);
+    expect(derivePlaylistDownloadQueueState(run, 1_000)).toMatchObject({
+      trackIds: ["track-3", "track-4"],
+      total: 2,
+      completed: 0,
+      active: [],
+      pending: 2,
+    });
   });
 });

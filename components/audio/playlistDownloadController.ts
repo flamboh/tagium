@@ -11,6 +11,7 @@ import {
   markPlaylistDownloadTrackCompleted,
   markPlaylistDownloadTrackFailed,
   removeActivePlaylistDownloadTrack,
+  removePlaylistDownloadTracks,
   reserveNextPlaylistDownloadTrack,
   type PlaylistDownloadQueueRun,
   type PlaylistDownloadQueueRuntimeSnapshot,
@@ -64,6 +65,7 @@ export interface PlaylistDownloadControllerDeps<Track extends PlaylistDownloadRu
 export interface PlaylistDownloadController<Track extends PlaylistDownloadRuntimeTrack> {
   enqueue: (tracks: Track[]) => void;
   cancel: () => void;
+  remove: (trackIds: string[]) => void;
   retry: (tracks: Track[]) => void;
   getSnapshot: () => PlaylistDownloadControllerSnapshot | null;
 }
@@ -183,10 +185,13 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
     exit: Exit.Exit<void, unknown>,
   ) => {
     run.activeFibers.delete(track.fileId);
+    const trackWasRemoved = !run.model.items.some((item) => item.id === track.fileId);
 
     if (Exit.isFailure(exit)) {
       const error = firstCauseError(exit.cause);
-      if (Exit.hasInterrupts(exit) || isPlaylistDownloadAbort(error)) {
+      if (trackWasRemoved) {
+        deps.onTrackSettled?.({ track, outcome: "canceled" });
+      } else if (Exit.hasInterrupts(exit) || isPlaylistDownloadAbort(error)) {
         markPlaylistDownloadTrackCanceled(run, track.fileId, now());
         deps.onTrackSettled?.({ track, outcome: "canceled" });
         if (currentRun === run) {
@@ -286,6 +291,23 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
       deps.onAction?.({ type: "cancel_requested", snapshot: createSnapshot(currentRun) });
       currentRun.canceled = true;
       cancelActive(currentRun);
+      publish(currentRun);
+      pump(currentRun);
+    },
+    remove: (trackIds) => {
+      if (!currentRun || trackIds.length === 0) return;
+
+      const removed = removePlaylistDownloadTracks(currentRun, trackIds);
+      if (removed.removedTrackIds.length === 0) return;
+
+      for (const track of removed.pendingTracks) {
+        deps.onTrackSettled?.({ track, outcome: "canceled" });
+      }
+      for (const trackId of removed.activeTrackIds) {
+        const fiber = currentRun.activeFibers.get(trackId);
+        if (fiber) Effect.runFork(Fiber.interrupt(fiber));
+      }
+
       publish(currentRun);
       pump(currentRun);
     },
