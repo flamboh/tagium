@@ -14,7 +14,7 @@ type RuntimeRequest = Request & {
 
 const machineAffinitySecret = "test-machine-affinity-secret";
 
-const makeAudioRequest = () => {
+const makeAudioRequest = (signal?: AbortSignal) => {
   const request = new Request("https://tagium.test/api/cobalt/audio", {
     method: "POST",
     headers: {
@@ -25,6 +25,7 @@ const makeAudioRequest = () => {
       url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
       audioBitrate: "128",
     }),
+    signal,
   }) as RuntimeRequest;
 
   request.runtime = {
@@ -210,6 +211,44 @@ describe("cobalt audio endpoint", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(response.status).toBe(502);
     expect(await response.text()).toBe("error.api.fetch.fail");
+  });
+
+  it("propagates client cancellation to the upstream Cobalt request", async () => {
+    const clientAbort = new AbortController();
+    let upstreamSignal: AbortSignal | undefined;
+    let releaseUpstream!: () => void;
+    const upstreamReleased = new Promise<void>((resolve) => {
+      releaseUpstream = resolve;
+    });
+    let upstreamStarted!: () => void;
+    const upstreamStart = new Promise<void>((resolve) => {
+      upstreamStarted = resolve;
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        upstreamSignal = init?.signal ?? undefined;
+        upstreamStarted();
+        await upstreamReleased;
+        return Response.json({
+          status: "error",
+          error: { code: "error.api.fetch.fail" },
+        });
+      }),
+    );
+
+    const responsePromise = handler(makeEvent(makeAudioRequest(clientAbort.signal)));
+    await upstreamStart;
+    clientAbort.abort(new DOMException("canceled", "AbortError"));
+    await Promise.resolve();
+
+    try {
+      expect(upstreamSignal?.aborted).toBe(true);
+    } finally {
+      releaseUpstream();
+      await responsePromise;
+    }
   });
 
   it("preserves Cobalt capacity overload responses", async () => {
