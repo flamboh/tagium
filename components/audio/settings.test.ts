@@ -70,8 +70,9 @@ describe("settings", () => {
       applySoundCloudAlbumCoverToTracks: false,
     };
 
-    saveAppSettings(settings, storage);
+    const saved = saveAppSettings(settings, storage);
 
+    expect(saved).toBe(true);
     expect(storage.savedValue()).toBe(JSON.stringify(settings));
   });
 
@@ -88,6 +89,6 @@ describe("settings", () => {
       applySoundCloudAlbumCoverToTracks: false,
     };
 
-    expect(() => saveAppSettings(settings, storage)).not.toThrow();
+    expect(saveAppSettings(settings, storage)).toBe(false);
   });
 });

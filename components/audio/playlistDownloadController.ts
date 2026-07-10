@@ -28,6 +28,23 @@ type PlaylistDownloadControllerRun<Track extends PlaylistDownloadRuntimeTrack> =
 
 export type PlaylistDownloadControllerSnapshot = PlaylistDownloadQueueRuntimeSnapshot;
 
+export interface PlaylistDownloadTrackSettled<Track extends PlaylistDownloadRuntimeTrack> {
+  track: Track;
+  outcome: "completed" | "failed" | "canceled";
+  error?: unknown;
+}
+
+export type PlaylistDownloadControllerAction<Track extends PlaylistDownloadRuntimeTrack> =
+  | {
+      type: "cancel_requested";
+      snapshot: PlaylistDownloadControllerSnapshot;
+    }
+  | {
+      type: "retry_started";
+      tracks: Track[];
+      previousSnapshot: PlaylistDownloadControllerSnapshot;
+    };
+
 export interface PlaylistDownloadControllerDeps<Track extends PlaylistDownloadRuntimeTrack> {
   createModelTrack: (track: Track) => PlaylistDownloadQueueModelTrack;
   downloadTrack: (track: Track) => Effect.Effect<File, unknown>;
@@ -37,6 +54,8 @@ export interface PlaylistDownloadControllerDeps<Track extends PlaylistDownloadRu
   markQueued: (tracks: Track[]) => void;
   markCanceled: (trackIds: string[]) => void;
   markFailed: (trackId: string, error: unknown) => void;
+  onTrackSettled?: (event: PlaylistDownloadTrackSettled<Track>) => void;
+  onAction?: (event: PlaylistDownloadControllerAction<Track>) => void;
   emitSnapshot: (snapshot: PlaylistDownloadControllerSnapshot) => void;
   now?: () => number;
 }
@@ -113,8 +132,12 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
 
   const cancelPending = (run: PlaylistDownloadControllerRun<Track>) => {
     if (run.pending.length === 0) return;
+    const pendingTracks = [...run.pending];
     const canceledTrackIds = cancelPendingPlaylistDownloadTracks(run, now());
     deps.markCanceled(canceledTrackIds);
+    for (const track of pendingTracks) {
+      deps.onTrackSettled?.({ track, outcome: "canceled" });
+    }
   };
 
   const cancelActive = (run: PlaylistDownloadControllerRun<Track>) => {
@@ -133,7 +156,9 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
     Effect.gen(function* () {
       if (!deps.hasTrack(track.fileId)) {
         yield* Effect.sync(() => {
-          markPlaylistDownloadTrackCompleted(run, track.fileId, now());
+          markPlaylistDownloadTrackCanceled(run, track.fileId, now());
+          deps.markCanceled([track.fileId]);
+          deps.onTrackSettled?.({ track, outcome: "canceled" });
         });
         return;
       }
@@ -146,6 +171,7 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
 
       yield* Effect.sync(() => {
         markPlaylistDownloadTrackCompleted(run, track.fileId, now());
+        deps.onTrackSettled?.({ track, outcome: "completed" });
       });
     });
 
@@ -160,11 +186,13 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
       const error = firstCauseError(exit.cause);
       if (Exit.hasInterrupts(exit) || isPlaylistDownloadAbort(error)) {
         markPlaylistDownloadTrackCanceled(run, track.fileId, now());
+        deps.onTrackSettled?.({ track, outcome: "canceled" });
         if (currentRun === run) {
           deps.markCanceled([track.fileId]);
         }
       } else {
         markPlaylistDownloadTrackFailed(run, track.fileId, toErrorMessage(error), now());
+        deps.onTrackSettled?.({ track, outcome: "failed", error });
         if (currentRun === run) {
           deps.markFailed(track.fileId, error);
         }
@@ -216,7 +244,7 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
   };
 
   const enqueue = (tracks: Track[]) => {
-    if (tracks.length === 0) return;
+    if (tracks.length === 0) return [];
 
     if (currentRun && !currentRun.done && !currentRun.canceled) {
       const queuedTracks = enqueuePlaylistDownloadQueueTracks(
@@ -226,12 +254,12 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
         deps.getFileErrorTrackIds(),
         deps.createModelTrack,
       );
-      if (queuedTracks.length === 0) return;
+      if (queuedTracks.length === 0) return [];
 
       deps.markQueued(queuedTracks);
       publish(currentRun);
       pump(currentRun);
-      return;
+      return queuedTracks;
     }
 
     const run: PlaylistDownloadControllerRun<Track> = {
@@ -242,20 +270,29 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
     deps.markQueued(tracks);
     publish(run);
     pump(run);
+    return tracks;
   };
 
   return {
-    enqueue,
+    enqueue: (tracks) => {
+      enqueue(tracks);
+    },
     cancel: () => {
       if (!currentRun) return;
       if (currentRun.done) return;
 
+      deps.onAction?.({ type: "cancel_requested", snapshot: createSnapshot(currentRun) });
       currentRun.canceled = true;
       cancelActive(currentRun);
       publish(currentRun);
       pump(currentRun);
     },
-    retry: enqueue,
+    retry: (tracks) => {
+      const previousSnapshot = currentSnapshot;
+      const queuedTracks = enqueue(tracks);
+      if (!previousSnapshot || queuedTracks.length === 0) return;
+      deps.onAction?.({ type: "retry_started", tracks: queuedTracks, previousSnapshot });
+    },
     getSnapshot: () => currentSnapshot,
   };
 };

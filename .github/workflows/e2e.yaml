@@ -69,7 +69,13 @@ jobs:
           cache: true
 
       - run: vp install
-      - run: vp build
+      - name: Build production Worker
+        run: vp build
+        env:
+          VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
+          VITE_PUBLIC_POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+          VITE_PUBLIC_DEPLOY_ENV: production
+          VITE_PUBLIC_RELEASE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
 
       - name: Deploy Worker
         run: bun run deploy:production

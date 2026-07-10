@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   createDirtyMetadataPatch,
+  getAcceptedUploadParseResult,
   getFileImportKey,
   getSubmittedAudioMetadata,
   getTagiumFileImportKey,
+  getTrackSourceMix,
 } from "./audioTagger";
 import type { AudioMetadata } from "./types";
+import type { UploadedTrack } from "./mp3Utils";
 
 const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   filename: "old-title",
@@ -23,6 +26,33 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
 });
 
 describe("audioTagger metadata patches", () => {
+  it("rejects parser error records instead of accepting them into the library", () => {
+    const accepted = {
+      file: {
+        id: "accepted",
+        filename: "accepted.mp3",
+        status: "pending",
+        downloadStatus: "ready",
+      },
+      albumSeed: { title: "", artist: "", genre: "" },
+    } satisfies UploadedTrack;
+    const rejected = {
+      file: {
+        id: "rejected",
+        filename: "rejected.mp3",
+        status: "error",
+        downloadStatus: "ready",
+        downloadError: "unable to parse audio metadata.",
+      },
+      albumSeed: { title: "", artist: "", genre: "" },
+    } satisfies UploadedTrack;
+
+    expect(getAcceptedUploadParseResult([accepted, rejected])).toEqual({
+      acceptedUploads: [accepted],
+      parseRejectedCount: 1,
+    });
+  });
+
   it("keeps a lightweight source identity after releasing the original file", () => {
     const original = new File(["original"], "track.mp3", { lastModified: 123 });
     const edited = new File(["edited audio"], "renamed.mp3", { lastModified: 456 });
@@ -111,5 +141,21 @@ describe("audioTagger metadata patches", () => {
     );
 
     expect(patch).toEqual({ title: "New Title" });
+  });
+
+  it("summarizes removed track sources without exposing their URLs", () => {
+    expect(
+      getTrackSourceMix([
+        { id: "local", filename: "local.mp3", status: "saved", downloadStatus: "ready" },
+        {
+          id: "imported",
+          filename: "imported.mp3",
+          status: "saved",
+          downloadStatus: "ready",
+          downloadRequest: { sourceUrl: "https://soundcloud.com/private", audioBitrate: "320" },
+        },
+      ]),
+    ).toBe("mixed");
+    expect(getTrackSourceMix([])).toBe("unknown");
   });
 });
