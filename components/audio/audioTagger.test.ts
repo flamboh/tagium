@@ -101,6 +101,21 @@ describe("audioTagger metadata patches", () => {
     expect(patch).toEqual({ filename: "New Title", title: "New Title" });
   });
 
+  it("quietly sanitizes manual filenames before metadata is committed", () => {
+    const submittedMetadata = getSubmittedAudioMetadata(
+      metadata({ filename: " ../mix/name?.mp3 " }),
+      false,
+    );
+
+    expect(submittedMetadata.filename).toBe("-mix-name-.mp3");
+  });
+
+  it("preserves an empty manual filename as a blocking validation state", () => {
+    const submittedMetadata = getSubmittedAudioMetadata(metadata({ filename: "   " }), false);
+
+    expect(submittedMetadata.filename).toBe("");
+  });
+
   it("buffers only dirty form fields", () => {
     const patch = createDirtyMetadataPatch(
       metadata({

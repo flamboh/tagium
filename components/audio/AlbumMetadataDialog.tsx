@@ -115,7 +115,7 @@ export default function AlbumMetadataDialog({
           <div className="p-5 overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-[11rem_minmax(0,1fr)] gap-4 md:min-h-[236px] items-stretch">
               <div className="order-2 min-w-0 h-full flex flex-col justify-between gap-3 md:order-2">
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-0">
                   <div>
                     <label className="block text-sm font-medium mb-1">album title:</label>
                     <Input
@@ -128,11 +128,16 @@ export default function AlbumMetadataDialog({
                       }
                       placeholder={placeholder.title}
                       aria-invalid={showErrors && !draft.title.trim()}
+                      aria-describedby="album-title-error"
                       className={placeholderClassName}
                     />
-                    {showErrors && !draft.title.trim() && (
-                      <p className="text-xs text-destructive mt-1">album title is required</p>
-                    )}
+                    <p
+                      id="album-title-error"
+                      className="h-4 text-xs leading-4 text-destructive"
+                      aria-live="polite"
+                    >
+                      {showErrors && !draft.title.trim() ? "album title is required" : ""}
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">artist:</label>
@@ -146,13 +151,18 @@ export default function AlbumMetadataDialog({
                       }
                       placeholder={placeholder.artist}
                       aria-invalid={showErrors && !draft.artist.trim()}
+                      aria-describedby="album-artist-error"
                       className={placeholderClassName}
                     />
-                    {showErrors && !draft.artist.trim() && (
-                      <p className="text-xs text-destructive mt-1">artist is required</p>
-                    )}
+                    <p
+                      id="album-artist-error"
+                      className="h-4 text-xs leading-4 text-destructive"
+                      aria-live="polite"
+                    >
+                      {showErrors && !draft.artist.trim() ? "artist is required" : ""}
+                    </p>
                   </div>
-                  <div>
+                  <div className="mb-3">
                     <label className="block text-sm font-medium mb-1">genre:</label>
                     <Input
                       value={draft.genre}

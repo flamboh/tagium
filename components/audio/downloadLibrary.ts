@@ -1,13 +1,17 @@
 import filenamify from "filenamify";
 import type { AlbumGroup, TagiumFile } from "./types";
+import { isValidFilenameBase } from "./filename";
 
 export interface DownloadZipEntry {
   path: string;
   file: File;
 }
 
+export const isTrackReadyForDownload = (file: TagiumFile) =>
+  Boolean(file.file && file.metadata && isValidFilenameBase(file.metadata.filename));
+
 export const allTracksReadyForDownload = (files: TagiumFile[]) =>
-  files.every((file) => Boolean(file.file && file.metadata));
+  files.every(isTrackReadyForDownload);
 
 const padTimePart = (value: number) => String(value).padStart(2, "0");
 
@@ -114,7 +118,7 @@ const addTrackEntry = (
   folderPath: string,
   track: TagiumFile | undefined,
 ) => {
-  if (!track?.file || !track.metadata) return;
+  if (!track || !isTrackReadyForDownload(track) || !track.file) return;
   const filename = cleanPathPart(track.filename, "track.mp3");
   entries.push({
     path: uniquePath(`${folderPath}/${filename}`, usedPaths),
@@ -145,7 +149,7 @@ export function getLibraryDownloadEntries({
     const albumTracks = album.trackIds
       .map((trackId) => filesById.get(trackId))
       .filter((track): track is TagiumFile & { file: File } =>
-        Boolean(track?.file && track.metadata),
+        Boolean(track && isTrackReadyForDownload(track)),
       );
 
     album.trackIds.forEach((trackId) => includedTrackIds.add(trackId));

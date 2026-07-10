@@ -13,9 +13,7 @@ describe("upload input attributes", () => {
   it("keeps mobile MP3 uploads scoped to files instead of capture", () => {
     const inputs = [
       fileInput(renderToStaticMarkup(<AudioUpload onAudioUpload={() => {}} />)),
-      fileInput(
-        renderToStaticMarkup(<LandingScreen onAudioUpload={() => {}} onUrlImport={() => {}} />),
-      ),
+      fileInput(renderToStaticMarkup(<LandingScreen onAudioUpload={() => {}} />)),
     ];
 
     for (const input of inputs) {
