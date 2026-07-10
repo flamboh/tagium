@@ -81,6 +81,7 @@ describe("youtube playlist endpoint", () => {
     };
     const html = [
       `<script>var ytInitialData = ${JSON.stringify(initialData)};</script>`,
+      `<script>ytcfg.set("EMERGENCY_BASE_URL", "/error"); window.onerror = function() { window.failed = true; };</script>`,
       `<script>ytcfg.set(${JSON.stringify({
         INNERTUBE_API_KEY: "api-key",
         INNERTUBE_CLIENT_VERSION: "2.20260708.00.00",

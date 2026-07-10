@@ -189,8 +189,9 @@ const collectContinuationTokens = (value: unknown, tokens: string[]) => {
 const extractJsonObject = (source: string, marker: string, startAt = 0) => {
   const markerIndex = source.indexOf(marker, startAt);
   if (markerIndex < 0) return undefined;
-  const objectStart = source.indexOf("{", markerIndex + marker.length);
-  if (objectStart < 0) return undefined;
+  let objectStart = markerIndex + marker.length;
+  while (/\s/.test(source[objectStart] ?? "")) objectStart++;
+  if (source[objectStart] !== "{") return undefined;
 
   let depth = 0;
   let inString = false;
@@ -230,8 +231,17 @@ const getYouTubeConfig = (html: string) => {
   const config: JsonRecord = {};
   let offset = 0;
   while (true) {
-    const extracted = extractJsonObject(html, "ytcfg.set(", offset);
-    if (!extracted) break;
+    const markerIndex = html.indexOf("ytcfg.set(", offset);
+    if (markerIndex < 0) break;
+    offset = markerIndex + "ytcfg.set(".length;
+
+    let extracted: ReturnType<typeof extractJsonObject>;
+    try {
+      extracted = extractJsonObject(html, "ytcfg.set(", markerIndex);
+    } catch {
+      continue;
+    }
+    if (!extracted) continue;
     if (isRecord(extracted.value)) Object.assign(config, extracted.value);
     offset = extracted.end;
   }
