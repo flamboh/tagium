@@ -17,6 +17,7 @@ import {
   type PlaylistDownloadRuntimeTrack,
 } from "./playlistDownloadQueueRuntime";
 import type { PlaylistDownloadQueueTrack as PlaylistDownloadQueueModelTrack } from "./playlistDownloadQueue";
+import { createDownloadAdmissionWindow } from "./downloadAdmissionWindow";
 
 export const PLAYLIST_DOWNLOAD_CONCURRENCY = 3;
 
@@ -92,6 +93,7 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
   let currentRun: PlaylistDownloadControllerRun<Track> | null = null;
   let nextRunId = 0;
   let currentSnapshot: PlaylistDownloadControllerSnapshot | null = null;
+  const downloadAdmission = createDownloadAdmissionWindow();
   const now = deps.now ?? (() => Date.now());
 
   const createSnapshot = (run: PlaylistDownloadControllerRun<Track>) =>
@@ -228,7 +230,7 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
 
     clearBudgetWake(run);
     while (run.active.length < PLAYLIST_DOWNLOAD_CONCURRENCY && run.pending.length > 0) {
-      const budget = reserveNextPlaylistDownloadTrack(run, now());
+      const budget = reserveNextPlaylistDownloadTrack(run, downloadAdmission, now());
       if (budget.status === "waiting-for-tunnel-budget") {
         scheduleBudgetWake(run, budget.waitMs);
         publish(run);

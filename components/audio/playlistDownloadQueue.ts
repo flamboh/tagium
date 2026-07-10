@@ -26,15 +26,8 @@ export interface PlaylistDownloadQueueItem {
   error?: string;
 }
 
-export interface PlaylistDownloadQueueBudgetReservation {
-  itemId: string;
-  tunnelCost: number;
-  reservedAtMs: number;
-}
-
 export interface PlaylistDownloadQueueState {
   items: PlaylistDownloadQueueItem[];
-  budgetReservations: PlaylistDownloadQueueBudgetReservation[];
 }
 
 export interface PlaylistDownloadQueueSummary {
@@ -46,30 +39,13 @@ export interface PlaylistDownloadQueueSummary {
   failedCount: number;
   canceledCount: number;
   activeTitles: string[];
-  waitingForTunnelBudget: boolean;
-  nextBudgetWaitMs?: number;
   etaMs?: number;
 }
-
-export type PlaylistDownloadQueueBudgetResult =
-  | {
-      status: "reserved";
-      queue: PlaylistDownloadQueueState;
-    }
-  | {
-      status: "waiting-for-tunnel-budget";
-      queue: PlaylistDownloadQueueState;
-      waitMs: number;
-    };
-
-export const PLAYLIST_DOWNLOAD_TUNNEL_BUDGET = 40;
-export const PLAYLIST_DOWNLOAD_TUNNEL_BUDGET_WINDOW_MS = 60_000;
-export const SOUND_CLOUD_TRACK_TUNNEL_COST = 2;
 
 export const createPlaylistDownloadQueueItem = (
   track: PlaylistDownloadQueueTrack,
 ): PlaylistDownloadQueueItem => {
-  let tunnelCost = SOUND_CLOUD_TRACK_TUNNEL_COST;
+  let tunnelCost = DEFAULT_DOWNLOAD_ADMISSION_COST;
   if (track.tunnelCost !== undefined) {
     tunnelCost = track.tunnelCost;
   }
@@ -86,86 +62,7 @@ export const createPlaylistDownloadQueueItem = (
 
 export const createPlaylistDownloadQueue = (
   tracks: PlaylistDownloadQueueTrack[],
-): PlaylistDownloadQueueState => ({
-  items: tracks.map(createPlaylistDownloadQueueItem),
-  budgetReservations: [],
-});
-
-export const getNextPlaylistDownloadBudgetWaitMs = (
-  queue: PlaylistDownloadQueueState,
-  tunnelCost: number,
-  nowMs: number,
-) => {
-  if (tunnelCost > PLAYLIST_DOWNLOAD_TUNNEL_BUDGET) {
-    throw new Error("playlist download item exceeds Cobalt tunnel budget.");
-  }
-
-  const reservations = getActiveBudgetReservations(queue, nowMs);
-  let usedTunnelCount = 0;
-  for (const reservation of reservations) {
-    usedTunnelCount += reservation.tunnelCost;
-  }
-
-  if (usedTunnelCount + tunnelCost <= PLAYLIST_DOWNLOAD_TUNNEL_BUDGET) {
-    return 0;
-  }
-
-  let releasedTunnelCount = 0;
-  const sortedReservations = [...reservations].sort((left, right) => {
-    return left.reservedAtMs - right.reservedAtMs;
-  });
-
-  for (const reservation of sortedReservations) {
-    releasedTunnelCount += reservation.tunnelCost;
-    if (usedTunnelCount - releasedTunnelCount + tunnelCost <= PLAYLIST_DOWNLOAD_TUNNEL_BUDGET) {
-      const availableAtMs = reservation.reservedAtMs + PLAYLIST_DOWNLOAD_TUNNEL_BUDGET_WINDOW_MS;
-      return Math.max(0, availableAtMs - nowMs);
-    }
-  }
-
-  throw new Error("playlist download budget wait could not be calculated.");
-};
-
-export const reservePlaylistDownloadBudget = (
-  queue: PlaylistDownloadQueueState,
-  itemId: string,
-  nowMs: number,
-): PlaylistDownloadQueueBudgetResult => {
-  const item = findPlaylistDownloadQueueItem(queue, itemId);
-  if (item.status !== "pending") {
-    throw new Error("playlist download budget can only be reserved for pending items.");
-  }
-
-  const budgetReservations = getActiveBudgetReservations(queue, nowMs);
-  const waitMs = getNextPlaylistDownloadBudgetWaitMs(queue, item.tunnelCost, nowMs);
-  const nextQueue = {
-    ...queue,
-    budgetReservations,
-  };
-
-  if (waitMs > 0) {
-    return {
-      status: "waiting-for-tunnel-budget",
-      queue: nextQueue,
-      waitMs,
-    };
-  }
-
-  return {
-    status: "reserved",
-    queue: {
-      ...nextQueue,
-      budgetReservations: [
-        ...budgetReservations,
-        {
-          itemId,
-          tunnelCost: item.tunnelCost,
-          reservedAtMs: nowMs,
-        },
-      ],
-    },
-  };
-};
+): PlaylistDownloadQueueState => ({ items: tracks.map(createPlaylistDownloadQueueItem) });
 
 export const markPlaylistDownloadActive = (
   queue: PlaylistDownloadQueueState,
@@ -250,16 +147,6 @@ export const derivePlaylistDownloadQueueSummary = (
   const completedCount = queue.items.filter((item) => item.status === "completed").length;
   const failedCount = queue.items.filter((item) => item.status === "failed").length;
   const canceledCount = queue.items.filter((item) => item.status === "canceled").length;
-  let nextBudgetWaitMs: number | undefined;
-
-  const firstPendingItem = pendingItems[0];
-  if (firstPendingItem) {
-    const waitMs = getNextPlaylistDownloadBudgetWaitMs(queue, firstPendingItem.tunnelCost, nowMs);
-    if (waitMs > 0) {
-      nextBudgetWaitMs = waitMs;
-    }
-  }
-
   return {
     label: `Downloading ${completedCount}/${queue.items.length}`,
     totalCount: queue.items.length,
@@ -269,24 +156,8 @@ export const derivePlaylistDownloadQueueSummary = (
     failedCount,
     canceledCount,
     activeTitles: activeItems.map((item) => item.title),
-    waitingForTunnelBudget: nextBudgetWaitMs !== undefined,
-    nextBudgetWaitMs,
     etaMs: estimatePlaylistDownloadQueueEtaMs(queue, nowMs),
   };
-};
-
-const getActiveBudgetReservations = (queue: PlaylistDownloadQueueState, nowMs: number) =>
-  queue.budgetReservations.filter((reservation) => {
-    return reservation.reservedAtMs + PLAYLIST_DOWNLOAD_TUNNEL_BUDGET_WINDOW_MS > nowMs;
-  });
-
-const findPlaylistDownloadQueueItem = (queue: PlaylistDownloadQueueState, itemId: string) => {
-  const item = queue.items.find((entry) => entry.id === itemId);
-  if (!item) {
-    throw new Error("playlist download item not found.");
-  }
-
-  return item;
 };
 
 const updatePlaylistDownloadQueueItem = (
@@ -360,3 +231,4 @@ const estimatePlaylistDownloadQueueEtaMs = (queue: PlaylistDownloadQueueState, n
 
   return Math.round(etaMs);
 };
+import { DEFAULT_DOWNLOAD_ADMISSION_COST } from "./downloadAdmissionWindow";

@@ -1,0 +1,1138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Implementation plan for cancellation-safe Cobalt download admission in Tagium."
+    />
+    <title>Tagium Cobalt Download Admission Plan - 2026-07-09</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #18231f;
+        --muted: #5f6d67;
+        --bg: #eef3ef;
+        --panel: #ffffff;
+        --panel-soft: #f7faf8;
+        --line: #d3ddd7;
+        --accent: #087f68;
+        --accent-soft: #e4f4ef;
+        --warn: #aa681d;
+        --warn-soft: #fff4e5;
+        --bad: #aa403a;
+        --bad-soft: #fcebea;
+        --blue: #316b93;
+        --blue-soft: #eaf3f9;
+        --code: #edf2ef;
+        --shadow: 0 12px 34px rgb(24 35 31 / 7%);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, rgb(8 127 104 / 8%), transparent 34rem), var(--bg);
+        color: var(--ink);
+        line-height: 1.55;
+      }
+
+      main {
+        width: min(1160px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 38px 0 64px;
+      }
+
+      header,
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+      }
+
+      header {
+        position: relative;
+        overflow: hidden;
+        padding: 30px;
+      }
+
+      header::after {
+        position: absolute;
+        inset: auto -90px -115px auto;
+        width: 290px;
+        height: 290px;
+        border: 42px solid rgb(8 127 104 / 8%);
+        border-radius: 50%;
+        content: "";
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 24px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        position: relative;
+        z-index: 1;
+        max-width: 860px;
+        font-size: clamp(2rem, 5vw, 3.6rem);
+        line-height: 1.03;
+        letter-spacing: -0.045em;
+      }
+
+      h2 {
+        margin-bottom: 14px;
+        font-size: clamp(1.25rem, 2vw, 1.55rem);
+        letter-spacing: -0.02em;
+      }
+
+      h3 {
+        margin-bottom: 7px;
+        font-size: 1rem;
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul,
+      ol {
+        margin: 0;
+        padding-left: 1.25rem;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      a {
+        color: var(--accent);
+        font-weight: 700;
+        text-underline-offset: 2px;
+      }
+
+      code,
+      pre {
+        border-radius: 7px;
+        background: var(--code);
+        font-family: "SFMono-Regular", Consolas, monospace;
+      }
+
+      code {
+        padding: 2px 5px;
+        font-size: 0.91em;
+      }
+
+      pre {
+        margin: 12px 0 0;
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        padding: 15px;
+        font-size: 0.89rem;
+        line-height: 1.55;
+      }
+
+      pre code {
+        padding: 0;
+        background: transparent;
+      }
+
+      .eyebrow {
+        position: relative;
+        z-index: 1;
+        margin-bottom: 12px;
+        color: var(--accent);
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+
+      .subtitle {
+        position: relative;
+        z-index: 1;
+        max-width: 850px;
+        margin-top: 15px;
+        color: var(--muted);
+        font-size: 1.08rem;
+      }
+
+      .meta {
+        position: relative;
+        z-index: 1;
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 0.86rem;
+      }
+
+      .toc {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .toc a,
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: var(--panel-soft);
+        color: var(--ink);
+        font-size: 0.8rem;
+        font-weight: 750;
+        text-decoration: none;
+      }
+
+      .grid-2,
+      .grid-3,
+      .phase-grid {
+        display: grid;
+        min-width: 0;
+        gap: 14px;
+      }
+
+      .grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .grid-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .phase-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .card {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 16px;
+        background: var(--panel-soft);
+      }
+
+      .card p,
+      .card li,
+      .muted {
+        color: var(--muted);
+      }
+
+      .card ul,
+      .card ol {
+        margin-top: 9px;
+      }
+
+      .callout {
+        border-left: 5px solid var(--accent);
+      }
+
+      .warn {
+        border-left: 5px solid var(--warn);
+        background: linear-gradient(90deg, var(--warn-soft), var(--panel) 46%);
+      }
+
+      .bad {
+        border-left: 5px solid var(--bad);
+        background: linear-gradient(90deg, var(--bad-soft), var(--panel) 46%);
+      }
+
+      .info {
+        border-left: 5px solid var(--blue);
+        background: linear-gradient(90deg, var(--blue-soft), var(--panel) 46%);
+      }
+
+      .metric {
+        display: flex;
+        align-items: baseline;
+        gap: 9px;
+        margin-top: 8px;
+      }
+
+      .metric strong {
+        color: var(--bad);
+        font-size: 2rem;
+        line-height: 1;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .flow-step {
+        position: relative;
+        min-width: 0;
+        min-height: 118px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px;
+        background: var(--panel-soft);
+      }
+
+      .flow-step:not(:last-child)::after {
+        position: absolute;
+        z-index: 2;
+        top: 44px;
+        right: -12px;
+        width: 20px;
+        color: var(--accent);
+        content: "→";
+        font-size: 1.3rem;
+        font-weight: 900;
+        text-align: center;
+      }
+
+      .flow-step strong {
+        display: block;
+        margin-bottom: 5px;
+      }
+
+      .flow-step span {
+        color: var(--muted);
+        font-size: 0.86rem;
+      }
+
+      .number {
+        display: inline-grid;
+        width: 26px;
+        height: 26px;
+        margin-bottom: 9px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: white;
+        font-size: 0.78rem;
+        font-weight: 850;
+        place-items: center;
+      }
+
+      .phase {
+        position: relative;
+        padding-top: 46px;
+      }
+
+      .phase::before {
+        position: absolute;
+        top: 14px;
+        left: 16px;
+        color: var(--accent);
+        content: attr(data-phase);
+        font-size: 0.74rem;
+        font-weight: 850;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      table {
+        width: 100%;
+        min-width: 760px;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 11px 13px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: var(--panel-soft);
+        font-size: 0.78rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      td small {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+      }
+
+      .checklist {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 9px 18px;
+        padding: 0;
+        list-style: none;
+      }
+
+      .checklist li {
+        position: relative;
+        margin: 0;
+        padding-left: 28px;
+      }
+
+      .checklist li::before {
+        position: absolute;
+        top: 2px;
+        left: 0;
+        display: grid;
+        width: 19px;
+        height: 19px;
+        border: 1px solid var(--accent);
+        border-radius: 5px;
+        color: var(--accent);
+        content: "✓";
+        font-size: 0.76rem;
+        font-weight: 900;
+        place-items: center;
+      }
+
+      .file-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .file-row {
+        display: grid;
+        grid-template-columns: minmax(230px, 0.8fr) 1.8fr;
+        gap: 12px;
+        border-top: 1px solid var(--line);
+        padding-top: 9px;
+      }
+
+      .file-row:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      .file-row span {
+        color: var(--muted);
+      }
+
+      .file-row code {
+        overflow-wrap: anywhere;
+      }
+
+      .decision {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 12px;
+        border-top: 1px solid var(--line);
+        padding: 10px 0;
+      }
+
+      .decision:first-of-type {
+        border-top: 0;
+      }
+
+      .decision strong {
+        color: var(--accent);
+      }
+
+      footer {
+        margin-top: 24px;
+        color: var(--muted);
+        font-size: 0.84rem;
+        text-align: center;
+      }
+
+      @media (max-width: 960px) {
+        .grid-3,
+        .phase-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .flow {
+          grid-template-columns: 1fr;
+        }
+
+        .flow-step:not(:last-child)::after {
+          top: auto;
+          right: 50%;
+          bottom: -20px;
+          transform: rotate(90deg);
+        }
+      }
+
+      @media (max-width: 680px) {
+        main {
+          width: min(100vw - 18px, 1160px);
+          padding-top: 18px;
+        }
+
+        header,
+        section {
+          border-radius: 9px;
+          padding: 18px;
+        }
+
+        .grid-2,
+        .grid-3,
+        .phase-grid,
+        .checklist {
+          grid-template-columns: 1fr;
+        }
+
+        .file-row,
+        .decision {
+          grid-template-columns: 1fr;
+          gap: 3px;
+        }
+      }
+
+      @media print {
+        body {
+          background: white;
+        }
+
+        main {
+          width: 100%;
+          padding: 0;
+        }
+
+        header,
+        section {
+          box-shadow: none;
+          break-inside: avoid;
+        }
+
+        .toc {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Implementation plan · Cobalt resource protection</p>
+        <h1>Cancellation-safe download admission</h1>
+        <p class="subtitle">
+          Prevent rapid start/cancel cycles from resetting Tagium's local download budget, propagate
+          cancellation to Cobalt, and enforce a server-side ceiling before work reaches Fly.
+        </p>
+        <p class="meta">
+          Prepared 2026-07-09 · Applies to the queue and resilience work in PR #66 · Companion to
+          <a href="./cobalt-proxy-architecture-2026-07-07.html">the Cobalt proxy architecture</a>
+        </p>
+        <nav class="toc" aria-label="Plan sections">
+          <a href="#decision">Decision</a>
+          <a href="#evidence">Evidence</a>
+          <a href="#architecture">Architecture</a>
+          <a href="#semantics">Semantics</a>
+          <a href="#implementation">Implementation</a>
+          <a href="#testing">Testing</a>
+          <a href="#rollout">Rollout</a>
+          <a href="#acceptance">Acceptance</a>
+        </nav>
+      </header>
+
+      <section id="decision" class="callout">
+        <h2>Decision</h2>
+        <p>
+          Treat a Cobalt plan start as an admitted resource operation. Admission history belongs to
+          the browser session and the server, not to a disposable queue run. Cancellation stops work
+          where possible, but never refunds a permit after the plan request crosses the network
+          seam.
+        </p>
+        <div class="grid-3" style="margin-top: 16px">
+          <article class="card">
+            <span class="pill">Browser</span>
+            <h3 style="margin-top: 10px">One session ledger</h3>
+            <p>
+              Keep the 60-second reservation window alive across cancel, retry, and replacement
+              runs.
+            </p>
+          </article>
+          <article class="card">
+            <span class="pill">Transport</span>
+            <h3 style="margin-top: 10px">One abort chain</h3>
+            <p>
+              Carry browser cancellation through the Worker to the Fly proxy and upstream Cobalt.
+            </p>
+          </article>
+          <article class="card">
+            <span class="pill">Server</span>
+            <h3 style="margin-top: 10px">One authoritative gate</h3>
+            <p>
+              Reject excessive plan starts before Fly allocates work, independent of client
+              behavior.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="evidence" class="bad">
+        <h2>Reproduced failure</h2>
+        <p>
+          A deterministic controller probe started three tracks, canceled immediately, and repeated
+          the sequence seven times without advancing the clock. The intended client ceiling is 40
+          tunnel units per minute, or 20 ordinary tracks at the default cost of two.
+        </p>
+        <div class="metric">
+          <strong>21</strong><span>download requests started at the same instant</span>
+        </div>
+        <pre><code>vp test run components/audio/playlistDownloadController.test.ts \
+  -t "keeps the local tunnel budget across rapidly canceled runs"
+
+Expected: 20 starts, then waiting for budget
+Actual:   21 starts</code></pre>
+        <div class="grid-2" style="margin-top: 16px">
+          <article class="card">
+            <h3>Why the budget resets</h3>
+            <p>
+              <a href="../components/audio/playlistDownloadQueueRuntime.ts"
+                >createPlaylistDownloadQueueRun</a
+              >
+              creates a new queue model and empty reservation list. The controller deliberately
+              creates a fresh run when the previous run is canceled.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Why cancel does not undo server work</h3>
+            <p>
+              <a href="../server/api/cobalt/audio.post.ts">requestCobaltAudio</a> uses its own
+              timeout signal instead of combining it with the incoming request signal. The Worker
+              can therefore continue its upstream request after the browser has stopped waiting.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Current failure path</h2>
+        <div class="flow" aria-label="Current cancellation bypass flow">
+          <div class="flow-step">
+            <span class="number">1</span>
+            <strong>Queue starts</strong>
+            <span>Three tracks reserve budget inside run A and begin plan requests.</span>
+          </div>
+          <div class="flow-step">
+            <span class="number">2</span>
+            <strong>User cancels</strong>
+            <span>Fibers are interrupted and run A becomes canceled.</span>
+          </div>
+          <div class="flow-step">
+            <span class="number">3</span>
+            <strong>Queue restarts</strong>
+            <span>Run B is created with an empty reservation ledger.</span>
+          </div>
+          <div class="flow-step">
+            <span class="number">4</span>
+            <strong>Worker continues</strong>
+            <span>The upstream fetch has only a timeout signal, not the client abort.</span>
+          </div>
+          <div class="flow-step">
+            <span class="number">5</span>
+            <strong>Fly absorbs work</strong>
+            <span>Capacity gates bound concurrency, but not starts per actor per minute.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="architecture">
+        <h2>Target architecture</h2>
+        <p>
+          Introduce two deep modules at deliberate seams. Queue callers keep their existing small
+          interface; timing, pruning, cancellation, and server adapter details stay behind the
+          modules.
+        </p>
+        <div class="grid-2" style="margin-top: 16px">
+          <article class="card">
+            <span class="pill">In-process module</span>
+            <h3 style="margin-top: 10px">DownloadAdmissionWindow</h3>
+            <p>
+              Owned by the long-lived playlist controller. It hides the sliding-window ledger, cost
+              accounting, pruning, wake scheduling, and abortable waiting.
+            </p>
+            <pre><code>admit({ cost, now, signal })
+  → admitted
+  → waits until capacity exists
+  → aborts without spending if still waiting</code></pre>
+          </article>
+          <article class="card">
+            <span class="pill">Remote-owned seam</span>
+            <h3 style="margin-top: 10px">CobaltRequestAdmission</h3>
+            <p>
+              Called by the audio route before its Fly fetch. A Cloudflare rate-limiting adapter
+              runs in production; an in-memory adapter makes the same interface deterministic in
+              tests and local dev.
+            </p>
+            <pre><code>admit({ sessionKey, clientKey })
+  → allowed
+  → rejected { status: 429, retryAfter: 60 }
+  → unavailable { status: 503 }</code></pre>
+          </article>
+        </div>
+        <div class="flow" aria-label="Target download admission flow">
+          <div class="flow-step">
+            <span class="number">1</span>
+            <strong>Queue requests admission</strong>
+            <span>All runs share one browser-session window.</span>
+          </div>
+          <div class="flow-step">
+            <span class="number">2</span>
+            <strong>Permit is spent</strong>
+            <span>Only when the plan request is ready to dispatch.</span>
+          </div>
+          <div class="flow-step">
+            <span class="number">3</span>
+            <strong>Worker admits actor</strong>
+            <span>Session limit first, coarse client/IP backstop second.</span>
+          </div>
+          <div class="flow-step">
+            <span class="number">4</span>
+            <strong>Fly gates capacity</strong>
+            <span>Existing resolve and tunnel concurrency gates remain unchanged.</span>
+          </div>
+          <div class="flow-step">
+            <span class="number">5</span>
+            <strong>Abort travels upstream</strong>
+            <span>Cancel closes Worker fetch, Fly request, and Cobalt work where possible.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="semantics">
+        <h2>Cancellation and permit semantics</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>State at cancellation</th>
+                <th>Permit treatment</th>
+                <th>Runtime action</th>
+                <th>User-visible result</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Pending behind local admission</td>
+                <td>Do not consume</td>
+                <td>Remove the waiter and cancel its wake timer.</td>
+                <td>Track becomes canceled immediately.</td>
+              </tr>
+              <tr>
+                <td>Admitted, before fetch invocation</td>
+                <td>Conservatively retain</td>
+                <td>Abort before network I/O if the signal wins the dispatch race.</td>
+                <td>No retry loop; reservation expires normally.</td>
+              </tr>
+              <tr>
+                <td>Plan request dispatched</td>
+                <td>Retain until window expiry</td>
+                <td>Abort browser fetch and propagate the signal to the Worker upstream fetch.</td>
+                <td>Track is canceled; no permit refund.</td>
+              </tr>
+              <tr>
+                <td>Tunnel or local processing active</td>
+                <td>Retain until window expiry</td>
+                <td>Close the Worker/Fly chain; existing proxy cleanup destroys upstream.</td>
+                <td>Partial work is discarded safely.</td>
+              </tr>
+              <tr>
+                <td>Server admission rejected</td>
+                <td>Client permit remains spent</td>
+                <td>Return 429 with Retry-After; pause rather than immediate retry.</td>
+                <td>Queue explains the wait and resumes later.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="warn">
+        <h2>Limits are intentionally layered</h2>
+        <div class="grid-3">
+          <article class="card">
+            <h3>Local admission</h3>
+            <p>
+              Prevents accidental abuse and gives immediate queue feedback. Reloading can reset it.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Worker admission</h3>
+            <p>
+              Protects Fly from a reset or bypassed client. It is the resource-policy authority.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Fly capacity gates</h3>
+            <p>
+              Protect the single shared vCPU from concurrency spikes; they do not replace rate
+              limits.
+            </p>
+          </article>
+        </div>
+        <p style="margin-top: 13px">
+          Cloudflare's Rate Limiting binding is appropriate for abuse mitigation, but its counters
+          are permissive, eventually consistent, and local to a Cloudflare location. If telemetry
+          shows that a strict global ceiling is necessary, replace only the production adapter with
+          a Durable Object or a trusted keyed limiter at the single Fly proxy; callers keep the same
+          interface.
+        </p>
+      </section>
+
+      <section id="implementation">
+        <h2>Implementation sequence</h2>
+        <div class="phase-grid">
+          <article class="card phase" data-phase="Phase 1">
+            <h3>Make the client ledger survive runs</h3>
+            <ol>
+              <li>Extract budget arithmetic from queue item state.</li>
+              <li>Own one admission window in the controller closure.</li>
+              <li>Carry reservations across cancel and retry.</li>
+              <li>Keep the controller interface unchanged.</li>
+            </ol>
+          </article>
+          <article class="card phase" data-phase="Phase 2">
+            <h3>Propagate cancellation end to end</h3>
+            <ol>
+              <li>Pass the incoming request signal into Cobalt resolution.</li>
+              <li>Combine it with the five-minute timeout.</li>
+              <li>Classify client abort separately from upstream failure.</li>
+              <li>Verify Fly destroys the upstream request.</li>
+            </ol>
+          </article>
+          <article class="card phase" data-phase="Phase 3">
+            <h3>Add authoritative Worker admission</h3>
+            <ol>
+              <li>Add session and coarse client rate-limit bindings.</li>
+              <li>Admit before calling Fly.</li>
+              <li>Return 429 and Retry-After on denial.</li>
+              <li>Remove the production in-memory Map limiter.</li>
+            </ol>
+          </article>
+          <article class="card phase" data-phase="Phase 4">
+            <h3>Observe and tune</h3>
+            <ol>
+              <li>Log coarse admission outcomes without URLs.</li>
+              <li>Watch 429, abort, and Fly resolve counts.</li>
+              <li>Compare admitted starts with upstream starts.</li>
+              <li>Adjust thresholds only from production evidence.</li>
+            </ol>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Planned file changes</h2>
+        <div class="file-list">
+          <div class="file-row">
+            <code>components/audio/playlistDownloadQueue.ts</code>
+            <span
+              >Remove the run-owned reservation ledger and leave queue items as presentation/work
+              state.</span
+            >
+          </div>
+          <div class="file-row">
+            <code>components/audio/downloadAdmissionWindow.ts</code>
+            <span
+              >Add the in-process module for sliding-window admission, abortable waiting, pruning,
+              and next-wake calculation.</span
+            >
+          </div>
+          <div class="file-row">
+            <code>components/audio/playlistDownloadController.ts</code>
+            <span
+              >Own one admission window for the controller lifetime and use it for every run, retry,
+              and single-track queue.</span
+            >
+          </div>
+          <div class="file-row">
+            <code>components/audio/playlistDownloadQueueRuntime.ts</code>
+            <span
+              >Accept admission decisions instead of reaching into a queue model's reservation
+              state.</span
+            >
+          </div>
+          <div class="file-row">
+            <code>server/api/cobalt/audio.post.ts</code>
+            <span
+              >Call server admission before Fly and combine the incoming abort signal with the
+              request timeout.</span
+            >
+          </div>
+          <div class="file-row">
+            <code>server/utils/cobaltRequestAdmission.ts</code>
+            <span
+              >Define the owned interface and production/local adapters; normalize 429 and 503
+              outcomes.</span
+            >
+          </div>
+          <div class="file-row">
+            <code>wrangler.jsonc</code>
+            <span
+              >Add separate Cloudflare Rate Limiting bindings for anonymous sessions and the coarse
+              client backstop.</span
+            >
+          </div>
+          <div class="file-row">
+            <code>components/audio/*test.ts · server-tests/cobalt/*</code>
+            <span
+              >Add regression coverage at the controller interface and route seam; avoid tests
+              coupled to private ledger representation.</span
+            >
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Initial policy</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Gate</th>
+                <th>Initial threshold</th>
+                <th>Key</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Browser admission</td>
+                <td>40 tunnel units / 60 seconds<small>20 ordinary tracks at cost 2</small></td>
+                <td>Controller lifetime</td>
+                <td>Preserves the current product limit while closing cancel/restart reset.</td>
+              </tr>
+              <tr>
+                <td>Worker session admission</td>
+                <td>20 plan starts / 60 seconds</td>
+                <td>Server-issued anonymous session cookie</td>
+                <td>
+                  Matches ordinary local throughput and survives queue replacement or page logic
+                  errors.
+                </td>
+              </tr>
+              <tr>
+                <td>Worker client backstop</td>
+                <td>60 plan starts / 60 seconds</td>
+                <td>Coarse Cloudflare client key</td>
+                <td>Limits session-token churn while leaving room for shared networks.</td>
+              </tr>
+              <tr>
+                <td>Fly resolve gate</td>
+                <td>Existing concurrency and queue caps</td>
+                <td>Global Machine capacity</td>
+                <td>Protects CPU and latency independently of actor admission.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="testing">
+        <h2>Test plan</h2>
+        <div class="grid-2">
+          <article class="card">
+            <h3>Client regression tests</h3>
+            <ul>
+              <li>Seven start/cancel cycles at one timestamp start exactly 20 tracks, not 21.</li>
+              <li>
+                The 21st track enters a waiting state and starts when the oldest reservation
+                expires.
+              </li>
+              <li>Canceling a waiter consumes no permit and leaves no wake fiber.</li>
+              <li>Canceling after dispatch retains the permit.</li>
+              <li>Retry and a newly loaded SoundCloud set share the same admission history.</li>
+              <li>Advancing the clock prunes only expired reservations.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Server and transport tests</h3>
+            <ul>
+              <li>The 21st session plan request returns 429 without invoking the Fly fetch.</li>
+              <li>
+                The coarse client backstop rejects rotating session identifiers at its threshold.
+              </li>
+              <li>Rate-adapter failure returns 503 and does not fail open to Fly.</li>
+              <li>Aborting the incoming request aborts the upstream fetch signal.</li>
+              <li>Timeout still aborts when the browser remains connected.</li>
+              <li>Fly proxy cleanup releases its gate once and destroys upstream on disconnect.</li>
+            </ul>
+          </article>
+        </div>
+        <pre><code>vp check
+vp test components/audio/downloadAdmissionWindow.test.ts
+vp test components/audio/playlistDownloadController.test.ts
+vp test server-tests/cobalt/audio.post.test.ts
+bun run test server-tests/cobalt-machine-proxy.test.js
+vp build
+CI=1 bun run test:e2e</code></pre>
+      </section>
+
+      <section id="rollout">
+        <h2>Rollout and PR structure</h2>
+        <div class="grid-3">
+          <article class="card">
+            <span class="pill">PR A · stack on #66</span>
+            <h3 style="margin-top: 10px">Client admission</h3>
+            <p>
+              Land the reproduced regression test and session-owned browser ledger first. This
+              closes the easy accidental bypass without changing infrastructure.
+            </p>
+          </article>
+          <article class="card">
+            <span class="pill">PR B · stack on PR A</span>
+            <h3 style="margin-top: 10px">Abort propagation</h3>
+            <p>
+              Wire the incoming signal through the Worker and prove that cancellation reaches the
+              Fly proxy. This reduces wasted work independently of rate policy.
+            </p>
+          </article>
+          <article class="card">
+            <span class="pill">PR C · stack on PR B</span>
+            <h3 style="margin-top: 10px">Server admission</h3>
+            <p>
+              Add bindings, production policy, 429 handling, and observability. Exercise it in
+              preview before promoting to production.
+            </p>
+          </article>
+        </div>
+        <div class="grid-2" style="margin-top: 14px">
+          <article class="card">
+            <h3>Preview verification</h3>
+            <ol>
+              <li>Set a low temporary session threshold in preview.</li>
+              <li>Run start/cancel cycles and verify no Fly call after denial.</li>
+              <li>Confirm queue copy shows a wait instead of a generic failure.</li>
+              <li>Inspect logs for counts only; URLs and track metadata must remain absent.</li>
+            </ol>
+          </article>
+          <article class="card">
+            <h3>Rollback</h3>
+            <ol>
+              <li>Server adapter can be disabled by configuration if false positives appear.</li>
+              <li>Keep browser admission active; it has no infrastructure dependency.</li>
+              <li>Abort propagation is independently safe to retain.</li>
+              <li>Do not restore the old per-run ledger as a fallback.</li>
+            </ol>
+          </article>
+        </div>
+      </section>
+
+      <section class="info">
+        <h2>Observability and privacy</h2>
+        <p>
+          Emit only coarse outcomes: admitted, waited, canceled-before-dispatch,
+          canceled-after-dispatch, server-rate-limited, and upstream-started. Include duration,
+          threshold class, and deploy SHA; exclude source URLs, filenames, titles, and raw client
+          keys.
+        </p>
+        <div class="grid-3" style="margin-top: 14px">
+          <article class="card">
+            <h3>Primary ratio</h3>
+            <p>
+              <code>upstream starts / admitted starts</code> should approach 1 and never exceed it
+              materially.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Waste signal</h3>
+            <p>Track how many upstream starts are aborted before a plan is returned.</p>
+          </article>
+          <article class="card">
+            <h3>False-positive signal</h3>
+            <p>Track unique sessions receiving 429 and whether they succeed after Retry-After.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="acceptance">
+        <h2>Acceptance criteria</h2>
+        <ul class="checklist">
+          <li>Canceling and immediately restarting cannot reset the browser's 60-second ledger.</li>
+          <li>The 21st ordinary track waits rather than starting another server request.</li>
+          <li>Waiting requests can be canceled without spending admission.</li>
+          <li>Dispatched requests remain charged even when canceled.</li>
+          <li>Browser cancellation reaches the Worker upstream fetch.</li>
+          <li>The Fly proxy destroys upstream work and releases capacity once.</li>
+          <li>Server admission runs before any Fly request.</li>
+          <li>Server denial returns 429 with Retry-After and does not auto-retry immediately.</li>
+          <li>Production does not depend on an isolate-local JavaScript Map for enforcement.</li>
+          <li>Logs and analytics contain no media URLs, titles, filenames, or raw actor keys.</li>
+          <li>
+            Existing queue cancellation, retry, hydration, and stale-run tests continue to pass.
+          </li>
+          <li>Preview validation demonstrates the limiter without touching production Cobalt.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Explicit non-goals and rejected shortcuts</h2>
+        <div class="decision">
+          <strong>Button debounce</strong>
+          <span
+            >Useful polish, but it reduces click frequency rather than enforcing resource
+            starts.</span
+          >
+        </div>
+        <div class="decision">
+          <strong>Wait for old fibers</strong>
+          <span
+            >Prevents overlap but still allows unlimited sequential starts within the minute.</span
+          >
+        </div>
+        <div class="decision">
+          <strong>Refund on abort</strong>
+          <span
+            >Unsafe after dispatch because Cobalt may already have spent CPU or contacted an
+            upstream provider.</span
+          >
+        </div>
+        <div class="decision">
+          <strong>IP-only identity</strong>
+          <span
+            >Shared networks create false positives; use a session key with a higher coarse client
+            backstop.</span
+          >
+        </div>
+        <div class="decision">
+          <strong>Capacity gate only</strong>
+          <span>Concurrency protects latency and memory, not per-actor consumption over time.</span>
+        </div>
+      </section>
+
+      <footer>Tagium engineering plan · Cancellation-safe Cobalt admission · 2026-07-09</footer>
+    </main>
+  </body>
+</html>

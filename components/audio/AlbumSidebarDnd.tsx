@@ -209,11 +209,6 @@ export function SortableTrackRow({
               <Ban className="h-3 w-3 text-muted-foreground flex-shrink-0" />
             )}
           </div>
-          {track.downloadStatus === "canceled" && (
-            <span className="pl-7 text-xs text-muted-foreground truncate" aria-live="polite">
-              canceled
-            </span>
-          )}
         </div>
       </Button>
       {retryable && (

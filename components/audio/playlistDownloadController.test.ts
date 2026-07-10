@@ -44,6 +44,7 @@ const createControllerHarness = (
   const canceled: string[][] = [];
   const failed: Array<{ trackId: string; error: unknown }> = [];
   const hydrated: string[] = [];
+  const downloadStarts: string[] = [];
   const downloads = new Map<string, ReturnType<typeof deferred<File>>>();
   const hydrations = new Map<string, ReturnType<typeof deferred<void>>>();
   const downloadSignals = new Map<string, AbortSignal>();
@@ -67,6 +68,7 @@ const createControllerHarness = (
     downloadTrack: (track) =>
       Effect.tryPromise({
         try: (signal) => {
+          downloadStarts.push(track.fileId);
           downloadSignals.set(track.fileId, signal);
           const download = deferred<File>();
           downloads.set(track.fileId, download);
@@ -101,6 +103,7 @@ const createControllerHarness = (
     canceled,
     failed,
     hydrated,
+    downloadStarts,
     downloads,
     hydrations,
     downloadSignals,
@@ -213,6 +216,28 @@ describe("playlistDownloadController", () => {
         }),
       },
     ]);
+  });
+
+  it("keeps the local tunnel budget across repeated cancel and restart cycles", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const harness = createControllerHarness();
+
+    for (let run = 0; run < 6; run += 1) {
+      harness.controller.enqueue(tracks(3));
+      await flushEffects();
+      harness.controller.cancel();
+      await flushEffects();
+    }
+
+    harness.controller.enqueue(tracks(3));
+    await flushEffects();
+
+    expect(harness.downloadStarts).toHaveLength(20);
+    expect(harness.controller.getSnapshot()).toMatchObject({
+      pending: 1,
+      waitingForTunnelBudget: true,
+    });
   });
 
   it("retries failed, canceled, and completed-with-file-error tracks without duplicates", async () => {

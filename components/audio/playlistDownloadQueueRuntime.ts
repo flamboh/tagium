@@ -6,9 +6,9 @@ import {
   markPlaylistDownloadCanceled,
   markPlaylistDownloadCompleted,
   markPlaylistDownloadFailed,
-  reservePlaylistDownloadBudget,
   retryPlaylistDownloadItem,
 } from "./playlistDownloadQueue";
+import type { DownloadAdmissionWindow } from "./downloadAdmissionWindow";
 import type {
   PlaylistDownloadQueueState as PlaylistDownloadQueueModel,
   PlaylistDownloadQueueTrack as PlaylistDownloadQueueModelTrack,
@@ -39,6 +39,7 @@ export type PlaylistDownloadQueueRun<
   model: PlaylistDownloadQueueModel;
   canceled: boolean;
   done: boolean;
+  waitingForTunnelBudget: boolean;
 };
 
 export type PlaylistDownloadQueueRuntimeSnapshot = {
@@ -87,6 +88,7 @@ export const createPlaylistDownloadQueueRun = <Track extends PlaylistDownloadRun
   model: createPlaylistDownloadQueue(tracks.map(createModelTrack)),
   canceled: false,
   done: false,
+  waitingForTunnelBudget: false,
 });
 
 export const derivePlaylistDownloadQueueState = (
@@ -108,7 +110,7 @@ export const derivePlaylistDownloadQueueState = (
     etaMs: summary.etaMs,
     canceled: run.canceled,
     done: run.done,
-    waitingForTunnelBudget: !run.done && summary.waitingForTunnelBudget,
+    waitingForTunnelBudget: !run.done && run.waitingForTunnelBudget,
   };
 };
 
@@ -165,21 +167,30 @@ export const enqueuePlaylistDownloadQueueTracks = <Track extends PlaylistDownloa
 
 export const reserveNextPlaylistDownloadTrack = <Track extends PlaylistDownloadRuntimeTrack>(
   run: PlaylistDownloadQueueRun<Track>,
+  admission: DownloadAdmissionWindow,
   nowMs: number,
 ): ReserveNextPlaylistDownloadResult<Track> => {
   const nextTrack = run.pending[0];
-  if (!nextTrack) return { status: "empty" };
+  if (!nextTrack) {
+    run.waitingForTunnelBudget = false;
+    return { status: "empty" };
+  }
 
-  const budget = reservePlaylistDownloadBudget(run.model, nextTrack.fileId, nowMs);
-  run.model = budget.queue;
+  const queueItem = run.model.items.find((item) => item.id === nextTrack.fileId);
+  if (!queueItem) {
+    throw new Error("playlist download item not found.");
+  }
+  const budget = admission.reserve(queueItem.tunnelCost, nowMs);
 
-  if (budget.status === "waiting-for-tunnel-budget") {
+  if (budget.status === "waiting") {
+    run.waitingForTunnelBudget = true;
     return {
       status: "waiting-for-tunnel-budget",
       waitMs: budget.waitMs,
     };
   }
 
+  run.waitingForTunnelBudget = false;
   run.pending = run.pending.slice(1);
   return {
     status: "reserved",
@@ -245,6 +256,7 @@ export const cancelPendingPlaylistDownloadTracks = (
     run.model = markPlaylistDownloadCanceled(run.model, trackId, nowMs);
   }
   run.pending = [];
+  run.waitingForTunnelBudget = false;
   return canceledTrackIds;
 };
 
@@ -264,6 +276,7 @@ export const finishPlaylistDownloadQueueRunIfIdle = (run: PlaylistDownloadQueueR
   if (!run.canceled && run.pending.length > 0) return false;
 
   run.done = true;
+  run.waitingForTunnelBudget = false;
   return true;
 };
 

@@ -13,6 +13,10 @@ import {
   reserveNextPlaylistDownloadTrack,
 } from "./playlistDownloadQueueRuntime";
 import type { PlaylistDownloadRuntimeTrack } from "./playlistDownloadQueueRuntime";
+import {
+  createDownloadAdmissionWindow,
+  type DownloadAdmissionWindow,
+} from "./downloadAdmissionWindow";
 
 type Track = PlaylistDownloadRuntimeTrack & {
   sourceUrl: string;
@@ -25,15 +29,26 @@ const tracks = (count: number): Track[] =>
     sourceUrl: `https://soundcloud.com/artist/track-${index + 1}`,
   }));
 
-const createRun = (count: number) =>
-  createPlaylistDownloadQueueRun(1, tracks(count), 0, (track) => ({
+const admissionByRun = new WeakMap<object, DownloadAdmissionWindow>();
+
+const createRun = (count: number) => {
+  const run = createPlaylistDownloadQueueRun(1, tracks(count), 0, (track) => ({
     id: track.fileId,
     title: track.title,
     sourceUrl: track.sourceUrl,
   }));
+  admissionByRun.set(run, createDownloadAdmissionWindow());
+  return run;
+};
+
+const getAdmission = (run: object) => {
+  const admission = admissionByRun.get(run);
+  if (!admission) throw new Error("download admission not found for test run.");
+  return admission;
+};
 
 const reserve = (run: ReturnType<typeof createRun>, nowMs: number) => {
-  const result = reserveNextPlaylistDownloadTrack(run, nowMs);
+  const result = reserveNextPlaylistDownloadTrack(run, getAdmission(run), nowMs);
   expect(result.status).toBe("reserved");
   if (result.status !== "reserved") {
     throw new Error("expected reserved playlist track.");
@@ -49,7 +64,7 @@ describe("playlistDownloadQueueRuntime", () => {
       reserve(run, 0);
     }
 
-    const result = reserveNextPlaylistDownloadTrack(run, 0);
+    const result = reserveNextPlaylistDownloadTrack(run, getAdmission(run), 0);
     const state = derivePlaylistDownloadQueueState(run, 0);
 
     expect(result).toEqual({
@@ -69,11 +84,11 @@ describe("playlistDownloadQueueRuntime", () => {
       reserve(run, 0);
     }
 
-    expect(reserveNextPlaylistDownloadTrack(run, 59_999)).toEqual({
+    expect(reserveNextPlaylistDownloadTrack(run, getAdmission(run), 59_999)).toEqual({
       status: "waiting-for-tunnel-budget",
       waitMs: 1,
     });
-    expect(reserveNextPlaylistDownloadTrack(run, 60_000)).toMatchObject({
+    expect(reserveNextPlaylistDownloadTrack(run, getAdmission(run), 60_000)).toMatchObject({
       status: "reserved",
       track: { fileId: "track-21" },
     });
