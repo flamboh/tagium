@@ -59,7 +59,7 @@ export default function AudioDownloader({ onUrlImport }: AudioDownloaderProps) {
                 void handleDownload();
               }
             }}
-            placeholder="paste media url"
+            placeholder="soundcloud or youtube url"
             className="pl-9 placeholder:text-muted-foreground/45"
             disabled={downloading}
           />
