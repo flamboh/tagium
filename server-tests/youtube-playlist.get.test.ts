@@ -95,6 +95,23 @@ describe("youtube playlist endpoint", () => {
         expect(url).toContain("list=PLESiES1i-ThqUjxot6jWLDu90fxtkcpA0");
         return new Response(html);
       }
+      if (url.startsWith("https://www.youtube.com/youtubei/v1/next?")) {
+        expect(typeof init?.body).toBe("string");
+        expect(JSON.parse(init?.body as string)).toMatchObject({ videoId: "first-video" });
+        return Response.json({
+          contents: {
+            twoColumnWatchNextResults: {
+              results: {
+                results: {
+                  contents: [
+                    { videoPrimaryInfoRenderer: { dateText: { simpleText: "Aug 14, 2022" } } },
+                  ],
+                },
+              },
+            },
+          },
+        });
+      }
 
       expect(url).toContain("https://www.youtube.com/youtubei/v1/browse?key=api-key");
       expect(typeof init?.body).toBe("string");
@@ -122,6 +139,7 @@ describe("youtube playlist endpoint", () => {
       artist: "Playlist Owner",
       genre: "",
       isAlbum: false,
+      year: 2022,
       coverUrl: "https://i.ytimg.com/large.jpg",
       tracks: [
         {
@@ -144,7 +162,7 @@ describe("youtube playlist endpoint", () => {
         },
       ],
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("rejects non-playlist YouTube URLs without fetching them", async () => {

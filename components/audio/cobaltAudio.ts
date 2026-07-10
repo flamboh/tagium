@@ -20,6 +20,7 @@ export type CobaltAudioDownloadLifecycleCallback = (
 export interface CobaltAudioDownloadRequest {
   sourceUrl: string;
   audioBitrate: AudioDownloadBitrate;
+  year?: number;
   onLifecycle?: CobaltAudioDownloadLifecycleCallback;
   signal?: AbortSignal;
 }
@@ -202,6 +203,7 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
           body: JSON.stringify({
             url: request.sourceUrl,
             audioBitrate: request.audioBitrate,
+            ...(request.year === undefined ? {} : { year: request.year }),
           }),
         });
 

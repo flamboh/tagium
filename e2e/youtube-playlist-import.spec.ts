@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 test("imports a YouTube playlist as an album-backed download queue", async ({ page }) => {
   const playlistUrl = "https://www.youtube.com/playlist?list=PLESiES1i-ThqUjxot6jWLDu90fxtkcpA0";
   const sourceUrls: string[] = [];
+  const sourceYears: number[] = [];
   let releaseDownloads = () => {};
   const downloadsReleased = new Promise<void>((resolve) => {
     releaseDownloads = resolve;
@@ -16,6 +17,7 @@ test("imports a YouTube playlist as an album-backed download queue", async ({ pa
         title: "YouTube Playlist",
         artist: "Playlist Owner",
         genre: "",
+        year: 2022,
         isAlbum: false,
         tracks: [
           {
@@ -35,8 +37,9 @@ test("imports a YouTube playlist as an album-backed download queue", async ({ pa
     });
   });
   await page.route("**/api/cobalt/audio", async (route) => {
-    const body = route.request().postDataJSON() as { url: string };
+    const body = route.request().postDataJSON() as { url: string; year: number };
     sourceUrls.push(body.url);
+    sourceYears.push(body.year);
     await downloadsReleased;
     await route
       .fulfill({ status: 502, contentType: "text/plain", body: "test download released" })
@@ -49,6 +52,7 @@ test("imports a YouTube playlist as an album-backed download queue", async ({ pa
     await page.getByRole("button", { name: "start media import" }).click();
 
     await expect(page.getByText("YouTube Playlist", { exact: true })).toBeVisible();
+    await expect(page.locator('input[name="year"]')).toHaveValue("2022");
     await expect(page.getByText("downloading 0/2", { exact: true })).toBeVisible();
     await expect
       .poll(() => sourceUrls)
@@ -56,6 +60,7 @@ test("imports a YouTube playlist as an album-backed download queue", async ({ pa
         "https://www.youtube.com/watch?v=first-video",
         "https://www.youtube.com/watch?v=second-video",
       ]);
+    await expect.poll(() => sourceYears).toEqual([2022, 2022]);
   } finally {
     releaseDownloads();
   }

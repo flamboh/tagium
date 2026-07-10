@@ -290,7 +290,11 @@ export const createPlaylistDownloadPlan = ({
         trackNumber: track.trackNumber,
       }),
       true,
-      { sourceUrl: track.url, audioBitrate },
+      {
+        sourceUrl: track.url,
+        audioBitrate,
+        ...(playlist.year === undefined ? {} : { year: playlist.year }),
+      },
       createPlaylistPendingMetadataPatch(playlist, track),
     ),
   );

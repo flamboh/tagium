@@ -20,6 +20,7 @@ export interface TagiumFile {
   downloadRequest?: {
     sourceUrl: string;
     audioBitrate: AudioDownloadBitrate;
+    year?: number;
   };
   pendingMetadataPatch?: MetadataPatch;
   // Compatibility for UI/status consumers that still render a buffered flag.
