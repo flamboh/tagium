@@ -761,7 +761,7 @@ export default function AudioTagger() {
             setFiles(syncedFiles);
           }
           const firstUploadedTrack = orderedUploads[0];
-          const firstTrackIsLoose = !forceSingleAlbum && !firstUploadedTrack.albumSeed.title.trim();
+          const firstTrackIsLoose = merged.unassignedTrackIds.includes(firstUploadedTrack.file.id);
           targetKind = firstTrackIsLoose ? "loose" : "album";
           setSelectedFileId(firstUploadedTrack.file.id);
           setSelectedAlbumId(firstTrackIsLoose ? null : firstSelectedAlbumId);
