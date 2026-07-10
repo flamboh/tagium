@@ -218,6 +218,43 @@ describe("playlistDownloadController", () => {
     ]);
   });
 
+  it("removes deleted active and pending tracks from the current run", async () => {
+    const harness = createControllerHarness();
+
+    harness.controller.enqueue(tracks(5));
+    await flushEffects();
+    harness.controller.remove(["track-2", "track-5"]);
+    await flushEffects();
+
+    expect(harness.downloadSignals.get("track-2")?.aborted).toBe(true);
+    expect(harness.downloadStarts).not.toContain("track-5");
+    expect(harness.controller.getSnapshot()).toMatchObject({
+      trackIds: ["track-1", "track-3", "track-4"],
+      total: 3,
+      active: [{ fileId: "track-1" }, { fileId: "track-3" }, { fileId: "track-4" }],
+      pending: 0,
+    });
+  });
+
+  it("removes a deleted completed track from both progress counts", async () => {
+    const harness = createControllerHarness();
+
+    harness.controller.enqueue(tracks(4));
+    await flushEffects();
+    harness.downloads.get("track-1")?.resolve(audioFile("track-1.mp3"));
+    await flushEffects();
+
+    expect(harness.controller.getSnapshot()).toMatchObject({ total: 4, completed: 1 });
+
+    harness.controller.remove(["track-1"]);
+
+    expect(harness.controller.getSnapshot()).toMatchObject({
+      trackIds: ["track-2", "track-3", "track-4"],
+      total: 3,
+      completed: 0,
+    });
+  });
+
   it("keeps the local tunnel budget across repeated cancel and restart cycles", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);

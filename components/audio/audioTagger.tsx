@@ -1287,6 +1287,7 @@ export default function AudioTagger() {
     (idsToRemove: string[]) => {
       const idSet = new Set(idsToRemove);
       const removedFiles = filesRef.current.filter((file) => idSet.has(file.id));
+      playlistDownloadControllerRef.current?.remove(idsToRemove);
       const affectedAlbumIds = albumsRef.current
         .filter((album) => album.trackIds.some((trackId) => idSet.has(trackId)))
         .map((album) => album.id);

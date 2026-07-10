@@ -71,6 +71,12 @@ export type ReserveNextPlaylistDownloadResult<Track extends PlaylistDownloadRunt
       waitMs: number;
     };
 
+export type RemovePlaylistDownloadTracksResult<Track extends PlaylistDownloadRuntimeTrack> = {
+  removedTrackIds: string[];
+  pendingTracks: Track[];
+  activeTrackIds: string[];
+};
+
 export const createPlaylistDownloadQueueRun = <Track extends PlaylistDownloadRuntimeTrack>(
   id: number,
   tracks: Track[],
@@ -96,6 +102,7 @@ export const derivePlaylistDownloadQueueState = (
   nowMs: number,
 ): PlaylistDownloadQueueRuntimeSnapshot => {
   const summary = derivePlaylistDownloadQueueSummary(run.model, nowMs);
+  const queuedTrackIds = new Set(run.trackIds);
 
   return {
     id: run.id,
@@ -105,13 +112,43 @@ export const derivePlaylistDownloadQueueState = (
     failed: summary.failedCount,
     canceledCount: summary.canceledCount,
     pending: summary.pendingCount,
-    active: run.active,
+    // Deleted active work remains internal until its fiber settles, preserving the concurrency cap.
+    active: run.active.filter((track) => queuedTrackIds.has(track.fileId)),
     startedAt: run.startedAt,
     etaMs: summary.etaMs,
     canceled: run.canceled,
     done: run.done,
     waitingForTunnelBudget: !run.done && run.waitingForTunnelBudget,
   };
+};
+
+export const removePlaylistDownloadTracks = <Track extends PlaylistDownloadRuntimeTrack>(
+  run: PlaylistDownloadQueueRun<Track>,
+  trackIds: string[],
+): RemovePlaylistDownloadTracksResult<Track> => {
+  const requestedTrackIds = new Set(trackIds);
+  const removedItems = run.model.items.filter((item) => requestedTrackIds.has(item.id));
+  if (removedItems.length === 0) {
+    return { removedTrackIds: [], pendingTracks: [], activeTrackIds: [] };
+  }
+
+  const removedTrackIds = new Set(removedItems.map((item) => item.id));
+  const pendingTracks = run.pending.filter((track) => removedTrackIds.has(track.fileId));
+  const activeTrackIds = run.active
+    .filter((track) => removedTrackIds.has(track.fileId))
+    .map((track) => track.fileId);
+
+  run.pending = run.pending.filter((track) => !removedTrackIds.has(track.fileId));
+  run.trackIds = run.trackIds.filter((trackId) => !removedTrackIds.has(trackId));
+  run.model = {
+    ...run.model,
+    items: run.model.items.filter((item) => !removedTrackIds.has(item.id)),
+  };
+  run.total = run.model.items.length;
+  run.completed -= removedItems.filter((item) => item.status === "completed").length;
+  run.failed -= removedItems.filter((item) => item.status === "failed").length;
+
+  return { removedTrackIds: [...removedTrackIds], pendingTracks, activeTrackIds };
 };
 
 export const enqueuePlaylistDownloadQueueTracks = <Track extends PlaylistDownloadRuntimeTrack>(
