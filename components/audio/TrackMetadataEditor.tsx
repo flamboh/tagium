@@ -10,14 +10,14 @@ import {
   UseFormRegister,
   useWatch,
 } from "react-hook-form";
-import filenamify from "filenamify";
 import CoverArt from "./coverArt";
 import { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
-import { getDownloadErrorDisplay } from "./downloadErrorMessage";
+import { getTrackFailureDisplay } from "./systemFailure";
 import { getSampleTrack } from "./sampleMetadata";
+import { isValidFilenameBase, sanitizeFilenameBase } from "./filename";
 
 interface TrackMetadataEditorProps {
   selectedFile: TagiumFile | null;
@@ -81,6 +81,9 @@ export default function TrackMetadataEditor({
   const watchedFilename = useWatch({ control, name: "filename", defaultValue: "" });
   const inAlbum = !!selectedFileAlbum;
   const audioReady = Boolean(selectedFile?.file);
+  const sanitizedFilename = sanitizeFilenameBase(syncFilenames ? watchedTitle : watchedFilename);
+  const filenameInvalid = !isValidFilenameBase(syncFilenames ? watchedTitle : watchedFilename);
+  const canDownloadTrack = audioReady && !isTrackCoverProcessing && !filenameInvalid;
   const albumFieldReason = "controlled by the album";
   const filenameRegistration = register("filename", {
     onChange: (event) => onPreviewMetadataChange("filename", event),
@@ -118,8 +121,11 @@ export default function TrackMetadataEditor({
   const placeholder = getSampleTrack(selectedFile.id);
   const filenamePlaceholder = placeholder.filename;
   const downloadErrorDisplay = selectedFile.downloadError
-    ? getDownloadErrorDisplay(selectedFile.downloadError)
+    ? getTrackFailureDisplay(selectedFile.downloadError)
     : null;
+  const hasTrackFailure =
+    (selectedFile.downloadStatus === "error" || selectedFile.status === "error") &&
+    downloadErrorDisplay;
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -129,43 +135,77 @@ export default function TrackMetadataEditor({
         }}
         className="flex min-h-0 flex-col h-full"
       >
-        <div className="h-16 border-b flex-shrink-0 flex flex-col justify-center gap-1 px-4 max-lg:[@media(max-height:700px)]:h-12 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:p-6">
-          {syncFilenames ? (
-            <h2 className="inline-flex min-w-0 max-w-full items-center text-base font-semibold text-muted-foreground max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="min-w-0 cursor-not-allowed truncate">
-                    {filenamify(watchedTitle, { replacement: "-" })}
+        <div className="relative h-16 border-b flex-shrink-0 px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6">
+          <div className="flex h-full min-w-0 items-center">
+            {syncFilenames ? (
+              <h2 className="inline-flex min-w-0 max-w-full items-center text-base font-semibold text-muted-foreground max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="min-w-0 cursor-not-allowed truncate">
+                      {sanitizedFilename || filenamePlaceholder}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>filename follows the title</TooltipContent>
+                </Tooltip>
+                <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
+              </h2>
+            ) : (
+              <label className="inline-flex min-w-0 max-w-full items-center text-base font-semibold max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
+                <span className="grid w-fit max-w-[calc(100%-2.25rem)] overflow-hidden">
+                  <span className="invisible col-start-1 row-start-1 whitespace-pre" aria-hidden>
+                    {watchedFilename || filenamePlaceholder}
                   </span>
-                </TooltipTrigger>
-                <TooltipContent>filename follows the title</TooltipContent>
-              </Tooltip>
-              <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
-            </h2>
-          ) : (
-            <label className="inline-flex min-w-0 max-w-full items-center text-base font-semibold max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
-              <span className="grid w-fit max-w-[calc(100%-2.25rem)] overflow-hidden">
-                <span className="invisible col-start-1 row-start-1 whitespace-pre" aria-hidden>
-                  {watchedFilename || filenamePlaceholder}
+                  <input
+                    {...filenameRegistration}
+                    aria-label="filename"
+                    aria-invalid={filenameInvalid}
+                    aria-describedby={filenameInvalid ? "track-filename-error" : undefined}
+                    size={1}
+                    className="col-start-1 row-start-1 min-w-0 truncate bg-transparent outline-none placeholder:text-muted-foreground/45"
+                    placeholder={filenamePlaceholder}
+                  />
                 </span>
-                <input
-                  {...filenameRegistration}
-                  aria-label="filename"
-                  size={1}
-                  className="col-start-1 row-start-1 min-w-0 truncate bg-transparent outline-none placeholder:text-muted-foreground/45"
-                  placeholder={filenamePlaceholder}
-                />
-              </span>
-              <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
-            </label>
-          )}
-          {(selectedFile.downloadStatus === "error" || selectedFile.status === "error") &&
-            downloadErrorDisplay && (
-              <div className="min-w-0 text-xs text-destructive" aria-live="polite">
-                <p className="font-medium leading-tight">{downloadErrorDisplay.title}</p>
-                <p className="truncate leading-tight">{downloadErrorDisplay.description}</p>
-              </div>
+                <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
+              </label>
             )}
+          </div>
+          <div className="absolute inset-x-4 bottom-1 h-4 min-w-0 overflow-hidden text-xs leading-4 text-destructive max-lg:[@media(max-height:700px)]:inset-x-3 max-lg:[@media(max-height:700px)]:bottom-0 lg:inset-x-6 lg:h-8">
+            {filenameInvalid ? (
+              <div className="flex min-w-0 items-center gap-2">
+                <p
+                  id="track-filename-error"
+                  className="min-w-0 truncate font-medium"
+                  aria-live="polite"
+                >
+                  filename is required
+                </p>
+                {hasTrackFailure && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="shrink-0 underline decoration-dotted underline-offset-2"
+                        aria-label={`${downloadErrorDisplay.title}: ${downloadErrorDisplay.description}`}
+                      >
+                        track error
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-medium">{downloadErrorDisplay.title}</p>
+                      <p>{downloadErrorDisplay.description}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            ) : hasTrackFailure ? (
+              <div className="min-w-0 text-xs text-destructive" aria-live="polite">
+                <p className="truncate font-medium">{downloadErrorDisplay.title}</p>
+                <p className="sr-only truncate lg:not-sr-only">
+                  {downloadErrorDisplay.description}
+                </p>
+              </div>
+            ) : null}
+          </div>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 max-lg:[@media(max-height:700px)]:p-2 lg:p-6 lg:pb-28">
           <div className="flex min-h-full flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:min-h-0 lg:flex-row lg:gap-4">
@@ -187,6 +227,10 @@ export default function TrackMetadataEditor({
                 <Input
                   {...titleInputRegistration}
                   ref={titleInputRef}
+                  aria-invalid={syncFilenames && filenameInvalid}
+                  aria-describedby={
+                    syncFilenames && filenameInvalid ? "track-filename-error" : undefined
+                  }
                   placeholder={placeholder.title}
                   className={placeholderClassName}
                 />
@@ -279,17 +323,19 @@ export default function TrackMetadataEditor({
               </div>
               <div className="flex min-h-0 flex-1 items-center justify-end gap-2 pt-1 max-lg:[@media(max-height:700px)]:flex-none max-lg:[@media(max-height:700px)]:pt-0 lg:flex-none lg:pt-2">
                 <DisabledReason
-                  disabled={!audioReady || isTrackCoverProcessing}
+                  disabled={!canDownloadTrack}
                   reason={
                     isTrackCoverProcessing
                       ? "cover art is still processing"
-                      : "track file is not ready"
+                      : filenameInvalid
+                        ? "filename is required"
+                        : "track file is not ready"
                   }
                 >
                   <Button
                     type="button"
                     onClick={handleSubmit(onDownloadUpdatedFile)}
-                    disabled={!audioReady || isTrackCoverProcessing}
+                    disabled={!canDownloadTrack}
                     className="min-w-36 max-lg:[@media(max-height:700px)]:h-10 max-lg:[@media(max-height:700px)]:text-xs"
                   >
                     download track

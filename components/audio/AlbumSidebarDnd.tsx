@@ -324,7 +324,7 @@ export function SortableAlbumCard({
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            {canDownload ? "download album" : "album needs ready tracks"}
+            {canDownload ? "download album" : "album tracks need files, metadata, and filenames"}
           </TooltipContent>
         </Tooltip>
         <Tooltip>

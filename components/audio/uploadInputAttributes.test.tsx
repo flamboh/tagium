@@ -14,7 +14,11 @@ describe("upload input attributes", () => {
     const inputs = [
       fileInput(renderToStaticMarkup(<AudioUpload onAudioUpload={() => {}} />)),
       fileInput(
-        renderToStaticMarkup(<LandingScreen onAudioUpload={() => {}} onUrlImport={() => {}} />),
+        renderToStaticMarkup(
+          <LandingScreen active onAudioUpload={() => {}}>
+            {null}
+          </LandingScreen>,
+        ),
       ),
     ];
 

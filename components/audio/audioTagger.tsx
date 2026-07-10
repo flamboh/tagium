@@ -39,6 +39,7 @@ import {
   createZipBlob,
   downloadBlob,
   getLibraryDownloadEntries,
+  isTrackReadyForDownload,
 } from "./downloadLibrary";
 import TagSidebarPanel from "./TagSidebarPanel";
 import type { PlaylistDownloadQueuePanelState } from "./PlaylistDownloadQueuePanel";
@@ -56,7 +57,7 @@ import {
 import LandingScreen from "./LandingScreen";
 import TrackMetadataEditor from "./TrackMetadataEditor";
 import SettingsPage from "./SettingsPage";
-import AudioDownloader from "./AudioDownloader";
+import MediaUrlEntry from "./MediaUrlEntry";
 import {
   sortTrackIdsByTrackNumber,
   sortUploadedTracksByTrackNumber,
@@ -70,7 +71,8 @@ import { createImportLifecycleTracker, type ImportLifecycleTracker } from "./imp
 import { isSoundCloudSetUrl, resolveSoundCloudSet } from "./soundcloudSet";
 import type { Playlist } from "./playlist";
 import { isYouTubePlaylistUrl, resolveYouTubePlaylist } from "./youtubePlaylist";
-import { getDownloadErrorMessage, notifyDownloadError } from "./downloadErrorMessage";
+import { getSystemFailurePresentation, reportSystemFailure } from "./systemFailure";
+import { isValidFilenameBase, sanitizeFilenameBase } from "./filename";
 import {
   AlbumGroup,
   AppSettings,
@@ -175,7 +177,7 @@ export const getSubmittedAudioMetadata = (
   syncFilenames: boolean,
 ): AudioMetadata => ({
   ...data,
-  filename: syncFilenames ? filenamify(data.title, { replacement: "-" }) : data.filename,
+  filename: sanitizeFilenameBase(syncFilenames ? data.title : data.filename),
   year: getNullableNumericMetadataValue(data.year),
   trackNumber: getNullableNumericMetadataValue(data.trackNumber),
 });
@@ -443,10 +445,7 @@ export default function AudioTagger() {
         reset(metadata);
       }
     } catch (error) {
-      let message = "unable to save metadata.";
-      if (error instanceof Error) {
-        message = error.message;
-      }
+      const message = getSystemFailurePresentation(error, "metadata").trackDescription;
       const nextFiles = filesRef.current.map((file) =>
         file.id === fileToUpdate.id
           ? withPendingMetadataPatch(
@@ -643,6 +642,9 @@ export default function AudioTagger() {
         const acceptedUploads = parseResult.acceptedUploads;
         acceptedCount = acceptedUploads.length;
         parseRejectedCount = parseResult.parseRejectedCount;
+        if (parseRejectedCount > 0) {
+          reportSystemFailure(new Error("audio upload parsing failed"), "upload");
+        }
         if (acceptedUploads.length === 0) return;
         const orderedUploads = sortUploadedTracksByTrackNumber(acceptedUploads);
 
@@ -702,7 +704,7 @@ export default function AudioTagger() {
             try {
               importedCover = await fetchImportedCover(importedAlbum.coverUrl);
             } catch (error) {
-              console.warn("failed to import album cover:", error);
+              reportSystemFailure(error, "cover-import");
             }
           }
           const embeddedCover = acceptedUploads.find((upload) => upload.albumSeed.cover)?.albumSeed
@@ -785,11 +787,7 @@ export default function AudioTagger() {
     setFiles(nextFiles);
   };
   const markDownloadError = (fileId: string, error: unknown) => {
-    let message = "download failed.";
-    if (error instanceof Error) {
-      message = getDownloadErrorMessage(error);
-      notifyDownloadError(error);
-    }
+    const message = reportSystemFailure(error, "download").trackDescription;
     const nextFiles = filesRef.current.map((file) =>
       file.id === fileId
         ? {
@@ -1084,7 +1082,7 @@ export default function AudioTagger() {
               }),
           );
         } catch (error) {
-          console.warn("failed to import album cover:", error);
+          reportSystemFailure(error, "cover-import");
         }
       })();
     }
@@ -1163,6 +1161,7 @@ export default function AudioTagger() {
     setLoading(true);
     try {
       const syncedFiles = prepareFilesForExport();
+      if (!allTracksReadyForDownload(syncedFiles)) return;
       await writeFilesForExport(syncedFiles);
 
       const entries = getLibraryDownloadEntries({
@@ -1183,7 +1182,7 @@ export default function AudioTagger() {
       });
     } catch (error) {
       analytics.capture({ type: "export_failed", exportKind: "library", error });
-      console.error("error downloading all files:", error);
+      reportSystemFailure(error, "export");
     } finally {
       setLoading(false);
     }
@@ -1196,6 +1195,9 @@ export default function AudioTagger() {
       settings.applySoundCloudAlbumCoverToTracks !== nextSettings.applySoundCloudAlbumCoverToTracks;
     const settingsSaved = saveAppSettings(nextSettings);
     setSettings(nextSettings);
+    if (!settingsSaved && settingsChanged) {
+      reportSystemFailure(new Error("settings storage unavailable"), "storage");
+    }
     if (settingsSaved && settingsChanged) {
       analytics.capture({
         type: "settings_changed",
@@ -1231,6 +1233,15 @@ export default function AudioTagger() {
   const handleDownloadAlbum = async (albumId: string) => {
     const album = albumsRef.current.find((a) => a.id === albumId);
     if (!album) return;
+    const currentAlbumFiles = album.trackIds
+      .map((trackId) => filesRef.current.find((file) => file.id === trackId))
+      .filter((file): file is TagiumFile => Boolean(file));
+    if (
+      currentAlbumFiles.length !== album.trackIds.length ||
+      !allTracksReadyForDownload(currentAlbumFiles)
+    ) {
+      return;
+    }
     const trackCount = album.trackIds.length;
     analytics.capture({ type: "export_started", exportKind: "album", trackCount, albumCount: 1 });
     setLoading(true);
@@ -1239,7 +1250,7 @@ export default function AudioTagger() {
       const albumFiles = album.trackIds
         .map((id) => syncedFiles.find((file) => file.id === id))
         .filter((file): file is TagiumFile & { file: File; metadata: AudioMetadata } =>
-          Boolean(file?.file && file.metadata),
+          Boolean(file && isTrackReadyForDownload(file)),
         );
       if (albumFiles.length !== album.trackIds.length) {
         throw new Error("album export tracks were not ready.");
@@ -1267,7 +1278,7 @@ export default function AudioTagger() {
       });
     } catch (error) {
       analytics.capture({ type: "export_failed", exportKind: "album", error });
-      console.error("error downloading album:", error);
+      reportSystemFailure(error, "export");
     } finally {
       setLoading(false);
     }
@@ -1276,6 +1287,7 @@ export default function AudioTagger() {
     if (!selectedFile) return;
     const fileId = selectedFile.id;
     const submittedData = getSubmittedMetadata(data);
+    if (!isValidFilenameBase(submittedData.filename)) return;
     analytics.capture({ type: "export_started", exportKind: "track", trackCount: 1 });
     try {
       await handleTagUpdate(selectedFile, submittedData);
@@ -1290,7 +1302,7 @@ export default function AudioTagger() {
       });
     } catch (error) {
       analytics.capture({ type: "export_failed", exportKind: "track", error });
-      console.error("failed to update tags before download:", error);
+      reportSystemFailure(error, "export");
     }
   };
   const removeFiles = useCallback(
@@ -1778,6 +1790,7 @@ export default function AudioTagger() {
   };
 
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
+  const landingIsActive = libraryIsEmpty && activeView === "editor";
   const playlistQueueDownloaded = playlistDownloadQueue ? playlistDownloadQueue.completed : 0;
   const playlistQueueEta = playlistDownloadQueue
     ? formatPlaylistQueueEta(playlistDownloadQueue.etaMs)
@@ -1903,16 +1916,20 @@ export default function AudioTagger() {
           onRetryPlaylistDownloadQueue={handleRetryPlaylistDownloads}
         />
         <div className="relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1">
-          <div className="h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1">
+          <div
+            className={
+              landingIsActive
+                ? "contents"
+                : "h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1"
+            }
+          >
             {activeView === "settings" ? (
               <SettingsPage
                 settings={settings}
                 onChange={handleSettingsChange}
                 onBack={() => setActiveView("editor")}
               />
-            ) : libraryIsEmpty ? (
-              <LandingScreen onAudioUpload={handleAudioUpload} onUrlImport={handleUrlImport} />
-            ) : (
+            ) : !libraryIsEmpty ? (
               <TrackMetadataEditor
                 selectedFile={selectedFile}
                 selectedFileId={selectedFileId}
@@ -1930,15 +1947,15 @@ export default function AudioTagger() {
                   handlePreviewMetadataChange(field, event.target.value)
                 }
               />
-            )}
+            ) : null}
           </div>
-          {!libraryIsEmpty && activeView === "editor" && (
-            <div className="flex-shrink-0 border-t bg-background/95 p-3 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-4 lg:z-10 lg:flex lg:justify-center lg:border-t-0 lg:bg-transparent lg:px-4 lg:p-0">
-              <div className="pointer-events-auto flex w-full max-w-3xl flex-col gap-2">
-                <AudioDownloader onUrlImport={handleUrlImport} />
-              </div>
-            </div>
-          )}
+          <LandingScreen active={landingIsActive} onAudioUpload={handleAudioUpload}>
+            <MediaUrlEntry
+              layout={libraryIsEmpty ? "landing" : "editor"}
+              hidden={activeView !== "editor"}
+              onUrlImport={handleUrlImport}
+            />
+          </LandingScreen>
         </div>
       </div>
     </>

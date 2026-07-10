@@ -4,6 +4,7 @@ import {
   createLibraryDownloadFilename,
   createZipBlob,
   getLibraryDownloadEntries,
+  isTrackReadyForDownload,
 } from "./downloadLibrary";
 import type { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
 
@@ -229,6 +230,21 @@ describe("downloadLibrary", () => {
 
     expect(allTracksReadyForDownload([file("ready", "ready.mp3")])).toBe(true);
     expect(allTracksReadyForDownload([unreadyFile])).toBe(false);
+    expect(entries).toEqual([]);
+  });
+
+  it("blocks every export containing a track with an empty filename", () => {
+    const invalidFilename = file("invalid", "original.mp3");
+    invalidFilename.metadata = metadata("");
+
+    const entries = getLibraryDownloadEntries({
+      albums: [album("album", "Album", ["invalid"])],
+      looseTrackIds: [],
+      files: [invalidFilename],
+    });
+
+    expect(isTrackReadyForDownload(invalidFilename)).toBe(false);
+    expect(allTracksReadyForDownload([invalidFilename])).toBe(false);
     expect(entries).toEqual([]);
   });
 

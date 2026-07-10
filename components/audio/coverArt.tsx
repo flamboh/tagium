@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useId, useRef } from "react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import ImageCropper from "../ui/image-cropper";
 import { Crop, Upload } from "lucide-react";
-import { toast } from "sonner";
 import { runCoverArtUploadTransaction } from "./coverArtProcessing";
 import type { AudioMetadata } from "./types";
 
@@ -42,6 +41,9 @@ export default function CoverArt({
   const [tempImageForCropping, setTempImageForCropping] = useState<string | null>(null);
   const [showCropper, setShowCropper] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
+  const [coverErrorOpen, setCoverErrorOpen] = useState(false);
+  const coverErrorId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverUploadIdRef = useRef(0);
   const processingChangeRef = useRef(onProcessingChange);
@@ -62,9 +64,12 @@ export default function CoverArt({
       });
       if (!optimizedFile || uploadId !== coverUploadIdRef.current) return;
       setUploadedCover(optimizedFile);
+      setCoverError(null);
+      setCoverErrorOpen(false);
     } catch (error) {
       if (uploadId !== coverUploadIdRef.current) return;
-      toast.error(error instanceof Error ? error.message : "could not load cover art.");
+      setCoverError(error instanceof Error ? error.message : "could not load cover art.");
+      setCoverErrorOpen(true);
     } finally {
       if (uploadId === coverUploadIdRef.current) reportProcessing(false);
     }
@@ -109,6 +114,8 @@ export default function CoverArt({
     coverUploadIdRef.current += 1;
     reportProcessing(false);
     setUploadedCover(null);
+    setCoverError(null);
+    setCoverErrorOpen(false);
     setShowCropper(false);
     setTempImageForCropping((previous) => {
       if (previous) {
@@ -233,29 +240,39 @@ export default function CoverArt({
           className="hidden"
           ref={fileInputRef}
         />
-        <Button
-          type="button"
-          variant="outline"
-          disabled={isProcessing}
-          aria-busy={isProcessing}
-          className={
-            isCompact
-              ? "h-24 w-full border-dashed border-2 flex flex-col items-center gap-1 px-2 hover:bg-accent/50 cursor-pointer md:h-full md:min-h-12 md:w-44 md:px-3"
-              : "h-10 w-full border-dashed border-2 flex gap-2 px-3 hover:bg-accent/50 cursor-pointer max-lg:[@media(max-height:700px)]:gap-1 lg:h-24 lg:w-64 lg:flex-col"
-          }
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload
-            className={
-              isCompact
-                ? "h-4 w-4 text-muted-foreground"
-                : "h-6 w-6 text-muted-foreground max-lg:[@media(max-height:700px)]:h-4 max-lg:[@media(max-height:700px)]:w-4"
-            }
-          />
-          <span className="text-muted-foreground whitespace-nowrap text-[10px] md:text-xs">
-            {isProcessing ? "processing cover" : "upload cover"}
-          </span>
-        </Button>
+        <Tooltip open={Boolean(coverError) && coverErrorOpen} onOpenChange={setCoverErrorOpen}>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isProcessing}
+              aria-busy={isProcessing}
+              aria-invalid={Boolean(coverError)}
+              aria-describedby={coverError ? coverErrorId : undefined}
+              className={
+                isCompact
+                  ? "h-24 w-full border-dashed border-2 flex flex-col items-center gap-1 px-2 hover:bg-accent/50 cursor-pointer md:h-full md:min-h-12 md:w-44 md:px-3"
+                  : "h-10 w-full border-dashed border-2 flex gap-2 px-3 hover:bg-accent/50 cursor-pointer max-lg:[@media(max-height:700px)]:gap-1 lg:h-24 lg:w-64 lg:flex-col"
+              }
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload
+                className={
+                  isCompact
+                    ? "h-4 w-4 text-muted-foreground"
+                    : "h-6 w-6 text-muted-foreground max-lg:[@media(max-height:700px)]:h-4 max-lg:[@media(max-height:700px)]:w-4"
+                }
+              />
+              <span className="text-muted-foreground whitespace-nowrap text-[10px] md:text-xs">
+                {isProcessing ? "processing cover" : "upload cover"}
+              </span>
+            </Button>
+          </TooltipTrigger>
+          {coverError && <TooltipContent side="bottom">{coverError}</TooltipContent>}
+        </Tooltip>
+        <p id={coverErrorId} className="sr-only" aria-live="polite">
+          {coverError ?? ""}
+        </p>
       </div>
     </div>
   );

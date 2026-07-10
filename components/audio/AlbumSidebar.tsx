@@ -41,6 +41,7 @@ import {
   type SidebarDropData,
 } from "./AlbumSidebarDnd";
 import type { AlbumGroup, TagiumFile } from "./types";
+import { isTrackReadyForDownload } from "./downloadLibrary";
 
 interface AlbumSidebarProps {
   albums: AlbumGroup[];
@@ -322,7 +323,7 @@ export default function AlbumSidebar({
                 album.trackIds.length > 0 &&
                 album.trackIds.every((trackId) => {
                   const file = filesById.get(trackId);
-                  return file?.file && file.metadata;
+                  return file ? isTrackReadyForDownload(file) : false;
                 });
               return (
                 <SortableAlbumCard

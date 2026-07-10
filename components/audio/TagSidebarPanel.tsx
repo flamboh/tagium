@@ -11,6 +11,8 @@ import PlaylistDownloadQueuePanel, {
 import { AlbumGroup, TagiumFile } from "./types";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { allTracksReadyForDownload } from "./downloadLibrary";
+import { isValidFilenameBase } from "./filename";
 
 interface TagSidebarPanelProps {
   loading: boolean;
@@ -84,12 +86,17 @@ export default function TagSidebarPanel({
 }: TagSidebarPanelProps) {
   const dragCounterRef = useRef(0);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
-  const canDownloadAll = files.length > 0 && files.every((file) => file.file && file.metadata);
+  const canDownloadAll = files.length > 0 && allTracksReadyForDownload(files);
+  const hasInvalidFilename = files.some(
+    (file) => file.metadata && !isValidFilenameBase(file.metadata.filename),
+  );
   const downloadAllReason = loading
     ? "download in progress"
     : files.length === 0
       ? "add tracks first"
-      : "tracks need files and metadata";
+      : hasInvalidFilename
+        ? "every track needs a filename"
+        : "tracks need files and metadata";
 
   const isFileDrag = (event: React.DragEvent<HTMLDivElement>) =>
     event.dataTransfer.types.includes("Files");
