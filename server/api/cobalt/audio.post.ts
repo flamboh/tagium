@@ -177,6 +177,7 @@ const requestCobaltAudio = async (
   runtimeEnv: CobaltRuntimeEnv,
   url: string,
   audioBitrate: string,
+  requestSignal: AbortSignal,
 ): Promise<CobaltAudioResult> => {
   let response: Response;
 
@@ -185,7 +186,7 @@ const requestCobaltAudio = async (
     response = await fetch(endpoint, {
       method: "POST",
       redirect: "manual",
-      signal: AbortSignal.timeout(COBALT_REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.any([requestSignal, AbortSignal.timeout(COBALT_REQUEST_TIMEOUT_MS)]),
       headers: getCobaltHeaders(runtimeEnv),
       body: JSON.stringify({
         url,
@@ -362,7 +363,12 @@ export default defineHandler(async (event) => {
       return new Response("Invalid audio download request.", { status: 400 });
     }
 
-    const cobaltResult = await requestCobaltAudio(runtimeEnv, body.url, body.audioBitrate);
+    const cobaltResult = await requestCobaltAudio(
+      runtimeEnv,
+      body.url,
+      body.audioBitrate,
+      event.req.signal,
+    );
     const cobaltResponse = cobaltResult.response;
 
     if (isCobaltCapacityError(cobaltResponse)) {
