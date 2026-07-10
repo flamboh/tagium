@@ -7,6 +7,7 @@ import {
 } from "./coverArtProcessing";
 import type { Playlist } from "./playlist";
 import type { SoundCloudSet } from "./soundcloudSet";
+import type { TrackMetadata } from "./trackMetadata";
 import type { AlbumGroup, AppSettings, AudioMetadata, MetadataPatch, TagiumFile } from "./types";
 
 export type DownloadRequest = NonNullable<TagiumFile["downloadRequest"]>;
@@ -61,6 +62,7 @@ export interface CreateSingleUrlDownloadPlanInput {
   sourceUrl: string;
   audioBitrate: AppSettings["audioBitrate"];
   createId: () => string;
+  metadata?: TrackMetadata;
 }
 
 export interface CreateSoundCloudSetDownloadPlanInput {
@@ -242,14 +244,15 @@ export const createSingleUrlDownloadPlan = ({
   sourceUrl,
   audioBitrate,
   createId,
+  metadata,
 }: CreateSingleUrlDownloadPlanInput): SingleUrlDownloadPlan => {
   const id = createId();
-  const title = titleFromSourceUrl(sourceUrl);
+  const title = metadata?.title || titleFromSourceUrl(sourceUrl);
   const pendingFile = createPendingDownloadTrack(
     id,
     createDownloadMetadata({
       title,
-      artist: "",
+      artist: metadata?.artist ?? "",
       album: "",
       genre: "",
     }),

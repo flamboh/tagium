@@ -1,6 +1,31 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { MAX_COVER_ART_UPLOAD_BYTES } from "./coverArtProcessing";
-import { fetchImportedCover } from "./downloadTrack";
+import { createSingleUrlDownloadPlan, fetchImportedCover } from "./downloadTrack";
+
+describe("single URL download plans", () => {
+  it("seeds pending tracks with metadata resolved before download", () => {
+    const plan = createSingleUrlDownloadPlan({
+      sourceUrl: "https://youtube.com/watch?v=abcdefghijk",
+      audioBitrate: "320",
+      createId: () => "track-1",
+      metadata: {
+        title: "Burial - Archangel (Official Audio)",
+        artist: "Burial",
+        coverUrl: "https://example.com/cover.jpg",
+      },
+    });
+
+    expect(plan.pendingFiles[0]).toMatchObject({
+      filename: "Burial - Archangel (Official Audio).mp3",
+      downloadStatus: "downloading",
+      metadata: {
+        title: "Burial - Archangel (Official Audio)",
+        artist: "Burial",
+      },
+    });
+    expect(plan.queuedTracks[0]?.title).toBe("Burial - Archangel (Official Audio)");
+  });
+});
 
 const streamedResponse = (chunks: Uint8Array[], contentType: string) =>
   new Response(
