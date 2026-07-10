@@ -11,10 +11,10 @@ describe("local error presentation", () => {
     );
   });
 
-  it("reserves enough fixed header space for both track-error lines", () => {
-    expect(trackMetadataEditorSource).toContain("lg:px-6 lg:py-4");
+  it("centers the filename independently from the fixed error margin", () => {
+    expect(trackMetadataEditorSource).toContain('className="flex h-full min-w-0 items-center"');
     expect(trackMetadataEditorSource).toContain(
-      'className="h-8 min-w-0 shrink-0 overflow-hidden text-xs leading-4 text-destructive',
+      'className="absolute inset-x-4 bottom-1 h-4 min-w-0 overflow-hidden',
     );
   });
 
