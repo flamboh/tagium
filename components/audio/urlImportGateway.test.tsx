@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import audioTaggerSource from "./audioTagger.tsx?raw";
+import landingScreenSource from "./LandingScreen.tsx?raw";
 import mediaUrlEntrySource from "./MediaUrlEntry.tsx?raw";
 import MediaUrlEntry from "./MediaUrlEntry";
 
@@ -110,6 +111,11 @@ describe("media URL entry", () => {
     expect(mediaUrlEntrySource).toContain("onUrlImport");
     expect(mediaUrlEntrySource).not.toContain("isSoundCloudSetUrl");
     expect(mediaUrlEntrySource).not.toContain("resolveSoundCloudSet");
+  });
+
+  it("keeps the URL entry in the centered landing stack instead of pinning it to the bottom", () => {
+    expect(landingScreenSource).toContain("{children}");
+    expect(mediaUrlEntrySource).not.toContain("bottom-[clamp(");
   });
 
   it("submits a trimmed valid URL and retains one layout-aware DOM module", async () => {

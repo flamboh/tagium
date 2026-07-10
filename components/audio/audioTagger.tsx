@@ -1790,6 +1790,7 @@ export default function AudioTagger() {
   };
 
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
+  const landingIsActive = libraryIsEmpty && activeView === "editor";
   const playlistQueueDownloaded = playlistDownloadQueue ? playlistDownloadQueue.completed : 0;
   const playlistQueueEta = playlistDownloadQueue
     ? formatPlaylistQueueEta(playlistDownloadQueue.etaMs)
@@ -1915,16 +1916,20 @@ export default function AudioTagger() {
           onRetryPlaylistDownloadQueue={handleRetryPlaylistDownloads}
         />
         <div className="relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1">
-          <div className="h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1">
+          <div
+            className={
+              landingIsActive
+                ? "contents"
+                : "h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1"
+            }
+          >
             {activeView === "settings" ? (
               <SettingsPage
                 settings={settings}
                 onChange={handleSettingsChange}
                 onBack={() => setActiveView("editor")}
               />
-            ) : libraryIsEmpty ? (
-              <LandingScreen onAudioUpload={handleAudioUpload} />
-            ) : (
+            ) : !libraryIsEmpty ? (
               <TrackMetadataEditor
                 selectedFile={selectedFile}
                 selectedFileId={selectedFileId}
@@ -1942,13 +1947,15 @@ export default function AudioTagger() {
                   handlePreviewMetadataChange(field, event.target.value)
                 }
               />
-            )}
+            ) : null}
           </div>
-          <MediaUrlEntry
-            layout={libraryIsEmpty ? "landing" : "editor"}
-            hidden={activeView !== "editor"}
-            onUrlImport={handleUrlImport}
-          />
+          <LandingScreen active={landingIsActive} onAudioUpload={handleAudioUpload}>
+            <MediaUrlEntry
+              layout={libraryIsEmpty ? "landing" : "editor"}
+              hidden={activeView !== "editor"}
+              onUrlImport={handleUrlImport}
+            />
+          </LandingScreen>
         </div>
       </div>
     </>

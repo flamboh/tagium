@@ -122,8 +122,7 @@ export default function MediaUrlEntry({ layout, hidden, onUrlImport }: MediaUrlE
       inert={hidden || undefined}
       className={cn(
         hidden && "hidden",
-        layout === "landing" &&
-          "absolute inset-x-0 bottom-[clamp(1.5rem,6vh,4rem)] z-10 flex justify-center px-8 max-lg:[@media(max-height:700px)]:bottom-4 max-lg:[@media(max-height:700px)]:px-4",
+        layout === "landing" && "flex w-full justify-center",
         layout === "editor" &&
           "flex-shrink-0 border-t bg-background/95 p-3 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-4 lg:z-10 lg:flex lg:justify-center lg:border-t-0 lg:bg-transparent lg:px-4 lg:p-0",
       )}
@@ -132,7 +131,9 @@ export default function MediaUrlEntry({ layout, hidden, onUrlImport }: MediaUrlE
         ref={feedbackRef}
         className={cn(
           "pointer-events-auto flex w-full flex-col",
-          layout === "landing" ? "max-w-md gap-3" : "max-w-3xl gap-1",
+          layout === "landing"
+            ? "max-w-md gap-10 max-lg:[@media(max-height:700px)]:gap-6"
+            : "max-w-3xl gap-1",
         )}
       >
         {layout === "landing" && (
