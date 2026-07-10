@@ -1,4 +1,10 @@
 import filenamify from "filenamify";
+import {
+  coverArtFileToPicture,
+  MAX_COVER_ART_UPLOAD_BYTES,
+  normalizeCoverArtType,
+  optimizeCoverArt,
+} from "./coverArtProcessing";
 import type { SoundCloudSet } from "./soundcloudSet";
 import type { AlbumGroup, AppSettings, AudioMetadata, MetadataPatch, TagiumFile } from "./types";
 
@@ -144,26 +150,59 @@ export const createPendingDownloadTrack = (
   metadata,
 });
 
-export const fetchImportedCover = async (coverUrl: string): Promise<AudioMetadata["picture"]> => {
-  const response = await fetch(coverUrl);
+interface FetchImportedCoverDependencies {
+  fetch?: typeof globalThis.fetch;
+  optimize?: (file: File) => Promise<File>;
+}
+
+const readCoverResponseFile = async (response: Response, contentType: string) => {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_COVER_ART_UPLOAD_BYTES) {
+    throw new Error("cover art must be 25 MB or smaller.");
+  }
+  if (!response.body) throw new Error("album cover response body is unavailable.");
+
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
+  const reader = response.body.getReader();
+  let receivedBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      receivedBytes += value.byteLength;
+      if (receivedBytes > MAX_COVER_ART_UPLOAD_BYTES) {
+        await reader.cancel();
+        throw new Error("cover art must be 25 MB or smaller.");
+      }
+      chunks.push(Uint8Array.from(value));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const extension = contentType === "image/png" ? "png" : "jpg";
+  return new File(chunks, `imported-cover.${extension}`, { type: contentType });
+};
+
+export const fetchImportedCover = async (
+  coverUrl: string,
+  dependencies: FetchImportedCoverDependencies = {},
+): Promise<AudioMetadata["picture"]> => {
+  const response = await (dependencies.fetch ?? globalThis.fetch)(coverUrl);
 
   if (!response.ok) {
     throw new Error(`album cover request failed (${response.status})`);
   }
 
-  const contentType = response.headers.get("content-type");
-  if (!contentType) {
+  const contentTypeHeader = response.headers.get("content-type");
+  if (!contentTypeHeader) {
     throw new Error("album cover response missing content type.");
   }
-
-  return [
-    {
-      format: contentType,
-      type: 3,
-      data: new Uint8Array(await response.arrayBuffer()),
-      description: "album cover",
-    },
-  ];
+  const contentType = normalizeCoverArtType(contentTypeHeader);
+  const coverFile = await readCoverResponseFile(response, contentType);
+  const optimizedCover = await (dependencies.optimize ?? optimizeCoverArt)(coverFile);
+  return coverArtFileToPicture(optimizedCover, "album cover");
 };
 
 export const createQueuedDownloadTrack = (file: PendingDownloadTrack): QueuedDownloadTrack => ({

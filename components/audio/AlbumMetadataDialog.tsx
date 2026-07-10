@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,7 +53,10 @@ export default function AlbumMetadataDialog({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [isSyncingCover, setIsSyncingCover] = useState(false);
+  const [isProcessingCover, setIsProcessingCover] = useState(false);
   const [syncCoverRotation, setSyncCoverRotation] = useState(0);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const canSyncCoverToTracks =
     mode === "edit" && draft.cover && draft.cover.length > 0 && onSyncCoverToTracks;
   const syncCoverLabel = isSyncingCover ? "syncing cover to tracks" : "sync cover to tracks";
@@ -61,7 +64,7 @@ export default function AlbumMetadataDialog({
 
   const handleSyncCoverToTracks = () => {
     if (!onSyncCoverToTracks) return;
-    if (isSyncingCover) return;
+    if (isSyncingCover || isProcessingCover) return;
 
     const startedAt = performance.now();
     setSyncCoverRotation((rotation) => rotation + 360);
@@ -75,31 +78,15 @@ export default function AlbumMetadataDialog({
     });
   };
 
-  const handleCoverUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const arrayBuffer = reader.result as ArrayBuffer;
-      const uint8Array = new Uint8Array(arrayBuffer);
-      onChange({
-        ...draft,
-        cover: [
-          {
-            format: file.type,
-            type: 3,
-            data: uint8Array,
-            description: "uploaded cover",
-          },
-        ],
-      });
-    };
-    reader.readAsArrayBuffer(file);
+  const handleCoverUpload = (cover: NonNullable<AudioMetadata["picture"]>) => {
+    onChange({ ...draftRef.current, cover });
   };
 
   return (
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
+        if (!nextOpen && !isProcessingCover) {
           setShowDeleteConfirm(false);
           setShowErrors(false);
           onClose();
@@ -111,6 +98,7 @@ export default function AlbumMetadataDialog({
           className="flex flex-col gap-0"
           onSubmit={(event) => {
             event.preventDefault();
+            if (isProcessingCover) return;
             if (!draft.title.trim() || !draft.artist.trim()) {
               setShowErrors(true);
               return;
@@ -198,6 +186,7 @@ export default function AlbumMetadataDialog({
               <CoverArt
                 picture={draft.cover}
                 onCoverUpload={handleCoverUpload}
+                onProcessingChange={setIsProcessingCover}
                 size="compact"
                 className="order-1 md:order-1"
                 coverOverlay={
@@ -211,7 +200,7 @@ export default function AlbumMetadataDialog({
                           aria-label={syncCoverLabel}
                           aria-busy={isSyncingCover}
                           className="absolute bottom-2 left-2 size-10 p-0 max-lg:[@media(max-height:700px)]:bottom-1.5 max-lg:[@media(max-height:700px)]:left-1.5"
-                          disabled={isSyncingCover}
+                          disabled={isSyncingCover || isProcessingCover}
                           onClick={handleSyncCoverToTracks}
                         >
                           <RefreshCw
@@ -236,12 +225,18 @@ export default function AlbumMetadataDialog({
                 <span className="text-sm text-muted-foreground mr-auto">
                   delete album and all {trackCount} track{trackCount !== 1 ? "s" : ""}?
                 </span>
-                <Button type="button" variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isProcessingCover}
+                  onClick={() => setShowDeleteConfirm(false)}
+                >
                   keep album
                 </Button>
                 <Button
                   type="button"
                   variant="destructive"
+                  disabled={isProcessingCover}
                   onClick={() => {
                     setShowDeleteConfirm(false);
                     onDelete?.();
@@ -256,16 +251,28 @@ export default function AlbumMetadataDialog({
                   <Button
                     type="button"
                     variant="ghost"
+                    disabled={isProcessingCover}
                     className="mr-auto text-destructive hover:text-destructive hover:bg-destructive/10"
                     onClick={() => setShowDeleteConfirm(true)}
                   >
                     delete album
                   </Button>
                 )}
-                <Button type="button" variant="outline" onClick={onClose}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isProcessingCover}
+                  onClick={onClose}
+                >
                   cancel
                 </Button>
-                <Button type="submit">{mode === "create" ? "create album" : "save album"}</Button>
+                <Button type="submit" disabled={isProcessingCover}>
+                  {isProcessingCover
+                    ? "processing cover"
+                    : mode === "create"
+                      ? "create album"
+                      : "save album"}
+                </Button>
               </>
             )}
           </DialogFooter>

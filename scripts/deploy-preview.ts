@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { argv, exit } from "node:process";
 
 const WRANGLER_CONFIG_PATH = ".output/server/wrangler.json";
+const WRANGLER_VERSION = "wrangler@4.110.0";
 
 type WranglerConfig = {
   vars?: Record<string, string>;
@@ -19,7 +20,7 @@ if (argv.includes("--no-upload")) {
   exit(0);
 }
 
-const upload = spawnSync("npx", ["wrangler", "versions", "upload"], {
+const upload = spawnSync("npx", [WRANGLER_VERSION, "versions", "upload", ...argv.slice(2)], {
   stdio: "inherit",
 });
 

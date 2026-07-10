@@ -54,6 +54,14 @@ export const getProxyConfig = (runtimeEnv = env) => ({
   maxQueueWaitMs: Number(runtimeEnv.PROXY_MAX_QUEUE_WAIT_MS ?? 15_000),
 });
 
+export const getDrainTimeoutMs = (runtimeEnv = env) => {
+  const drainTimeoutMs = Number(runtimeEnv.PROXY_DRAIN_TIMEOUT_MS ?? 270_000);
+  if (!Number.isFinite(drainTimeoutMs) || drainTimeoutMs <= 0 || drainTimeoutMs > 270_000) {
+    throw new Error("PROXY_DRAIN_TIMEOUT_MS must be between 1 and 270000.");
+  }
+  return drainTimeoutMs;
+};
+
 /*
  * Concurrency gates protect the single shared vCPU behind this proxy. Load testing found this
  * Machine handles roughly 20-45 concurrent real downloads (resolve + audio/cover tunnel fetches)
@@ -101,7 +109,7 @@ export const createGate = (name, maxConcurrent, maxQueued, maxQueueWaitMs) => {
       return { cancel: () => {} };
     }
 
-    const entry = { grant: onGranted };
+    const entry = { grant: onGranted, reject: onRejected };
     entry.timeoutHandle = setTimeout(() => {
       const index = queue.indexOf(entry);
       if (index >= 0) {
@@ -122,9 +130,18 @@ export const createGate = (name, maxConcurrent, maxQueued, maxQueueWaitMs) => {
     };
   };
 
+  const drain = () => {
+    while (queue.length > 0) {
+      const entry = queue.shift();
+      clearTimeout(entry.timeoutHandle);
+      entry.reject("draining");
+    }
+  };
+
   return {
     name,
     acquire,
+    drain,
     release,
     get active() {
       return active;
@@ -145,6 +162,7 @@ export const createCobaltProxyServer = ({
   cobaltPort: upstreamPort = cobaltPort,
   runtimeEnv = env,
   proxyConfig = getProxyConfig(runtimeEnv),
+  lifecycle = { draining: false },
 } = {}) => {
   const resolveGate = createGate(
     "resolve",
@@ -161,11 +179,38 @@ export const createCobaltProxyServer = ({
 
   const getGateForPath = (pathname) => (pathname.startsWith("/tunnel") ? tunnelGate : resolveGate);
 
-  return http.createServer((clientRequest, clientResponse) => {
+  const server = http.createServer((clientRequest, clientResponse) => {
     const requestId = getProxyRequestId(clientRequest);
     const startedAt = Date.now();
     const context = getRequestContext(clientRequest, requestId, runtimeEnv);
     const requestUrl = new URL(clientRequest.url ?? "/", "http://tagium-cobalt.local");
+
+    if (requestUrl.pathname === "/healthz") {
+      clientResponse.writeHead(200, { "content-type": "text/plain;charset=UTF-8" });
+      clientResponse.end("ok");
+      return;
+    }
+
+    if (requestUrl.pathname === "/readyz") {
+      const status = lifecycle.draining ? 503 : 200;
+      clientResponse.writeHead(status, {
+        "content-type": "text/plain;charset=UTF-8",
+        ...(lifecycle.draining ? { connection: "close" } : {}),
+      });
+      clientResponse.end(lifecycle.draining ? "draining" : "ready");
+      return;
+    }
+
+    if (lifecycle.draining) {
+      clientResponse.writeHead(503, {
+        "content-type": "application/json;charset=UTF-8",
+        connection: "close",
+        "retry-after": "2",
+      });
+      clientResponse.end(capacityErrorBody);
+      return;
+    }
+
     const gate = getGateForPath(requestUrl.pathname);
 
     let released = false;
@@ -374,6 +419,49 @@ export const createCobaltProxyServer = ({
       });
     }
   });
+
+  server.beginDraining = () => {
+    lifecycle.draining = true;
+    resolveGate.drain();
+    tunnelGate.drain();
+  };
+
+  return server;
+};
+
+export const drainCobaltProxyServer = ({
+  server,
+  cobalt,
+  lifecycle,
+  signal = "SIGTERM",
+  drainTimeoutMs = 270_000,
+}) => {
+  lifecycle.draining = true;
+  server.beginDraining?.();
+
+  return new Promise((resolve) => {
+    let stopped = false;
+    const stopCobalt = () => {
+      if (stopped) return;
+      stopped = true;
+      clearTimeout(timeoutHandle);
+      cobalt.kill(signal);
+      resolve();
+    };
+    const timeoutHandle = setTimeout(() => {
+      server.closeAllConnections?.();
+      stopCobalt();
+    }, drainTimeoutMs);
+    timeoutHandle.unref?.();
+
+    if (!server.listening) {
+      stopCobalt();
+      return;
+    }
+
+    server.close(() => stopCobalt());
+    server.closeIdleConnections?.();
+  });
 };
 
 export const startCobaltProxy = ({
@@ -396,19 +484,27 @@ export const startCobaltProxy = ({
       API_PORT: String(upstreamPort),
     },
   });
+  const lifecycle = { draining: false };
   const server = createCobaltProxyServer({
     cobaltHost: upstreamHost,
     cobaltPort: upstreamPort,
     runtimeEnv,
+    lifecycle,
   });
   let shuttingDown = false;
+  let shutdownPromise;
 
-  const shutdown = (signal) => {
+  const shutdown = (signal = "SIGTERM") => {
+    if (shutdownPromise) return shutdownPromise;
     shuttingDown = true;
-    if (server.listening) {
-      server.close();
-    }
-    cobalt.kill(signal);
+    shutdownPromise = drainCobaltProxyServer({
+      server,
+      cobalt,
+      lifecycle,
+      signal,
+      drainTimeoutMs: getDrainTimeoutMs(runtimeEnv),
+    });
+    return shutdownPromise;
   };
 
   process.on("SIGINT", shutdown);

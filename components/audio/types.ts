@@ -13,6 +13,7 @@ export interface TagiumFile {
   id: string;
   file?: File;
   originalFile?: File;
+  sourceImportKey?: string;
   status: "pending" | "saved" | "error";
   downloadStatus: "downloading" | "ready" | "error" | "canceled";
   downloadError?: string;

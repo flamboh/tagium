@@ -81,7 +81,15 @@ export default defineConfig({
     env: {
       builtin: true,
     },
-    ignorePatterns: ["dist", "build", "coverage", "node_modules", ".repos/*"],
+    ignorePatterns: [
+      "dist",
+      "build",
+      "coverage",
+      "node_modules",
+      "playwright-report",
+      "test-results",
+      ".repos/*",
+    ],
     overrides: [
       {
         files: ["**/*.{ts,tsx}"],
@@ -180,7 +188,7 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ["**/node_modules/**", "**/.git/**", "**/.repos/**"],
+    exclude: ["**/node_modules/**", "**/.git/**", "**/.repos/**", "**/e2e/**"],
   },
   plugins: [react(), libavAssets(), ...(isTest ? [] : [nitro()])],
   resolve: {
