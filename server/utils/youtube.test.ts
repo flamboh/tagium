@@ -1,9 +1,23 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { getYouTubeVideoId, resolveYouTubeUploadYear } from "./youtube";
 
-const playerResponse = (microformat: Record<string, unknown>) =>
+const youtubeConfig = {
+  INNERTUBE_API_KEY: "api-key",
+  INNERTUBE_CLIENT_VERSION: "2.20260708.00.00",
+  INNERTUBE_CONTEXT: { client: { clientName: "WEB" } },
+};
+
+const nextResponse = (dateText: string) =>
   Response.json({
-    microformat: { playerMicroformatRenderer: microformat },
+    contents: {
+      twoColumnWatchNextResults: {
+        results: {
+          results: {
+            contents: [{ videoPrimaryInfoRenderer: { dateText: { simpleText: dateText } } }],
+          },
+        },
+      },
+    },
   });
 
 describe("youtube video metadata", () => {
@@ -24,23 +38,25 @@ describe("youtube video metadata", () => {
     expect(getYouTubeVideoId("https://www.youtube.com/watch?v=short")).toBeUndefined();
   });
 
-  it("prefers the upload date year and falls back to publish date", async () => {
+  it("resolves the displayed upload year with discovered or supplied client config", async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(
-        playerResponse({
-          uploadDate: "2025-04-03T21:00:23-07:00",
-          publishDate: "2024-12-31T00:00:00-08:00",
-        }),
+        new Response(`<script>ytcfg.set(${JSON.stringify(youtubeConfig)});</script>`),
       )
-      .mockResolvedValueOnce(playerResponse({ publishDate: "2005-04-23T20:31:52-07:00" }));
+      .mockResolvedValueOnce(nextResponse("Apr 3, 2025"))
+      .mockResolvedValueOnce(nextResponse("Apr 23, 2005"));
 
     await expect(resolveYouTubeUploadYear("https://youtu.be/dQw4w9WgXcQ", { fetch })).resolves.toBe(
       2025,
     );
     await expect(
-      resolveYouTubeUploadYear("https://www.youtube.com/watch?v=jNQXAC9IVRw", { fetch }),
+      resolveYouTubeUploadYear("https://www.youtube.com/watch?v=jNQXAC9IVRw", {
+        config: youtubeConfig,
+        fetch,
+      }),
     ).resolves.toBe(2005);
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 
   it("does not fetch metadata for non-video URLs", async () => {

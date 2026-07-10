@@ -2,6 +2,7 @@ import { defineHandler } from "nitro";
 import { z } from "zod";
 import {
   extractYouTubeJsonObject,
+  getYouTubeConfig,
   resolveYouTubeUploadYear,
   YOUTUBE_ORIGIN,
   YOUTUBE_USER_AGENT,
@@ -188,27 +189,6 @@ const collectContinuationTokens = (value: unknown, tokens: string[]) => {
   for (const entry of Object.values(value)) collectContinuationTokens(entry, tokens);
 };
 
-const getYouTubeConfig = (html: string) => {
-  const config: JsonRecord = {};
-  let offset = 0;
-  while (true) {
-    const markerIndex = html.indexOf("ytcfg.set(", offset);
-    if (markerIndex < 0) break;
-    offset = markerIndex + "ytcfg.set(".length;
-
-    let extracted: ReturnType<typeof extractYouTubeJsonObject>;
-    try {
-      extracted = extractYouTubeJsonObject(html, "ytcfg.set(", markerIndex);
-    } catch {
-      continue;
-    }
-    if (!extracted) continue;
-    if (isRecord(extracted.value)) Object.assign(config, extracted.value);
-    offset = extracted.end;
-  }
-  return config;
-};
-
 const getPlaylistTitle = (initialData: unknown) => {
   const metadata = findFirstValue(initialData, "playlistMetadataRenderer");
   return isRecord(metadata) && typeof metadata.title === "string" ? metadata.title.trim() : "";
@@ -298,6 +278,7 @@ export default defineHandler(async (event) => {
   const html = await response.text();
   const initialData = extractYouTubeJsonObject(html, "var ytInitialData =")?.value;
   if (!initialData) throw new Error("youtube.initial_data");
+  const config = getYouTubeConfig(html);
 
   const title = getPlaylistTitle(initialData);
   if (!title) throw new Error("youtube.playlist_title");
@@ -311,8 +292,6 @@ export default defineHandler(async (event) => {
     const pendingTokens: string[] = [];
     const visitedTokens = new Set<string>();
     collectContinuationTokens(initialData, pendingTokens);
-    const config = getYouTubeConfig(html);
-
     while (pendingTokens.length > 0 && visitedTokens.size < MAX_CONTINUATION_REQUESTS) {
       const token = pendingTokens.shift();
       if (!token || visitedTokens.has(token)) continue;
@@ -327,7 +306,10 @@ export default defineHandler(async (event) => {
   }
 
   if (tracks.length === 0) throw new Error("youtube.no_resolvable_tracks");
-  const year = await resolveYouTubeUploadYear(tracks[0]!.url, { signal: event.req.signal });
+  const year = await resolveYouTubeUploadYear(tracks[0]!.url, {
+    config,
+    signal: event.req.signal,
+  });
 
   return {
     title,

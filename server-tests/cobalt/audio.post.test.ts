@@ -124,11 +124,26 @@ describe("cobalt audio endpoint", () => {
   it("infers direct YouTube track year from its upload date", async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = input instanceof Request ? input.url : new URL(input).toString();
-      if (url.startsWith("https://www.youtube.com/youtubei/v1/player?")) {
+      if (url === "https://www.youtube.com/") {
+        return new Response(
+          `<script>ytcfg.set(${JSON.stringify({
+            INNERTUBE_API_KEY: "api-key",
+            INNERTUBE_CLIENT_VERSION: "2.20260708.00.00",
+            INNERTUBE_CONTEXT: { client: { clientName: "WEB" } },
+          })});</script>`,
+        );
+      }
+      if (url.startsWith("https://www.youtube.com/youtubei/v1/next?")) {
         return Response.json({
-          microformat: {
-            playerMicroformatRenderer: {
-              uploadDate: "1987-10-25T00:00:00-07:00",
+          contents: {
+            twoColumnWatchNextResults: {
+              results: {
+                results: {
+                  contents: [
+                    { videoPrimaryInfoRenderer: { dateText: { simpleText: "Oct 25, 1987" } } },
+                  ],
+                },
+              },
             },
           },
         });
@@ -166,7 +181,7 @@ describe("cobalt audio endpoint", () => {
         },
       },
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("appends Cobalt machine ids to proxied tunnel URLs", async () => {

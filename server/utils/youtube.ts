@@ -1,25 +1,12 @@
-import { z } from "zod";
-
 export const YOUTUBE_ORIGIN = "https://www.youtube.com";
 export const YOUTUBE_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
-const YOUTUBE_WEB_CLIENT_VERSION = "2.20240101.00.00";
 
-const playerResponseSchema = z
-  .object({
-    microformat: z
-      .object({
-        playerMicroformatRenderer: z
-          .object({
-            uploadDate: z.string().optional(),
-            publishDate: z.string().optional(),
-          })
-          .passthrough(),
-      })
-      .passthrough(),
-  })
-  .passthrough();
+type JsonRecord = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is JsonRecord =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 const videoIdPattern = /^[A-Za-z0-9_-]{11}$/;
 
@@ -64,6 +51,27 @@ export const extractYouTubeJsonObject = (source: string, marker: string, startAt
   return undefined;
 };
 
+export const getYouTubeConfig = (html: string) => {
+  const config: JsonRecord = {};
+  let offset = 0;
+  while (true) {
+    const markerIndex = html.indexOf("ytcfg.set(", offset);
+    if (markerIndex < 0) break;
+    offset = markerIndex + "ytcfg.set(".length;
+
+    let extracted: ReturnType<typeof extractYouTubeJsonObject>;
+    try {
+      extracted = extractYouTubeJsonObject(html, "ytcfg.set(", markerIndex);
+    } catch {
+      continue;
+    }
+    if (!extracted) continue;
+    if (isRecord(extracted.value)) Object.assign(config, extracted.value);
+    offset = extracted.end;
+  }
+  return config;
+};
+
 export const getYouTubeVideoId = (sourceUrl: string) => {
   try {
     const url = new URL(sourceUrl);
@@ -90,7 +98,7 @@ export const getYouTubeVideoId = (sourceUrl: string) => {
 };
 
 const yearFromDate = (date: string | undefined) => {
-  const match = date?.match(/^(\d{4})-/);
+  const match = date?.match(/(?:^|\D)(\d{4})(?:\D|$)/);
   if (!match) return undefined;
   const year = Number(match[1]);
   return Number.isInteger(year) && year >= 1000 && year <= 9999 ? year : undefined;
@@ -98,39 +106,67 @@ const yearFromDate = (date: string | undefined) => {
 
 export const resolveYouTubeUploadYear = async (
   sourceUrl: string,
-  options: { fetch?: typeof globalThis.fetch; signal?: AbortSignal } = {},
+  options: {
+    config?: JsonRecord;
+    fetch?: typeof globalThis.fetch;
+    signal?: AbortSignal;
+  } = {},
 ) => {
   const videoId = getYouTubeVideoId(sourceUrl);
   if (!videoId) return undefined;
+  const fetch = options.fetch ?? globalThis.fetch;
 
-  const playerUrl = new URL("/youtubei/v1/player", YOUTUBE_ORIGIN);
-  playerUrl.searchParams.set("prettyPrint", "false");
-  const response = await (options.fetch ?? globalThis.fetch)(playerUrl, {
+  let config = options.config;
+  if (!config) {
+    const homepageResponse = await fetch(YOUTUBE_ORIGIN, {
+      headers: { "user-agent": YOUTUBE_USER_AGENT },
+      signal: options.signal,
+    });
+    if (!homepageResponse.ok) {
+      throw new Error(`youtube.config_failed (${homepageResponse.status})`);
+    }
+    config = getYouTubeConfig(await homepageResponse.text());
+  }
+
+  const apiKey = config.INNERTUBE_API_KEY;
+  const context = config.INNERTUBE_CONTEXT;
+  const clientVersion = config.INNERTUBE_CLIENT_VERSION;
+  if (typeof apiKey !== "string" || !isRecord(context) || typeof clientVersion !== "string") {
+    return undefined;
+  }
+
+  const nextUrl = new URL("/youtubei/v1/next", YOUTUBE_ORIGIN);
+  nextUrl.searchParams.set("prettyPrint", "false");
+  nextUrl.searchParams.set("key", apiKey);
+  const response = await fetch(nextUrl, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "user-agent": YOUTUBE_USER_AGENT,
       "x-youtube-client-name": "1",
-      "x-youtube-client-version": YOUTUBE_WEB_CLIENT_VERSION,
+      "x-youtube-client-version": clientVersion,
     },
-    body: JSON.stringify({
-      videoId,
-      context: {
-        client: {
-          clientName: "WEB",
-          clientVersion: YOUTUBE_WEB_CLIENT_VERSION,
-          hl: "en",
-          gl: "US",
-        },
-      },
-    }),
+    body: JSON.stringify({ videoId, context }),
     signal: options.signal,
   });
   if (!response.ok) throw new Error(`youtube.video_failed (${response.status})`);
 
-  const playerResponse = playerResponseSchema.safeParse(await response.json());
-  if (!playerResponse.success) return undefined;
-
-  const microformat = playerResponse.data.microformat.playerMicroformatRenderer;
-  return yearFromDate(microformat.uploadDate) ?? yearFromDate(microformat.publishDate);
+  const data = await response.json();
+  const primaryInfo = (() => {
+    if (!isRecord(data)) return undefined;
+    const contents = data.contents;
+    if (!isRecord(contents)) return undefined;
+    const watchResults = contents.twoColumnWatchNextResults;
+    if (!isRecord(watchResults)) return undefined;
+    const results = watchResults.results;
+    if (!isRecord(results) || !isRecord(results.results)) return undefined;
+    const resultContents = results.results.contents;
+    if (!Array.isArray(resultContents)) return undefined;
+    return resultContents
+      .map((entry) => (isRecord(entry) ? entry.videoPrimaryInfoRenderer : undefined))
+      .find(isRecord);
+  })();
+  if (!primaryInfo || !isRecord(primaryInfo.dateText)) return undefined;
+  const dateText = primaryInfo.dateText.simpleText;
+  return yearFromDate(typeof dateText === "string" ? dateText : undefined);
 };

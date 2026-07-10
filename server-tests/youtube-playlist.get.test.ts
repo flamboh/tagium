@@ -95,12 +95,20 @@ describe("youtube playlist endpoint", () => {
         expect(url).toContain("list=PLESiES1i-ThqUjxot6jWLDu90fxtkcpA0");
         return new Response(html);
       }
-      if (url.startsWith("https://www.youtube.com/youtubei/v1/player?")) {
+      if (url.startsWith("https://www.youtube.com/youtubei/v1/next?")) {
         expect(typeof init?.body).toBe("string");
         expect(JSON.parse(init?.body as string)).toMatchObject({ videoId: "first-video" });
         return Response.json({
-          microformat: {
-            playerMicroformatRenderer: { uploadDate: "2022-08-14T12:30:00-07:00" },
+          contents: {
+            twoColumnWatchNextResults: {
+              results: {
+                results: {
+                  contents: [
+                    { videoPrimaryInfoRenderer: { dateText: { simpleText: "Aug 14, 2022" } } },
+                  ],
+                },
+              },
+            },
           },
         });
       }
