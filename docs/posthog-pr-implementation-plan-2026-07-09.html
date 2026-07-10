@@ -1,0 +1,1743 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Tagium PostHog PR Implementation Plan — 2026-07-09</title>
+    <style>
+      :root {
+        --ink: #17211d;
+        --muted: #5d6963;
+        --bg: #edf1ed;
+        --paper: #fbfcfa;
+        --panel: #ffffff;
+        --line: #d6ddd7;
+        --line-strong: #b8c4bb;
+        --green: #176b4d;
+        --green-soft: #e5f2eb;
+        --teal: #0d7377;
+        --teal-soft: #e3f3f2;
+        --amber: #966316;
+        --amber-soft: #faf0d9;
+        --red: #a34035;
+        --red-soft: #f8e8e4;
+        --navy: #263b52;
+        --code: #f0f3ef;
+        --shadow: 0 18px 55px rgb(31 48 39 / 9%);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 8% 0%, rgb(23 107 77 / 8%), transparent 26rem), var(--bg);
+        color: var(--ink);
+        line-height: 1.55;
+      }
+
+      a {
+        color: var(--green);
+        font-weight: 700;
+        text-decoration-thickness: 1px;
+        text-underline-offset: 3px;
+      }
+
+      code,
+      pre {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      code {
+        padding: 2px 5px;
+        border-radius: 5px;
+        background: var(--code);
+        font-size: 0.9em;
+      }
+
+      pre {
+        margin: 12px 0 0;
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #f2f5f1;
+        padding: 15px 16px;
+        font-size: 0.84rem;
+        line-height: 1.55;
+      }
+
+      pre code {
+        padding: 0;
+        background: transparent;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      ul,
+      ol {
+        margin: 0;
+        padding-left: 1.25rem;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 235px minmax(0, 1020px);
+        gap: 22px;
+        width: min(1310px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 58px;
+      }
+
+      nav {
+        position: sticky;
+        top: 20px;
+        align-self: start;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgb(251 252 250 / 92%);
+        box-shadow: 0 10px 32px rgb(31 48 39 / 6%);
+        padding: 16px;
+        backdrop-filter: blur(10px);
+      }
+
+      .nav-mark {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 14px;
+        font-size: 0.78rem;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .nav-mark::before {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        background: var(--green);
+        content: "";
+      }
+
+      nav a {
+        display: block;
+        border-left: 2px solid transparent;
+        padding: 7px 8px;
+        color: var(--muted);
+        font-size: 0.84rem;
+        font-weight: 680;
+        text-decoration: none;
+      }
+
+      nav a:hover,
+      nav a:focus-visible {
+        border-left-color: var(--green);
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .nav-note {
+        margin-top: 14px;
+        border-top: 1px solid var(--line);
+        padding-top: 12px;
+        color: var(--muted);
+        font-size: 0.74rem;
+      }
+
+      main {
+        min-width: 0;
+      }
+
+      header,
+      section {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--paper);
+        box-shadow: var(--shadow);
+      }
+
+      header {
+        position: relative;
+        overflow: hidden;
+        padding: 32px;
+      }
+
+      header::after {
+        position: absolute;
+        top: -100px;
+        right: -78px;
+        width: 300px;
+        height: 300px;
+        border: 44px solid rgb(23 107 77 / 7%);
+        border-radius: 50%;
+        content: "";
+      }
+
+      .eyebrow {
+        position: relative;
+        z-index: 1;
+        color: var(--green);
+        font-size: 0.76rem;
+        font-weight: 850;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        position: relative;
+        z-index: 1;
+        max-width: 780px;
+        margin-top: 8px;
+        font-size: clamp(2rem, 5vw, 3.6rem);
+        line-height: 1.02;
+        letter-spacing: -0.04em;
+      }
+
+      .subtitle {
+        position: relative;
+        z-index: 1;
+        max-width: 800px;
+        margin-top: 16px;
+        color: var(--muted);
+        font-size: 1.05rem;
+      }
+
+      .meta-row {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 20px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+        padding: 5px 10px;
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 750;
+      }
+
+      .pill::before {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--green);
+        content: "";
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 24px;
+        scroll-margin-top: 20px;
+      }
+
+      h2 {
+        margin-bottom: 14px;
+        font-size: 1.38rem;
+        letter-spacing: -0.02em;
+      }
+
+      h3 {
+        margin: 19px 0 9px;
+        font-size: 1rem;
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      .lead {
+        max-width: 870px;
+        color: var(--muted);
+        font-size: 1rem;
+      }
+
+      .grid-2,
+      .grid-3 {
+        display: grid;
+        gap: 14px;
+        margin-top: 15px;
+      }
+
+      .grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .grid-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        padding: 16px;
+      }
+
+      .card h3 {
+        margin: 0 0 8px;
+      }
+
+      .card p,
+      .card li {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 10px;
+        border-radius: 999px;
+        padding: 3px 8px;
+        font-size: 0.7rem;
+        font-weight: 850;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .status.green {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .status.amber {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .status.red {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .callout {
+        margin-top: 15px;
+        border: 1px solid #bad7c9;
+        border-left: 5px solid var(--green);
+        border-radius: 9px;
+        background: var(--green-soft);
+        padding: 14px 16px;
+      }
+
+      .callout.warn {
+        border-color: #e6cea1;
+        border-left-color: var(--amber);
+        background: var(--amber-soft);
+      }
+
+      .callout.bad {
+        border-color: #e7c0ba;
+        border-left-color: var(--red);
+        background: var(--red-soft);
+      }
+
+      .callout strong {
+        display: block;
+        margin-bottom: 3px;
+      }
+
+      .callout p,
+      .callout li {
+        font-size: 0.91rem;
+      }
+
+      .principle {
+        display: grid;
+        grid-template-columns: 34px 1fr;
+        gap: 10px;
+        align-items: start;
+      }
+
+      .principle + .principle {
+        margin-top: 12px;
+      }
+
+      .number {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--navy);
+        color: #fff;
+        font-size: 0.78rem;
+        font-weight: 850;
+      }
+
+      .principle p {
+        color: var(--muted);
+        font-size: 0.91rem;
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: 1fr 28px 1.15fr 28px 1.2fr 28px 1fr;
+        align-items: stretch;
+        gap: 6px;
+        margin-top: 18px;
+      }
+
+      .flow-node {
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        background: var(--panel);
+        padding: 14px;
+      }
+
+      .flow-node.primary {
+        border-color: #8ebda6;
+        background: var(--green-soft);
+      }
+
+      .flow-node strong {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 0.9rem;
+      }
+
+      .flow-node span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.78rem;
+      }
+
+      .arrow {
+        display: grid;
+        place-items: center;
+        color: var(--green);
+        font-size: 1.35rem;
+        font-weight: 900;
+      }
+
+      .interface {
+        display: grid;
+        grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+        gap: 16px;
+        margin-top: 18px;
+      }
+
+      .depth {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        overflow: hidden;
+        border: 1px solid #94b7a5;
+        border-radius: 10px;
+        background: #fff;
+      }
+
+      .depth-top {
+        background: var(--green);
+        padding: 12px 14px;
+        color: #fff;
+        font-size: 0.85rem;
+        font-weight: 850;
+      }
+
+      .depth-body {
+        padding: 15px;
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      .depth-body ul {
+        padding-left: 1.1rem;
+      }
+
+      .table-wrap {
+        margin-top: 15px;
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel);
+        font-size: 0.84rem;
+      }
+
+      th,
+      td {
+        padding: 10px 11px;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th:last-child,
+      td:last-child {
+        border-right: 0;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      th {
+        background: #f1f4f1;
+        color: #35423b;
+        font-size: 0.75rem;
+        letter-spacing: 0.035em;
+        text-transform: uppercase;
+      }
+
+      td {
+        color: var(--muted);
+      }
+
+      td strong {
+        color: var(--ink);
+      }
+
+      .event {
+        white-space: nowrap;
+        color: var(--green);
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-weight: 800;
+      }
+
+      .phase {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr);
+        gap: 16px;
+        padding: 18px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .phase:first-of-type {
+        margin-top: 4px;
+      }
+
+      .phase-id {
+        color: var(--green);
+        font-size: 0.75rem;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .phase h3 {
+        margin: 0 0 7px;
+        font-size: 1.03rem;
+      }
+
+      .phase p,
+      .phase li {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .phase .deliverable {
+        margin-top: 10px;
+        color: var(--ink);
+        font-weight: 730;
+      }
+
+      .gate {
+        display: grid;
+        grid-template-columns: 22px 1fr;
+        gap: 8px;
+        align-items: start;
+      }
+
+      .gate + .gate {
+        margin-top: 9px;
+      }
+
+      .check {
+        display: grid;
+        width: 19px;
+        height: 19px;
+        place-items: center;
+        border: 1px solid #91b8a4;
+        border-radius: 5px;
+        background: var(--green-soft);
+        color: var(--green);
+        font-size: 0.72rem;
+        font-weight: 900;
+      }
+
+      .gate span:last-child {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .stack {
+        display: grid;
+        grid-template-columns: 1fr 40px 1fr;
+        align-items: center;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .branch {
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        background: var(--panel);
+        padding: 16px;
+      }
+
+      .branch.parent {
+        border-top: 5px solid var(--navy);
+      }
+
+      .branch.child {
+        border-top: 5px solid var(--green);
+      }
+
+      .branch small {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .branch strong {
+        display: block;
+      }
+
+      .branch code {
+        display: inline-block;
+        margin-top: 6px;
+      }
+
+      .stack-arrow {
+        color: var(--green);
+        text-align: center;
+        font-size: 1.5rem;
+        font-weight: 900;
+      }
+
+      .two-col-list {
+        columns: 2;
+        column-gap: 30px;
+      }
+
+      .two-col-list li {
+        break-inside: avoid;
+        margin-bottom: 8px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      footer {
+        margin-top: 20px;
+        color: var(--muted);
+        font-size: 0.8rem;
+        text-align: center;
+      }
+
+      @media (max-width: 980px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+
+        nav {
+          position: static;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 3px;
+        }
+
+        .nav-mark,
+        .nav-note {
+          width: 100%;
+        }
+
+        nav a {
+          border: 1px solid var(--line);
+          border-radius: 999px;
+          padding: 5px 9px;
+        }
+
+        .flow {
+          grid-template-columns: 1fr;
+        }
+
+        .arrow {
+          transform: rotate(90deg);
+        }
+      }
+
+      @media (max-width: 720px) {
+        .shell {
+          width: min(100% - 20px, 1020px);
+          padding-top: 10px;
+        }
+
+        header,
+        section {
+          padding: 19px;
+        }
+
+        .grid-2,
+        .grid-3,
+        .interface,
+        .stack {
+          grid-template-columns: 1fr;
+        }
+
+        .stack-arrow {
+          transform: rotate(90deg);
+        }
+
+        .phase {
+          grid-template-columns: 1fr;
+          gap: 5px;
+        }
+
+        .two-col-list {
+          columns: 1;
+        }
+      }
+
+      @media print {
+        body {
+          background: #fff;
+        }
+
+        .shell {
+          display: block;
+          width: 100%;
+          padding: 0;
+        }
+
+        nav {
+          display: none;
+        }
+
+        header,
+        section {
+          break-inside: avoid;
+          box-shadow: none;
+        }
+
+        a {
+          color: inherit;
+          text-decoration: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <nav aria-label="Plan sections">
+        <div class="nav-mark">Implementation plan</div>
+        <a href="#outcome">Outcome</a>
+        <a href="#current-state">Current state</a>
+        <a href="#architecture">Target architecture</a>
+        <a href="#events">Event contract</a>
+        <a href="#privacy">Privacy guardrails</a>
+        <a href="#environment">Environment isolation</a>
+        <a href="#execution">Execution phases</a>
+        <a href="#bundle">Bundle decision</a>
+        <a href="#stack">Graphite stack</a>
+        <a href="#verification">Verification</a>
+        <a href="#files">File map</a>
+        <div class="nav-note">
+          Prepared from the 2026-07-09 handoff, the current <code>main</code> checkout, and live PR
+          metadata for #65 and #66.
+        </div>
+      </nav>
+
+      <main>
+        <header>
+          <div class="eyebrow">Tagium · PostHog PR #65</div>
+          <h1>Make analytics truthful, isolated, and lightweight</h1>
+          <p class="subtitle">
+            A concrete plan to rebuild the wizard-generated instrumentation around a typed module,
+            emit outcomes from real workflow seams, activate PostHog only in the production deploy,
+            and restack the result safely on the stability work in PR #66.
+          </p>
+          <div class="meta-row">
+            <span class="pill">Prepared 2026-07-09</span>
+            <span class="pill">No session replay</span>
+            <span class="pill">#66 must merge first</span>
+            <span class="pill">Graphite child PR</span>
+          </div>
+        </header>
+
+        <section id="outcome">
+          <h2>Outcome</h2>
+          <p class="lead">
+            PR #65 will become a narrow analytics change on top of PR #66. UI modules will report
+            domain facts through one typed interface; the analytics implementation will own SDK
+            loading, event names, common properties, provider/error normalization, payload
+            redaction, and environment gating.
+          </p>
+
+          <div class="grid-3">
+            <div class="card">
+              <span class="status green">Correct</span>
+              <h3>Events describe observed outcomes</h3>
+              <p>
+                Upload, import, export, cancellation, and retry events fire after the corresponding
+                workflow milestone—not when a button is clicked or work is merely queued.
+              </p>
+            </div>
+            <div class="card">
+              <span class="status green">Isolated</span>
+              <h3>Only production can send</h3>
+              <p>
+                Local, test, E2E, and Cloudflare preview builds have no key and use the no-op
+                adapter. Production additionally requires an explicit <code>production</code> build
+                environment.
+              </p>
+            </div>
+            <div class="card">
+              <span class="status green">Proportional</span>
+              <h3>The SDK leaves the startup path</h3>
+              <p>
+                PostHog loads during idle time into its own chunk. A bounded in-memory queue keeps
+                early domain events until the client is ready.
+              </p>
+            </div>
+          </div>
+
+          <div class="callout bad">
+            <strong>Hard merge constraint</strong>
+            <p>
+              Do not merge PR #65 before PR #66. Both change
+              <code>components/audio/audioTagger.tsx</code>, especially import and removal flows;
+              #66’s confirmation, session-safety, memory, and deploy behavior is the baseline to
+              preserve.
+            </p>
+          </div>
+        </section>
+
+        <section id="current-state">
+          <h2>Current state and why the original PR cannot merge as-is</h2>
+          <div class="grid-2">
+            <div class="card">
+              <span class="status amber">PR #65 · open draft</span>
+              <h3>
+                <a href="https://github.com/flamboh/tagium/pull/65"
+                  >Add PostHog analytics integration</a
+                >
+              </h3>
+              <ul>
+                <li>Base: <code>main</code>; head: <code>posthog/instrumentation-dbe758</code>.</li>
+                <li>Direct <code>posthog.capture</code> calls live in UI handlers.</li>
+                <li>A committed <code>.env.production</code> activates preview/E2E builds.</li>
+                <li>The SDK is imported synchronously at app startup.</li>
+                <li>Reported bundle delta is about 220 kB minified / 73 kB gzip.</li>
+              </ul>
+            </div>
+            <div class="card">
+              <span class="status green">PR #66 · open draft</span>
+              <h3>
+                <a href="https://github.com/flamboh/tagium/pull/66"
+                  >Improve session and runtime resilience</a
+                >
+              </h3>
+              <ul>
+                <li>Base: <code>main</code>; head: <code>codex/stability-safety</code>.</li>
+                <li>Adds confirmed track removal and before-unload protection.</li>
+                <li>Hardens upload deduplication and browser memory behavior.</li>
+                <li>Adds post-merge cross-browser E2E and fail-closed production deploy.</li>
+                <li>Creates the correct GitHub <code>production</code> environment seam.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="callout warn">
+            <strong>The two main semantic defects</strong>
+            <ul>
+              <li>
+                <code>soundcloud_set_imported</code> fires after set resolution and queue creation,
+                before Cobalt download, local processing, parsing, and hydration finish.
+              </li>
+              <li>
+                <code>audio_files_uploaded</code> counts the original selection before duplicate
+                filtering and parsing, so it can report files that Tagium never accepted.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section id="architecture">
+          <h2>Target architecture</h2>
+          <p class="lead">
+            The analytics module is deliberately deep: callers learn one typed capture interface,
+            while initialization, lazy loading, queueing, normalization, common fields, and final
+            redaction remain local to its implementation.
+          </p>
+
+          <div class="flow" role="img" aria-label="Analytics data flow">
+            <div class="flow-node">
+              <strong>UI / domain workflows</strong>
+              <span>Upload, import, export, settings, albums, confirmed removal</span>
+            </div>
+            <div class="arrow" aria-hidden="true">→</div>
+            <div class="flow-node">
+              <strong>Lifecycle seams</strong>
+              <span>Upload result + import tracker + playlist controller terminal callbacks</span>
+            </div>
+            <div class="arrow" aria-hidden="true">→</div>
+            <div class="flow-node primary">
+              <strong><code>src/analytics.ts</code></strong>
+              <span>Typed event union, normalization, queue, common fields, redaction</span>
+            </div>
+            <div class="arrow" aria-hidden="true">→</div>
+            <div class="flow-node">
+              <strong>Adapters</strong>
+              <span>No-op by default; lazy PostHog adapter only for a keyed production build</span>
+            </div>
+          </div>
+
+          <div class="interface">
+            <div class="depth">
+              <div class="depth-top">Small interface</div>
+              <div class="depth-body">
+                <pre><code>analytics.capture({
+  type: "import_finished",
+  provider: "soundcloud",
+  importKind: "set",
+  outcome: "partial",
+  counts: { completed: 18, failed: 2, canceled: 0 },
+})</code></pre>
+              </div>
+            </div>
+            <div class="depth">
+              <div class="depth-top">Deep implementation</div>
+              <div class="depth-body">
+                <ul>
+                  <li>Compile-time event and property allowlist.</li>
+                  <li>Provider and stable error-code mapping.</li>
+                  <li><code>event_version</code>, <code>deploy_env</code>, and release SHA.</li>
+                  <li>Production-only initialization and no-op adapter.</li>
+                  <li>Idle-time dynamic import plus bounded early-event queue.</li>
+                  <li><code>before_send</code> denylist/redaction as a final guard.</li>
+                  <li>Explicit PostHog privacy and collection configuration.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <h3>Accurate import aggregation</h3>
+          <p class="lead">
+            The existing playlist controller can merge newly enqueued tracks into an active run, so
+            one terminal queue snapshot cannot reliably describe one URL or SoundCloud set. Add a
+            small <code>ImportLifecycleTracker</code> keyed by an opaque, in-memory operation ID.
+            The ID travels with managed queue tracks but is never sent to PostHog. The tracker
+            receives per-track terminal outcomes from the controller and emits exactly one final
+            event when every expected track is completed, failed, or canceled.
+          </p>
+
+          <div class="grid-2">
+            <div class="card">
+              <h3>Controller change</h3>
+              <p>
+                Add a generic lifecycle callback to the controller dependencies for track
+                completion, failure, and cancellation. Keep the controller analytics-agnostic: it
+                reports typed workflow facts, and its existing tests prove ordering and exactly-once
+                behavior.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Tracker change</h3>
+              <p>
+                Start an operation after input validation; record SoundCloud set resolution; attach
+                the local operation ID to planned tracks; aggregate terminal outcomes; classify the
+                final result as <code>completed</code>, <code>partial</code>, <code>failed</code>,
+                or <code>canceled</code>.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="events">
+          <h2>Event contract and emission points</h2>
+          <p class="lead">
+            Event names describe facts Tagium can actually observe. Property sets are fixed and
+            avoid URLs, names, metadata, response bodies, and arbitrary exception text.
+          </p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Event</th>
+                  <th>Emit when</th>
+                  <th>Allowed event properties</th>
+                  <th>Implementation seam</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="event">audio_upload_completed</td>
+                  <td>Duplicate filtering and parsing have both finished.</td>
+                  <td>
+                    <code>requested_count</code>, <code>accepted_count</code>,
+                    <code>duplicate_count</code>, <code>parse_rejected_count</code>,
+                    <code>target_kind</code>
+                  </td>
+                  <td><code>handleAudioUpload</code> result, after <code>parseUploads</code></td>
+                </tr>
+                <tr>
+                  <td class="event">import_started</td>
+                  <td>A non-empty, valid import is accepted for resolution/planning.</td>
+                  <td><code>provider</code>, <code>import_kind</code></td>
+                  <td><code>handleUrlImport</code> before resolver/controller work</td>
+                </tr>
+                <tr>
+                  <td class="event">import_resolved</td>
+                  <td>A SoundCloud set resolves and a track plan exists.</td>
+                  <td>
+                    <code>provider</code>, <code>import_kind</code>, <code>resolved_count</code>,
+                    <code>has_cover</code>
+                  </td>
+                  <td>Immediately after <code>resolveSoundCloudSet</code></td>
+                </tr>
+                <tr>
+                  <td class="event">import_finished</td>
+                  <td>
+                    Every track in the operation is terminal, or resolution fails before queueing.
+                  </td>
+                  <td>
+                    <code>provider</code>, <code>import_kind</code>, <code>outcome</code>,
+                    <code>total_count</code>, <code>completed_count</code>,
+                    <code>failed_count</code>, <code>canceled_count</code>, optional
+                    <code>error_code</code>, <code>duration_ms</code>
+                  </td>
+                  <td>Import tracker fed by controller terminal callbacks</td>
+                </tr>
+                <tr>
+                  <td class="event">import_retry_started</td>
+                  <td>The controller accepts one or more failed/canceled tracks for retry.</td>
+                  <td>
+                    <code>provider</code>, <code>retry_count</code>,
+                    <code>previous_failed_count</code>, <code>previous_canceled_count</code>
+                  </td>
+                  <td>Controller enqueue result, not the retry button handler</td>
+                </tr>
+                <tr>
+                  <td class="event">import_cancel_requested</td>
+                  <td>An active controller run actually transitions to canceled.</td>
+                  <td>
+                    <code>total_count</code>, <code>completed_count</code>,
+                    <code>active_count</code>, <code>pending_count</code>
+                  </td>
+                  <td>Controller <code>cancel</code> transition</td>
+                </tr>
+                <tr>
+                  <td class="event">export_started</td>
+                  <td>Tagium begins metadata writing / ZIP preparation.</td>
+                  <td>
+                    <code>export_kind</code>, <code>track_count</code>, optional
+                    <code>album_count</code>
+                  </td>
+                  <td>Track, album, or library export workflow</td>
+                </tr>
+                <tr>
+                  <td class="event">export_prepared</td>
+                  <td>The Blob is ready and Tagium has triggered the browser download.</td>
+                  <td>
+                    <code>export_kind</code>, <code>track_count</code>, optional
+                    <code>album_count</code>, <code>size_bucket</code>
+                  </td>
+                  <td>After Blob creation and <code>downloadBlob</code> invocation</td>
+                </tr>
+                <tr>
+                  <td class="event">export_failed</td>
+                  <td>Metadata writing or archive preparation fails.</td>
+                  <td><code>export_kind</code>, <code>error_code</code></td>
+                  <td>Export workflow catch path</td>
+                </tr>
+                <tr>
+                  <td class="event">album_created</td>
+                  <td>The album state update succeeds.</td>
+                  <td><code>seed_track_count</code>, <code>has_cover</code></td>
+                  <td>After <code>createAlbumFromTracks</code> is applied</td>
+                </tr>
+                <tr>
+                  <td class="event">album_edited</td>
+                  <td>The album state update succeeds.</td>
+                  <td><code>track_count</code>, <code>has_cover</code></td>
+                  <td>After <code>updateAlbumMetadata</code> is applied</td>
+                </tr>
+                <tr>
+                  <td class="event">settings_changed</td>
+                  <td>Settings persist successfully and differ from the previous value.</td>
+                  <td>Only allowlisted booleans and <code>audio_bitrate</code></td>
+                  <td><code>handleSettingsChange</code> after save</td>
+                </tr>
+                <tr>
+                  <td class="event">tracks_removed</td>
+                  <td>The #66 confirmation is accepted and removal state is applied.</td>
+                  <td><code>track_count</code>, <code>source_mix</code></td>
+                  <td><code>removeFiles</code>, never the request/cancel path</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="callout">
+            <strong>Export wording is intentionally conservative</strong>
+            <p>
+              The browser can prove that Tagium prepared a file and triggered an anchor download. It
+              cannot prove that the user kept or saved the file, so no event is named
+              <code>*_downloaded</code>.
+            </p>
+          </div>
+        </section>
+
+        <section id="privacy">
+          <h2>Privacy and schema guardrails</h2>
+          <div class="grid-2">
+            <div class="card">
+              <h3>Normalization before capture</h3>
+              <ul>
+                <li>
+                  Provider is exactly <code>youtube</code>, <code>soundcloud</code>, or
+                  <code>other</code>; hostname is never sent.
+                </li>
+                <li>
+                  Errors map to stable codes such as <code>capacity</code>,
+                  <code>rate_limited</code>, <code>service_unavailable</code>, <code>timeout</code>,
+                  <code>resolve_failed</code>, <code>parse_failed</code>,
+                  <code>metadata_write_failed</code>, and <code>unknown</code>.
+                </li>
+                <li>Sizes use coarse buckets where useful, not raw filenames or metadata.</li>
+                <li>Operation IDs stay in memory and are not analytics properties.</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Final <code>before_send</code> guard</h3>
+              <ul>
+                <li>Drop unknown custom event names.</li>
+                <li>Drop properties outside the event-specific allowlist.</li>
+                <li>
+                  For <code>$pageview</code> and <code>$autocapture</code>, remove SDK location and
+                  referrer properties and replace them with an allowlisted
+                  <code>app_view</code> enum; Tagium does not need raw browser locations for product
+                  analytics.
+                </li>
+                <li>
+                  Reject keys associated with URLs, filenames, titles, artists, albums, artwork, raw
+                  messages, response bodies, or tunnel identifiers.
+                </li>
+                <li>
+                  Return <code>null</code> rather than sending an event that cannot be made safe.
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <h3>Explicit PostHog settings</h3>
+          <pre><code>{
+  defaults: "2026-05-30",
+  capture_pageview: "history_change",
+  capture_pageleave: true,
+  autocapture: {
+    dom_event_allowlist: ["click", "submit"],
+    element_allowlist: ["button", "form"],
+  },
+  mask_all_text: true,
+  mask_all_element_attributes: true,
+  disable_session_recording: true,
+  enable_heatmaps: false,
+  disable_surveys: true,
+  person_profiles: "identified_only",
+  before_send: redactAndValidateEvent,
+}</code></pre>
+          <p class="lead" style="margin-top: 12px">
+            This chooses pageviews plus narrow interaction autocapture, with text and element
+            attributes masked. It deliberately excludes session replay, heatmaps, surveys, console
+            logs, copied text, and broad form/input capture. The exact options will be locked by
+            adapter tests against the installed SDK types. See the
+            <a href="https://posthog.com/docs/libraries/js/config"
+              >PostHog JavaScript configuration reference</a
+            >.
+          </p>
+
+          <div class="callout bad">
+            <strong>Never capture</strong>
+            <p>
+              Source URLs, browser locations/referrers, hostnames, filenames, track/album/artist
+              values, artwork bytes or URLs, upstream response bodies, arbitrary exception messages,
+              tunnel IDs, or the PostHog project token in documentation/tests.
+            </p>
+          </div>
+        </section>
+
+        <section id="environment">
+          <h2>Environment isolation</h2>
+          <p class="lead">
+            Activation requires both a key and an explicit production marker. This makes a missing
+            key safely disable analytics and makes an accidentally copied key insufficient to enable
+            preview/test traffic.
+          </p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Build</th>
+                  <th>PostHog key</th>
+                  <th><code>deploy_env</code></th>
+                  <th>Adapter</th>
+                  <th>Expected network</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <strong>Local <code>vp dev</code></strong>
+                  </td>
+                  <td>Absent</td>
+                  <td><code>local</code></td>
+                  <td>No-op</td>
+                  <td>Zero PostHog requests; no warnings</td>
+                </tr>
+                <tr>
+                  <td><strong>Unit tests</strong></td>
+                  <td>Absent</td>
+                  <td><code>test</code></td>
+                  <td>No-op / injected memory adapter</td>
+                  <td>Zero PostHog requests</td>
+                </tr>
+                <tr>
+                  <td><strong>PR / Cloudflare preview</strong></td>
+                  <td>Absent</td>
+                  <td><code>preview</code></td>
+                  <td>No-op</td>
+                  <td>Zero PostHog requests</td>
+                </tr>
+                <tr>
+                  <td><strong>Post-merge E2E</strong></td>
+                  <td>Absent</td>
+                  <td><code>e2e</code></td>
+                  <td>No-op</td>
+                  <td>Zero PostHog requests</td>
+                </tr>
+                <tr>
+                  <td><strong>Production deploy build</strong></td>
+                  <td>GitHub <code>production</code> environment secret/variable</td>
+                  <td><code>production</code></td>
+                  <td>Lazy PostHog</td>
+                  <td>Allowed; every custom event includes environment</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <h3>Repository changes</h3>
+              <ul>
+                <li>Delete PR #65’s committed <code>.env.production</code>.</li>
+                <li>Undo the corresponding <code>.gitignore</code> exception.</li>
+                <li>
+                  Add typed Vite env declarations for key, host, deploy environment, and release
+                  SHA.
+                </li>
+                <li>
+                  Gate initialization on <code>key &amp;&amp; deployEnv === "production"</code>.
+                </li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>#66 workflow changes</h3>
+              <ul>
+                <li>Keep the browser E2E build unkeyed.</li>
+                <li>
+                  Pass PostHog key/host only to the deploy job’s <code>vp build</code> step from the
+                  GitHub <code>production</code> environment.
+                </li>
+                <li>Set deploy environment and exact merge SHA during that build.</li>
+                <li>Do not expose the key to preview workflows or PR-triggered builds.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section id="execution">
+          <h2>Execution phases</h2>
+
+          <div class="phase">
+            <div class="phase-id">Phase 0</div>
+            <div>
+              <h3>Establish the #66 baseline</h3>
+              <p>
+                Fetch both PR branches; inspect the PostHog bot branch permissions and full diff;
+                check out <code>codex/stability-safety</code>; run its focused tests; then restack
+                the PostHog branch locally before editing. Resolve conflicts in favor of #66’s
+                import, confirmed-removal, memory, CI, deploy, <code>.gitignore</code>, and lockfile
+                behavior.
+              </p>
+              <p class="deliverable">
+                Gate: the child branch contains #66 unchanged before analytics work begins.
+              </p>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-id">Phase 1</div>
+            <div>
+              <h3>Write the analytics contract tests first</h3>
+              <p>
+                Add tests for enabled/disabled builds, typed payload mapping, common fields,
+                provider allowlisting, stable error codes, event-specific property allowlists,
+                redaction, and bounded pre-load queue behavior. Use an injected memory adapter; do
+                not make network requests in tests.
+              </p>
+              <p class="deliverable">
+                Gate: red tests describe the full public interface before SDK wiring.
+              </p>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-id">Phase 2</div>
+            <div>
+              <h3>Implement the typed, production-gated analytics module</h3>
+              <p>
+                Replace <code>src/posthog.ts</code> with <code>src/analytics.ts</code>. Implement
+                the no-op and PostHog adapters, dynamic import scheduler, bounded queue,
+                normalization, common fields, explicit SDK config, and final
+                <code>before_send</code> guard. App startup calls a tiny initializer that does not
+                synchronously import the SDK.
+              </p>
+              <p class="deliverable">
+                Gate: adapter tests pass with zero SDK/network work when disabled.
+              </p>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-id">Phase 3</div>
+            <div>
+              <h3>Move upload and mutation events to observed state changes</h3>
+              <p>
+                Instrument upload completion after filtering/parsing; settings after persistence;
+                albums after state update; track removal only inside #66’s confirmed
+                <code>removeFiles</code> path. Remove all direct SDK calls from UI modules.
+              </p>
+              <p class="deliverable">
+                Gate: canceled removals and rejected uploads produce no success event.
+              </p>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-id">Phase 4</div>
+            <div>
+              <h3>Add import lifecycle tracking at the controller seam</h3>
+              <p>
+                Introduce the in-memory operation tracker and generic terminal callbacks. Cover set
+                resolution failure, full completion, partial completion, total failure,
+                cancellation, retry, stale run completion, and hydration/parse errors. Preserve
+                controller concurrency and #66 session-safety behavior.
+              </p>
+              <p class="deliverable">
+                Gate: one terminal event per operation, even when operations share a queue run.
+              </p>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-id">Phase 5</div>
+            <div>
+              <h3>Rename export events around what the browser can prove</h3>
+              <p>
+                Emit <code>export_started</code> before metadata/archive work,
+                <code>export_prepared</code> after the Blob is ready and the browser trigger runs,
+                and <code>export_failed</code> on preparation errors. Apply the same contract to
+                track, album, and full-library exports.
+              </p>
+              <p class="deliverable">Gate: no event claims that the user saved a file.</p>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-id">Phase 6</div>
+            <div>
+              <h3>Wire production-only build values</h3>
+              <p>
+                Remove the committed activation file. Update #66’s deploy job so only the build in
+                the GitHub <code>production</code> environment receives key, host, environment, and
+                release SHA. Keep preview and the preceding E2E build unkeyed, then assert the built
+                artifacts/network behavior for each environment.
+              </p>
+              <p class="deliverable">
+                Gate: preview/E2E send nothing; production Activity receives representative events.
+              </p>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-id">Phase 7</div>
+            <div>
+              <h3>Measure bundle and cold-load impact</h3>
+              <p>
+                Record a #66 baseline and analytics build using the same command/toolchain. Confirm
+                the SDK is a lazy chunk, compare full versus slim entry points if
+                feature-compatible, and record initial chunk gzip size plus a basic
+                cold-load/first-paint measurement.
+              </p>
+              <p class="deliverable">
+                Gate: the PR documents numbers and the chosen SDK entry point.
+              </p>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-id">Phase 8</div>
+            <div>
+              <h3>Review, restack, and submit the Graphite stack</h3>
+              <p>
+                Run the full verification suite, review the final diff against both the handoff and
+                #66, inspect the bot PR’s permissions, track parent/child relationships with
+                <code>gt</code>, and submit the complete stack only after the diff is understood.
+              </p>
+              <p class="deliverable">
+                Gate: GitHub and Graphite both show #66 → PostHog, with #65 targeting #66.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="bundle">
+          <h2>Bundle decision framework</h2>
+          <div class="grid-2">
+            <div class="card">
+              <span class="status green">Default choice</span>
+              <h3>Lazy full SDK in its own chunk</h3>
+              <p>
+                Schedule <code>import("posthog-js")</code> after first paint / during idle time and
+                buffer early events in memory. This removes the reported ~73 kB gzip delta from the
+                initial client chunk without recreating SDK delivery semantics.
+              </p>
+            </div>
+            <div class="card">
+              <span class="status amber">Benchmark</span>
+              <h3>Try <code>dist/module.slim</code></h3>
+              <p>
+                Adopt it only if the installed package exports it cleanly, TypeScript resolves it,
+                and it supports custom capture, pageviews, the selected limited autocapture,
+                masking, and <code>before_send</code>. Otherwise keep the lazy full SDK.
+              </p>
+            </div>
+          </div>
+
+          <div class="callout warn">
+            <strong>Decision rule</strong>
+            <p>
+              Prefer the smallest solution that retains SDK identity, batching, retries, unload
+              delivery, and opt-out behavior. A CDN snippet merely relocates bytes; a bespoke
+              capture transport is out of scope unless measured SDK startup cost remains
+              unacceptable after code splitting.
+            </p>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Variant</th>
+                  <th>Measure</th>
+                  <th>Accept when</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>#66 baseline</strong></td>
+                  <td>Initial chunk min/gzip; cold first paint</td>
+                  <td>Reference only</td>
+                </tr>
+                <tr>
+                  <td><strong>Lazy full SDK</strong></td>
+                  <td>Initial chunk, lazy chunk, cold first paint, idle request timing</td>
+                  <td>Initial path is near baseline and all required features work</td>
+                </tr>
+                <tr>
+                  <td><strong>Lazy slim SDK</strong></td>
+                  <td>Same metrics plus functional config tests</td>
+                  <td>Smaller and feature-equivalent; no type/export workaround</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="stack">
+          <h2>Graphite stack procedure</h2>
+          <div class="stack" role="img" aria-label="PR 66 is the parent and PR 65 is the child">
+            <div class="branch parent">
+              <small>Parent · merge first</small>
+              <strong>PR #66 · Stability</strong>
+              <code>codex/stability-safety</code>
+            </div>
+            <div class="stack-arrow" aria-hidden="true">→</div>
+            <div class="branch child">
+              <small>Child · analytics</small>
+              <strong>PR #65 · PostHog</strong>
+              <code>posthog/instrumentation-dbe758</code>
+            </div>
+          </div>
+
+          <ol style="margin-top: 18px">
+            <li>Start from a clean worktree and fetch both PR branches.</li>
+            <li>Confirm #66 is tracked in Graphite with <code>main</code> as parent.</li>
+            <li>Check out the PostHog branch and restack/rebase it onto #66.</li>
+            <li>
+              Resolve shared files in favor of #66 first, then reapply analytics through the new
+              module and lifecycle seams.
+            </li>
+            <li>
+              Review the complete diff and inspect whether the PostHog bot branch can be updated.
+            </li>
+            <li>Track the PostHog branch with #66 as its Graphite parent.</li>
+            <li>
+              Use <code>gt submit --stack</code> (after consulting local <code>gt --help</code> for
+              the installed version) to publish/update stack metadata.
+            </li>
+            <li>Confirm #65 targets <code>codex/stability-safety</code>, not <code>main</code>.</li>
+          </ol>
+
+          <div class="callout bad">
+            <strong>Publishing safety</strong>
+            <p>
+              Do not force-push, retarget, or submit until the full restacked diff and bot-branch
+              permissions are understood. Use <code>gt</code> for the stacked relationship, not a
+              plain <code>gh pr create</code> workflow.
+            </p>
+          </div>
+        </section>
+
+        <section id="verification">
+          <h2>Verification and definition of done</h2>
+          <div class="grid-2">
+            <div class="card">
+              <h3>Automated commands</h3>
+              <pre><code>vp check
+vp test
+bun run build
+bun run test:e2e</code></pre>
+              <p style="margin-top: 10px">
+                Run focused adapter, import tracker, playlist controller, upload, export, and
+                environment tests during implementation; run the full suite before submission.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Environment probes</h3>
+              <ul>
+                <li>Intercept network in preview and E2E: no PostHog hosts/paths requested.</li>
+                <li>Inspect production build: configured key and release SHA are present.</li>
+                <li>Run local <code>vp dev</code> without a key: no warning and no request.</li>
+                <li>Check PostHog Activity with representative production events.</li>
+                <li>
+                  Confirm every custom event carries <code>event_version</code> and
+                  <code>deploy_env</code>.
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <h3>Acceptance checklist</h3>
+          <div class="grid-2">
+            <div>
+              <div class="gate">
+                <span class="check">✓</span
+                ><span>No direct PostHog imports outside <code>src/analytics.ts</code>.</span>
+              </div>
+              <div class="gate">
+                <span class="check">✓</span
+                ><span
+                  >Replay is explicitly disabled in code and confirmed in network traffic.</span
+                >
+              </div>
+              <div class="gate">
+                <span class="check">✓</span
+                ><span>Upload counts reflect accepted, duplicate, and parse-rejected files.</span>
+              </div>
+              <div class="gate">
+                <span class="check">✓</span
+                ><span
+                  >Set imports distinguish resolved, completed, partial, failed, and canceled
+                  outcomes.</span
+                >
+              </div>
+              <div class="gate">
+                <span class="check">✓</span
+                ><span>Retry/cancel events originate at controller transitions.</span>
+              </div>
+              <div class="gate">
+                <span class="check">✓</span
+                ><span>Removal is captured only after #66 confirmation.</span>
+              </div>
+            </div>
+            <div>
+              <div class="gate">
+                <span class="check">✓</span
+                ><span
+                  >No URL, filename, metadata value, artwork, raw error, response body, or tunnel ID
+                  appears in a payload.</span
+                >
+              </div>
+              <div class="gate">
+                <span class="check">✓</span
+                ><span>Preview, test, and E2E builds make no PostHog requests.</span>
+              </div>
+              <div class="gate">
+                <span class="check">✓</span><span>Production build is the only keyed build.</span>
+              </div>
+              <div class="gate">
+                <span class="check">✓</span
+                ><span>Bundle and cold-load deltas are recorded in the PR.</span>
+              </div>
+              <div class="gate">
+                <span class="check">✓</span
+                ><span>Final diff passes standards/spec review against #66 and this plan.</span>
+              </div>
+              <div class="gate">
+                <span class="check">✓</span
+                ><span>Graphite shows #66 → #65 and GitHub bases match.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="files">
+          <h2>Expected file map</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>File</th>
+                  <th>Planned responsibility / change</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>src/analytics.ts</code></td>
+                  <td>
+                    Typed public interface, adapters, lazy queue, config, normalization, redaction.
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>src/analytics.test.ts</code></td>
+                  <td>Enabled/disabled, schema, common fields, redaction, queue, config tests.</td>
+                </tr>
+                <tr>
+                  <td><code>src/vite-env.d.ts</code></td>
+                  <td>Typed build-time key, host, environment, and release SHA declarations.</td>
+                </tr>
+                <tr>
+                  <td><code>src/main.tsx</code></td>
+                  <td>Call tiny initializer; never synchronously import the PostHog SDK.</td>
+                </tr>
+                <tr>
+                  <td><code>components/audio/importLifecycle.ts</code></td>
+                  <td>Aggregate one import operation independently of shared queue runs.</td>
+                </tr>
+                <tr>
+                  <td><code>components/audio/importLifecycle.test.ts</code></td>
+                  <td>Completed/partial/failed/canceled/exactly-once operation outcomes.</td>
+                </tr>
+                <tr>
+                  <td><code>components/audio/playlistDownloadController.ts</code></td>
+                  <td>
+                    Report analytics-agnostic terminal lifecycle facts and accepted retries/cancel.
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>components/audio/playlistDownloadController.test.ts</code></td>
+                  <td>
+                    Prove callback order, stale-run safety, and exactly-once terminal reporting.
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>components/audio/audioTagger.tsx</code></td>
+                  <td>
+                    Integrate typed capture at post-#66 upload, import, export, mutation seams.
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>components/audio/audioTagger.test.ts</code></td>
+                  <td>
+                    Outcome timing, confirmation behavior, and payload count integration tests.
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>components/audio/LandingScreen.tsx</code></td>
+                  <td>Keep presentation/error display only; remove direct analytics calls.</td>
+                </tr>
+                <tr>
+                  <td><code>.github/workflows/e2e.yaml</code></td>
+                  <td>Pass analytics values only to the production deploy build step.</td>
+                </tr>
+                <tr>
+                  <td><code>.env.production</code></td>
+                  <td>Delete from #65; never commit the activation value.</td>
+                </tr>
+                <tr>
+                  <td><code>.gitignore</code></td>
+                  <td>Preserve #66 behavior; remove the PostHog PR’s production-env exception.</td>
+                </tr>
+                <tr>
+                  <td><code>package.json</code> / <code>bun.lock</code></td>
+                  <td>Keep the approved PostHog dependency and lockfile, resolving against #66.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="callout">
+            <strong>Scope control</strong>
+            <p>
+              This plan does not introduce a custom analytics backend, identity system, session
+              replay, consent UI, broad import refactor, or persistence layer. If the implementation
+              reveals a need for any of those, stop and reassess rather than silently expanding #65.
+            </p>
+          </div>
+        </section>
+
+        <footer>
+          Tagium PostHog implementation plan · based on
+          <a href="/tmp/tagium-posthog-pr-handoff.md">tagium-posthog-pr-handoff.md</a>, PR #65, PR
+          #66, the current repository, and PostHog’s JavaScript configuration documentation.
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

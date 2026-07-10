@@ -49,7 +49,8 @@ export const saveAppSettings = (settings: AppSettings, storage?: Pick<Storage, "
   try {
     const targetStorage = storage ?? localStorage;
     targetStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    return true;
   } catch {
-    return;
+    return false;
   }
 };

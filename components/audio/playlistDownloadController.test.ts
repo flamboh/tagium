@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { Effect } from "effect";
 import {
   createPlaylistDownloadController,
+  type PlaylistDownloadControllerAction,
   type PlaylistDownloadControllerSnapshot,
 } from "./playlistDownloadController";
 import type { PlaylistDownloadRuntimeTrack } from "./playlistDownloadQueueRuntime";
@@ -47,6 +48,12 @@ const createControllerHarness = (
   const hydrations = new Map<string, ReturnType<typeof deferred<void>>>();
   const downloadSignals = new Map<string, AbortSignal>();
   const hydrationSignals = new Map<string, AbortSignal>();
+  const lifecycle: Array<{
+    track: Track;
+    outcome: "completed" | "failed" | "canceled";
+    error?: unknown;
+  }> = [];
+  const actions: PlaylistDownloadControllerAction<Track>[] = [];
   const fileErrorTrackIds = new Set<string>();
   const now = options.now ?? (() => Date.now());
 
@@ -82,6 +89,8 @@ const createControllerHarness = (
     markQueued: (nextTracks) => queued.push(nextTracks.map((track) => track.fileId)),
     markCanceled: (trackIds) => canceled.push(trackIds),
     markFailed: (trackId, error) => failed.push({ trackId, error }),
+    onTrackSettled: (event) => lifecycle.push(event),
+    onAction: (event) => actions.push(event),
     emitSnapshot: (snapshot) => snapshots.push(snapshot),
   });
 
@@ -96,6 +105,8 @@ const createControllerHarness = (
     hydrations,
     downloadSignals,
     hydrationSignals,
+    lifecycle,
+    actions,
     fileErrorTrackIds,
   };
 };
@@ -179,6 +190,29 @@ describe("playlistDownloadController", () => {
       canceledCount: 4,
       active: [],
     });
+    expect(harness.lifecycle).toEqual(
+      expect.arrayContaining(
+        tracks(4).map((track) => ({
+          track,
+          outcome: "canceled",
+        })),
+      ),
+    );
+    expect(harness.actions).toEqual([
+      {
+        type: "cancel_requested",
+        snapshot: expect.objectContaining({
+          total: 4,
+          completed: 0,
+          active: [
+            expect.objectContaining({ fileId: "track-1" }),
+            expect.objectContaining({ fileId: "track-2" }),
+            expect.objectContaining({ fileId: "track-3" }),
+          ],
+          pending: 1,
+        }),
+      },
+    ]);
   });
 
   it("retries failed, canceled, and completed-with-file-error tracks without duplicates", async () => {
@@ -203,6 +237,19 @@ describe("playlistDownloadController", () => {
       pending: 0,
     });
     expect(harness.controller.getSnapshot()?.trackIds).toEqual(["track-1", "track-2", "track-3"]);
+    expect(harness.actions).toEqual([
+      {
+        type: "retry_started",
+        tracks: tracks(3),
+        previousSnapshot: expect.objectContaining({
+          total: 3,
+          completed: 1,
+          failed: 1,
+          canceledCount: 1,
+          done: true,
+        }),
+      },
+    ]);
   });
 
   it("does not let stale completions mutate a newer run", async () => {
@@ -264,5 +311,26 @@ describe("playlistDownloadController", () => {
       completed: 1,
       done: true,
     });
+  });
+
+  it("reports completion only after download and hydration both succeed", async () => {
+    const harness = createControllerHarness();
+    harness.hydrations.set("track-1", deferred<void>());
+    harness.controller.enqueue([tracks(1)[0]]);
+    await flushEffects();
+
+    harness.downloads.get("track-1")?.resolve(audioFile("track-1.mp3"));
+    await flushEffects();
+    expect(harness.lifecycle).toEqual([]);
+
+    harness.hydrations.get("track-1")?.resolve();
+    await flushEffects();
+
+    expect(harness.lifecycle).toEqual([
+      {
+        track: tracks(1)[0],
+        outcome: "completed",
+      },
+    ]);
   });
 });

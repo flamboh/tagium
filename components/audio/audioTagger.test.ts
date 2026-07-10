@@ -4,6 +4,7 @@ import {
   getFileImportKey,
   getSubmittedAudioMetadata,
   getTagiumFileImportKey,
+  getTrackSourceMix,
 } from "./audioTagger";
 import type { AudioMetadata } from "./types";
 
@@ -111,5 +112,21 @@ describe("audioTagger metadata patches", () => {
     );
 
     expect(patch).toEqual({ title: "New Title" });
+  });
+
+  it("summarizes removed track sources without exposing their URLs", () => {
+    expect(
+      getTrackSourceMix([
+        { id: "local", filename: "local.mp3", status: "saved", downloadStatus: "ready" },
+        {
+          id: "imported",
+          filename: "imported.mp3",
+          status: "saved",
+          downloadStatus: "ready",
+          downloadRequest: { sourceUrl: "https://soundcloud.com/private", audioBitrate: "320" },
+        },
+      ]),
+    ).toBe("mixed");
+    expect(getTrackSourceMix([])).toBe("unknown");
   });
 });

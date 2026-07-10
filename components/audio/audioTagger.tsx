@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } fr
 import { Cause, Effect, Exit } from "effect";
 import { SubmitHandler, useForm } from "react-hook-form";
 import filenamify from "filenamify";
+import { analytics, type TrackSourceMix } from "@/src/analytics";
 import AlbumMetadataDialog, { AlbumMetadataDraft } from "./AlbumMetadataDialog";
 import DestructiveActionDialog from "./DestructiveActionDialog";
 import {
@@ -64,6 +65,7 @@ import {
 import { loadAppSettings, saveAppSettings } from "./settings";
 import { getSampleAlbum } from "./sampleMetadata";
 import { hasRecoverableSessionWork, useBeforeUnloadProtection } from "./sessionSafety";
+import { createImportLifecycleTracker, type ImportLifecycleTracker } from "./importLifecycle";
 import { isSoundCloudSetUrl, resolveSoundCloudSet, type SoundCloudSet } from "./soundcloudSet";
 import { getDownloadErrorMessage, notifyDownloadError } from "./downloadErrorMessage";
 import {
@@ -76,7 +78,7 @@ import {
 } from "./types";
 
 type ActiveView = "editor" | "settings";
-type ManagedDownloadTrack = QueuedDownloadTrack;
+type ManagedDownloadTrack = QueuedDownloadTrack & { importOperationId?: string };
 type PlaylistDownloadQueueState = PlaylistDownloadControllerSnapshot;
 
 const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
@@ -90,6 +92,13 @@ const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
 export const getFileImportKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
 export const getTagiumFileImportKey = (file: TagiumFile) =>
   file.sourceImportKey ?? (file.originalFile ? getFileImportKey(file.originalFile) : undefined);
+export const getTrackSourceMix = (files: TagiumFile[]): TrackSourceMix => {
+  if (files.length === 0) return "unknown";
+  const importedCount = files.filter((file) => Boolean(file.downloadRequest)).length;
+  if (importedCount === 0) return "local";
+  if (importedCount === files.length) return "imported";
+  return "mixed";
+};
 const getManagedDownloadTrackTitle = (file: TagiumFile) => {
   if (file.metadata?.title) return file.metadata.title;
   return file.filename;
@@ -284,6 +293,14 @@ export default function AudioTagger() {
   const playlistDownloadQueueRef = useRef<PlaylistDownloadQueueState | null>(null);
   const playlistDownloadControllerRef =
     useRef<PlaylistDownloadController<ManagedDownloadTrack> | null>(null);
+  const importLifecycleTrackerRef = useRef<ImportLifecycleTracker | null>(null);
+  if (!importLifecycleTrackerRef.current) {
+    importLifecycleTrackerRef.current = createImportLifecycleTracker({
+      capture: analytics.capture,
+      createId: () => crypto.randomUUID(),
+      now: () => Date.now(),
+    });
+  }
   filesRef.current = files;
   albumsRef.current = albums;
   selectedFileIdRef.current = selectedFileId;
@@ -590,11 +607,28 @@ export default function AudioTagger() {
         return true;
       });
 
-      if (uniqueUploadedFiles.length === 0) return;
+      let acceptedCount = 0;
+      let targetKind: "loose" | "album" = targetAlbumId || importedAlbum ? "album" : "loose";
+      const captureUploadResult = () => {
+        analytics.capture({
+          type: "audio_upload_completed",
+          requestedCount: uploadedFiles.length,
+          acceptedCount,
+          duplicateCount: uploadedFiles.length - uniqueUploadedFiles.length,
+          parseRejectedCount: uniqueUploadedFiles.length - acceptedCount,
+          targetKind,
+        });
+      };
+
+      if (uniqueUploadedFiles.length === 0) {
+        captureUploadResult();
+        return;
+      }
 
       setLoading(true);
       try {
         const parsedUploads = await runAudioBackendEffect(parseUploads(uniqueUploadedFiles));
+        acceptedCount = parsedUploads.length;
         if (parsedUploads.length === 0) return;
         const orderedUploads = sortUploadedTracksByTrackNumber(parsedUploads);
 
@@ -616,6 +650,7 @@ export default function AudioTagger() {
         );
         const forceSingleAlbum =
           !hasTargetAlbum && (parsedUploads.length > 1 || Boolean(importedAlbum));
+        if (hasTargetAlbum || forceSingleAlbum || importedAlbum) targetKind = "album";
         let firstSelectedAlbumId: string | null = null;
 
         if (hasTargetAlbum && targetAlbumId) {
@@ -715,12 +750,14 @@ export default function AudioTagger() {
           }
           const firstUploadedTrack = orderedUploads[0];
           const firstTrackIsLoose = !forceSingleAlbum && !firstUploadedTrack.albumSeed.title.trim();
+          targetKind = firstTrackIsLoose ? "loose" : "album";
           setSelectedFileId(firstUploadedTrack.file.id);
           setSelectedAlbumId(firstTrackIsLoose ? null : firstSelectedAlbumId);
         }
       } finally {
         reservedImportKeys.forEach((importKey) => pendingImportKeysRef.current.delete(importKey));
         setLoading(false);
+        captureUploadResult();
       }
     };
 
@@ -900,6 +937,33 @@ export default function AudioTagger() {
       markQueued: markDownloadsQueued,
       markCanceled: markDownloadsCanceled,
       markFailed: markDownloadError,
+      onTrackSettled: ({ track, outcome, error }) => {
+        if (!track.importOperationId) return;
+        importLifecycleTrackerRef.current?.settle(track.importOperationId, {
+          trackId: track.fileId,
+          outcome,
+          ...(error === undefined ? {} : { error }),
+        });
+      },
+      onAction: (event) => {
+        if (event.type === "cancel_requested") {
+          analytics.capture({
+            type: "import_cancel_requested",
+            totalCount: event.snapshot.total,
+            completedCount: event.snapshot.completed,
+            activeCount: event.snapshot.active.length,
+            pendingCount: event.snapshot.pending,
+          });
+          return;
+        }
+        analytics.capture({
+          type: "import_retry_started",
+          sourceUrls: event.tracks.map((track) => track.downloadRequest.sourceUrl),
+          retryCount: event.tracks.length,
+          previousFailedCount: event.previousSnapshot.failed,
+          previousCanceledCount: event.previousSnapshot.canceledCount,
+        });
+      },
       emitSnapshot: (snapshot) => {
         playlistDownloadQueueRef.current = snapshot;
         setPlaylistDownloadQueue(snapshot);
@@ -921,7 +985,7 @@ export default function AudioTagger() {
       downloadRequest: file.downloadRequest,
     };
   };
-  const handleAudioDownload = (sourceUrl: string) => {
+  const handleAudioDownload = (sourceUrl: string, importOperationId: string) => {
     bufferCurrentFormMetadata();
     setActiveView("editor");
     const plan = createSingleUrlDownloadPlan({
@@ -939,9 +1003,13 @@ export default function AudioTagger() {
     setSelectedFileId(plan.selection.selectedFileId);
     setSelectedFileIds(plan.selection.selectedFileIds);
     setLastSelectedFileId(plan.selection.lastSelectedFileId);
-    queueDownloadTracks(plan.queuedTracks);
+    importLifecycleTrackerRef.current?.resolve(importOperationId, {
+      trackIds: plan.queuedTracks.map((track) => track.fileId),
+      hasCover: false,
+    });
+    queueDownloadTracks(plan.queuedTracks.map((track) => ({ ...track, importOperationId })));
   };
-  const handleSoundCloudSetDownload = (set: SoundCloudSet) => {
+  const handleSoundCloudSetDownload = (set: SoundCloudSet, importOperationId: string) => {
     bufferCurrentFormMetadata();
     setActiveView("editor");
     const plan = createSoundCloudSetDownloadPlan({
@@ -1007,21 +1075,35 @@ export default function AudioTagger() {
       })();
     }
 
-    queueDownloadTracks(plan.queuedTracks);
+    importLifecycleTrackerRef.current?.resolve(importOperationId, {
+      trackIds: plan.queuedTracks.map((track) => track.fileId),
+      hasCover: Boolean(set.coverUrl),
+    });
+    queueDownloadTracks(plan.queuedTracks.map((track) => ({ ...track, importOperationId })));
   };
   const handleUrlImport = async (sourceUrl: string) => {
     const trimmedUrl = sourceUrl.trim();
     if (!trimmedUrl) return;
 
+    const importKind = isSoundCloudSetUrl(trimmedUrl) ? "set" : "single";
+    const importOperationId = importLifecycleTrackerRef.current!.start({
+      sourceUrl: trimmedUrl,
+      importKind,
+    });
     setUrlImporting(true);
     try {
-      if (isSoundCloudSetUrl(trimmedUrl)) {
-        const set = await resolveSoundCloudSet(trimmedUrl);
-        handleSoundCloudSetDownload(set);
+      if (importKind === "set") {
+        try {
+          const set = await resolveSoundCloudSet(trimmedUrl);
+          handleSoundCloudSetDownload(set, importOperationId);
+        } catch (error) {
+          importLifecycleTrackerRef.current?.fail(importOperationId, error, "resolve");
+          throw error;
+        }
         return;
       }
 
-      handleAudioDownload(trimmedUrl);
+      handleAudioDownload(trimmedUrl, importOperationId);
     } finally {
       setUrlImporting(false);
     }
@@ -1053,6 +1135,9 @@ export default function AudioTagger() {
   const handleDownloadAll = async () => {
     if (files.length === 0) return;
     if (!allTracksReadyForDownload(filesRef.current)) return;
+    const trackCount = filesRef.current.length;
+    const albumCount = albumsRef.current.length;
+    analytics.capture({ type: "export_started", exportKind: "library", trackCount, albumCount });
     setLoading(true);
     try {
       const syncedFiles = prepareFilesForExport();
@@ -1063,19 +1148,41 @@ export default function AudioTagger() {
         looseTrackIds,
         files: filesRef.current,
       });
-      if (entries.length === 0) return;
+      if (entries.length === 0) throw new Error("library export had no entries.");
 
       const blob = await createZipBlob(entries);
       downloadBlob(blob, createLibraryDownloadFilename());
+      analytics.capture({
+        type: "export_prepared",
+        exportKind: "library",
+        trackCount,
+        albumCount,
+        sizeBytes: blob.size,
+      });
     } catch (error) {
+      analytics.capture({ type: "export_failed", exportKind: "library", error });
       console.error("error downloading all files:", error);
     } finally {
       setLoading(false);
     }
   };
   const handleSettingsChange = (nextSettings: AppSettings) => {
-    saveAppSettings(nextSettings);
+    const settingsChanged =
+      settings.syncTrackNumbers !== nextSettings.syncTrackNumbers ||
+      settings.syncFilenames !== nextSettings.syncFilenames ||
+      settings.audioBitrate !== nextSettings.audioBitrate ||
+      settings.applySoundCloudAlbumCoverToTracks !== nextSettings.applySoundCloudAlbumCoverToTracks;
+    const settingsSaved = saveAppSettings(nextSettings);
     setSettings(nextSettings);
+    if (settingsSaved && settingsChanged) {
+      analytics.capture({
+        type: "settings_changed",
+        syncTrackNumbers: nextSettings.syncTrackNumbers,
+        syncFilenames: nextSettings.syncFilenames,
+        audioBitrate: nextSettings.audioBitrate,
+        applySoundCloudCover: nextSettings.applySoundCloudAlbumCoverToTracks,
+      });
+    }
     let syncedFiles = filesRef.current;
     if (!settings.syncTrackNumbers && nextSettings.syncTrackNumbers) {
       syncedFiles = applyTrackOrderNumbersToFiles(
@@ -1102,6 +1209,8 @@ export default function AudioTagger() {
   const handleDownloadAlbum = async (albumId: string) => {
     const album = albumsRef.current.find((a) => a.id === albumId);
     if (!album) return;
+    const trackCount = album.trackIds.length;
+    analytics.capture({ type: "export_started", exportKind: "album", trackCount, albumCount: 1 });
     setLoading(true);
     try {
       const syncedFiles = prepareFilesForExport([albumId]);
@@ -1110,7 +1219,9 @@ export default function AudioTagger() {
         .filter((file): file is TagiumFile & { file: File; metadata: AudioMetadata } =>
           Boolean(file?.file && file.metadata),
         );
-      if (albumFiles.length !== album.trackIds.length) return;
+      if (albumFiles.length !== album.trackIds.length) {
+        throw new Error("album export tracks were not ready.");
+      }
       await writeFilesForExport(albumFiles);
 
       const entries = getLibraryDownloadEntries({
@@ -1120,16 +1231,20 @@ export default function AudioTagger() {
         albumRoot: "",
         includeUnassignedFiles: false,
       });
-      if (entries.length === 0) return;
+      if (entries.length === 0) throw new Error("album export had no entries.");
 
       const blob = await createZipBlob(entries);
       const albumFilename = filenamify(album.title, { replacement: "-" });
-      if (albumFilename) {
-        downloadBlob(blob, `${albumFilename}.zip`);
-        return;
-      }
-      downloadBlob(blob, "album.zip");
+      downloadBlob(blob, albumFilename ? `${albumFilename}.zip` : "album.zip");
+      analytics.capture({
+        type: "export_prepared",
+        exportKind: "album",
+        trackCount,
+        albumCount: 1,
+        sizeBytes: blob.size,
+      });
     } catch (error) {
+      analytics.capture({ type: "export_failed", exportKind: "album", error });
       console.error("error downloading album:", error);
     } finally {
       setLoading(false);
@@ -1139,18 +1254,27 @@ export default function AudioTagger() {
     if (!selectedFile) return;
     const fileId = selectedFile.id;
     const submittedData = getSubmittedMetadata(data);
+    analytics.capture({ type: "export_started", exportKind: "track", trackCount: 1 });
     try {
       await handleTagUpdate(selectedFile, submittedData);
       const updatedFile = filesRef.current.find((file) => file.id === fileId);
-      if (!updatedFile?.file) return;
+      if (!updatedFile?.file) throw new Error("track export was not ready.");
       downloadBlob(updatedFile.file, updatedFile.filename);
+      analytics.capture({
+        type: "export_prepared",
+        exportKind: "track",
+        trackCount: 1,
+        sizeBytes: updatedFile.file.size,
+      });
     } catch (error) {
+      analytics.capture({ type: "export_failed", exportKind: "track", error });
       console.error("failed to update tags before download:", error);
     }
   };
   const removeFiles = useCallback(
     (idsToRemove: string[]) => {
       const idSet = new Set(idsToRemove);
+      const removedFiles = filesRef.current.filter((file) => idSet.has(file.id));
       const affectedAlbumIds = albumsRef.current
         .filter((album) => album.trackIds.some((trackId) => idSet.has(trackId)))
         .map((album) => album.id);
@@ -1178,6 +1302,13 @@ export default function AudioTagger() {
       setLastSelectedFileId((currentFileId) =>
         currentFileId && idSet.has(currentFileId) ? null : currentFileId,
       );
+      if (removedFiles.length > 0) {
+        analytics.capture({
+          type: "tracks_removed",
+          trackCount: removedFiles.length,
+          sourceMix: getTrackSourceMix(removedFiles),
+        });
+      }
     },
     [settings.syncTrackNumbers],
   );
@@ -1505,6 +1636,11 @@ export default function AudioTagger() {
 
         filesRef.current = taggedFiles;
         setFiles(taggedFiles);
+        analytics.capture({
+          type: "album_edited",
+          trackCount: updatedAlbum.trackIds.length,
+          hasCover: Boolean(updatedAlbum.cover?.length),
+        });
       }
       closeAlbumDialog();
       return;
@@ -1535,6 +1671,11 @@ export default function AudioTagger() {
               return applySyncedFilenamesToFiles(taggedFiles, createdAlbum.trackIds);
             }
             return taggedFiles;
+          });
+          analytics.capture({
+            type: "album_created",
+            trackCount: createdAlbum.trackIds.length,
+            hasCover: Boolean(createdAlbum.cover?.length),
           });
         }
       }
