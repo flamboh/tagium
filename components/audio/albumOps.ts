@@ -93,6 +93,12 @@ export function mergeUploadedTracksIntoAlbums(
   const albumByKey = new Map(
     nextAlbums.map((album) => [buildAlbumKey(album.title, album.artist), album]),
   );
+  const uploadedAlbumCounts = new Map<string, number>();
+  for (const { albumSeed } of parsedUploads) {
+    if (!albumSeed.title.trim()) continue;
+    const key = buildAlbumKey(albumSeed.title, albumSeed.artist);
+    uploadedAlbumCounts.set(key, (uploadedAlbumCounts.get(key) ?? 0) + 1);
+  }
   let firstSelectedAlbumId: string | null = null;
   const unassignedTrackIds: string[] = [];
   const albumsToSync = new Set<string>();
@@ -100,12 +106,12 @@ export function mergeUploadedTracksIntoAlbums(
   parsedUploads.forEach((upload, index) => {
     const { albumSeed } = upload;
 
-    if (!albumSeed.title.trim()) {
+    const key = buildAlbumKey(albumSeed.title, albumSeed.artist);
+    if (!albumSeed.title.trim() || (uploadedAlbumCounts.get(key) ?? 0) < 2) {
       unassignedTrackIds.push(upload.file.id);
       return;
     }
 
-    const key = buildAlbumKey(albumSeed.title, albumSeed.artist);
     let targetAlbum = albumByKey.get(key);
 
     if (!targetAlbum) {

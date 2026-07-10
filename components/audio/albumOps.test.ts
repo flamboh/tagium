@@ -77,6 +77,33 @@ describe("albumOps", () => {
     expect(result.albumsToSync).toEqual([]);
   });
 
+  it("keeps a single upload with album metadata loose", () => {
+    const result = mergeUploadedTracksIntoAlbums(
+      [],
+      [upload("track-1", { title: "Tagged Album", artist: "Tagged Artist", genre: "Rock" })],
+    );
+
+    expect(result.albums).toEqual([]);
+    expect(result.firstSelectedAlbumId).toBeNull();
+    expect(result.unassignedTrackIds).toEqual(["track-1"]);
+    expect(result.albumsToSync).toEqual([]);
+  });
+
+  it("groups only matching album metadata from a multi-track upload", () => {
+    const result = mergeUploadedTracksIntoAlbums(
+      [],
+      [
+        upload("track-1", { title: "Tagged Album", artist: "Tagged Artist", genre: "Rock" }),
+        upload("track-2", { title: "Tagged Album", artist: "Tagged Artist", genre: "Rock" }),
+        upload("track-3", { title: "Single Metadata", artist: "Tagged Artist", genre: "Rock" }),
+      ],
+    );
+
+    expect(result.albums).toHaveLength(1);
+    expect(result.albums[0].trackIds).toEqual(["track-1", "track-2"]);
+    expect(result.unassignedTrackIds).toEqual(["track-3"]);
+  });
+
   it("moves tracks between album and loose sidebar lists", () => {
     const result = moveTrackInSidebar(
       [album("album-1", ["a", "b"]), album("album-2", ["c"])],
