@@ -156,8 +156,9 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
     Effect.gen(function* () {
       if (!deps.hasTrack(track.fileId)) {
         yield* Effect.sync(() => {
-          markPlaylistDownloadTrackCompleted(run, track.fileId, now());
-          deps.onTrackSettled?.({ track, outcome: "completed" });
+          markPlaylistDownloadTrackCanceled(run, track.fileId, now());
+          deps.markCanceled([track.fileId]);
+          deps.onTrackSettled?.({ track, outcome: "canceled" });
         });
         return;
       }

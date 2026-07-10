@@ -169,8 +169,10 @@ const errorCodeFrom = (
 };
 
 type BeforeSendEvent = {
+  uuid?: string;
   event: string;
   properties: Record<string, unknown>;
+  timestamp?: Date;
 };
 
 const COMMON_CUSTOM_PROPERTIES = ["event_version", "deploy_env", "release_sha"];
@@ -243,6 +245,34 @@ const CUSTOM_EVENT_PROPERTIES: Record<string, ReadonlySet<string>> = {
   ]),
 };
 const SAFE_SDK_EVENTS = new Set(["$pageview", "$pageleave", "$autocapture"]);
+const SAFE_SDK_PROPERTIES = new Set([
+  "token",
+  "distinct_id",
+  "$device_id",
+  "$session_id",
+  "$window_id",
+  "$pageview_id",
+  "$insert_id",
+  "$time",
+  "$sent_at",
+  "$lib",
+  "$lib_version",
+  "$browser",
+  "$browser_version",
+  "$os",
+  "$os_version",
+  "$device_type",
+  "$screen_height",
+  "$screen_width",
+  "$viewport_height",
+  "$viewport_width",
+  "$timezone",
+  "$timezone_offset",
+  "$event_type",
+  "$prev_pageview_duration",
+  "$process_person_profile",
+  "$geoip_disable",
+]);
 const SENSITIVE_PROPERTY_NAME =
   /(?:url|href|referrer|pathname|host|filename|artist|album|artwork|message|response|body|tunnel|text|elements)/i;
 const URL_VALUE = /https?:\/\//i;
@@ -255,14 +285,20 @@ const redactAndValidateEvent = (event: BeforeSendEvent): BeforeSendEvent | null 
   const properties: Record<string, unknown> = {};
   for (const [property, value] of Object.entries(event.properties ?? {})) {
     const isAllowedCustomProperty = customAllowedProperties?.has(property) ?? false;
-    if (!isAllowedCustomProperty && !property.startsWith("$")) continue;
+    const isAllowedSdkProperty = SAFE_SDK_PROPERTIES.has(property);
+    if (!isAllowedCustomProperty && !isAllowedSdkProperty) continue;
     if (!isAllowedCustomProperty && SENSITIVE_PROPERTY_NAME.test(property)) continue;
     if (!isAllowedCustomProperty && typeof value === "string" && URL_VALUE.test(value)) continue;
     properties[property] = value;
   }
 
   if (isSdkEvent) properties.app_view = "tagium";
-  return { ...event, properties };
+  return {
+    ...(event.uuid === undefined ? {} : { uuid: event.uuid }),
+    event: event.event,
+    properties,
+    ...(event.timestamp === undefined ? {} : { timestamp: event.timestamp }),
+  };
 };
 
 const sizeBucket = (sizeBytes: number) => {
@@ -431,11 +467,20 @@ export const createAnalytics = (
   let client: AnalyticsClient | undefined;
   let loadScheduled = false;
 
+  const captureSafely = (event: AnalyticsEvent) => {
+    if (!client) return;
+    const serialized = serializeEvent(event, config);
+    try {
+      client.capture(serialized.name, serialized.properties);
+    } catch {
+      // Analytics must never interrupt the product workflow that emitted it.
+    }
+  };
+
   const flush = () => {
     if (!client) return;
     for (const event of queue.splice(0)) {
-      const serialized = serializeEvent(event, config);
-      client.capture(serialized.name, serialized.properties);
+      captureSafely(event);
     }
   };
 
@@ -446,8 +491,7 @@ export const createAnalytics = (
       void dependencies
         .loadClient()
         .then((loadedClient) => {
-          client = loadedClient;
-          client.init(config.key!, {
+          loadedClient.init(config.key!, {
             api_host: config.host,
             defaults: "2026-05-30",
             capture_pageview: "history_change",
@@ -464,6 +508,7 @@ export const createAnalytics = (
             person_profiles: "identified_only",
             before_send: redactAndValidateEvent,
           });
+          client = loadedClient;
           flush();
         })
         .catch(() => {
@@ -493,7 +538,7 @@ const scheduleWhenIdle = (load: () => void) => {
 };
 
 const loadPostHogClient = async (): Promise<AnalyticsClient> => {
-  const { default: posthog } = await import("posthog-js/dist/module.slim");
+  const { default: posthog } = await import("posthog-js");
   return {
     init: (key, options) => {
       posthog.init(key, options);

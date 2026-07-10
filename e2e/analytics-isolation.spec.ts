@@ -9,6 +9,7 @@ test("unkeyed E2E builds make no PostHog requests", async ({ page }) => {
 
   await page.goto("/");
   await page.getByRole("button", { name: "start media import" }).isVisible();
+  await page.waitForTimeout(2_000);
 
   expect(postHogRequests).toEqual([]);
 });

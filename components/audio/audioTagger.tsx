@@ -61,6 +61,7 @@ import {
   sortTrackIdsByTrackNumber,
   sortUploadedTracksByTrackNumber,
   toGenreString,
+  type UploadedTrack,
 } from "./mp3Utils";
 import { loadAppSettings, saveAppSettings } from "./settings";
 import { getSampleAlbum } from "./sampleMetadata";
@@ -98,6 +99,13 @@ export const getTrackSourceMix = (files: TagiumFile[]): TrackSourceMix => {
   if (importedCount === 0) return "local";
   if (importedCount === files.length) return "imported";
   return "mixed";
+};
+export const getAcceptedUploadParseResult = (uploads: UploadedTrack[]) => {
+  const acceptedUploads = uploads.filter((upload) => upload.file.status !== "error");
+  return {
+    acceptedUploads,
+    parseRejectedCount: uploads.length - acceptedUploads.length,
+  };
 };
 const getManagedDownloadTrackTitle = (file: TagiumFile) => {
   if (file.metadata?.title) return file.metadata.title;
@@ -608,6 +616,7 @@ export default function AudioTagger() {
       });
 
       let acceptedCount = 0;
+      let parseRejectedCount = 0;
       let targetKind: "loose" | "album" = targetAlbumId || importedAlbum ? "album" : "loose";
       const captureUploadResult = () => {
         analytics.capture({
@@ -615,7 +624,7 @@ export default function AudioTagger() {
           requestedCount: uploadedFiles.length,
           acceptedCount,
           duplicateCount: uploadedFiles.length - uniqueUploadedFiles.length,
-          parseRejectedCount: uniqueUploadedFiles.length - acceptedCount,
+          parseRejectedCount,
           targetKind,
         });
       };
@@ -628,9 +637,12 @@ export default function AudioTagger() {
       setLoading(true);
       try {
         const parsedUploads = await runAudioBackendEffect(parseUploads(uniqueUploadedFiles));
-        acceptedCount = parsedUploads.length;
-        if (parsedUploads.length === 0) return;
-        const orderedUploads = sortUploadedTracksByTrackNumber(parsedUploads);
+        const parseResult = getAcceptedUploadParseResult(parsedUploads);
+        const acceptedUploads = parseResult.acceptedUploads;
+        acceptedCount = acceptedUploads.length;
+        parseRejectedCount = parseResult.parseRejectedCount;
+        if (acceptedUploads.length === 0) return;
+        const orderedUploads = sortUploadedTracksByTrackNumber(acceptedUploads);
 
         const nextFiles = [
           ...filesRef.current,
@@ -649,7 +661,7 @@ export default function AudioTagger() {
           targetAlbumId && currentAlbums.some((album) => album.id === targetAlbumId),
         );
         const forceSingleAlbum =
-          !hasTargetAlbum && (parsedUploads.length > 1 || Boolean(importedAlbum));
+          !hasTargetAlbum && (acceptedUploads.length > 1 || Boolean(importedAlbum));
         if (hasTargetAlbum || forceSingleAlbum || importedAlbum) targetKind = "album";
         let firstSelectedAlbumId: string | null = null;
 
@@ -691,7 +703,7 @@ export default function AudioTagger() {
               console.warn("failed to import album cover:", error);
             }
           }
-          const embeddedCover = parsedUploads.find((upload) => upload.albumSeed.cover)?.albumSeed
+          const embeddedCover = acceptedUploads.find((upload) => upload.albumSeed.cover)?.albumSeed
             .cover;
           const downloadedAlbum: AlbumGroup = {
             id: crypto.randomUUID(),
@@ -721,7 +733,7 @@ export default function AudioTagger() {
         } else {
           const merged = mergeUploadedTracksIntoAlbums(currentAlbums, orderedUploads, {
             forceSingleAlbum,
-            albumSeedUploads: parsedUploads,
+            albumSeedUploads: acceptedUploads,
             settings,
           });
           firstSelectedAlbumId = merged.firstSelectedAlbumId;
@@ -1115,7 +1127,7 @@ export default function AudioTagger() {
     const trackToRetry = managedDownloadTrackFromFile(fileToRetry);
     if (!trackToRetry) return;
 
-    queueDownloadTracks([trackToRetry]);
+    getPlaylistDownloadController().retry([trackToRetry]);
   };
   const handleCancelPlaylistDownloads = () => {
     getPlaylistDownloadController().cancel();

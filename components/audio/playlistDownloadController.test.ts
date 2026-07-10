@@ -333,4 +333,21 @@ describe("playlistDownloadController", () => {
       },
     ]);
   });
+
+  it("settles a track removed before work starts as canceled", async () => {
+    const harness = createControllerHarness({ hasTrack: () => false });
+
+    harness.controller.enqueue([tracks(1)[0]]);
+    await flushEffects();
+
+    expect(harness.downloads.size).toBe(0);
+    expect(harness.hydrated).toEqual([]);
+    expect(harness.lifecycle).toEqual([{ track: tracks(1)[0], outcome: "canceled" }]);
+    expect(harness.canceled).toEqual([["track-1"]]);
+    expect(harness.controller.getSnapshot()).toMatchObject({
+      completed: 0,
+      canceledCount: 1,
+      done: true,
+    });
+  });
 });

@@ -200,7 +200,7 @@ describe("analytics", () => {
     );
   });
 
-  it("drops unknown events and redacts location or arbitrary properties before send", async () => {
+  it("preserves the PostHog transport envelope while redacting unknown or sensitive properties", async () => {
     const init = vi.fn();
     const analytics = createAnalytics(
       { key: "public-test-key", deployEnv: "production" },
@@ -215,13 +215,27 @@ describe("analytics", () => {
 
     const options = init.mock.calls[0]?.[1] as {
       before_send: (event: {
+        uuid?: string;
         event: string;
         properties: Record<string, unknown>;
-      }) => { event: string; properties: Record<string, unknown> } | null;
+        timestamp?: Date;
+        $set?: Record<string, unknown>;
+      }) => {
+        uuid?: string;
+        event: string;
+        properties: Record<string, unknown>;
+        timestamp?: Date;
+      } | null;
     };
+    const timestamp = new Date("2026-07-09T00:00:00.000Z");
     const custom = options.before_send({
+      uuid: "capture-uuid",
       event: "audio_upload_completed",
+      timestamp,
+      $set: { email: "private@example.com" },
       properties: {
+        token: "public-test-key",
+        distinct_id: "anonymous-device-id",
         event_version: 1,
         deploy_env: "production",
         requested_count: 2,
@@ -232,6 +246,7 @@ describe("analytics", () => {
         source_url: "https://soundcloud.com/private-path",
         error_message: "private upstream response",
         unexpected_property: "private metadata",
+        $email: "private@example.com",
         $browser: "Chrome",
         $current_url: "https://tagium.example/?private=query",
       },
@@ -247,8 +262,12 @@ describe("analytics", () => {
     });
 
     expect(custom).toEqual({
+      uuid: "capture-uuid",
       event: "audio_upload_completed",
+      timestamp,
       properties: {
+        token: "public-test-key",
+        distinct_id: "anonymous-device-id",
         event_version: 1,
         deploy_env: "production",
         requested_count: 2,
@@ -266,6 +285,48 @@ describe("analytics", () => {
     expect(
       options.before_send({ event: "made_up_event", properties: { private: "value" } }),
     ).toBeNull();
+  });
+
+  it("fails open when the analytics provider throws and keeps accepting captures", async () => {
+    const capture = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error("provider unavailable");
+      })
+      .mockImplementation(() => undefined);
+    const analytics = createAnalytics(
+      { key: "public-test-key", deployEnv: "production" },
+      {
+        loadClient: async () => ({ init: vi.fn(), capture }),
+        schedule: (load) => load(),
+      },
+    );
+    analytics.initialize();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(() =>
+      analytics.capture({
+        type: "audio_upload_completed",
+        requestedCount: 1,
+        acceptedCount: 1,
+        duplicateCount: 0,
+        parseRejectedCount: 0,
+        targetKind: "loose",
+      }),
+    ).not.toThrow();
+    expect(() =>
+      analytics.capture({
+        type: "audio_upload_completed",
+        requestedCount: 2,
+        acceptedCount: 2,
+        duplicateCount: 0,
+        parseRejectedCount: 0,
+        targetKind: "loose",
+      }),
+    ).not.toThrow();
+
+    expect(capture).toHaveBeenCalledTimes(2);
   });
 
   it("bounds the early-event queue and keeps the most recent events", async () => {
