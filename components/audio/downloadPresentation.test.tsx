@@ -48,5 +48,6 @@ describe("download presentation", () => {
     );
 
     expect(markup).not.toContain(">canceled<");
+    expect(markup).toContain("h-3 w-3 text-muted-foreground flex-shrink-0 group-hover:opacity-0");
   });
 });
