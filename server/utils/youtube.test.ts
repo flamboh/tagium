@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { getYouTubeVideoId, resolveYouTubeUploadYear } from "./youtube";
 
-const playerResponseHtml = (microformat: Record<string, unknown>) =>
-  `<script>var ytInitialPlayerResponse = ${JSON.stringify({
+const playerResponse = (microformat: Record<string, unknown>) =>
+  Response.json({
     microformat: { playerMicroformatRenderer: microformat },
-  })};</script>`;
+  });
 
 describe("youtube video metadata", () => {
   it.each([
@@ -28,16 +28,12 @@ describe("youtube video metadata", () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(
-        new Response(
-          playerResponseHtml({
-            uploadDate: "2025-04-03T21:00:23-07:00",
-            publishDate: "2024-12-31T00:00:00-08:00",
-          }),
-        ),
+        playerResponse({
+          uploadDate: "2025-04-03T21:00:23-07:00",
+          publishDate: "2024-12-31T00:00:00-08:00",
+        }),
       )
-      .mockResolvedValueOnce(
-        new Response(playerResponseHtml({ publishDate: "2005-04-23T20:31:52-07:00" })),
-      );
+      .mockResolvedValueOnce(playerResponse({ publishDate: "2005-04-23T20:31:52-07:00" }));
 
     await expect(resolveYouTubeUploadYear("https://youtu.be/dQw4w9WgXcQ", { fetch })).resolves.toBe(
       2025,

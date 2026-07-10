@@ -33,11 +33,6 @@ const lockupVideo = (videoId: string, title: string, duration: string) => ({
   },
 });
 
-const playerResponseHtml = (uploadDate: string) =>
-  `<script>var ytInitialPlayerResponse = ${JSON.stringify({
-    microformat: { playerMicroformatRenderer: { uploadDate } },
-  })};</script>`;
-
 describe("youtube playlist endpoint", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -100,9 +95,14 @@ describe("youtube playlist endpoint", () => {
         expect(url).toContain("list=PLESiES1i-ThqUjxot6jWLDu90fxtkcpA0");
         return new Response(html);
       }
-      if (url.startsWith("https://www.youtube.com/watch?")) {
-        expect(url).toContain("v=first-video");
-        return new Response(playerResponseHtml("2022-08-14T12:30:00-07:00"));
+      if (url.startsWith("https://www.youtube.com/youtubei/v1/player?")) {
+        expect(typeof init?.body).toBe("string");
+        expect(JSON.parse(init?.body as string)).toMatchObject({ videoId: "first-video" });
+        return Response.json({
+          microformat: {
+            playerMicroformatRenderer: { uploadDate: "2022-08-14T12:30:00-07:00" },
+          },
+        });
       }
 
       expect(url).toContain("https://www.youtube.com/youtubei/v1/browse?key=api-key");

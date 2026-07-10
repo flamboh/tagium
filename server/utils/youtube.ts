@@ -4,6 +4,7 @@ export const YOUTUBE_ORIGIN = "https://www.youtube.com";
 export const YOUTUBE_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
+const YOUTUBE_WEB_CLIENT_VERSION = "2.20240101.00.00";
 
 const playerResponseSchema = z
   .object({
@@ -102,22 +103,32 @@ export const resolveYouTubeUploadYear = async (
   const videoId = getYouTubeVideoId(sourceUrl);
   if (!videoId) return undefined;
 
-  const videoUrl = new URL("/watch", YOUTUBE_ORIGIN);
-  videoUrl.searchParams.set("v", videoId);
-  videoUrl.searchParams.set("hl", "en");
-  const response = await (options.fetch ?? globalThis.fetch)(videoUrl, {
+  const playerUrl = new URL("/youtubei/v1/player", YOUTUBE_ORIGIN);
+  playerUrl.searchParams.set("prettyPrint", "false");
+  const response = await (options.fetch ?? globalThis.fetch)(playerUrl, {
+    method: "POST",
     headers: {
-      "accept-language": "en-US,en;q=0.9",
+      "content-type": "application/json",
       "user-agent": YOUTUBE_USER_AGENT,
+      "x-youtube-client-name": "1",
+      "x-youtube-client-version": YOUTUBE_WEB_CLIENT_VERSION,
     },
+    body: JSON.stringify({
+      videoId,
+      context: {
+        client: {
+          clientName: "WEB",
+          clientVersion: YOUTUBE_WEB_CLIENT_VERSION,
+          hl: "en",
+          gl: "US",
+        },
+      },
+    }),
     signal: options.signal,
   });
   if (!response.ok) throw new Error(`youtube.video_failed (${response.status})`);
 
-  const html = await response.text();
-  const playerResponse = playerResponseSchema.safeParse(
-    extractYouTubeJsonObject(html, "var ytInitialPlayerResponse =")?.value,
-  );
+  const playerResponse = playerResponseSchema.safeParse(await response.json());
   if (!playerResponse.success) return undefined;
 
   const microformat = playerResponse.data.microformat.playerMicroformatRenderer;

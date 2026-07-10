@@ -124,16 +124,14 @@ describe("cobalt audio endpoint", () => {
   it("infers direct YouTube track year from its upload date", async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = input instanceof Request ? input.url : new URL(input).toString();
-      if (url.startsWith("https://www.youtube.com/watch?")) {
-        return new Response(
-          `<script>var ytInitialPlayerResponse = ${JSON.stringify({
-            microformat: {
-              playerMicroformatRenderer: {
-                uploadDate: "1987-10-25T00:00:00-07:00",
-              },
+      if (url.startsWith("https://www.youtube.com/youtubei/v1/player?")) {
+        return Response.json({
+          microformat: {
+            playerMicroformatRenderer: {
+              uploadDate: "1987-10-25T00:00:00-07:00",
             },
-          })};</script>`,
-        );
+          },
+        });
       }
 
       return Response.json({
