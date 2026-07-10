@@ -3,9 +3,18 @@ name: CI
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      deploy_cobalt:
+        description: Deploy Cobalt to Fly.io after verification
+        required: false
+        type: boolean
+        default: false
   push:
     branches:
       - main
+
+permissions:
+  contents: read
 
 jobs:
   verify:
@@ -23,3 +32,56 @@ jobs:
       - run: vp check
       - run: vp test
       - run: vp build
+
+  fly_changes:
+    name: Check for Cobalt deployment changes
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.changes.outputs.should_deploy }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check deployment inputs
+        id: changes
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          DEPLOY_COBALT: ${{ inputs.deploy_cobalt }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "should_deploy=$DEPLOY_COBALT" >> "$GITHUB_OUTPUT"
+          elif [ -z "$BEFORE_SHA" ] || ! git cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "$BEFORE_SHA" "$GITHUB_SHA" -- \
+            fly.cobalt.toml \
+            Dockerfile.cobalt \
+            .dockerignore \
+            cobalt-machine-proxy.mjs; then
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy_cobalt:
+    name: Deploy Cobalt to Fly.io
+    needs:
+      - verify
+      - fly_changes
+    if: github.ref == 'refs/heads/main' && needs.fly_changes.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: tagium-cobalt-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # v1.6
+
+      - name: Deploy Cobalt
+        run: flyctl deploy --remote-only --wait-timeout 10m --config fly.cobalt.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
