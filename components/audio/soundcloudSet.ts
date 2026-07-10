@@ -1,39 +1,6 @@
-import { Effect, Schema } from "effect";
-import { AudioDecodeError, toPublicAudioError } from "./audioErrors";
-import { runAudioEffectWithoutServices } from "./audioRuntime";
-import type { ImportedAlbumMetadata } from "./types";
+import { decodePlaylist, toImportedAlbumMetadata, type Playlist } from "./playlist";
 
-const urlStringSchema = Schema.String.pipe(
-  Schema.refine((value): value is string => {
-    try {
-      new URL(value);
-      return true;
-    } catch {
-      return false;
-    }
-  }),
-);
-
-const soundCloudSetTrackSchema = Schema.Struct({
-  title: Schema.String,
-  url: urlStringSchema,
-  duration: Schema.optionalKey(Schema.Number),
-  trackNumber: Schema.Number,
-});
-
-const soundCloudSetSchema = Schema.Struct({
-  title: Schema.String,
-  artist: Schema.String,
-  genre: Schema.String,
-  year: Schema.optionalKey(Schema.Number),
-  isAlbum: Schema.Boolean,
-  coverUrl: Schema.optionalKey(Schema.String),
-  tracks: Schema.Array(soundCloudSetTrackSchema),
-});
-
-const decodeSoundCloudSetEffect = Schema.decodeUnknownEffect(soundCloudSetSchema);
-
-export type SoundCloudSet = Schema.Schema.Type<typeof soundCloudSetSchema>;
+export type SoundCloudSet = Playlist;
 
 export const isSoundCloudSetUrl = (url: string) => {
   try {
@@ -60,27 +27,7 @@ export const resolveSoundCloudSet = async (url: string) => {
     throw new Error("soundcloud set route returned non-json. restart tagium dev server.");
   }
 
-  try {
-    return await runAudioEffectWithoutServices(
-      decodeSoundCloudSetEffect(await response.json()).pipe(
-        Effect.mapError(
-          (cause) =>
-            new AudioDecodeError({
-              message: "malformed SoundCloud set response.",
-              cause,
-            }),
-        ),
-      ),
-    );
-  } catch (error) {
-    throw toPublicAudioError(error);
-  }
+  return decodePlaylist(await response.json(), "SoundCloud");
 };
 
-export const toImportedAlbumMetadata = (set: SoundCloudSet): ImportedAlbumMetadata => ({
-  title: set.title,
-  artist: set.artist,
-  genre: set.genre,
-  year: set.year,
-  coverUrl: set.coverUrl,
-});
+export { toImportedAlbumMetadata };

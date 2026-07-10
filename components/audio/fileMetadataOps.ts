@@ -1,4 +1,5 @@
 import filenamify from "filenamify";
+import type { Playlist } from "./playlist";
 import type { SoundCloudSet } from "./soundcloudSet";
 import type { AlbumGroup, AudioMetadata, MetadataPatch, TagiumFile } from "./types";
 
@@ -364,12 +365,12 @@ export function areAlbumTrackCoversSynced(
   });
 }
 
-export function applySoundCloudSetImportedCover(
+export function applyPlaylistImportedCover(
   files: TagiumFile[],
   albums: AlbumGroup[],
   albumId: string,
   trackIds: string[],
-  set: Pick<SoundCloudSet, "isAlbum">,
+  playlist: Pick<Playlist, "isAlbum">,
   settings: { applySoundCloudAlbumCoverToTracks: boolean },
   cover: AudioMetadata["picture"],
   selectedFileId: string | null,
@@ -378,7 +379,7 @@ export function applySoundCloudSetImportedCover(
     currentAlbum.id === albumId ? { ...currentAlbum, cover } : currentAlbum,
   );
 
-  if (!set.isAlbum || !settings.applySoundCloudAlbumCoverToTracks) {
+  if (!playlist.isAlbum || !settings.applySoundCloudAlbumCoverToTracks) {
     return { albums: coveredAlbums, files };
   }
 
@@ -387,6 +388,27 @@ export function applySoundCloudSetImportedCover(
     ...applyAlbumCoverToFilesWithSelectedMetadata(files, trackIds, cover, selectedFileId),
   };
 }
+
+export const applySoundCloudSetImportedCover = (
+  files: TagiumFile[],
+  albums: AlbumGroup[],
+  albumId: string,
+  trackIds: string[],
+  set: Pick<SoundCloudSet, "isAlbum">,
+  settings: { applySoundCloudAlbumCoverToTracks: boolean },
+  cover: AudioMetadata["picture"],
+  selectedFileId: string | null,
+) =>
+  applyPlaylistImportedCover(
+    files,
+    albums,
+    albumId,
+    trackIds,
+    set,
+    settings,
+    cover,
+    selectedFileId,
+  );
 
 export function prepareDownloadedTrackHydration(
   currentFile: TagiumFile,

@@ -5,6 +5,7 @@ import {
   normalizeCoverArtType,
   optimizeCoverArt,
 } from "./coverArtProcessing";
+import type { Playlist } from "./playlist";
 import type { SoundCloudSet } from "./soundcloudSet";
 import type { AlbumGroup, AppSettings, AudioMetadata, MetadataPatch, TagiumFile } from "./types";
 
@@ -39,20 +40,22 @@ export interface SingleUrlDownloadPlan extends DownloadTrackPlanBase {
   looseTrackIds: string[];
 }
 
-export interface SoundCloudSetCoverImportPlan {
+export interface PlaylistCoverImportPlan {
   albumId: string;
   trackIds: string[];
   coverUrl: string;
-  set: SoundCloudSet;
+  playlist: Playlist;
 }
 
-export interface SoundCloudSetDownloadPlan extends DownloadTrackPlanBase {
-  source: "soundcloud-set";
+export interface PlaylistDownloadPlan extends DownloadTrackPlanBase {
+  source: "playlist";
   album: AlbumGroup;
-  coverImport: SoundCloudSetCoverImportPlan | null;
+  coverImport: PlaylistCoverImportPlan | null;
 }
 
-export type DownloadTrackPlan = SingleUrlDownloadPlan | SoundCloudSetDownloadPlan;
+export type SoundCloudSetCoverImportPlan = PlaylistCoverImportPlan;
+export type SoundCloudSetDownloadPlan = PlaylistDownloadPlan;
+export type DownloadTrackPlan = SingleUrlDownloadPlan | PlaylistDownloadPlan;
 
 export interface CreateSingleUrlDownloadPlanInput {
   sourceUrl: string;
@@ -62,6 +65,12 @@ export interface CreateSingleUrlDownloadPlanInput {
 
 export interface CreateSoundCloudSetDownloadPlanInput {
   set: SoundCloudSet;
+  audioBitrate: AppSettings["audioBitrate"];
+  createId: () => string;
+}
+
+export interface CreatePlaylistDownloadPlanInput {
+  playlist: Playlist;
   audioBitrate: AppSettings["audioBitrate"];
   createId: () => string;
 }
@@ -81,10 +90,12 @@ export interface DownloadTrackWorkflowDeps {
 
 export type SingleUrlDownloadTrackWorkflowDeps = DownloadTrackWorkflowDeps;
 
-export interface SoundCloudSetDownloadWorkflowDeps extends DownloadTrackWorkflowDeps {
+export interface PlaylistDownloadWorkflowDeps extends DownloadTrackWorkflowDeps {
   getAlbums: () => AlbumGroup[];
   setAlbums: (albums: AlbumGroup[]) => void;
 }
+
+export type SoundCloudSetDownloadWorkflowDeps = PlaylistDownloadWorkflowDeps;
 
 const filenameFromTitle = (title: string) => {
   const filename = filenamify(title.trim(), { replacement: "-" });
@@ -215,15 +226,15 @@ export const createQueuedDownloadTracks = (
   files: readonly PendingDownloadTrack[],
 ): QueuedDownloadTrack[] => files.map(createQueuedDownloadTrack);
 
-const createSoundCloudSetPendingMetadataPatch = (
-  set: SoundCloudSet,
-  track: SoundCloudSet["tracks"][number],
+const createPlaylistPendingMetadataPatch = (
+  playlist: Playlist,
+  track: Playlist["tracks"][number],
 ): MetadataPatch => ({
   title: track.title,
-  artist: set.artist,
-  album: set.title,
-  genre: set.genre,
-  ...(set.year !== undefined ? { year: set.year } : {}),
+  artist: playlist.artist,
+  album: playlist.title,
+  genre: playlist.genre,
+  ...(playlist.year !== undefined ? { year: playlist.year } : {}),
   ...(track.trackNumber !== undefined ? { trackNumber: track.trackNumber } : {}),
 });
 
@@ -260,41 +271,41 @@ export const createSingleUrlDownloadPlan = ({
   };
 };
 
-export const createSoundCloudSetDownloadPlan = ({
-  set,
+export const createPlaylistDownloadPlan = ({
+  playlist,
   audioBitrate,
   createId,
-}: CreateSoundCloudSetDownloadPlanInput): SoundCloudSetDownloadPlan => {
+}: CreatePlaylistDownloadPlanInput): PlaylistDownloadPlan => {
   const albumId = createId();
-  const pendingFiles = set.tracks.map((track) =>
+  const pendingFiles = playlist.tracks.map((track) =>
     createPendingDownloadTrack(
       createId(),
       createDownloadMetadata({
         title: track.title,
-        artist: set.artist,
-        album: set.title,
-        genre: set.genre,
-        year: set.year,
+        artist: playlist.artist,
+        album: playlist.title,
+        genre: playlist.genre,
+        year: playlist.year,
         duration: track.duration,
         trackNumber: track.trackNumber,
       }),
       true,
       { sourceUrl: track.url, audioBitrate },
-      createSoundCloudSetPendingMetadataPatch(set, track),
+      createPlaylistPendingMetadataPatch(playlist, track),
     ),
   );
   const album: AlbumGroup = {
     id: albumId,
-    title: set.title,
-    artist: set.artist,
-    genre: set.genre,
+    title: playlist.title,
+    artist: playlist.artist,
+    genre: playlist.genre,
     trackIds: pendingFiles.map((file) => file.id),
-    year: set.year,
+    year: playlist.year,
   };
   const firstPendingFileId = pendingFiles[0]?.id ?? null;
 
   return {
-    source: "soundcloud-set",
+    source: "playlist",
     pendingFiles,
     queuedTracks: createQueuedDownloadTracks(pendingFiles),
     selection: {
@@ -304,24 +315,31 @@ export const createSoundCloudSetDownloadPlan = ({
       lastSelectedFileId: firstPendingFileId,
     },
     album,
-    coverImport: set.coverUrl
+    coverImport: playlist.coverUrl
       ? {
           albumId,
           trackIds: album.trackIds,
-          coverUrl: set.coverUrl,
-          set,
+          coverUrl: playlist.coverUrl,
+          playlist,
         }
       : null,
   };
 };
+
+export const createSoundCloudSetDownloadPlan = ({
+  set,
+  audioBitrate,
+  createId,
+}: CreateSoundCloudSetDownloadPlanInput): SoundCloudSetDownloadPlan =>
+  createPlaylistDownloadPlan({ playlist: set, audioBitrate, createId });
 
 export function startDownloadTrackPlan(
   plan: SingleUrlDownloadPlan,
   deps: SingleUrlDownloadTrackWorkflowDeps,
 ): void;
 export function startDownloadTrackPlan(
-  plan: SoundCloudSetDownloadPlan,
-  deps: SoundCloudSetDownloadWorkflowDeps,
+  plan: PlaylistDownloadPlan,
+  deps: PlaylistDownloadWorkflowDeps,
 ): void;
 export function startDownloadTrackPlan(
   plan: DownloadTrackPlan,
@@ -333,8 +351,8 @@ export function startDownloadTrackPlan(
   const nextFiles = [...deps.getFiles(), ...plan.pendingFiles];
   deps.setFiles(nextFiles);
 
-  if (plan.source === "soundcloud-set") {
-    const albumDeps = deps as SoundCloudSetDownloadWorkflowDeps;
+  if (plan.source === "playlist") {
+    const albumDeps = deps as PlaylistDownloadWorkflowDeps;
     albumDeps.setAlbums([...albumDeps.getAlbums(), plan.album]);
   } else {
     deps.addLooseTrackIds?.(plan.looseTrackIds);

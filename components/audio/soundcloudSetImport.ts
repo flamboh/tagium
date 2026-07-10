@@ -56,7 +56,7 @@ export const startSoundCloudSetCoverImport = (
         deps.getAlbums(),
         coverImport.albumId,
         coverImport.trackIds,
-        coverImport.set,
+        coverImport.playlist,
         deps.settings,
         cover,
         deps.getSelectedFileId?.() ?? null,
