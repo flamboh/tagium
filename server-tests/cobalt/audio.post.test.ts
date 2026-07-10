@@ -7,12 +7,30 @@ type RuntimeRequest = Request & {
       env: {
         COBALT_API_URL: string;
         COBALT_MACHINE_AFFINITY_SECRET: string;
+        COBALT_SESSION_RATE_LIMITER?: RateLimitBinding;
+        COBALT_CLIENT_RATE_LIMITER?: RateLimitBinding;
+        TAGIUM_DEPLOY_ENV: "local" | "preview" | "production";
       };
     };
   };
 };
 
+type RateLimitBinding = {
+  limit: (input: { key: string }) => Promise<{ success: boolean }>;
+};
+
 const machineAffinitySecret = "test-machine-affinity-secret";
+
+const createRateLimitBinding = (limit: number): RateLimitBinding => {
+  const counts = new Map<string, number>();
+  return {
+    limit: async ({ key }) => {
+      const count = (counts.get(key) ?? 0) + 1;
+      counts.set(key, count);
+      return { success: count <= limit };
+    },
+  };
+};
 
 const makeAudioRequest = (signal?: AbortSignal) => {
   const request = new Request("https://tagium.test/api/cobalt/audio", {
@@ -33,6 +51,7 @@ const makeAudioRequest = (signal?: AbortSignal) => {
       env: {
         COBALT_API_URL: "https://cobalt.test/",
         COBALT_MACHINE_AFFINITY_SECRET: machineAffinitySecret,
+        TAGIUM_DEPLOY_ENV: "local",
       },
     },
   };
@@ -249,6 +268,96 @@ describe("cobalt audio endpoint", () => {
       releaseUpstream();
       await responsePromise;
     }
+  });
+
+  it("rejects the twenty-first session plan before calling Cobalt", async () => {
+    const sessionLimiter = createRateLimitBinding(20);
+    const clientLimiter = createRateLimitBinding(60);
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        status: "tunnel",
+        url: "https://cobalt.test/tunnel?id=123456789012345678901",
+        filename: "download.mp3",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const responses: Response[] = [];
+    for (let index = 0; index < 21; index += 1) {
+      const request = makeAudioRequest();
+      request.headers.set("Cookie", "tagium_client_id=session-1");
+      request.headers.set("CF-Connecting-IP", "203.0.113.10");
+      request.runtime.cloudflare.env.COBALT_SESSION_RATE_LIMITER = sessionLimiter;
+      request.runtime.cloudflare.env.COBALT_CLIENT_RATE_LIMITER = clientLimiter;
+      responses.push(await handler(makeEvent(request)));
+    }
+
+    expect(responses.slice(0, 20).every((response) => response.status === 200)).toBe(true);
+    expect(responses[20].status).toBe(429);
+    expect(responses[20].headers.get("Retry-After")).toBe("60");
+    expect(fetchMock).toHaveBeenCalledTimes(20);
+  });
+
+  it("limits rotating sessions with the coarse client backstop", async () => {
+    const sessionLimiter = createRateLimitBinding(20);
+    const clientLimiter = createRateLimitBinding(60);
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        status: "tunnel",
+        url: "https://cobalt.test/tunnel?id=123456789012345678901",
+        filename: "download.mp3",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    let lastResponse: Response | undefined;
+    for (let index = 0; index < 61; index += 1) {
+      const request = makeAudioRequest();
+      request.headers.set("Cookie", `tagium_client_id=session-${index}`);
+      request.headers.set("CF-Connecting-IP", "203.0.113.10");
+      request.runtime.cloudflare.env.COBALT_SESSION_RATE_LIMITER = sessionLimiter;
+      request.runtime.cloudflare.env.COBALT_CLIENT_RATE_LIMITER = clientLimiter;
+      lastResponse = await handler(makeEvent(request));
+    }
+
+    expect(lastResponse?.status).toBe(429);
+    expect(fetchMock).toHaveBeenCalledTimes(60);
+  });
+
+  it("fails closed when production admission bindings are missing", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const request = makeAudioRequest();
+    request.runtime.cloudflare.env.TAGIUM_DEPLOY_ENV = "production";
+
+    const response = await handler(makeEvent(request));
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("2");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sets an anonymous admission cookie on the first admitted request", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          status: "tunnel",
+          url: "https://cobalt.test/tunnel?id=123456789012345678901",
+          filename: "download.mp3",
+        }),
+      ),
+    );
+    const request = makeAudioRequest();
+    request.runtime.cloudflare.env.COBALT_SESSION_RATE_LIMITER = createRateLimitBinding(20);
+    request.runtime.cloudflare.env.COBALT_CLIENT_RATE_LIMITER = createRateLimitBinding(60);
+
+    const response = await handler(makeEvent(request));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Set-Cookie")).toMatch(
+      /^tagium_client_id=[\w-]+; Path=\/; Max-Age=2592000; HttpOnly; Secure; SameSite=Lax$/,
+    );
   });
 
   it("preserves Cobalt capacity overload responses", async () => {

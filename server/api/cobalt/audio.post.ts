@@ -11,8 +11,15 @@ import { env as processEnv } from "node:process";
 import { z } from "zod";
 import { parseCobaltMachineId, signCobaltMachine } from "../../utils/cobalt-machine-affinity";
 import {
+  createCloudflareCobaltRequestAdmission,
+  createInMemoryCobaltRequestAdmission,
+  type CloudflareRateLimitBinding,
+  type CobaltRequestAdmission,
+} from "../../utils/cobalt-request-admission";
+import {
   consumeAudioDevFault,
   enforceRateLimit,
+  getDeployEnv,
   type CobaltRuntimeEnv as DevControlRuntimeEnv,
 } from "../../utils/dev-controls";
 
@@ -85,7 +92,9 @@ type CobaltRuntimeEnv = {
   COBALT_ALLOWED_ORIGIN?: string;
   COBALT_API_KEY?: string;
   COBALT_API_URL?: string;
+  COBALT_CLIENT_RATE_LIMITER?: CloudflareRateLimitBinding;
   COBALT_MACHINE_AFFINITY_SECRET?: string;
+  COBALT_SESSION_RATE_LIMITER?: CloudflareRateLimitBinding;
 } & DevControlRuntimeEnv;
 type CloudflareRequest = Request & {
   runtime?: {
@@ -339,6 +348,41 @@ const parseAudioRequest = async (request: Request) => {
   }
 };
 
+const getCobaltRequestAdmission = (
+  request: Request,
+  runtimeEnv: CobaltRuntimeEnv,
+): CobaltRequestAdmission | undefined => {
+  if (runtimeEnv.COBALT_SESSION_RATE_LIMITER && runtimeEnv.COBALT_CLIENT_RATE_LIMITER) {
+    return createCloudflareCobaltRequestAdmission({
+      sessionLimiter: runtimeEnv.COBALT_SESSION_RATE_LIMITER,
+      clientLimiter: runtimeEnv.COBALT_CLIENT_RATE_LIMITER,
+    });
+  }
+
+  if (getDeployEnv(request, runtimeEnv).deployEnv === "local") {
+    return createInMemoryCobaltRequestAdmission(enforceRateLimit);
+  }
+
+  return undefined;
+};
+
+const admissionUnavailableResponse = () =>
+  new Response("Download admission is unavailable.", {
+    status: 503,
+    headers: { "Retry-After": "2" },
+  });
+
+const admissionLimitedResponse = () =>
+  new Response("Download rate limit exceeded.", {
+    status: 429,
+    headers: { "Retry-After": "60" },
+  });
+
+const withAdmissionCookie = (response: Response, setCookie: string | undefined) => {
+  if (setCookie) response.headers.append("Set-Cookie", setCookie);
+  return response;
+};
+
 export default defineHandler(async (event) => {
   try {
     const runtimeEnv = getRuntimeEnv(event.req);
@@ -353,14 +397,22 @@ export default defineHandler(async (event) => {
       return devFaultResponse;
     }
 
-    const limited = enforceRateLimit(event.req);
-    if (limited) {
-      return limited;
-    }
-
     const body = await parseAudioRequest(event.req);
     if (!body) {
       return new Response("Invalid audio download request.", { status: 400 });
+    }
+
+    const admission = getCobaltRequestAdmission(event.req, runtimeEnv);
+    if (!admission) return admissionUnavailableResponse();
+
+    const admissionDecision = await admission.admit(event.req);
+    const respond = (response: Response) =>
+      withAdmissionCookie(response, admissionDecision.setCookie);
+    if (admissionDecision.status === "unavailable") {
+      return respond(admissionUnavailableResponse());
+    }
+    if (admissionDecision.status === "limited") {
+      return respond(admissionLimitedResponse());
     }
 
     const cobaltResult = await requestCobaltAudio(
@@ -372,35 +424,43 @@ export default defineHandler(async (event) => {
     const cobaltResponse = cobaltResult.response;
 
     if (isCobaltCapacityError(cobaltResponse)) {
-      return cobaltCapacityErrorResponse(cobaltResponse, cobaltResult.retryAfter);
+      return respond(cobaltCapacityErrorResponse(cobaltResponse, cobaltResult.retryAfter));
     }
 
     if (cobaltResponse.status === CobaltResponseType.Error) {
-      return cobaltErrorResponse(cobaltResponse.error.code);
+      return respond(cobaltErrorResponse(cobaltResponse.error.code));
     }
 
     if (cobaltResponse.status === CobaltResponseType.LocalProcessing) {
-      return localProcessingResponse(event.req, runtimeEnv, cobaltResponse, cobaltResult.machineId);
+      return respond(
+        localProcessingResponse(event.req, runtimeEnv, cobaltResponse, cobaltResult.machineId),
+      );
     }
 
     if (cobaltResponse.status === CobaltResponseType.Picker) {
       if (!cobaltResponse.audio || !cobaltResponse.audioFilename) {
-        return cobaltErrorResponse("Cobalt returned multiple items without a single audio file.");
+        return respond(
+          cobaltErrorResponse("Cobalt returned multiple items without a single audio file."),
+        );
       }
 
-      return proxiedTunnelResponse(
-        event.req,
-        runtimeEnv,
-        {
-          status: CobaltResponseType.Tunnel,
-          url: cobaltResponse.audio,
-          filename: cobaltResponse.audioFilename,
-        },
-        cobaltResult.machineId,
+      return respond(
+        proxiedTunnelResponse(
+          event.req,
+          runtimeEnv,
+          {
+            status: CobaltResponseType.Tunnel,
+            url: cobaltResponse.audio,
+            filename: cobaltResponse.audioFilename,
+          },
+          cobaltResult.machineId,
+        ),
       );
     }
 
-    return proxiedTunnelResponse(event.req, runtimeEnv, cobaltResponse, cobaltResult.machineId);
+    return respond(
+      proxiedTunnelResponse(event.req, runtimeEnv, cobaltResponse, cobaltResult.machineId),
+    );
   } catch (error) {
     if (error instanceof Error) {
       return cobaltErrorResponse(error.message);
