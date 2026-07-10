@@ -206,7 +206,7 @@ export function SortableTrackRow({
               />
             )}
             {track.downloadStatus === "canceled" && (
-              <Ban className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+              <Ban className="h-3 w-3 text-muted-foreground flex-shrink-0 group-hover:opacity-0" />
             )}
           </div>
         </div>
