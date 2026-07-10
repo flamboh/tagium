@@ -12,9 +12,9 @@ describe("local error presentation", () => {
   });
 
   it("reserves enough fixed header space for both track-error lines", () => {
-    expect(trackMetadataEditorSource).toContain('className="h-20 border-b');
+    expect(trackMetadataEditorSource).toContain("lg:px-6 lg:py-4");
     expect(trackMetadataEditorSource).toContain(
-      'className="h-8 min-w-0 overflow-hidden text-xs leading-4 text-destructive',
+      'className="h-8 min-w-0 shrink-0 overflow-hidden text-xs leading-4 text-destructive',
     );
   });
 

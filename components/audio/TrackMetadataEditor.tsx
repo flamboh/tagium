@@ -135,7 +135,7 @@ export default function TrackMetadataEditor({
         }}
         className="flex min-h-0 flex-col h-full"
       >
-        <div className="h-20 border-b flex-shrink-0 flex flex-col justify-center gap-1 px-4 max-lg:[@media(max-height:700px)]:h-12 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:p-6">
+        <div className="h-16 border-b flex-shrink-0 flex flex-col justify-center gap-1 px-4 max-lg:[@media(max-height:700px)]:h-12 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6 lg:py-4">
           {syncFilenames ? (
             <h2 className="inline-flex min-w-0 max-w-full items-center text-base font-semibold text-muted-foreground max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
               <Tooltip>
@@ -167,7 +167,7 @@ export default function TrackMetadataEditor({
               <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
             </label>
           )}
-          <div className="h-8 min-w-0 overflow-hidden text-xs leading-4 text-destructive max-lg:[@media(max-height:700px)]:h-4">
+          <div className="h-8 min-w-0 shrink-0 overflow-hidden text-xs leading-4 text-destructive max-lg:[@media(max-height:700px)]:h-4">
             {filenameInvalid ? (
               <div className="flex min-w-0 items-center gap-2">
                 <p
