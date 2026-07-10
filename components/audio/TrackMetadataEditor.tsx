@@ -135,7 +135,7 @@ export default function TrackMetadataEditor({
         }}
         className="flex min-h-0 flex-col h-full"
       >
-        <div className="h-16 border-b flex-shrink-0 flex flex-col justify-center gap-1 px-4 max-lg:[@media(max-height:700px)]:h-12 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:p-6">
+        <div className="h-20 border-b flex-shrink-0 flex flex-col justify-center gap-1 px-4 max-lg:[@media(max-height:700px)]:h-12 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:p-6">
           {syncFilenames ? (
             <h2 className="inline-flex min-w-0 max-w-full items-center text-base font-semibold text-muted-foreground max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
               <Tooltip>
@@ -167,12 +167,12 @@ export default function TrackMetadataEditor({
               <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
             </label>
           )}
-          <div className="h-8 min-w-0 overflow-hidden text-xs text-destructive max-lg:[@media(max-height:700px)]:h-4">
+          <div className="h-8 min-w-0 overflow-hidden text-xs leading-4 text-destructive max-lg:[@media(max-height:700px)]:h-4">
             {filenameInvalid ? (
               <div className="flex min-w-0 items-center gap-2">
                 <p
                   id="track-filename-error"
-                  className="min-w-0 truncate font-medium leading-tight"
+                  className="min-w-0 truncate font-medium"
                   aria-live="polite"
                 >
                   filename is required
@@ -197,8 +197,8 @@ export default function TrackMetadataEditor({
               </div>
             ) : hasTrackFailure ? (
               <div className="min-w-0 text-xs text-destructive" aria-live="polite">
-                <p className="font-medium leading-tight">{downloadErrorDisplay.title}</p>
-                <p className="truncate leading-tight max-lg:[@media(max-height:700px)]:sr-only">
+                <p className="font-medium">{downloadErrorDisplay.title}</p>
+                <p className="truncate max-lg:[@media(max-height:700px)]:sr-only">
                   {downloadErrorDisplay.description}
                 </p>
               </div>

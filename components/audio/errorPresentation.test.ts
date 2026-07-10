@@ -11,6 +11,13 @@ describe("local error presentation", () => {
     );
   });
 
+  it("reserves enough fixed header space for both track-error lines", () => {
+    expect(trackMetadataEditorSource).toContain('className="h-20 border-b');
+    expect(trackMetadataEditorSource).toContain(
+      'className="h-8 min-w-0 overflow-hidden text-xs leading-4 text-destructive',
+    );
+  });
+
   it("keeps cover validation state separate from tooltip visibility", () => {
     expect(coverArtSource).toContain("onOpenChange={setCoverErrorOpen}");
     expect(coverArtSource).toContain("aria-describedby={coverError ? coverErrorId : undefined}");
