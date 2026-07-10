@@ -32,7 +32,7 @@ const createRateLimitBinding = (limit: number): RateLimitBinding => {
   };
 };
 
-const makeAudioRequest = (signal?: AbortSignal) => {
+const makeAudioRequest = (signal?: AbortSignal, year: number | null = 2020) => {
   const request = new Request("https://tagium.test/api/cobalt/audio", {
     method: "POST",
     headers: {
@@ -42,6 +42,7 @@ const makeAudioRequest = (signal?: AbortSignal) => {
     body: JSON.stringify({
       url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
       audioBitrate: "128",
+      ...(year === null ? {} : { year }),
     }),
     signal,
   }) as RuntimeRequest;
@@ -113,8 +114,61 @@ describe("cobalt audio endpoint", () => {
       ],
       output: {
         filename: "download.mp3",
+        metadata: {
+          date: "2020",
+        },
       },
     });
+  });
+
+  it("infers direct YouTube track year from its upload date", async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = input instanceof Request ? input.url : new URL(input).toString();
+      if (url.startsWith("https://www.youtube.com/watch?")) {
+        return new Response(
+          `<script>var ytInitialPlayerResponse = ${JSON.stringify({
+            microformat: {
+              playerMicroformatRenderer: {
+                uploadDate: "1987-10-25T00:00:00-07:00",
+              },
+            },
+          })};</script>`,
+        );
+      }
+
+      return Response.json({
+        status: "local-processing",
+        type: "audio",
+        service: "youtube",
+        tunnel: [
+          "https://cobalt.test/tunnel?id=123456789012345678901&exp=1234567890123&sig=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&sec=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&iv=cccccccccccccccccccccc",
+        ],
+        output: {
+          type: "audio/mpeg",
+          filename: "download.mp3",
+          metadata: { title: "Download", date: "release-date-that-must-be-replaced" },
+        },
+        audio: {
+          copy: false,
+          format: "mp3",
+          bitrate: "128",
+        },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await handler(makeEvent(makeAudioRequest(undefined, null)));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      output: {
+        metadata: {
+          title: "Download",
+          date: "1987",
+        },
+      },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("appends Cobalt machine ids to proxied tunnel URLs", async () => {

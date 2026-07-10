@@ -276,6 +276,7 @@ describe("download track plans", () => {
         downloadRequest: {
           sourceUrl: "https://soundcloud.com/artist/first-track",
           audioBitrate: "320",
+          year: 2024,
         },
       },
       {
@@ -284,6 +285,7 @@ describe("download track plans", () => {
         downloadRequest: {
           sourceUrl: "https://soundcloud.com/artist/second-track",
           audioBitrate: "320",
+          year: 2024,
         },
       },
     ]);
@@ -313,8 +315,16 @@ describe("soundcloud set import", () => {
       },
     ]);
     expect(harness.files.map((file) => file.downloadRequest)).toEqual([
-      { sourceUrl: "https://soundcloud.com/artist/first-track", audioBitrate: "320" },
-      { sourceUrl: "https://soundcloud.com/artist/second-track", audioBitrate: "320" },
+      {
+        sourceUrl: "https://soundcloud.com/artist/first-track",
+        audioBitrate: "320",
+        year: 2024,
+      },
+      {
+        sourceUrl: "https://soundcloud.com/artist/second-track",
+        audioBitrate: "320",
+        year: 2024,
+      },
     ]);
     expect(harness.files.map((file) => file.pendingMetadataPatch)).toEqual([
       {
@@ -341,6 +351,7 @@ describe("soundcloud set import", () => {
         downloadRequest: {
           sourceUrl: "https://soundcloud.com/artist/first-track",
           audioBitrate: "320",
+          year: 2024,
         },
       },
       {
@@ -349,6 +360,7 @@ describe("soundcloud set import", () => {
         downloadRequest: {
           sourceUrl: "https://soundcloud.com/artist/second-track",
           audioBitrate: "320",
+          year: 2024,
         },
       },
     ]);

@@ -33,6 +33,11 @@ const lockupVideo = (videoId: string, title: string, duration: string) => ({
   },
 });
 
+const playerResponseHtml = (uploadDate: string) =>
+  `<script>var ytInitialPlayerResponse = ${JSON.stringify({
+    microformat: { playerMicroformatRenderer: { uploadDate } },
+  })};</script>`;
+
 describe("youtube playlist endpoint", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -95,6 +100,10 @@ describe("youtube playlist endpoint", () => {
         expect(url).toContain("list=PLESiES1i-ThqUjxot6jWLDu90fxtkcpA0");
         return new Response(html);
       }
+      if (url.startsWith("https://www.youtube.com/watch?")) {
+        expect(url).toContain("v=first-video");
+        return new Response(playerResponseHtml("2022-08-14T12:30:00-07:00"));
+      }
 
       expect(url).toContain("https://www.youtube.com/youtubei/v1/browse?key=api-key");
       expect(typeof init?.body).toBe("string");
@@ -122,6 +131,7 @@ describe("youtube playlist endpoint", () => {
       artist: "Playlist Owner",
       genre: "",
       isAlbum: false,
+      year: 2022,
       coverUrl: "https://i.ytimg.com/large.jpg",
       tracks: [
         {
@@ -144,7 +154,7 @@ describe("youtube playlist endpoint", () => {
         },
       ],
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("rejects non-playlist YouTube URLs without fetching them", async () => {

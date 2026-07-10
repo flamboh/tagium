@@ -7,6 +7,7 @@ const playlist: Playlist = {
   title: "Status Update Music",
   artist: "lucida",
   genre: "",
+  year: 2026,
   isAlbum: false,
   coverUrl: "https://i.ytimg.com/playlist.jpg",
   tracks: [
@@ -54,12 +55,14 @@ describe("YouTube playlist imports", () => {
       id: "album-1",
       title: "Status Update Music",
       artist: "lucida",
+      year: 2026,
       trackIds: ["track-1", "track-2"],
     });
     expect(plan.queuedTracks.map((track) => track.downloadRequest.sourceUrl)).toEqual([
       "https://www.youtube.com/watch?v=first-video",
       "https://www.youtube.com/watch?v=second-video",
     ]);
+    expect(plan.queuedTracks.map((track) => track.downloadRequest.year)).toEqual([2026, 2026]);
     expect(plan.pendingFiles.map((file) => file.pendingMetadataPatch?.trackNumber)).toEqual([1, 2]);
     expect(plan.coverImport?.playlist.isAlbum).toBe(false);
   });

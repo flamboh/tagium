@@ -1,10 +1,12 @@
 import { defineHandler } from "nitro";
 import { z } from "zod";
+import {
+  extractYouTubeJsonObject,
+  resolveYouTubeUploadYear,
+  YOUTUBE_ORIGIN,
+  YOUTUBE_USER_AGENT,
+} from "../utils/youtube";
 
-const YOUTUBE_ORIGIN = "https://www.youtube.com";
-const USER_AGENT =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
-  "(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
 const MAX_CONTINUATION_REQUESTS = 100;
 
 const textSchema = z
@@ -186,47 +188,6 @@ const collectContinuationTokens = (value: unknown, tokens: string[]) => {
   for (const entry of Object.values(value)) collectContinuationTokens(entry, tokens);
 };
 
-const extractJsonObject = (source: string, marker: string, startAt = 0) => {
-  const markerIndex = source.indexOf(marker, startAt);
-  if (markerIndex < 0) return undefined;
-  let objectStart = markerIndex + marker.length;
-  while (/\s/.test(source[objectStart] ?? "")) objectStart++;
-  if (source[objectStart] !== "{") return undefined;
-
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-  for (let index = objectStart; index < source.length; index++) {
-    const character = source[index];
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (character === "\\") {
-        escaped = true;
-      } else if (character === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (character === '"') {
-      inString = true;
-      continue;
-    }
-    if (character === "{") depth++;
-    if (character === "}") {
-      depth--;
-      if (depth === 0) {
-        return {
-          value: JSON.parse(source.slice(objectStart, index + 1)) as unknown,
-          end: index + 1,
-        };
-      }
-    }
-  }
-  return undefined;
-};
-
 const getYouTubeConfig = (html: string) => {
   const config: JsonRecord = {};
   let offset = 0;
@@ -235,9 +196,9 @@ const getYouTubeConfig = (html: string) => {
     if (markerIndex < 0) break;
     offset = markerIndex + "ytcfg.set(".length;
 
-    let extracted: ReturnType<typeof extractJsonObject>;
+    let extracted: ReturnType<typeof extractYouTubeJsonObject>;
     try {
-      extracted = extractJsonObject(html, "ytcfg.set(", markerIndex);
+      extracted = extractYouTubeJsonObject(html, "ytcfg.set(", markerIndex);
     } catch {
       continue;
     }
@@ -296,7 +257,7 @@ const fetchContinuation = async (token: string, config: JsonRecord) => {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "user-agent": USER_AGENT,
+      "user-agent": YOUTUBE_USER_AGENT,
       "x-youtube-client-name": "1",
       "x-youtube-client-version": clientVersion,
     },
@@ -330,12 +291,12 @@ export default defineHandler(async (event) => {
   const response = await fetch(playlistUrl, {
     headers: {
       "accept-language": "en-US,en;q=0.9",
-      "user-agent": USER_AGENT,
+      "user-agent": YOUTUBE_USER_AGENT,
     },
   });
   if (!response.ok) throw new Error(`youtube.playlist_failed (${response.status})`);
   const html = await response.text();
-  const initialData = extractJsonObject(html, "var ytInitialData =")?.value;
+  const initialData = extractYouTubeJsonObject(html, "var ytInitialData =")?.value;
   if (!initialData) throw new Error("youtube.initial_data");
 
   const title = getPlaylistTitle(initialData);
@@ -366,12 +327,14 @@ export default defineHandler(async (event) => {
   }
 
   if (tracks.length === 0) throw new Error("youtube.no_resolvable_tracks");
+  const year = await resolveYouTubeUploadYear(tracks[0]!.url, { signal: event.req.signal });
 
   return {
     title,
     artist: getPlaylistArtist(initialData),
     genre: "",
     isAlbum: false,
+    ...(year === undefined ? {} : { year }),
     coverUrl: getPlaylistCover(initialData),
     tracks,
   };

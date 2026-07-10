@@ -22,6 +22,7 @@ import {
   getDeployEnv,
   type CobaltRuntimeEnv as DevControlRuntimeEnv,
 } from "../../utils/dev-controls";
+import { getYouTubeVideoId, resolveYouTubeUploadYear } from "../../utils/youtube";
 
 enum CobaltResponseType {
   Error = "error",
@@ -34,6 +35,7 @@ enum CobaltResponseType {
 const audioRequestSchema = z.object({
   url: z.string().url(),
   audioBitrate: z.enum(["320", "256", "128", "96", "64"]),
+  year: z.number().int().min(1000).max(9999).optional(),
 });
 
 const cobaltResponseSchema = z.discriminatedUnion("status", [
@@ -340,6 +342,23 @@ const localProcessingResponse = (
     ),
   });
 
+const withYearMetadata = (
+  response: Extract<CobaltResponse, { status: CobaltResponseType.LocalProcessing }>,
+  year: number | undefined,
+) => {
+  if (year === undefined) return response;
+  return {
+    ...response,
+    output: {
+      ...response.output,
+      metadata: {
+        ...response.output.metadata,
+        date: String(year),
+      },
+    },
+  };
+};
+
 const parseAudioRequest = async (request: Request) => {
   try {
     return audioRequestSchema.parse(await request.json());
@@ -415,6 +434,12 @@ export default defineHandler(async (event) => {
       return respond(admissionLimitedResponse());
     }
 
+    const yearPromise =
+      body.year !== undefined
+        ? Promise.resolve(body.year)
+        : getYouTubeVideoId(body.url)
+          ? resolveYouTubeUploadYear(body.url, { signal: event.req.signal }).catch(() => undefined)
+          : Promise.resolve(undefined);
     const cobaltResult = await requestCobaltAudio(
       runtimeEnv,
       body.url,
@@ -432,8 +457,9 @@ export default defineHandler(async (event) => {
     }
 
     if (cobaltResponse.status === CobaltResponseType.LocalProcessing) {
+      const responseWithYear = withYearMetadata(cobaltResponse, await yearPromise);
       return respond(
-        localProcessingResponse(event.req, runtimeEnv, cobaltResponse, cobaltResult.machineId),
+        localProcessingResponse(event.req, runtimeEnv, responseWithYear, cobaltResult.machineId),
       );
     }
 
