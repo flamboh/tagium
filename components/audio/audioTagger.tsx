@@ -27,7 +27,7 @@ import {
   applyAlbumSharedTagsToFiles,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
-  applySoundCloudSetImportedCover,
+  applyPlaylistImportedCover,
   areAlbumTrackCoversSynced,
   prepareDownloadedTrackHydration,
   resolveDownloadedTrackHydrationWrite,
@@ -44,7 +44,7 @@ import TagSidebarPanel from "./TagSidebarPanel";
 import type { PlaylistDownloadQueuePanelState } from "./PlaylistDownloadQueuePanel";
 import {
   createSingleUrlDownloadPlan,
-  createSoundCloudSetDownloadPlan,
+  createPlaylistDownloadPlan,
   fetchImportedCover,
   type QueuedDownloadTrack,
 } from "./downloadTrack";
@@ -67,7 +67,9 @@ import { loadAppSettings, saveAppSettings } from "./settings";
 import { getSampleAlbum } from "./sampleMetadata";
 import { hasRecoverableSessionWork, useBeforeUnloadProtection } from "./sessionSafety";
 import { createImportLifecycleTracker, type ImportLifecycleTracker } from "./importLifecycle";
-import { isSoundCloudSetUrl, resolveSoundCloudSet, type SoundCloudSet } from "./soundcloudSet";
+import { isSoundCloudSetUrl, resolveSoundCloudSet } from "./soundcloudSet";
+import type { Playlist } from "./playlist";
+import { isYouTubePlaylistUrl, resolveYouTubePlaylist } from "./youtubePlaylist";
 import { getDownloadErrorMessage, notifyDownloadError } from "./downloadErrorMessage";
 import {
   AlbumGroup,
@@ -1021,11 +1023,11 @@ export default function AudioTagger() {
     });
     queueDownloadTracks(plan.queuedTracks.map((track) => ({ ...track, importOperationId })));
   };
-  const handleSoundCloudSetDownload = (set: SoundCloudSet, importOperationId: string) => {
+  const handlePlaylistDownload = (playlist: Playlist, importOperationId: string) => {
     bufferCurrentFormMetadata();
     setActiveView("editor");
-    const plan = createSoundCloudSetDownloadPlan({
-      set,
+    const plan = createPlaylistDownloadPlan({
+      playlist,
       audioBitrate: settings.audioBitrate,
       createId: () => crypto.randomUUID(),
     });
@@ -1049,12 +1051,12 @@ export default function AudioTagger() {
             albums: coveredAlbums,
             files: coveredFiles,
             selectedMetadata,
-          } = applySoundCloudSetImportedCover(
+          } = applyPlaylistImportedCover(
             filesRef.current,
             albumsRef.current,
             coverImport.albumId,
             coverImport.trackIds,
-            coverImport.set,
+            coverImport.playlist,
             settings,
             cover,
             selectedFileIdRef.current,
@@ -1089,7 +1091,7 @@ export default function AudioTagger() {
 
     importLifecycleTrackerRef.current?.resolve(importOperationId, {
       trackIds: plan.queuedTracks.map((track) => track.fileId),
-      hasCover: Boolean(set.coverUrl),
+      hasCover: Boolean(playlist.coverUrl),
     });
     queueDownloadTracks(plan.queuedTracks.map((track) => ({ ...track, importOperationId })));
   };
@@ -1097,17 +1099,25 @@ export default function AudioTagger() {
     const trimmedUrl = sourceUrl.trim();
     if (!trimmedUrl) return;
 
-    const importKind = isSoundCloudSetUrl(trimmedUrl) ? "set" : "single";
+    const playlistProvider = isSoundCloudSetUrl(trimmedUrl)
+      ? "soundcloud"
+      : isYouTubePlaylistUrl(trimmedUrl)
+        ? "youtube"
+        : null;
+    const importKind = playlistProvider ? "set" : "single";
     const importOperationId = importLifecycleTrackerRef.current!.start({
       sourceUrl: trimmedUrl,
       importKind,
     });
     setUrlImporting(true);
     try {
-      if (importKind === "set") {
+      if (playlistProvider) {
         try {
-          const set = await resolveSoundCloudSet(trimmedUrl);
-          handleSoundCloudSetDownload(set, importOperationId);
+          const playlist =
+            playlistProvider === "soundcloud"
+              ? await resolveSoundCloudSet(trimmedUrl)
+              : await resolveYouTubePlaylist(trimmedUrl);
+          handlePlaylistDownload(playlist, importOperationId);
         } catch (error) {
           importLifecycleTrackerRef.current?.fail(importOperationId, error, "resolve");
           throw error;
