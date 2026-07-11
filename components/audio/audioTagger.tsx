@@ -301,6 +301,11 @@ export default function AudioTagger() {
     }
     document.startViewTransition(updateView);
   };
+  const handleSettingsOpen = () => {
+    if (isTrackCoverProcessing) return;
+    changeActiveView("settings");
+  };
+  const handleSettingsClose = () => changeActiveView("editor");
   const hasRecoverableWork = hasRecoverableSessionWork({
     fileCount: files.length,
     albumCount: albums.length,
@@ -1921,10 +1926,7 @@ export default function AudioTagger() {
           onReorderAlbums={handleReorderAlbums}
           playlistDownloadQueue={playlistSidebarQueue}
           onDownloadAll={handleDownloadAll}
-          onOpenSettings={() => {
-            if (isTrackCoverProcessing) return;
-            changeActiveView(activeView === "settings" ? "editor" : "settings");
-          }}
+          onOpenSettings={activeView === "settings" ? handleSettingsClose : handleSettingsOpen}
           onCancelPlaylistDownloadQueue={handleCancelPlaylistDownloads}
           onRetryPlaylistDownloadQueue={handleRetryPlaylistDownloads}
         />
@@ -1940,7 +1942,7 @@ export default function AudioTagger() {
               <SettingsPage
                 settings={settings}
                 onChange={handleSettingsChange}
-                onBack={() => changeActiveView("editor")}
+                onBack={handleSettingsClose}
               />
             ) : !libraryIsEmpty ? (
               <TrackMetadataEditor

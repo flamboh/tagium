@@ -68,8 +68,14 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
         />
       )}
 
-      {active && (
-        <div className="flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6">
+      <div
+        className={
+          active
+            ? "flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6"
+            : "contents"
+        }
+      >
+        {active && (
           <>
             <div className="text-center select-none">
               <h1 className="text-7xl font-bold tracking-tighter text-foreground">tagium</h1>
@@ -102,9 +108,9 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
               </div>
             </button>
           </>
-        </div>
-      )}
-      {children}
+        )}
+        {children}
+      </div>
     </div>
   );
 }

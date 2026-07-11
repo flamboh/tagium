@@ -115,6 +115,9 @@ describe("media URL entry", () => {
 
   it("keeps the URL entry in the centered landing stack instead of pinning it to the bottom", () => {
     expect(landingScreenSource).toContain("{children}");
+    expect(landingScreenSource).toContain(
+      '? "flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6"',
+    );
     expect(mediaUrlEntrySource).not.toContain("bottom-[clamp(");
   });
 
@@ -149,6 +152,13 @@ describe("media URL entry", () => {
       "animateLayout={!libraryIsEmpty || !supportsViewTransitions}",
     );
     expect(mediaUrlEntrySource).toContain("media-url-entry flex");
+  });
+
+  it("routes both settings exit controls through the same transition handler", () => {
+    expect(audioTaggerSource).toContain(
+      'activeView === "settings" ? handleSettingsClose : handleSettingsOpen',
+    );
+    expect(audioTaggerSource).toContain("onBack={handleSettingsClose}");
   });
 
   it("keeps malformed URL feedback local to the input", async () => {
