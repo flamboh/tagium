@@ -54,6 +54,7 @@ import {
   type PlaylistDownloadControllerSnapshot,
 } from "./playlistDownloadController";
 import LandingScreen from "./LandingScreen";
+import ListeningGuidePrototype from "./ListeningGuidePrototype";
 import TrackMetadataEditor from "./TrackMetadataEditor";
 import SettingsPage from "./SettingsPage";
 import AudioDownloader from "./AudioDownloader";
@@ -1904,7 +1905,9 @@ export default function AudioTagger() {
         />
         <div className="relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1">
           <div className="h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1">
-            {activeView === "settings" ? (
+            {new URLSearchParams(window.location.search).get("prototype") === "listening-guide" ? (
+              <ListeningGuidePrototype />
+            ) : activeView === "settings" ? (
               <SettingsPage
                 settings={settings}
                 onChange={handleSettingsChange}
