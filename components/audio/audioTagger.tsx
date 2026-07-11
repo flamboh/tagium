@@ -82,6 +82,7 @@ import { resolveTrackMetadata, type TrackMetadata } from "./trackMetadata";
 import { isYouTubePlaylistUrl, resolveYouTubePlaylist } from "./youtubePlaylist";
 import { getSystemFailurePresentation, reportSystemFailure } from "./systemFailure";
 import { isValidFilenameBase, sanitizeFilenameBase } from "./filename";
+import { toast } from "sonner";
 import {
   AlbumGroup,
   AppSettings,
@@ -678,9 +679,13 @@ export default function AudioTagger() {
         const acceptedUploads = parseResult.acceptedUploads;
         acceptedCount = acceptedUploads.length;
         parseRejectedCount = parseResult.parseRejectedCount;
-        if (parseRejectedCount > 0) {
-          reportSystemFailure(new Error("audio upload parsing failed"), "upload");
-        }
+        parsedUploads
+          .filter((upload) => upload.file.status === "error")
+          .forEach((upload) =>
+            toast.error(
+              upload.file.downloadError ?? `${upload.file.filename} could not be imported.`,
+            ),
+          );
         if (acceptedUploads.length === 0) return;
         const orderedUploads = sortUploadedTracksByTrackNumber(acceptedUploads);
         const nextFiles = [
@@ -843,7 +848,7 @@ export default function AudioTagger() {
         yield* Effect.sync(() => signal.throwIfAborted());
         const [parsedUpload] = yield* parseUploads([downloadedFile]);
         yield* Effect.sync(() => signal.throwIfAborted());
-        if (!parsedUpload) {
+        if (!parsedUpload || parsedUpload.file.status === "error") {
           return yield* Effect.fail(new Error("downloaded track could not be parsed."));
         }
 

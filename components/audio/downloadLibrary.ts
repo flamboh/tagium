@@ -1,6 +1,7 @@
 import filenamify from "filenamify";
 import type { AlbumGroup, TagiumFile } from "./types";
 import { isValidFilenameBase } from "./filename";
+import { normalizeMp3Filename } from "./mp3Compatibility";
 
 export interface DownloadZipEntry {
   path: string;
@@ -119,7 +120,7 @@ const addTrackEntry = (
   track: TagiumFile | undefined,
 ) => {
   if (!track || !isTrackReadyForDownload(track) || !track.file) return;
-  const filename = cleanPathPart(track.filename, "track.mp3");
+  const filename = normalizeMp3Filename(cleanPathPart(track.filename, "track.mp3"));
   entries.push({
     path: uniquePath(`${folderPath}/${filename}`, usedPaths),
     file: track.file,

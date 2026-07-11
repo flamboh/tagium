@@ -3,6 +3,12 @@ import { AudioMetadataReadError, AudioMetadataWriteError, toPublicAudioError } f
 import { audioMetadataSchema } from "./metadata";
 import { parseTrackTagNumber, toGenreString, type UploadedTrack } from "./mp3Utils";
 import type { AudioMetadata, TagiumFile } from "./types";
+import {
+  getMp3AdmissionError,
+  MP3_MIME_TYPE,
+  normalizeMp3File,
+  normalizeMp3Filename,
+} from "./mp3Compatibility";
 
 interface MP3TagPicture {
   format: string;
@@ -141,10 +147,17 @@ const parseUploadedTrack = (file: File) =>
     const id = crypto.randomUUID();
 
     return yield* Effect.gen(function* () {
-      const MP3Tag = yield* loadMP3Tag;
       const arrayBuffer = yield* readArrayBuffer(file);
+      const admissionError = getMp3AdmissionError(file, new Uint8Array(arrayBuffer));
+      if (admissionError) {
+        return yield* Effect.fail(
+          new AudioMetadataReadError({ message: admissionError, cause: undefined }),
+        );
+      }
+      const normalizedFile = normalizeMp3File(file);
+      const MP3Tag = yield* loadMP3Tag;
       const mp3tag = yield* readMp3Tags(MP3Tag, arrayBuffer, false);
-      const duration = yield* getDuration(file);
+      const duration = yield* getDuration(normalizedFile);
       const pictureData =
         mp3tag.tags.v2?.APIC?.map((picture) => ({
           format: picture.format,
@@ -154,7 +167,7 @@ const parseUploadedTrack = (file: File) =>
         })) ?? [];
 
       const metadata = yield* decodeReadMetadata({
-        filename: file.name.split(".").slice(0, -1).join("."),
+        filename: normalizeMp3Filename(file.name).replace(/\.mp3$/i, ""),
         title: mp3tag.tags.title || "",
         artist: mp3tag.tags.artist || "",
         album: mp3tag.tags.album || "",
@@ -170,9 +183,9 @@ const parseUploadedTrack = (file: File) =>
       return {
         file: {
           id,
-          file,
+          file: normalizedFile,
           originalFile: file,
-          filename: file.name,
+          filename: normalizedFile.name,
           status: "pending",
           downloadStatus: "ready",
           hasBufferedChanges: false,
@@ -282,7 +295,7 @@ const writeMetadata = (fileToUpdate: TagiumFile, newTags: AudioMetadata) =>
       [new Uint8Array(buffer)],
       metadataToWrite.filename ? `${metadataToWrite.filename}.mp3` : fileToUpdate.filename,
       {
-        type: fileToUpdate.file.type,
+        type: MP3_MIME_TYPE,
       },
     );
   });

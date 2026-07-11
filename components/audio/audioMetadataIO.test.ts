@@ -48,6 +48,13 @@ const mp3tagMock = vi.hoisted(() => ({
   nextReadError: undefined as string | undefined,
 }));
 
+const validMp3Bytes = () => {
+  const bytes = new Uint8Array(834);
+  bytes.set([0xff, 0xfb, 0x90, 0x00], 0);
+  bytes.set([0xff, 0xfb, 0x90, 0x00], 417);
+  return bytes;
+};
+
 vi.mock("mp3tag.js", () => ({
   default: class MP3Tag {
     tags = structuredClone(mp3tagMock.nextTags);
@@ -79,8 +86,8 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
 
 const tagiumFile = (overrides: Partial<TagiumFile> = {}): TagiumFile => ({
   id: "track-1",
-  file: new File(["audio"], "track-1.mp3", { type: "audio/mpeg" }),
-  originalFile: new File(["audio"], "track-1.mp3", { type: "audio/mpeg" }),
+  file: new File([validMp3Bytes()], "track-1.mp3", { type: "audio/mpeg" }),
+  originalFile: new File([validMp3Bytes()], "track-1.mp3", { type: "audio/mpeg" }),
   filename: "track-1.mp3",
   status: "pending",
   downloadStatus: "ready",
@@ -139,7 +146,7 @@ afterEach(() => {
 describe("AudioMetadataIO", () => {
   it("parses uploaded tracks through mp3tag and converts APIC bytes", async () => {
     const [upload] = await parseUploadedTracks([
-      new File(["audio"], "artist.track.mp3", { type: "audio/mpeg" }),
+      new File([validMp3Bytes()], "artist.track.mp3", { type: "audio/mpeg" }),
     ]);
 
     expect(upload.file.status).toBe("pending");
@@ -165,7 +172,7 @@ describe("AudioMetadataIO", () => {
     delete nextTags.track;
 
     const [upload] = await parseUploadedTracks([
-      new File(["audio"], "untagged.mp3", { type: "audio/mpeg" }),
+      new File([validMp3Bytes()], "untagged.mp3", { type: "audio/mpeg" }),
     ]);
 
     mp3tagMock.nextTags = originalTags;
@@ -179,7 +186,7 @@ describe("AudioMetadataIO", () => {
     mp3tagMock.nextReadError = "Invalid ID3 tag";
 
     const [upload] = await parseUploadedTracks([
-      new File(["audio"], "broken.mp3", { type: "audio/mpeg" }),
+      new File([validMp3Bytes()], "broken.mp3", { type: "audio/mpeg" }),
     ]);
 
     expect(upload.file.status).toBe("error");
@@ -196,7 +203,7 @@ describe("AudioMetadataIO", () => {
     });
 
     const [upload] = await parseUploadedTracks([
-      new File(["audio"], "duration-failure.mp3", { type: "audio/mpeg" }),
+      new File([validMp3Bytes()], "duration-failure.mp3", { type: "audio/mpeg" }),
     ]);
 
     expect(upload.file.status).toBe("error");
