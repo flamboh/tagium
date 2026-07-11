@@ -59,7 +59,7 @@ describe("imported cover downloads", () => {
 
     await expect(
       fetchImportedCover("https://example.com/cover", { fetch: async () => response }),
-    ).rejects.toThrow("JPEG or PNG");
+    ).rejects.toThrow("jpeg or png");
     expect(readBody).not.toHaveBeenCalled();
   });
 

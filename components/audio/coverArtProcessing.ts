@@ -24,7 +24,7 @@ export const getCoverArtTargetSize = (
 
 export const validateCoverArtUpload = (file: File) => {
   if (!supportedCoverArtTypes.has(file.type.toLowerCase())) {
-    throw new Error("cover art image must be a JPEG or PNG.");
+    throw new Error("cover art image must be a jpeg or png.");
   }
   if (file.size > MAX_COVER_ART_UPLOAD_BYTES) {
     throw new Error("cover art must be 25 MB or smaller.");
@@ -34,7 +34,7 @@ export const validateCoverArtUpload = (file: File) => {
 export const normalizeCoverArtType = (contentType: string) => {
   const normalized = contentType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
   if (!supportedCoverArtTypes.has(normalized)) {
-    throw new Error("cover art image must be a JPEG or PNG.");
+    throw new Error("cover art image must be a jpeg or png.");
   }
   return normalized === "image/jpg" ? "image/jpeg" : normalized;
 };

@@ -55,7 +55,7 @@ describe("audioTagger metadata patches", () => {
   });
 
   it("consolidates every rejected file error into one presentation", () => {
-    const rejectedUploads = ["empty.mp3 is empty.", "song.wav is not an MP3."].map(
+    const rejectedUploads = ["empty.mp3 is empty.", "song.wav is not an mp3."].map(
       (downloadError, index) =>
         ({
           file: {
@@ -70,7 +70,7 @@ describe("audioTagger metadata patches", () => {
     );
 
     expect(getUploadRejectionMessage(rejectedUploads)).toBe(
-      "empty.mp3 is empty.\nsong.wav is not an MP3.",
+      "empty.mp3 is empty.\nsong.wav is not an mp3.",
     );
   });
 
