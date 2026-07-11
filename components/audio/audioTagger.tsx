@@ -70,6 +70,7 @@ import { hasRecoverableSessionWork, useBeforeUnloadProtection } from "./sessionS
 import { createImportLifecycleTracker, type ImportLifecycleTracker } from "./importLifecycle";
 import { isSoundCloudSetUrl, resolveSoundCloudSet } from "./soundcloudSet";
 import type { Playlist } from "./playlist";
+import { resolveTrackMetadata, type TrackMetadata } from "./trackMetadata";
 import { isYouTubePlaylistUrl, resolveYouTubePlaylist } from "./youtubePlaylist";
 import { getSystemFailurePresentation, reportSystemFailure } from "./systemFailure";
 import { isValidFilenameBase, sanitizeFilenameBase } from "./filename";
@@ -997,13 +998,18 @@ export default function AudioTagger() {
       downloadRequest: file.downloadRequest,
     };
   };
-  const handleAudioDownload = (sourceUrl: string, importOperationId: string) => {
+  const handleAudioDownload = (
+    sourceUrl: string,
+    importOperationId: string,
+    metadata?: TrackMetadata,
+  ) => {
     bufferCurrentFormMetadata();
     setActiveView("editor");
     const plan = createSingleUrlDownloadPlan({
       sourceUrl,
       audioBitrate: settings.audioBitrate,
       createId: () => crypto.randomUUID(),
+      metadata,
     });
     const nextFiles = [...filesRef.current, ...plan.pendingFiles];
     filesRef.current = nextFiles;
@@ -1123,7 +1129,13 @@ export default function AudioTagger() {
         return;
       }
 
-      handleAudioDownload(trimmedUrl, importOperationId);
+      let trackMetadata: TrackMetadata | undefined;
+      try {
+        trackMetadata = await resolveTrackMetadata(trimmedUrl);
+      } catch {
+        // Metadata enrichment is optional; the download retains its URL-derived fallback.
+      }
+      handleAudioDownload(trimmedUrl, importOperationId, trackMetadata);
     } finally {
       setUrlImporting(false);
     }
