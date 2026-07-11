@@ -285,6 +285,9 @@ export default function AudioTagger() {
   const [editingAlbumId, setEditingAlbumId] = useState<string | null>(null);
   const [createSeedTrackIds, setCreateSeedTrackIds] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<ActiveView>("editor");
+  const [listeningGuidePrototypeAvailable, setListeningGuidePrototypeAvailable] = useState(
+    import.meta.env.DEV,
+  );
   const [settings, setSettings] = useState<AppSettings>(loadAppSettings);
   const [playlistDownloadQueue, setPlaylistDownloadQueue] =
     useState<PlaylistDownloadQueueState | null>(null);
@@ -293,6 +296,8 @@ export default function AudioTagger() {
     albumCount: albums.length,
     importing: loading || urlImporting,
   });
+  const listeningGuidePrototypeOpen =
+    new URLSearchParams(window.location.search).get("prototype") === "listening-guide";
   useBeforeUnloadProtection(hasRecoverableWork);
   const filesRef = useRef<TagiumFile[]>(files);
   const albumsRef = useRef<AlbumGroup[]>(albums);
@@ -343,6 +348,14 @@ export default function AudioTagger() {
       reset(selectedFile.metadata);
     }
   }, [selectedFile, reset]);
+  useEffect(() => {
+    if (import.meta.env.DEV) return;
+
+    fetch("/api/dev/config", { headers: { Accept: "application/json" } })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((config) => setListeningGuidePrototypeAvailable(config?.deployEnv === "preview"))
+      .catch(() => setListeningGuidePrototypeAvailable(false));
+  }, []);
   useEffect(() => {
     const fileIdSet = new Set(files.map((file) => file.id));
     setLooseTrackIds((prevLooseTrackIds) =>
@@ -1879,6 +1892,7 @@ export default function AudioTagger() {
           selectedFileId={selectedFileId}
           selectedFileIds={selectedFileIds}
           settingsOpen={activeView === "settings"}
+          listeningGuideOpen={listeningGuidePrototypeOpen}
           onAudioUpload={handleAudioUpload}
           onSelectAlbum={handleSelectAlbum}
           onSelectFile={handleSelectFile}
@@ -1900,12 +1914,22 @@ export default function AudioTagger() {
             if (isTrackCoverProcessing) return;
             setActiveView((currentView) => (currentView === "settings" ? "editor" : "settings"));
           }}
+          onOpenListeningGuide={
+            listeningGuidePrototypeAvailable
+              ? () => {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set("prototype", "listening-guide");
+                  url.searchParams.delete("variant");
+                  window.location.assign(url.toString());
+                }
+              : undefined
+          }
           onCancelPlaylistDownloadQueue={handleCancelPlaylistDownloads}
           onRetryPlaylistDownloadQueue={handleRetryPlaylistDownloads}
         />
         <div className="relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1">
           <div className="h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1">
-            {new URLSearchParams(window.location.search).get("prototype") === "listening-guide" ? (
+            {listeningGuidePrototypeOpen ? (
               <ListeningGuidePrototype />
             ) : activeView === "settings" ? (
               <SettingsPage

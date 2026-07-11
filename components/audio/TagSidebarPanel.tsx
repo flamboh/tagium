@@ -1,7 +1,7 @@
 "use client";
 
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AlbumSidebar from "./AlbumSidebar";
@@ -21,6 +21,7 @@ interface TagSidebarPanelProps {
   selectedFileId: string | null;
   selectedFileIds: Set<string>;
   settingsOpen: boolean;
+  listeningGuideOpen?: boolean;
   onAudioUpload: (files: File[]) => void;
   onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
   onSelectFile: (albumId: string, fileId: string, event?: ReactMouseEvent) => void;
@@ -48,8 +49,68 @@ interface TagSidebarPanelProps {
   playlistDownloadQueue?: PlaylistDownloadQueuePanelState | null;
   onDownloadAll: () => void;
   onOpenSettings: () => void;
+  onOpenListeningGuide?: () => void;
   onCancelPlaylistDownloadQueue?: () => void;
   onRetryPlaylistDownloadQueue?: () => void;
+}
+
+function ListeningGuideEntryButton({ active, onClick }: { active: boolean; onClick: () => void }) {
+  const services = ["spotify?", "apple music?"];
+  const [serviceIndex, setServiceIndex] = useState(0);
+  const [animating, setAnimating] = useState(false);
+
+  useEffect(() => {
+    let swapTimeout: ReturnType<typeof setTimeout> | undefined;
+    const interval = setInterval(() => {
+      setAnimating(true);
+      swapTimeout = setTimeout(() => {
+        setServiceIndex((current) => (current + 1) % services.length);
+        setAnimating(false);
+      }, 350);
+    }, 3_000);
+
+    return () => {
+      clearInterval(interval);
+      if (swapTimeout) clearTimeout(swapTimeout);
+    };
+  }, [services.length]);
+
+  const nextServiceIndex = (serviceIndex + 1) % services.length;
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className={cn(
+        "h-auto w-full flex-col gap-0 py-3 text-center",
+        active && "border-transparent bg-accent text-accent-foreground shadow-none hover:bg-accent",
+      )}
+      onClick={onClick}
+      aria-label="how do i listen on spotify or apple music?"
+    >
+      <span className="text-xs font-normal text-muted-foreground">how do i listen on</span>
+      <span className="relative h-5 w-full overflow-hidden font-semibold">
+        <span
+          aria-hidden="true"
+          className={cn(
+            "absolute inset-0 transition-[transform,opacity] duration-300 ease-in-out",
+            animating ? "-translate-y-full opacity-0" : "translate-y-0 opacity-100",
+          )}
+        >
+          {services[serviceIndex]}
+        </span>
+        <span
+          aria-hidden="true"
+          className={cn(
+            "absolute inset-0 transition-[transform,opacity] duration-300 ease-in-out",
+            animating ? "translate-y-0 opacity-100" : "translate-y-full opacity-0",
+          )}
+        >
+          {services[nextServiceIndex]}
+        </span>
+      </span>
+    </Button>
+  );
 }
 
 export default function TagSidebarPanel({
@@ -61,6 +122,7 @@ export default function TagSidebarPanel({
   selectedFileId,
   selectedFileIds,
   settingsOpen,
+  listeningGuideOpen = false,
   onAudioUpload,
   onSelectAlbum,
   onSelectFile,
@@ -79,6 +141,7 @@ export default function TagSidebarPanel({
   playlistDownloadQueue = null,
   onDownloadAll,
   onOpenSettings,
+  onOpenListeningGuide,
   onCancelPlaylistDownloadQueue,
   onRetryPlaylistDownloadQueue,
 }: TagSidebarPanelProps) {
@@ -210,6 +273,9 @@ export default function TagSidebarPanel({
           <Settings />
           settings
         </Button>
+        {onOpenListeningGuide && (
+          <ListeningGuideEntryButton active={listeningGuideOpen} onClick={onOpenListeningGuide} />
+        )}
       </div>
     </div>
   );
