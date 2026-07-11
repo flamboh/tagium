@@ -49,6 +49,42 @@ interface GuideSetup {
   source: SourceKey;
 }
 
+interface ListeningGuideState {
+  view: "wizard" | "guide";
+  step: number;
+  app: AppKey | null;
+  device: DeviceKey | null;
+  source: SourceKey | null;
+}
+
+const listeningGuideStorageKey = "tagium:listening-guide-prototype";
+const initialListeningGuideState: ListeningGuideState = {
+  view: "wizard",
+  step: 0,
+  app: null,
+  device: null,
+  source: null,
+};
+
+function loadListeningGuideState(): ListeningGuideState {
+  if (typeof window === "undefined") return initialListeningGuideState;
+
+  try {
+    const storedState = JSON.parse(
+      window.localStorage.getItem(listeningGuideStorageKey) ?? "null",
+    ) as Partial<ListeningGuideState> | null;
+    const app = appOptions.find((option) => option.key === storedState?.app)?.key ?? null;
+    const device = deviceOptions.find((option) => option.key === storedState?.device)?.key ?? null;
+    const source = sourceOptions.find((option) => option.key === storedState?.source)?.key ?? null;
+    const step = storedState?.step === 1 || storedState?.step === 2 ? storedState.step : 0;
+    const view = storedState?.view === "guide" && app && device && source ? "guide" : "wizard";
+
+    return { view, step, app, device, source };
+  } catch {
+    return initialListeningGuideState;
+  }
+}
+
 function PlaceholderMedia({
   kind = "image",
   label = "image",
@@ -137,35 +173,35 @@ function OptionCard({
 }
 
 function ListeningGuideWizard({
-  initialSetup,
+  state,
+  onChange,
   onComplete,
   onBack,
 }: {
-  initialSetup: GuideSetup | null;
+  state: ListeningGuideState;
+  onChange: (state: ListeningGuideState) => void;
   onComplete: (setup: GuideSetup) => void;
   onBack: () => void;
 }) {
-  const [step, setStep] = useState(0);
-  const [app, setApp] = useState<AppKey | null>(initialSetup?.app ?? null);
-  const [device, setDevice] = useState<DeviceKey | null>(initialSetup?.device ?? null);
-  const [source, setSource] = useState<SourceKey | null>(initialSetup?.source ?? null);
   const questionHeadingRef = useRef<HTMLHeadingElement>(null);
   const canAdvance =
-    (step === 0 && app !== null) ||
-    (step === 1 && device !== null) ||
-    (step === 2 && source !== null);
+    (state.step === 0 && state.app !== null) ||
+    (state.step === 1 && state.device !== null) ||
+    (state.step === 2 && state.source !== null);
 
   useEffect(() => {
     questionHeadingRef.current?.focus();
-  }, [step]);
+  }, [state.step]);
 
   const advance = () => {
-    if (step < 2) {
-      if (canAdvance) setStep((current) => current + 1);
+    if (state.step < 2) {
+      if (canAdvance) onChange({ ...state, step: state.step + 1 });
       return;
     }
 
-    if (app && device && source) onComplete({ app, device, source });
+    if (state.app && state.device && state.source) {
+      onComplete({ app: state.app, device: state.device, source: state.source });
+    }
   };
 
   return (
@@ -174,7 +210,7 @@ function ListeningGuideWizard({
       <main className="flex-1 overflow-y-auto px-5 pb-16 pt-8 md:px-8">
         <section className="mx-auto max-w-3xl">
           <p className="sr-only" role="status" aria-live="polite">
-            step {step + 1} of 3
+            step {state.step + 1} of 3
           </p>
           <div className="mb-10 flex justify-center gap-2" aria-hidden="true">
             {[0, 1, 2].map((index) => (
@@ -182,14 +218,14 @@ function ListeningGuideWizard({
                 key={index}
                 className={cn(
                   "size-2 rounded-full transition-colors",
-                  index === step ? "bg-primary" : "bg-muted",
+                  index === state.step ? "bg-primary" : "bg-muted",
                 )}
               />
             ))}
           </div>
 
           <div className="min-h-[34rem] sm:min-h-[17rem]">
-            {step === 0 && (
+            {state.step === 0 && (
               <div>
                 <h2
                   ref={questionHeadingRef}
@@ -204,11 +240,10 @@ function ListeningGuideWizard({
                       key={option.key}
                       logo={option.logo}
                       label={option.label}
-                      selected={app === option.key}
+                      selected={state.app === option.key}
                       className="h-[204px] flex-col justify-center gap-1 text-center"
                       onClick={() => {
-                        setApp(option.key);
-                        setStep(1);
+                        onChange({ ...state, app: option.key, step: 1 });
                       }}
                     />
                   ))}
@@ -216,7 +251,7 @@ function ListeningGuideWizard({
               </div>
             )}
 
-            {step === 1 && (
+            {state.step === 1 && (
               <div>
                 <h2
                   ref={questionHeadingRef}
@@ -231,10 +266,9 @@ function ListeningGuideWizard({
                       key={option.key}
                       icon={option.icon}
                       label={option.label}
-                      selected={device === option.key}
+                      selected={state.device === option.key}
                       onClick={() => {
-                        setDevice(option.key);
-                        setStep(2);
+                        onChange({ ...state, device: option.key, step: 2 });
                       }}
                     />
                   ))}
@@ -242,7 +276,7 @@ function ListeningGuideWizard({
               </div>
             )}
 
-            {step === 2 && (
+            {state.step === 2 && (
               <div>
                 <h2
                   ref={questionHeadingRef}
@@ -258,10 +292,15 @@ function ListeningGuideWizard({
                       icon={"icon" in option ? option.icon : undefined}
                       logo={"logo" in option ? option.logo : undefined}
                       label={option.label}
-                      selected={source === option.key}
+                      selected={state.source === option.key}
                       onClick={() => {
-                        setSource(option.key);
-                        if (app && device) onComplete({ app, device, source: option.key });
+                        if (state.app && state.device) {
+                          onComplete({
+                            app: state.app,
+                            device: state.device,
+                            source: option.key,
+                          });
+                        }
                       }}
                     />
                   ))}
@@ -275,8 +314,8 @@ function ListeningGuideWizard({
               type="button"
               variant="ghost"
               size="icon"
-              disabled={step === 0}
-              onClick={() => setStep((current) => current - 1)}
+              disabled={state.step === 0}
+              onClick={() => onChange({ ...state, step: state.step - 1 })}
               aria-label="previous question"
             >
               <ArrowLeft />
@@ -323,17 +362,17 @@ function VisualHandbookGuide({
       <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1fr)_14rem]">
         <main className="overflow-y-auto px-5 pb-28 pt-7 md:px-10 lg:px-14">
           <article id="guide-overview" className="mx-auto max-w-3xl scroll-mt-8">
-            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
               <h2
                 ref={guideHeadingRef}
                 tabIndex={-1}
-                className="min-w-0 text-3xl font-bold tracking-tight outline-none sm:flex-1 md:text-5xl"
+                className="text-3xl font-bold tracking-tight outline-none md:text-5xl"
               >
                 {source} to {app} on {device}
               </h2>
               <button
                 type="button"
-                className="shrink-0 cursor-pointer text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+                className="mt-2 cursor-pointer text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
                 onClick={onNewSelection}
               >
                 make new selection
@@ -384,16 +423,19 @@ function VisualHandbookGuide({
 }
 
 export default function ListeningGuidePrototype({ onBack }: { onBack: () => void }) {
-  const [setup, setSetup] = useState<GuideSetup | null>(null);
-  const [showGuide, setShowGuide] = useState(false);
+  const [state, setState] = useState<ListeningGuideState>(loadListeningGuideState);
 
-  if (!showGuide || !setup) {
+  useEffect(() => {
+    window.localStorage.setItem(listeningGuideStorageKey, JSON.stringify(state));
+  }, [state]);
+
+  if (state.view === "wizard" || !state.app || !state.device || !state.source) {
     return (
       <ListeningGuideWizard
-        initialSetup={setup}
+        state={state}
+        onChange={setState}
         onComplete={(nextSetup) => {
-          setSetup(nextSetup);
-          setShowGuide(true);
+          setState({ view: "guide", step: 2, ...nextSetup });
         }}
         onBack={onBack}
       />
@@ -401,6 +443,10 @@ export default function ListeningGuidePrototype({ onBack }: { onBack: () => void
   }
 
   return (
-    <VisualHandbookGuide setup={setup} onBack={onBack} onNewSelection={() => setShowGuide(false)} />
+    <VisualHandbookGuide
+      setup={{ app: state.app, device: state.device, source: state.source }}
+      onBack={onBack}
+      onNewSelection={() => setState(initialListeningGuideState)}
+    />
   );
 }
