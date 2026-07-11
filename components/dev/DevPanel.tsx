@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, RotateCcw, SlidersHorizontal, Zap } from "lucide-react";
+import { AlertTriangle, BellRing, RotateCcw, SlidersHorizontal, Zap } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,21 @@ type DevConfig = {
 
 type AudioFault = "rate-limit" | "capacity" | "timeout" | "unreachable" | "malformed";
 type TunnelFault = "rate-limit" | "capacity" | "timeout" | "empty-body";
+export type DevToastKind = "neutral" | "success" | "error" | "info" | "warning";
+
+const devToastKinds: DevToastKind[] = ["neutral", "success", "error", "info", "warning"];
+
+export const spawnDevToast = (kind: DevToastKind) => {
+  const title = `${kind} toast`;
+  const options = { description: "previewing Tagium's notification styling" };
+
+  if (kind === "neutral") {
+    toast(title, options);
+    return;
+  }
+
+  toast[kind](title, options);
+};
 
 const audioFaults: Array<{ value: AudioFault; label: string }> = [
   { value: "rate-limit", label: "429" },
@@ -288,6 +304,26 @@ export function DevPanel() {
                 >
                   clear
                 </Button>
+              </div>
+            </section>
+
+            <section className="grid gap-3">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+                <BellRing className="size-3.5" />
+                toasts
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {devToastKinds.map((kind) => (
+                  <Button
+                    key={kind}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => spawnDevToast(kind)}
+                  >
+                    {kind}
+                  </Button>
+                ))}
               </div>
             </section>
           </div>
