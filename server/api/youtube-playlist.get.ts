@@ -204,11 +204,14 @@ const getPlaylistCover = (initialData: unknown) => {
     findFirstValue(initialData, "playlistVideoThumbnailRenderer"),
   );
   if (!parsed.success || parsed.data.thumbnail.thumbnails.length === 0) return undefined;
-  return parsed.data.thumbnail.thumbnails.reduce((largest, thumbnail) => {
+  const coverUrl = parsed.data.thumbnail.thumbnails.reduce((largest, thumbnail) => {
     const largestArea = (largest.width ?? 0) * (largest.height ?? 0);
     const thumbnailArea = (thumbnail.width ?? 0) * (thumbnail.height ?? 0);
     return thumbnailArea >= largestArea ? thumbnail : largest;
   }).url;
+  const proxyUrl = new URL("/api/youtube-cover", "http://tagium.local");
+  proxyUrl.searchParams.set("url", coverUrl);
+  return `${proxyUrl.pathname}${proxyUrl.search}`;
 };
 
 const getDeclaredTrackCount = (initialData: unknown) => {

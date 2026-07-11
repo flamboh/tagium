@@ -140,7 +140,7 @@ describe("youtube playlist endpoint", () => {
       genre: "",
       isAlbum: false,
       year: 2022,
-      coverUrl: "https://i.ytimg.com/large.jpg",
+      coverUrl: "/api/youtube-cover?url=https%3A%2F%2Fi.ytimg.com%2Flarge.jpg",
       tracks: [
         {
           title: "First Track",
