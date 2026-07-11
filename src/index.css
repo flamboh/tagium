@@ -212,6 +212,26 @@
 }
 
 @layer components {
+  .media-url-entry {
+    view-transition-name: media-url-entry;
+  }
+
+  ::view-transition-group(media-url-entry) {
+    animation-duration: 420ms;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 180ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(*) {
+      animation-duration: 0.01ms;
+    }
+  }
+
   @media (min-width: 768px) {
     [data-sonner-toaster].tagium-toaster {
       --width: 28rem;

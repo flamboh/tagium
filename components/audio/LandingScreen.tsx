@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Music4, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,21 +14,6 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [contentMounted, setContentMounted] = useState(active);
-  const [contentVisible, setContentVisible] = useState(active);
-
-  useEffect(() => {
-    if (active) {
-      setContentMounted(true);
-      const frame = requestAnimationFrame(() => setContentVisible(true));
-      return () => cancelAnimationFrame(frame);
-    }
-
-    setContentVisible(false);
-    const timeout = window.setTimeout(() => setContentMounted(false), 180);
-    return () => window.clearTimeout(timeout);
-  }, [active]);
-
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     dragCounterRef.current++;
@@ -83,16 +68,8 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
         />
       )}
 
-      {contentMounted && (
-        <div
-          aria-hidden={!active || undefined}
-          inert={!active || undefined}
-          className={cn(
-            "flex w-full max-w-md flex-col items-center gap-10 transition-opacity duration-180 motion-reduce:transition-none max-lg:[@media(max-height:700px)]:gap-6",
-            contentVisible ? "opacity-100" : "pointer-events-none opacity-0",
-            !active && "absolute inset-0 z-20 m-auto h-fit p-8",
-          )}
-        >
+      {active && (
+        <div className="flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6">
           <>
             <div className="text-center select-none">
               <h1 className="text-7xl font-bold tracking-tighter text-foreground">tagium</h1>

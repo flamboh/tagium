@@ -1,6 +1,7 @@
 "use client";
-import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import { flushSync } from "react-dom";
 import { Cause, Effect, Exit } from "effect";
 import { SubmitHandler, useForm } from "react-hook-form";
 import filenamify from "filenamify";
@@ -73,7 +74,6 @@ import type { Playlist } from "./playlist";
 import { isYouTubePlaylistUrl, resolveYouTubePlaylist } from "./youtubePlaylist";
 import { getSystemFailurePresentation, reportSystemFailure } from "./systemFailure";
 import { isValidFilenameBase, sanitizeFilenameBase } from "./filename";
-import { cn } from "@/lib/utils";
 import {
   AlbumGroup,
   AppSettings,
@@ -135,41 +135,6 @@ const createPlaylistDownloadModelTrack = (track: ManagedDownloadTrack) => ({
 });
 type MetadataPatchField = keyof MetadataPatch;
 type DirtyMetadataFields = Partial<Record<keyof AudioMetadata, unknown>>;
-
-const VIEW_FADE_DURATION = 180;
-
-function ViewFade({ show, children }: { show: boolean; children: ReactNode }) {
-  const [mounted, setMounted] = useState(show);
-  const [visible, setVisible] = useState(show);
-
-  useEffect(() => {
-    if (show) {
-      setMounted(true);
-      const frame = requestAnimationFrame(() => setVisible(true));
-      return () => cancelAnimationFrame(frame);
-    }
-
-    setVisible(false);
-    const timeout = window.setTimeout(() => setMounted(false), VIEW_FADE_DURATION);
-    return () => window.clearTimeout(timeout);
-  }, [show]);
-
-  if (!mounted) return null;
-
-  return (
-    <div
-      aria-hidden={!show || undefined}
-      inert={!show || undefined}
-      className={cn(
-        "min-h-0 flex flex-1 flex-col transition-opacity duration-180 motion-reduce:transition-none",
-        visible ? "opacity-100" : "pointer-events-none opacity-0",
-        !show && "absolute inset-0 z-20",
-      )}
-    >
-      {children}
-    </div>
-  );
-}
 
 const metadataPatchFields = [
   "filename",
@@ -325,6 +290,17 @@ export default function AudioTagger() {
   const [settings, setSettings] = useState<AppSettings>(loadAppSettings);
   const [playlistDownloadQueue, setPlaylistDownloadQueue] =
     useState<PlaylistDownloadQueueState | null>(null);
+  const changeActiveView = (nextView: ActiveView) => {
+    const updateView = () => flushSync(() => setActiveView(nextView));
+    if (
+      !document.startViewTransition ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      updateView();
+      return;
+    }
+    document.startViewTransition(updateView);
+  };
   const hasRecoverableWork = hasRecoverableSessionWork({
     fileCount: files.length,
     albumCount: albums.length,
@@ -1827,6 +1803,7 @@ export default function AudioTagger() {
 
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
   const landingIsActive = libraryIsEmpty && activeView === "editor";
+  const supportsViewTransitions = "startViewTransition" in document;
   const playlistQueueDownloaded = playlistDownloadQueue ? playlistDownloadQueue.completed : 0;
   const playlistQueueEta = playlistDownloadQueue
     ? formatPlaylistQueueEta(playlistDownloadQueue.etaMs)
@@ -1946,7 +1923,7 @@ export default function AudioTagger() {
           onDownloadAll={handleDownloadAll}
           onOpenSettings={() => {
             if (isTrackCoverProcessing) return;
-            setActiveView((currentView) => (currentView === "settings" ? "editor" : "settings"));
+            changeActiveView(activeView === "settings" ? "editor" : "settings");
           }}
           onCancelPlaylistDownloadQueue={handleCancelPlaylistDownloads}
           onRetryPlaylistDownloadQueue={handleRetryPlaylistDownloads}
@@ -1959,14 +1936,13 @@ export default function AudioTagger() {
                 : "h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1"
             }
           >
-            <ViewFade show={activeView === "settings"}>
+            {activeView === "settings" ? (
               <SettingsPage
                 settings={settings}
                 onChange={handleSettingsChange}
-                onBack={() => setActiveView("editor")}
+                onBack={() => changeActiveView("editor")}
               />
-            </ViewFade>
-            <ViewFade show={activeView === "editor" && !libraryIsEmpty}>
+            ) : !libraryIsEmpty ? (
               <TrackMetadataEditor
                 selectedFile={selectedFile}
                 selectedFileId={selectedFileId}
@@ -1984,12 +1960,13 @@ export default function AudioTagger() {
                   handlePreviewMetadataChange(field, event.target.value)
                 }
               />
-            </ViewFade>
+            ) : null}
           </div>
           <LandingScreen active={landingIsActive} onAudioUpload={handleAudioUpload}>
             <MediaUrlEntry
               layout={landingIsActive ? "landing" : "editor"}
               hidden={activeView !== "editor" && !libraryIsEmpty}
+              animateLayout={!libraryIsEmpty || !supportsViewTransitions}
               onUrlImport={handleUrlImport}
             />
           </LandingScreen>

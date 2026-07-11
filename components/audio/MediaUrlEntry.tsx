@@ -10,6 +10,7 @@ import { getSystemFailurePresentation, reportSystemFailure } from "./systemFailu
 interface MediaUrlEntryProps {
   layout: "landing" | "editor";
   hidden: boolean;
+  animateLayout?: boolean;
   onUrlImport: (sourceUrl: string) => void | Promise<void>;
 }
 
@@ -24,7 +25,12 @@ const validateMediaUrl = (value: string) => {
   return "enter a complete http or https url";
 };
 
-export default function MediaUrlEntry({ layout, hidden, onUrlImport }: MediaUrlEntryProps) {
+export default function MediaUrlEntry({
+  layout,
+  hidden,
+  animateLayout = true,
+  onUrlImport,
+}: MediaUrlEntryProps) {
   const [sourceUrl, setSourceUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -46,17 +52,21 @@ export default function MediaUrlEntry({ layout, hidden, onUrlImport }: MediaUrlE
     const layoutChanged = previousLayoutRef.current !== layout;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    if (previousRect && layoutChanged && !reducedMotion) {
+    if (previousRect && layoutChanged && animateLayout && !reducedMotion) {
       const deltaX = previousRect.left - nextRect.left;
       const deltaY = previousRect.top - nextRect.top;
-      const scaleX = previousRect.width / Math.max(1, nextRect.width);
       form.animate(
         [
           {
-            transform: `translate(${deltaX}px, ${deltaY}px) scaleX(${scaleX})`,
+            transform: `translate(${deltaX}px, ${deltaY}px)`,
             transformOrigin: "top left",
+            width: `${previousRect.width}px`,
           },
-          { transform: "translate(0, 0) scaleX(1)", transformOrigin: "top left" },
+          {
+            transform: "translate(0, 0)",
+            transformOrigin: "top left",
+            width: `${nextRect.width}px`,
+          },
         ],
         { duration: 420, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
       );
@@ -64,7 +74,7 @@ export default function MediaUrlEntry({ layout, hidden, onUrlImport }: MediaUrlE
 
     previousRectRef.current = nextRect;
     previousLayoutRef.current = layout;
-  }, [hidden, layout]);
+  }, [animateLayout, hidden, layout]);
 
   const showValidationError = (message: string) => {
     setValidationError(message);
@@ -143,7 +153,12 @@ export default function MediaUrlEntry({ layout, hidden, onUrlImport }: MediaUrlE
             <div className="h-px flex-1 bg-border" />
           </div>
         )}
-        <form ref={formRef} noValidate onSubmit={handleSubmit} className="flex items-start gap-2">
+        <form
+          ref={formRef}
+          noValidate
+          onSubmit={handleSubmit}
+          className="media-url-entry flex items-start gap-2"
+        >
           <div className="min-w-0 flex-1">
             <div className="relative">
               <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

@@ -139,6 +139,16 @@ describe("media URL entry", () => {
 
   it("anchors width-changing layout motion to the measured left edge", () => {
     expect(mediaUrlEntrySource.match(/transformOrigin: "top left"/g)).toHaveLength(2);
+    expect(mediaUrlEntrySource).not.toContain("scaleX(");
+    expect(mediaUrlEntrySource).toContain("width: `${previousRect.width}px`");
+  });
+
+  it("uses a native shared-element transition for empty-library settings changes", () => {
+    expect(audioTaggerSource).toContain("document.startViewTransition(updateView)");
+    expect(audioTaggerSource).toContain(
+      "animateLayout={!libraryIsEmpty || !supportsViewTransitions}",
+    );
+    expect(mediaUrlEntrySource).toContain("media-url-entry flex");
   });
 
   it("keeps malformed URL feedback local to the input", async () => {
