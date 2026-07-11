@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } fr
 import { Cause, Effect, Exit } from "effect";
 import { SubmitHandler, useForm } from "react-hook-form";
 import filenamify from "filenamify";
+import { toast } from "sonner";
 import { analytics, type TrackSourceMix } from "@/src/analytics";
 import AlbumMetadataDialog, { AlbumMetadataDraft } from "./AlbumMetadataDialog";
 import DestructiveActionDialog from "./DestructiveActionDialog";
@@ -58,6 +59,13 @@ import LandingScreen from "./LandingScreen";
 import TrackMetadataEditor from "./TrackMetadataEditor";
 import SettingsPage from "./SettingsPage";
 import MediaUrlEntry from "./MediaUrlEntry";
+import MetadataCleanupDialog from "./MetadataCleanupDialog";
+import {
+  applyMetadataCleanupSuggestions,
+  findMetadataCleanupSuggestions,
+  undoMetadataCleanupSuggestions,
+  type MetadataCleanupSuggestion,
+} from "./metadataCleanup";
 import {
   sortTrackIdsByTrackNumber,
   sortUploadedTracksByTrackNumber,
@@ -288,6 +296,10 @@ export default function AudioTagger() {
   const [createSeedTrackIds, setCreateSeedTrackIds] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<ActiveView>("editor");
   const [settings, setSettings] = useState<AppSettings>(loadAppSettings);
+  const [metadataCleanupSuggestions, setMetadataCleanupSuggestions] = useState<
+    MetadataCleanupSuggestion[]
+  >([]);
+  const [metadataCleanupOpen, setMetadataCleanupOpen] = useState(false);
   const [playlistDownloadQueue, setPlaylistDownloadQueue] =
     useState<PlaylistDownloadQueueState | null>(null);
   const hasRecoverableWork = hasRecoverableSessionWork({
@@ -303,6 +315,7 @@ export default function AudioTagger() {
   const formDirtyRef = useRef(false);
   const importQueueRef = useRef(Promise.resolve());
   const pendingImportKeysRef = useRef(new Set<string>());
+  const offeredCleanupKeysRef = useRef(new Set<string>());
   const playlistDownloadQueueRef = useRef<PlaylistDownloadQueueState | null>(null);
   const playlistDownloadControllerRef =
     useRef<PlaylistDownloadController<ManagedDownloadTrack> | null>(null);
@@ -379,6 +392,28 @@ export default function AudioTagger() {
     setSelectedFileId(null);
     setSelectedAlbumId(null);
   }, [albums, files, looseTrackIds, selectedAlbumId, selectedFileId]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const suggestions = findMetadataCleanupSuggestions(files, albums).filter((suggestion) => {
+      const key = `${suggestion.trackId}:${suggestion.beforeTitle}:${suggestion.afterTitle}`;
+      if (offeredCleanupKeysRef.current.has(key)) return false;
+      offeredCleanupKeysRef.current.add(key);
+      return true;
+    });
+    if (suggestions.length === 0) return;
+
+    setMetadataCleanupSuggestions(suggestions);
+    const noun = suggestions.length === 1 ? "track" : "tracks";
+    toast(`we found ${suggestions.length} ${noun} that could be cleaned up`, {
+      description: `${suggestions[0].beforeTitle} → ${suggestions[0].afterTitle}`,
+      action: {
+        label: "review",
+        onClick: () => setMetadataCleanupOpen(true),
+      },
+    });
+  }, [albums, files, loading]);
 
   const handleTagUpdate = async (fileToUpdate: TagiumFile, newTags: AudioMetadata) => {
     const latestFileToUpdate =
@@ -512,7 +547,7 @@ export default function AudioTagger() {
   );
 
   const handlePreviewMetadataChange = useCallback(
-    (field: "filename" | "title", value: string) => {
+    (field: "filename" | "title" | "artist", value: string) => {
       const selectedId = selectedFileIdRef.current;
       if (!selectedId) return;
 
@@ -648,7 +683,6 @@ export default function AudioTagger() {
         }
         if (acceptedUploads.length === 0) return;
         const orderedUploads = sortUploadedTracksByTrackNumber(acceptedUploads);
-
         const nextFiles = [
           ...filesRef.current,
           ...orderedUploads.map((upload) => ({
@@ -1858,8 +1892,50 @@ export default function AudioTagger() {
     playlistSidebarQueue = nextPlaylistSidebarQueue;
   }
 
+  const applyMetadataCleanup = (suggestions: MetadataCleanupSuggestion[]) => {
+    const result = applyMetadataCleanupSuggestions(
+      filesRef.current,
+      suggestions,
+      settings.syncFilenames,
+    );
+    filesRef.current = result.files;
+    setFiles(result.files);
+    setMetadataCleanupOpen(false);
+
+    const selectedAfterCleanup = result.files.find((file) => file.id === selectedFileIdRef.current);
+    if (selectedAfterCleanup?.metadata) reset(selectedAfterCleanup.metadata);
+
+    const noun = suggestions.length === 1 ? "track" : "tracks";
+    toast.success(`cleaned up ${suggestions.length} ${noun}`, {
+      description: settings.syncFilenames
+        ? "titles and synced filenames were updated"
+        : "titles were updated",
+      action: {
+        label: "undo",
+        onClick: () => {
+          const restoredFiles = undoMetadataCleanupSuggestions(
+            filesRef.current,
+            result.undoEntries,
+          );
+          filesRef.current = restoredFiles;
+          setFiles(restoredFiles);
+          const selectedAfterUndo = restoredFiles.find(
+            (file) => file.id === selectedFileIdRef.current,
+          );
+          if (selectedAfterUndo?.metadata) reset(selectedAfterUndo.metadata);
+        },
+      },
+    });
+  };
+
   return (
     <>
+      <MetadataCleanupDialog
+        open={metadataCleanupOpen}
+        suggestions={metadataCleanupSuggestions}
+        onOpenChange={setMetadataCleanupOpen}
+        onApply={applyMetadataCleanup}
+      />
       <DestructiveActionDialog
         open={pendingTrackRemoval !== null}
         itemCount={pendingTrackRemoval?.length ?? 0}
