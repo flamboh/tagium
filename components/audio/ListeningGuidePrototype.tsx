@@ -360,7 +360,7 @@ function VisualHandbookGuide({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PrototypeHeader onBack={onBack} />
       <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1fr)_14rem]">
-        <main className="overflow-y-auto px-5 pb-28 pt-7 md:px-10 lg:px-14">
+        <main className="scroll-smooth overflow-y-auto px-5 pb-28 pt-7 motion-reduce:scroll-auto md:px-10 lg:px-14">
           <article id="guide-overview" className="mx-auto max-w-3xl scroll-mt-8">
             <div>
               <h2
