@@ -8,10 +8,12 @@ import {
 import { validFreeFormatMp3Bytes, validMp3Bytes } from "./mp3TestFixtures";
 
 describe("MP3 compatibility", () => {
-  it("accepts MP3 frame contents when browser metadata is missing or inconsistent", () => {
+  it("accepts MP3 frame contents when browser MIME metadata is missing or inconsistent", () => {
     const bytes = validMp3Bytes();
     expect(isMp3Bytes(bytes)).toBe(true);
-    expect(getMp3AdmissionError(new File([bytes], "track.bin"), bytes)).toBeNull();
+    expect(
+      getMp3AdmissionError(new File([bytes], "track.mp3", { type: "audio/wav" }), bytes),
+    ).toBeNull();
   });
 
   it("rejects a single complete frame ending at EOF", () => {
@@ -36,6 +38,17 @@ describe("MP3 compatibility", () => {
     expect(isMp3Bytes(validFreeFormatMp3Bytes())).toBe(true);
   });
 
+  it("rejects a WAV container even when its payload contains valid MP3 frames", () => {
+    const bytes = new Uint8Array(12 + validMp3Bytes().length);
+    bytes.set(new TextEncoder().encode("RIFF0000WAVE"));
+    bytes.set(validMp3Bytes(), 12);
+    const file = new File([bytes], "wrapped.wav", { type: "audio/wav" });
+
+    expect(getMp3AdmissionError(file, bytes)).toBe(
+      "wrapped.wav is not an MP3. Tagium currently supports MP3 files only.",
+    );
+  });
+
   it("rejects truncated or irregular free-format synchronization", () => {
     expect(isMp3Bytes(validFreeFormatMp3Bytes().slice(0, 750))).toBe(false);
     const irregular = validFreeFormatMp3Bytes();
@@ -54,8 +67,8 @@ describe("MP3 compatibility", () => {
     expect(getMp3AdmissionError(file, bytes)).toContain(message);
   });
 
-  it("normalizes an admitted file's extension and MIME type", () => {
-    const file = normalizeMp3File(new File([validMp3Bytes()], "track.wav", { type: "audio/wav" }));
+  it("normalizes an admitted file's MIME type", () => {
+    const file = normalizeMp3File(new File([validMp3Bytes()], "track.mp3", { type: "audio/wav" }));
     expect(file.name).toBe("track.mp3");
     expect(file.type).toBe(MP3_MIME_TYPE);
   });

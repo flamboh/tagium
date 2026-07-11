@@ -161,7 +161,7 @@ describe("AudioMetadataIO", () => {
 
   it("accepts a valid MP3 while returning actionable errors for mixed invalid inputs", async () => {
     const uploads = await parseUploadedTracks([
-      new File([validMp3Bytes()], "valid.bin"),
+      new File([validMp3Bytes()], "valid.mp3"),
       new File([], "empty.mp3", { type: "audio/mpeg" }),
       new File(["not audio"], "corrupt.mp3", { type: "audio/mpeg" }),
       new File(["fLaC0000"], "unsupported.flac", { type: "audio/flac" }),

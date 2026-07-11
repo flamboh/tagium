@@ -120,16 +120,18 @@ const startsWithAscii = (bytes: Uint8Array, value: string, offset = 0) =>
 
 export const getMp3AdmissionError = (file: File, bytes: Uint8Array) => {
   if (bytes.length === 0) return `${file.name} is empty. Choose a valid MP3 file.`;
-  if (isMp3Bytes(bytes)) return null;
-
+  if (!/\.mp3$/i.test(file.name)) {
+    return `${file.name} is not an MP3. Tagium currently supports MP3 files only.`;
+  }
   const knownUnsupported =
     startsWithAscii(bytes, "RIFF") ||
     startsWithAscii(bytes, "fLaC") ||
     startsWithAscii(bytes, "OggS") ||
     startsWithAscii(bytes, "ftyp", 4);
-  if (knownUnsupported || (!/\.mp3$/i.test(file.name) && file.type !== MP3_MIME_TYPE)) {
+  if (knownUnsupported) {
     return `${file.name} is not an MP3. Tagium currently supports MP3 files only.`;
   }
+  if (isMp3Bytes(bytes)) return null;
   return `${file.name} is not a valid MP3. The file may be corrupt or renamed.`;
 };
 
