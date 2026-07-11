@@ -128,7 +128,7 @@ export default function TrackMetadataEditor({
     downloadErrorDisplay;
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+    <div className="editor-view-content flex-1 min-h-0 flex flex-col overflow-hidden">
       <form
         onSubmit={(event) => {
           event.preventDefault();

@@ -216,14 +216,48 @@
     view-transition-name: media-url-entry;
   }
 
+  .editor-view-content {
+    view-transition-name: editor-view-content;
+  }
+
   ::view-transition-group(media-url-entry) {
     animation-duration: 420ms;
     animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
+  ::view-transition-group(editor-view-content) {
+    animation-duration: 180ms;
+  }
+
+  ::view-transition-old(editor-view-content) {
+    animation: editor-view-fade-out 180ms ease-out both;
+  }
+
+  ::view-transition-new(editor-view-content) {
+    animation: editor-view-fade-in 180ms ease-in both;
+  }
+
   ::view-transition-old(root),
   ::view-transition-new(root) {
-    animation-duration: 180ms;
+    animation: none;
+  }
+
+  @keyframes editor-view-fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes editor-view-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {

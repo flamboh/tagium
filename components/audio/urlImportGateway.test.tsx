@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import audioTaggerSource from "./audioTagger.tsx?raw";
 import landingScreenSource from "./LandingScreen.tsx?raw";
 import mediaUrlEntrySource from "./MediaUrlEntry.tsx?raw";
+import settingsPageSource from "./SettingsPage.tsx?raw";
+import trackMetadataEditorSource from "./TrackMetadataEditor.tsx?raw";
 import MediaUrlEntry from "./MediaUrlEntry";
 
 const reactHookMocks = vi.hoisted(() => ({
@@ -116,7 +118,7 @@ describe("media URL entry", () => {
   it("keeps the URL entry in the centered landing stack instead of pinning it to the bottom", () => {
     expect(landingScreenSource).toContain("{children}");
     expect(landingScreenSource).toContain(
-      '? "flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6"',
+      '? "editor-view-content flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6"',
     );
     expect(mediaUrlEntrySource).not.toContain("bottom-[clamp(");
   });
@@ -152,6 +154,12 @@ describe("media URL entry", () => {
       "animateLayout={!libraryIsEmpty || !supportsViewTransitions}",
     );
     expect(mediaUrlEntrySource).toContain("media-url-entry flex");
+  });
+
+  it("fades editor view content independently from the shared URL entry", () => {
+    expect(landingScreenSource).toContain("editor-view-content flex w-full");
+    expect(settingsPageSource).toContain("editor-view-content min-h-0");
+    expect(trackMetadataEditorSource).toContain("editor-view-content flex-1");
   });
 
   it("routes both settings exit controls through the same transition handler", () => {

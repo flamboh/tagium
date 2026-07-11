@@ -71,7 +71,7 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
       <div
         className={
           active
-            ? "flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6"
+            ? "editor-view-content flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6"
             : "contents"
         }
       >
