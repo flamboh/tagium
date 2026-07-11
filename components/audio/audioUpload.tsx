@@ -46,7 +46,7 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
         aria-label="upload audio files"
       >
         <Upload className="h-6 w-6 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">upload MP3 files only</span>
+        <span className="text-xs text-muted-foreground">upload mp3 files only</span>
       </Button>
     </div>
   );

@@ -21,7 +21,7 @@ describe("download presentation", () => {
     );
 
     expect(markup).toContain("waiting to start more downloads...");
-    expect(markup).not.toContain("Cobalt");
+    expect(markup.toLowerCase()).not.toContain("cobalt");
     expect(markup).not.toContain("tunnel budget");
   });
 

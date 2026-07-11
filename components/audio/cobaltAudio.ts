@@ -180,7 +180,7 @@ const decodeCobaltDownloadPlan = Effect.fn("decodeCobaltDownloadPlan")(function*
     Effect.mapError(
       (cause) =>
         new AudioDecodeError({
-          message: "malformed Cobalt audio plan.",
+          message: "malformed cobalt audio plan.",
           cause,
         }),
     ),

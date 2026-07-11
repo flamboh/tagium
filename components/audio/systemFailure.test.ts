@@ -18,10 +18,10 @@ beforeEach(() => {
 
 describe("system failure reporting", () => {
   it.each([
-    ["error.api.capacity_exceeded", "capacity", "Downloads are busy"],
-    ["Cobalt tunnel request failed (429)", "rate_limited", "Too many download requests"],
-    ["error.api.timed_out", "timeout", "The download took too long"],
-    ["error.api.unreachable", "service_unavailable", "Downloads are temporarily unavailable"],
+    ["error.api.capacity_exceeded", "capacity", "downloads are busy"],
+    ["Cobalt tunnel request failed (429)", "rate_limited", "too many download requests"],
+    ["error.api.timed_out", "timeout", "the download took too long"],
+    ["error.api.unreachable", "service_unavailable", "downloads are temporarily unavailable"],
   ] as const)("maps %s to safe public copy", (message, code, title) => {
     expect(getSystemFailurePresentation(new Error(message), "download")).toMatchObject({
       code,
@@ -37,8 +37,8 @@ describe("system failure reporting", () => {
 
     expect(presentation).toMatchObject({
       code: "unknown",
-      title: "Export failed",
-      description: "Tagium could not prepare your download. Your tracks are still in the library.",
+      title: "export failed",
+      description: "tagium could not prepare your download. Your tracks are still in the library.",
     });
     expect(JSON.stringify(presentation)).not.toContain("private upstream");
   });
@@ -48,8 +48,8 @@ describe("system failure reporting", () => {
     reportSystemFailure(new Error("second private cause"), "export");
 
     expect(toastMocks.error).toHaveBeenCalledTimes(2);
-    expect(toastMocks.error).toHaveBeenLastCalledWith("Export failed", {
-      description: "Tagium could not prepare your download. Your tracks are still in the library.",
+    expect(toastMocks.error).toHaveBeenLastCalledWith("export failed", {
+      description: "tagium could not prepare your download. Your tracks are still in the library.",
     });
   });
 
@@ -68,7 +68,7 @@ describe("system failure reporting", () => {
 
     expect(presentation.trackDescription).toBe("download failed. try again or use another link.");
     expect(getTrackFailureDisplay(presentation.trackDescription)).toEqual({
-      title: "Download failed",
+      title: "download failed",
       description: "download failed. try again or use another link.",
     });
   });
@@ -80,7 +80,7 @@ describe("system failure reporting", () => {
     );
 
     expect(getTrackFailureDisplay(presentation.trackDescription)).toEqual({
-      title: "Metadata could not be saved",
+      title: "metadata could not be saved",
       description: "metadata could not be saved. try again.",
     });
   });
@@ -90,7 +90,7 @@ describe("system failure reporting", () => {
       getSystemFailurePresentation(new Error("metadata record not found"), "metadata"),
     ).toMatchObject({
       code: "unknown",
-      title: "Metadata could not be saved",
+      title: "metadata could not be saved",
       description: "Your edits are still visible. Try the action again.",
     });
 
@@ -98,7 +98,7 @@ describe("system failure reporting", () => {
       getSystemFailurePresentation(new Error("export failed with rate limit 429"), "export"),
     ).toMatchObject({
       code: "unknown",
-      title: "Export failed",
+      title: "export failed",
     });
   });
 
@@ -107,8 +107,8 @@ describe("system failure reporting", () => {
       getSystemFailurePresentation(new Error("remote cover not found"), "cover-import"),
     ).toMatchObject({
       code: "unknown",
-      title: "Cover art was not imported",
-      description: "The tracks were imported without cover art. Upload a JPEG or PNG manually.",
+      title: "cover art was not imported",
+      description: "The tracks were imported without cover art. Upload a jpeg or png manually.",
     });
   });
 });

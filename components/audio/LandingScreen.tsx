@@ -105,7 +105,7 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
                   {isDragging ? "drop to import" : "drop your mp3s here"}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  MP3 files only · or click to browse
+                  mp3 files only · or click to browse
                 </p>
               </div>
             </button>

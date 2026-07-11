@@ -136,7 +136,7 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
                 tagium exists to make device-local music more accessible to everyone.
               </p>
               <p className="text-sm leading-6 text-muted-foreground">
-                listening guide: Tagium currently imports, edits, and downloads MP3 audio only.
+                listening guide: tagium currently imports, edits, and downloads mp3 audio only.
               </p>
             </div>
 

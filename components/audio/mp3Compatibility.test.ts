@@ -45,7 +45,7 @@ describe("MP3 compatibility", () => {
     const file = new File([bytes], "wrapped.wav", { type: "audio/wav" });
 
     expect(getMp3AdmissionError(file, bytes)).toBe(
-      "wrapped.wav is not an MP3. Tagium currently supports MP3 files only.",
+      "wrapped.wav is not an mp3. tagium currently supports mp3 files only.",
     );
   });
 
@@ -59,9 +59,9 @@ describe("MP3 compatibility", () => {
 
   it.each([
     ["empty", new Uint8Array(), "is empty"],
-    ["renamed WAV", new TextEncoder().encode("RIFF0000WAVEdata"), "is not an MP3"],
-    ["corrupt MP3", new TextEncoder().encode("not audio"), "is not a valid MP3"],
-    ["unsupported audio", new TextEncoder().encode("fLaC0000"), "is not an MP3"],
+    ["renamed WAV", new TextEncoder().encode("RIFF0000WAVEdata"), "is not an mp3"],
+    ["corrupt MP3", new TextEncoder().encode("not audio"), "is not a valid mp3"],
+    ["unsupported audio", new TextEncoder().encode("fLaC0000"), "is not an mp3"],
   ])("rejects %s with an actionable error", (_case, bytes, message) => {
     const file = new File([bytes], "track.mp3", { type: MP3_MIME_TYPE });
     expect(getMp3AdmissionError(file, bytes)).toContain(message);

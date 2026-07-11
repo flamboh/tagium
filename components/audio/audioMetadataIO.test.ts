@@ -175,9 +175,9 @@ describe("AudioMetadataIO", () => {
     ]);
     expect(uploads[0]?.file.filename).toBe("valid.mp3");
     expect(uploads.slice(1).map((upload) => upload.file.downloadError)).toEqual([
-      "empty.mp3 is empty. Choose a valid MP3 file.",
-      "corrupt.mp3 is not a valid MP3. The file may be corrupt or renamed.",
-      "unsupported.flac is not an MP3. Tagium currently supports MP3 files only.",
+      "empty.mp3 is empty. Choose a valid mp3 file.",
+      "corrupt.mp3 is not a valid mp3. The file may be corrupt or renamed.",
+      "unsupported.flac is not an mp3. tagium currently supports mp3 files only.",
     ]);
   });
 

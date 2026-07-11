@@ -86,7 +86,7 @@ const decodeCobaltLocalProcessingMessage = Effect.fn("decodeCobaltLocalProcessin
       Effect.mapError(
         (cause) =>
           new AudioDecodeError({
-            message: "malformed Cobalt local processing message.",
+            message: "malformed cobalt local processing message.",
             cause,
           }),
       ),

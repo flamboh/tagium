@@ -402,7 +402,7 @@ describe("CobaltAudio download", () => {
         sourceUrl: "https://soundcloud.com/artist/track",
         audioBitrate: "128",
       }),
-    ).rejects.toThrow("malformed Cobalt local processing message.");
+    ).rejects.toThrow("malformed cobalt local processing message.");
   });
 
   it("processes local audio with cover art through the worker and mp3tag", async () => {

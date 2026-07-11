@@ -104,7 +104,7 @@ export default function ImageCropper({ src, onCrop, onCancel }: ImageCropperProp
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             ref={imgRef}
-            alt="Crop preview"
+            alt="crop preview"
             style={{ maxWidth: "100%", maxHeight: "100%" }}
             src={src}
             onLoad={onImageLoad}
