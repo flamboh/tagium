@@ -81,7 +81,7 @@ import {
   TagiumFile,
 } from "./types";
 
-type ActiveView = "editor" | "settings";
+type ActiveView = "editor" | "settings" | "listening-guide";
 type ManagedDownloadTrack = QueuedDownloadTrack & { importOperationId?: string };
 type PlaylistDownloadQueueState = PlaylistDownloadControllerSnapshot;
 
@@ -296,8 +296,6 @@ export default function AudioTagger() {
     albumCount: albums.length,
     importing: loading || urlImporting,
   });
-  const listeningGuidePrototypeOpen =
-    new URLSearchParams(window.location.search).get("prototype") === "listening-guide";
   useBeforeUnloadProtection(hasRecoverableWork);
   const filesRef = useRef<TagiumFile[]>(files);
   const albumsRef = useRef<AlbumGroup[]>(albums);
@@ -1892,7 +1890,7 @@ export default function AudioTagger() {
           selectedFileId={selectedFileId}
           selectedFileIds={selectedFileIds}
           settingsOpen={activeView === "settings"}
-          listeningGuideOpen={listeningGuidePrototypeOpen}
+          listeningGuideOpen={activeView === "listening-guide"}
           onAudioUpload={handleAudioUpload}
           onSelectAlbum={handleSelectAlbum}
           onSelectFile={handleSelectFile}
@@ -1917,10 +1915,10 @@ export default function AudioTagger() {
           onOpenListeningGuide={
             listeningGuidePrototypeAvailable
               ? () => {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set("prototype", "listening-guide");
-                  url.searchParams.delete("variant");
-                  window.location.assign(url.toString());
+                  if (isTrackCoverProcessing) return;
+                  setActiveView((currentView) =>
+                    currentView === "listening-guide" ? "editor" : "listening-guide",
+                  );
                 }
               : undefined
           }
@@ -1929,8 +1927,8 @@ export default function AudioTagger() {
         />
         <div className="relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1">
           <div className="h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1">
-            {listeningGuidePrototypeOpen ? (
-              <ListeningGuidePrototype />
+            {activeView === "listening-guide" ? (
+              <ListeningGuidePrototype onBack={() => setActiveView("editor")} />
             ) : activeView === "settings" ? (
               <SettingsPage
                 settings={settings}

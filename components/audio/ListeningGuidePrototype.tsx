@@ -1,7 +1,7 @@
 "use client";
 
 // PROTOTYPE — Entry wizard feeding the selected right-rail handbook layout in the existing app shell.
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -83,21 +83,14 @@ function PlaceholderMedia({
   );
 }
 
-function PrototypeHeader({ eyebrow }: { eyebrow: string }) {
-  const leavePrototype = () => {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("prototype");
-    url.searchParams.delete("variant");
-    window.location.assign(url.toString());
-  };
-
+function PrototypeHeader({ eyebrow, onBack }: { eyebrow: string; onBack: () => void }) {
   return (
     <header className="flex h-[104px] shrink-0 items-center justify-between border-b px-5 md:px-8">
       <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
           className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-md text-primary/80 hover:bg-accent hover:text-primary"
-          onClick={leavePrototype}
+          onClick={onBack}
           aria-label="leave listening guide prototype"
         >
           <ArrowLeft className="size-5" />
@@ -195,7 +188,13 @@ function SetupSummary({ setup, onEdit }: { setup: GuideSetup; onEdit: () => void
   );
 }
 
-function ListeningGuideWizard({ onComplete }: { onComplete: (setup: GuideSetup) => void }) {
+function ListeningGuideWizard({
+  onComplete,
+  onBack,
+}: {
+  onComplete: (setup: GuideSetup) => void;
+  onBack: () => void;
+}) {
   const [step, setStep] = useState(0);
   const [app, setApp] = useState<AppKey | null>(null);
   const [devices, setDevices] = useState<DeviceKey[]>([]);
@@ -213,7 +212,7 @@ function ListeningGuideWizard({ onComplete }: { onComplete: (setup: GuideSetup) 
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PrototypeHeader eyebrow="personalized guide wizard" />
+      <PrototypeHeader eyebrow="personalized guide wizard" onBack={onBack} />
       <main className="flex-1 overflow-y-auto px-5 pb-16 pt-8 md:px-8">
         <div className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[minmax(0,1fr)_16rem]">
           <section>
@@ -374,12 +373,13 @@ function ListeningGuideWizard({ onComplete }: { onComplete: (setup: GuideSetup) 
 interface GuideVariantProps {
   setup: GuideSetup;
   onEditSetup: () => void;
+  onBack: () => void;
 }
 
-function VisualHandbookGuide({ setup, onEditSetup }: GuideVariantProps) {
+function VisualHandbookGuide({ setup, onEditSetup, onBack }: GuideVariantProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PrototypeHeader eyebrow="visual handbook" />
+      <PrototypeHeader eyebrow="visual handbook" onBack={onBack} />
       <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1fr)_14rem]">
         <main className="overflow-y-auto px-5 pb-28 pt-7 md:px-10 lg:px-14">
           <article className="mx-auto max-w-3xl">
@@ -453,32 +453,12 @@ function VisualHandbookGuide({ setup, onEditSetup }: GuideVariantProps) {
   );
 }
 
-export default function ListeningGuidePrototype() {
-  const [access, setAccess] = useState<"checking" | "allowed" | "denied">(
-    import.meta.env.DEV ? "allowed" : "checking",
-  );
+export default function ListeningGuidePrototype({ onBack }: { onBack: () => void }) {
   const [setup, setSetup] = useState<GuideSetup | null>(null);
 
-  useEffect(() => {
-    if (import.meta.env.DEV) return;
-
-    fetch("/api/dev/config", { headers: { Accept: "application/json" } })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((config) => setAccess(config?.deployEnv === "preview" ? "allowed" : "denied"))
-      .catch(() => setAccess("denied"));
-  }, []);
-
-  if (access !== "allowed") {
-    return (
-      <div className="grid min-h-0 flex-1 place-items-center p-6 text-sm text-muted-foreground">
-        {access === "checking" ? "loading prototype…" : "prototype unavailable"}
-      </div>
-    );
-  }
-
   if (!setup) {
-    return <ListeningGuideWizard onComplete={setSetup} />;
+    return <ListeningGuideWizard onComplete={setSetup} onBack={onBack} />;
   }
 
-  return <VisualHandbookGuide setup={setup} onEditSetup={() => setSetup(null)} />;
+  return <VisualHandbookGuide setup={setup} onEditSetup={() => setSetup(null)} onBack={onBack} />;
 }

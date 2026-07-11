@@ -12,6 +12,8 @@ import { AlbumGroup, TagiumFile } from "./types";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
+const listeningGuideServices = ["spotify?", "apple music?", "spotify?"];
+
 interface TagSidebarPanelProps {
   loading: boolean;
   files: TagiumFile[];
@@ -55,27 +57,18 @@ interface TagSidebarPanelProps {
 }
 
 function ListeningGuideEntryButton({ active, onClick }: { active: boolean; onClick: () => void }) {
-  const services = ["spotify?", "apple music?"];
   const [serviceIndex, setServiceIndex] = useState(0);
-  const [animating, setAnimating] = useState(false);
+  const [transitionEnabled, setTransitionEnabled] = useState(true);
 
   useEffect(() => {
-    let swapTimeout: ReturnType<typeof setTimeout> | undefined;
     const interval = setInterval(() => {
-      setAnimating(true);
-      swapTimeout = setTimeout(() => {
-        setServiceIndex((current) => (current + 1) % services.length);
-        setAnimating(false);
-      }, 350);
+      setServiceIndex((current) =>
+        current >= listeningGuideServices.length - 1 ? 1 : current + 1,
+      );
     }, 3_000);
 
-    return () => {
-      clearInterval(interval);
-      if (swapTimeout) clearTimeout(swapTimeout);
-    };
-  }, [services.length]);
-
-  const nextServiceIndex = (serviceIndex + 1) % services.length;
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <Button
@@ -93,20 +86,28 @@ function ListeningGuideEntryButton({ active, onClick }: { active: boolean; onCli
         <span
           aria-hidden="true"
           className={cn(
-            "absolute inset-0 transition-[transform,opacity] duration-300 ease-in-out",
-            animating ? "-translate-y-full opacity-0" : "translate-y-0 opacity-100",
+            "flex flex-col motion-reduce:transition-none",
+            transitionEnabled && "transition-transform duration-300 ease-in-out",
           )}
+          style={{ transform: `translateY(-${serviceIndex * 1.25}rem)` }}
+          onTransitionEnd={() => {
+            if (serviceIndex !== listeningGuideServices.length - 1) return;
+
+            setTransitionEnabled(false);
+            setServiceIndex(0);
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => setTransitionEnabled(true));
+            });
+          }}
         >
-          {services[serviceIndex]}
-        </span>
-        <span
-          aria-hidden="true"
-          className={cn(
-            "absolute inset-0 transition-[transform,opacity] duration-300 ease-in-out",
-            animating ? "translate-y-0 opacity-100" : "translate-y-full opacity-0",
-          )}
-        >
-          {services[nextServiceIndex]}
+          {listeningGuideServices.map((service, index) => (
+            <span
+              key={`${service}-${index}`}
+              className="flex h-5 shrink-0 items-center justify-center"
+            >
+              {service}
+            </span>
+          ))}
         </span>
       </span>
     </Button>
