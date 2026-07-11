@@ -36,7 +36,7 @@ interface TrackMetadataEditorProps {
   syncFilenames: boolean;
   syncTrackNumbers: boolean;
   onPreviewMetadataChange: (
-    field: "filename" | "title",
+    field: "filename" | "title" | "artist",
     event: ChangeEvent<HTMLInputElement>,
   ) => void;
 }
@@ -90,6 +90,9 @@ export default function TrackMetadataEditor({
   });
   const titleRegistration = register("title", {
     onChange: (event) => onPreviewMetadataChange("title", event),
+  });
+  const artistRegistration = register("artist", {
+    onChange: (event) => onPreviewMetadataChange("artist", event),
   });
   const { ref: titleRegistrationRef, ...titleInputRegistration } = titleRegistration;
   const placeholderClassName = "placeholder:text-muted-foreground/45";
@@ -239,7 +242,7 @@ export default function TrackMetadataEditor({
                 <label className="mb-1 block text-xs font-medium md:text-sm">artist:</label>
                 <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
                   <Input
-                    {...register("artist")}
+                    {...artistRegistration}
                     placeholder={placeholder.artist}
                     disabled={inAlbum}
                     className={`${placeholderClassName} ${syncedInputClassName}`}
