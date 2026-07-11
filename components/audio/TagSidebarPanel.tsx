@@ -59,8 +59,27 @@ interface TagSidebarPanelProps {
 function ListeningGuideEntryButton({ active, onClick }: { active: boolean; onClick: () => void }) {
   const [serviceIndex, setServiceIndex] = useState(0);
   const [transitionEnabled, setTransitionEnabled] = useState(true);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updateMotionPreference = () => {
+      setPrefersReducedMotion(mediaQuery.matches);
+      setTransitionEnabled(!mediaQuery.matches);
+      if (mediaQuery.matches) {
+        setServiceIndex(0);
+      }
+    };
+
+    updateMotionPreference();
+    mediaQuery.addEventListener("change", updateMotionPreference);
+
+    return () => mediaQuery.removeEventListener("change", updateMotionPreference);
+  }, []);
+
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+
     const interval = setInterval(() => {
       setServiceIndex((current) =>
         current >= listeningGuideServices.length - 1 ? 1 : current + 1,
@@ -68,7 +87,7 @@ function ListeningGuideEntryButton({ active, onClick }: { active: boolean; onCli
     }, 3_000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [prefersReducedMotion]);
 
   return (
     <Button
@@ -87,7 +106,9 @@ function ListeningGuideEntryButton({ active, onClick }: { active: boolean; onCli
           aria-hidden="true"
           className={cn(
             "flex flex-col motion-reduce:transition-none",
-            transitionEnabled && "transition-transform duration-300 ease-in-out",
+            transitionEnabled &&
+              !prefersReducedMotion &&
+              "transition-transform duration-300 ease-in-out",
           )}
           style={{ transform: `translateY(-${serviceIndex * 1.25}rem)` }}
           onTransitionEnd={() => {

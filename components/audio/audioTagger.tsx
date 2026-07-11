@@ -1919,6 +1919,7 @@ export default function AudioTagger() {
                   setActiveView((currentView) =>
                     currentView === "listening-guide" ? "editor" : "listening-guide",
                   );
+                  window.scrollTo({ top: 0, left: 0 });
                 }
               : undefined
           }
