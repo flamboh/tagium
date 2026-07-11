@@ -205,7 +205,7 @@ function ListeningGuideWizard({
                       logo={option.logo}
                       label={option.label}
                       selected={app === option.key}
-                      className="min-h-48"
+                      className="h-[204px] flex-col justify-center gap-1 text-center"
                       onClick={() => {
                         setApp(option.key);
                         setStep(1);
