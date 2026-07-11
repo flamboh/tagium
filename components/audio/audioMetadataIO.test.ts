@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 import { AudioMetadataIO, AudioMetadataIOLive } from "./audioMetadataIO";
 import { makeAudioRuntime } from "./audioRuntime";
 import type { AudioMetadata, TagiumFile } from "./types";
+import { validMp3Bytes } from "./mp3TestFixtures";
 
 const mp3tagMock = vi.hoisted(() => ({
   instances: [] as Array<{
@@ -47,13 +48,6 @@ const mp3tagMock = vi.hoisted(() => ({
   },
   nextReadError: undefined as string | undefined,
 }));
-
-const validMp3Bytes = () => {
-  const bytes = new Uint8Array(834);
-  bytes.set([0xff, 0xfb, 0x90, 0x00], 0);
-  bytes.set([0xff, 0xfb, 0x90, 0x00], 417);
-  return bytes;
-};
 
 vi.mock("mp3tag.js", () => ({
   default: class MP3Tag {
@@ -163,6 +157,28 @@ describe("AudioMetadataIO", () => {
     expect(upload.file.metadata?.picture[0]?.data).toBeInstanceOf(Uint8Array);
     expect(Array.from(upload.file.metadata?.picture[0]?.data ?? [])).toEqual([1, 2, 3]);
     expect(upload.albumSeed.cover).toBe(upload.file.metadata?.picture);
+  });
+
+  it("accepts a valid MP3 while returning actionable errors for mixed invalid inputs", async () => {
+    const uploads = await parseUploadedTracks([
+      new File([validMp3Bytes()], "valid.bin"),
+      new File([], "empty.mp3", { type: "audio/mpeg" }),
+      new File(["not audio"], "corrupt.mp3", { type: "audio/mpeg" }),
+      new File(["fLaC0000"], "unsupported.flac", { type: "audio/flac" }),
+    ]);
+
+    expect(uploads.map((upload) => upload.file.status)).toEqual([
+      "pending",
+      "error",
+      "error",
+      "error",
+    ]);
+    expect(uploads[0]?.file.filename).toBe("valid.mp3");
+    expect(uploads.slice(1).map((upload) => upload.file.downloadError)).toEqual([
+      "empty.mp3 is empty. Choose a valid MP3 file.",
+      "corrupt.mp3 is not a valid MP3. The file may be corrupt or renamed.",
+      "unsupported.flac is not an MP3. Tagium currently supports MP3 files only.",
+    ]);
   });
 
   it("normalizes missing numeric tags to null in parsed metadata snapshots", async () => {

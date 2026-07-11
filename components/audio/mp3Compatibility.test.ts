@@ -5,19 +5,43 @@ import {
   MP3_MIME_TYPE,
   normalizeMp3File,
 } from "./mp3Compatibility";
-
-const mp3Bytes = () => {
-  const bytes = new Uint8Array(834);
-  bytes.set([0xff, 0xfb, 0x90, 0x00], 0);
-  bytes.set([0xff, 0xfb, 0x90, 0x00], 417);
-  return bytes;
-};
+import { validFreeFormatMp3Bytes, validMp3Bytes } from "./mp3TestFixtures";
 
 describe("MP3 compatibility", () => {
   it("accepts MP3 frame contents when browser metadata is missing or inconsistent", () => {
-    const bytes = mp3Bytes();
+    const bytes = validMp3Bytes();
     expect(isMp3Bytes(bytes)).toBe(true);
     expect(getMp3AdmissionError(new File([bytes], "track.bin"), bytes)).toBeNull();
+  });
+
+  it("rejects a single complete frame ending at EOF", () => {
+    expect(isMp3Bytes(validMp3Bytes().slice(0, 417))).toBe(false);
+  });
+
+  it("rejects a truncated second frame", () => {
+    expect(isMp3Bytes(validMp3Bytes().slice(0, 500))).toBe(false);
+  });
+
+  it("rejects incompatible and payload-like second headers", () => {
+    const incompatible = validMp3Bytes();
+    incompatible.set([0xff, 0xf3, 0x90, 0x00], 417);
+    expect(isMp3Bytes(incompatible)).toBe(false);
+
+    const falseHeader = validMp3Bytes().slice(0, 500);
+    falseHeader.set([0xff, 0xfb, 0x90, 0x00], 417);
+    expect(isMp3Bytes(falseHeader)).toBe(false);
+  });
+
+  it("accepts synchronized complete free-format MP3 frames", () => {
+    expect(isMp3Bytes(validFreeFormatMp3Bytes())).toBe(true);
+  });
+
+  it("rejects truncated or irregular free-format synchronization", () => {
+    expect(isMp3Bytes(validFreeFormatMp3Bytes().slice(0, 750))).toBe(false);
+    const irregular = validFreeFormatMp3Bytes();
+    irregular.copyWithin(650, 600, 604);
+    irregular.fill(0, 600, 604);
+    expect(isMp3Bytes(irregular)).toBe(false);
   });
 
   it.each([
@@ -31,7 +55,7 @@ describe("MP3 compatibility", () => {
   });
 
   it("normalizes an admitted file's extension and MIME type", () => {
-    const file = normalizeMp3File(new File([mp3Bytes()], "track.wav", { type: "audio/wav" }));
+    const file = normalizeMp3File(new File([validMp3Bytes()], "track.wav", { type: "audio/wav" }));
     expect(file.name).toBe("track.mp3");
     expect(file.type).toBe(MP3_MIME_TYPE);
   });

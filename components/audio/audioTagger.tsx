@@ -121,6 +121,10 @@ export const getAcceptedUploadParseResult = (uploads: UploadedTrack[]) => {
     parseRejectedCount: uploads.length - acceptedUploads.length,
   };
 };
+export const getUploadRejectionMessage = (rejectedUploads: UploadedTrack[]) =>
+  rejectedUploads
+    .map((upload) => upload.file.downloadError ?? `${upload.file.filename} could not be imported.`)
+    .join("\n");
 const getManagedDownloadTrackTitle = (file: TagiumFile) => {
   if (file.metadata?.title) return file.metadata.title;
   return file.filename;
@@ -679,13 +683,13 @@ export default function AudioTagger() {
         const acceptedUploads = parseResult.acceptedUploads;
         acceptedCount = acceptedUploads.length;
         parseRejectedCount = parseResult.parseRejectedCount;
-        parsedUploads
-          .filter((upload) => upload.file.status === "error")
-          .forEach((upload) =>
-            toast.error(
-              upload.file.downloadError ?? `${upload.file.filename} could not be imported.`,
-            ),
+        const rejectedUploads = parsedUploads.filter((upload) => upload.file.status === "error");
+        if (rejectedUploads.length > 0) {
+          toast.error(
+            `${rejectedUploads.length} ${rejectedUploads.length === 1 ? "file" : "files"} could not be imported`,
+            { description: getUploadRejectionMessage(rejectedUploads) },
           );
+        }
         if (acceptedUploads.length === 0) return;
         const orderedUploads = sortUploadedTracksByTrackNumber(acceptedUploads);
         const nextFiles = [

@@ -8,9 +8,17 @@ const bitrateKbps = {
   mpeg2Layer23: [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
 } as const;
 
-const getFrameLength = (bytes: Uint8Array, offset: number) => {
+interface FrameHeader {
+  versionBits: number;
+  layer: number;
+  sampleRate: number;
+  bitrateIndex: number;
+  frameLength: number | null;
+}
+
+const getFrameHeader = (bytes: Uint8Array, offset: number): FrameHeader | null => {
   if (offset + 4 > bytes.length || bytes[offset] !== 0xff || (bytes[offset + 1]! & 0xe0) !== 0xe0) {
-    return 0;
+    return null;
   }
 
   const versionBits = (bytes[offset + 1]! >> 3) & 0x03;
@@ -18,21 +26,18 @@ const getFrameLength = (bytes: Uint8Array, offset: number) => {
   const bitrateIndex = (bytes[offset + 2]! >> 4) & 0x0f;
   const sampleRateIndex = (bytes[offset + 2]! >> 2) & 0x03;
   const padding = (bytes[offset + 2]! >> 1) & 0x01;
-  if (
-    versionBits === 1 ||
-    layerBits === 0 ||
-    bitrateIndex === 0 ||
-    bitrateIndex === 15 ||
-    sampleRateIndex === 3
-  ) {
-    return 0;
+  if (versionBits === 1 || layerBits === 0 || bitrateIndex === 15 || sampleRateIndex === 3) {
+    return null;
   }
 
   const isMpeg1 = versionBits === 3;
   const layer = 4 - layerBits;
-  const baseSampleRates = [44_100, 48_000, 32_000];
   const divisor = isMpeg1 ? 1 : versionBits === 2 ? 2 : 4;
-  const sampleRate = baseSampleRates[sampleRateIndex]! / divisor;
+  const sampleRate = [44_100, 48_000, 32_000][sampleRateIndex]! / divisor;
+  if (bitrateIndex === 0) {
+    return { versionBits, layer, sampleRate, bitrateIndex, frameLength: null };
+  }
+
   const table = isMpeg1
     ? layer === 1
       ? bitrateKbps.mpeg1Layer1
@@ -43,9 +48,46 @@ const getFrameLength = (bytes: Uint8Array, offset: number) => {
       ? bitrateKbps.mpeg2Layer1
       : bitrateKbps.mpeg2Layer23;
   const bitrate = table[bitrateIndex]! * 1_000;
-  return layer === 1
-    ? Math.floor(((12 * bitrate) / sampleRate + padding) * 4)
-    : Math.floor(((layer === 3 && !isMpeg1 ? 72 : 144) * bitrate) / sampleRate + padding);
+  const frameLength =
+    layer === 1
+      ? Math.floor(((12 * bitrate) / sampleRate + padding) * 4)
+      : Math.floor(((layer === 3 && !isMpeg1 ? 72 : 144) * bitrate) / sampleRate + padding);
+  return { versionBits, layer, sampleRate, bitrateIndex, frameLength };
+};
+
+const headersAreCompatible = (first: FrameHeader, next: FrameHeader) =>
+  first.versionBits === next.versionBits &&
+  first.layer === next.layer &&
+  first.sampleRate === next.sampleRate &&
+  (first.bitrateIndex === 0) === (next.bitrateIndex === 0);
+
+const hasCompleteKnownLengthFrames = (bytes: Uint8Array, offset: number, first: FrameHeader) => {
+  if (first.frameLength === null || offset + first.frameLength > bytes.length) return false;
+  const nextOffset = offset + first.frameLength;
+  const next = getFrameHeader(bytes, nextOffset);
+  return (
+    next !== null &&
+    next.frameLength !== null &&
+    headersAreCompatible(first, next) &&
+    nextOffset + next.frameLength <= bytes.length
+  );
+};
+
+const hasCompleteFreeFormatFrames = (bytes: Uint8Array, offset: number, first: FrameHeader) => {
+  // Free-format headers omit bitrate, so infer frame size from repeated, equally spaced syncs.
+  // Requiring three complete frames avoids treating payload bytes or truncated data as evidence.
+  const searchEnd = Math.min(bytes.length - 4, offset + 16_384);
+  for (let secondOffset = offset + 4; secondOffset <= searchEnd; secondOffset++) {
+    const second = getFrameHeader(bytes, secondOffset);
+    if (!second || !headersAreCompatible(first, second)) continue;
+    const spacing = secondOffset - offset;
+    const thirdOffset = secondOffset + spacing;
+    const third = getFrameHeader(bytes, thirdOffset);
+    if (third && headersAreCompatible(first, third) && thirdOffset + spacing <= bytes.length) {
+      return true;
+    }
+  }
+  return false;
 };
 
 const getAudioStart = (bytes: Uint8Array) => {
@@ -61,10 +103,14 @@ export const isMp3Bytes = (bytes: Uint8Array) => {
   const scanEnd = Math.min(bytes.length - 4, audioStart + 16_384);
 
   for (let offset = audioStart; offset <= scanEnd; offset++) {
-    const firstLength = getFrameLength(bytes, offset);
-    if (firstLength === 0 || offset + firstLength > bytes.length) continue;
-    const nextOffset = offset + firstLength;
-    if (nextOffset === bytes.length || getFrameLength(bytes, nextOffset) > 0) return true;
+    const first = getFrameHeader(bytes, offset);
+    if (!first) continue;
+    if (
+      (first.frameLength === null && hasCompleteFreeFormatFrames(bytes, offset, first)) ||
+      hasCompleteKnownLengthFrames(bytes, offset, first)
+    ) {
+      return true;
+    }
   }
   return false;
 };

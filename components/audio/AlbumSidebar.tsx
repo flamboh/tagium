@@ -242,8 +242,7 @@ export default function AlbumSidebar({
 
     event.preventDefault();
     event.stopPropagation();
-    const audioFiles = droppedFiles.filter((file) => file.type.startsWith("audio/"));
-    if (audioFiles.length > 0) onUpload(audioFiles);
+    onUpload(droppedFiles);
   };
 
   if (albums.length === 0 && looseTracks.length === 0) {
