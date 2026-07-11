@@ -12,7 +12,6 @@ import {
   MonitorSmartphone,
   Smartphone,
   Tablet,
-  X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -77,17 +76,19 @@ function PlaceholderMedia({
 
 function PrototypeHeader({ onBack }: { onBack: () => void }) {
   return (
-    <header className="flex h-[104px] shrink-0 items-center justify-between border-b px-5 md:px-8">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="flex h-[104px] shrink-0 flex-col justify-center gap-1 border-b p-6">
+      <div className="flex min-w-0 items-center gap-2">
         <button
           type="button"
-          className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-md text-primary/80 hover:bg-accent hover:text-primary"
+          className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center text-primary/80 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           onClick={onBack}
-          aria-label="close listening guide"
+          aria-label="back to editor"
         >
-          <X className="size-5" />
+          <ArrowLeft className="size-5" />
         </button>
-        <h1 className="truncate text-lg font-semibold">how do i listen?</h1>
+        <h1 className="relative -top-px truncate text-lg font-semibold leading-tight">
+          how do i listen?
+        </h1>
       </div>
     </header>
   );
@@ -182,84 +183,86 @@ function ListeningGuideWizard({
             ))}
           </div>
 
-          {step === 0 && (
-            <div>
-              <h2
-                ref={questionHeadingRef}
-                tabIndex={-1}
-                className="text-3xl font-bold tracking-tight outline-none md:text-4xl"
-              >
-                what app do you use?
-              </h2>
-              <div className="mt-7 grid gap-3 sm:grid-cols-2">
-                {appOptions.map((option) => (
-                  <OptionCard
-                    key={option.key}
-                    logo={option.logo}
-                    label={option.label}
-                    selected={app === option.key}
-                    onClick={() => {
-                      setApp(option.key);
-                      setStep(1);
-                    }}
-                  />
-                ))}
+          <div className="min-h-[34rem] sm:min-h-[17rem]">
+            {step === 0 && (
+              <div>
+                <h2
+                  ref={questionHeadingRef}
+                  tabIndex={-1}
+                  className="text-3xl font-bold tracking-tight outline-none md:text-4xl"
+                >
+                  what app do you use?
+                </h2>
+                <div className="mt-7 grid gap-3 sm:grid-cols-2">
+                  {appOptions.map((option) => (
+                    <OptionCard
+                      key={option.key}
+                      logo={option.logo}
+                      label={option.label}
+                      selected={app === option.key}
+                      onClick={() => {
+                        setApp(option.key);
+                        setStep(1);
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {step === 1 && (
-            <div>
-              <h2
-                ref={questionHeadingRef}
-                tabIndex={-1}
-                className="text-3xl font-bold tracking-tight outline-none md:text-4xl"
-              >
-                where do you want to listen?
-              </h2>
-              <div className="mt-7 grid gap-3 sm:grid-cols-2">
-                {deviceOptions.map((option) => (
-                  <OptionCard
-                    key={option.key}
-                    icon={option.icon}
-                    label={option.label}
-                    selected={device === option.key}
-                    onClick={() => {
-                      setDevice(option.key);
-                      setStep(2);
-                    }}
-                  />
-                ))}
+            {step === 1 && (
+              <div>
+                <h2
+                  ref={questionHeadingRef}
+                  tabIndex={-1}
+                  className="text-3xl font-bold tracking-tight outline-none md:text-4xl"
+                >
+                  where do you want to listen?
+                </h2>
+                <div className="mt-7 grid gap-3 sm:grid-cols-2">
+                  {deviceOptions.map((option) => (
+                    <OptionCard
+                      key={option.key}
+                      icon={option.icon}
+                      label={option.label}
+                      selected={device === option.key}
+                      onClick={() => {
+                        setDevice(option.key);
+                        setStep(2);
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {step === 2 && (
-            <div>
-              <h2
-                ref={questionHeadingRef}
-                tabIndex={-1}
-                className="text-3xl font-bold tracking-tight outline-none md:text-4xl"
-              >
-                where is your music?
-              </h2>
-              <div className="mt-7 grid gap-3 sm:grid-cols-2">
-                {sourceOptions.map((option) => (
-                  <OptionCard
-                    key={option.key}
-                    icon={"icon" in option ? option.icon : undefined}
-                    logo={"logo" in option ? option.logo : undefined}
-                    label={option.label}
-                    selected={source === option.key}
-                    onClick={() => {
-                      setSource(option.key);
-                      if (app && device) onComplete({ app, device, source: option.key });
-                    }}
-                  />
-                ))}
+            {step === 2 && (
+              <div>
+                <h2
+                  ref={questionHeadingRef}
+                  tabIndex={-1}
+                  className="text-3xl font-bold tracking-tight outline-none md:text-4xl"
+                >
+                  where is your music?
+                </h2>
+                <div className="mt-7 grid gap-3 sm:grid-cols-2">
+                  {sourceOptions.map((option) => (
+                    <OptionCard
+                      key={option.key}
+                      icon={"icon" in option ? option.icon : undefined}
+                      logo={"logo" in option ? option.logo : undefined}
+                      label={option.label}
+                      selected={source === option.key}
+                      onClick={() => {
+                        setSource(option.key);
+                        if (app && device) onComplete({ app, device, source: option.key });
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="mt-10 flex items-center justify-between">
             <Button
@@ -272,19 +275,16 @@ function ListeningGuideWizard({
             >
               <ArrowLeft />
             </Button>
-            {canAdvance ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={advance}
-                aria-label="next question"
-              >
-                <ArrowRight />
-              </Button>
-            ) : (
-              <span className="size-9" aria-hidden="true" />
-            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={!canAdvance}
+              onClick={advance}
+              aria-label="next question"
+            >
+              <ArrowRight />
+            </Button>
           </div>
         </section>
       </main>
