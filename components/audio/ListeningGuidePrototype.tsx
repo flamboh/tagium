@@ -100,12 +100,14 @@ function OptionCard({
   label,
   selected,
   onClick,
+  className,
 }: {
   icon?: LucideIcon;
   logo?: string;
   label: string;
   selected: boolean;
   onClick: () => void;
+  className?: string;
 }) {
   return (
     <button
@@ -113,6 +115,7 @@ function OptionCard({
       className={cn(
         "flex min-h-24 cursor-pointer items-center gap-4 rounded-xl border p-4 text-left transition-colors",
         selected ? "border-primary bg-primary/10" : "bg-card hover:bg-accent/50",
+        className,
       )}
       onClick={onClick}
     >
@@ -134,16 +137,18 @@ function OptionCard({
 }
 
 function ListeningGuideWizard({
+  initialSetup,
   onComplete,
   onBack,
 }: {
+  initialSetup: GuideSetup | null;
   onComplete: (setup: GuideSetup) => void;
   onBack: () => void;
 }) {
   const [step, setStep] = useState(0);
-  const [app, setApp] = useState<AppKey | null>(null);
-  const [device, setDevice] = useState<DeviceKey | null>(null);
-  const [source, setSource] = useState<SourceKey | null>(null);
+  const [app, setApp] = useState<AppKey | null>(initialSetup?.app ?? null);
+  const [device, setDevice] = useState<DeviceKey | null>(initialSetup?.device ?? null);
+  const [source, setSource] = useState<SourceKey | null>(initialSetup?.source ?? null);
   const questionHeadingRef = useRef<HTMLHeadingElement>(null);
   const canAdvance =
     (step === 0 && app !== null) ||
@@ -200,6 +205,7 @@ function ListeningGuideWizard({
                       logo={option.logo}
                       label={option.label}
                       selected={app === option.key}
+                      className="min-h-48"
                       onClick={() => {
                         setApp(option.key);
                         setStep(1);
@@ -292,7 +298,15 @@ function ListeningGuideWizard({
   );
 }
 
-function VisualHandbookGuide({ setup, onBack }: { setup: GuideSetup; onBack: () => void }) {
+function VisualHandbookGuide({
+  setup,
+  onBack,
+  onNewSelection,
+}: {
+  setup: GuideSetup;
+  onBack: () => void;
+  onNewSelection: () => void;
+}) {
   const app = appOptions.find((option) => option.key === setup.app)?.label;
   const device = deviceOptions.find((option) => option.key === setup.device)?.label;
   const source = sourceOptions.find((option) => option.key === setup.source)?.label;
@@ -309,13 +323,22 @@ function VisualHandbookGuide({ setup, onBack }: { setup: GuideSetup; onBack: () 
       <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1fr)_14rem]">
         <main className="overflow-y-auto px-5 pb-28 pt-7 md:px-10 lg:px-14">
           <article id="guide-overview" className="mx-auto max-w-3xl scroll-mt-8">
-            <h2
-              ref={guideHeadingRef}
-              tabIndex={-1}
-              className="text-3xl font-bold tracking-tight outline-none md:text-5xl"
-            >
-              {source} to {app} on {device}
-            </h2>
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <h2
+                ref={guideHeadingRef}
+                tabIndex={-1}
+                className="min-w-0 text-3xl font-bold tracking-tight outline-none sm:flex-1 md:text-5xl"
+              >
+                {source} to {app} on {device}
+              </h2>
+              <button
+                type="button"
+                className="shrink-0 cursor-pointer text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+                onClick={onNewSelection}
+              >
+                make new selection
+              </button>
+            </div>
 
             <PlaceholderMedia kind="video" label="video" className="my-10 aspect-video min-h-0" />
 
@@ -362,10 +385,22 @@ function VisualHandbookGuide({ setup, onBack }: { setup: GuideSetup; onBack: () 
 
 export default function ListeningGuidePrototype({ onBack }: { onBack: () => void }) {
   const [setup, setSetup] = useState<GuideSetup | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
 
-  if (!setup) {
-    return <ListeningGuideWizard onComplete={setSetup} onBack={onBack} />;
+  if (!showGuide || !setup) {
+    return (
+      <ListeningGuideWizard
+        initialSetup={setup}
+        onComplete={(nextSetup) => {
+          setSetup(nextSetup);
+          setShowGuide(true);
+        }}
+        onBack={onBack}
+      />
+    );
   }
 
-  return <VisualHandbookGuide setup={setup} onBack={onBack} />;
+  return (
+    <VisualHandbookGuide setup={setup} onBack={onBack} onNewSelection={() => setShowGuide(false)} />
+  );
 }
