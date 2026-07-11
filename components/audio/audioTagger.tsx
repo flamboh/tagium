@@ -120,6 +120,10 @@ export const getAcceptedUploadParseResult = (uploads: UploadedTrack[]) => {
     parseRejectedCount: uploads.length - acceptedUploads.length,
   };
 };
+export const getUploadRejectionMessage = (rejectedUploads: UploadedTrack[]) =>
+  rejectedUploads
+    .map((upload) => upload.file.downloadError ?? `${upload.file.filename} could not be imported.`)
+    .join("\n");
 const getManagedDownloadTrackTitle = (file: TagiumFile) => {
   if (file.metadata?.title) return file.metadata.title;
   return file.filename;
@@ -678,8 +682,12 @@ export default function AudioTagger() {
         const acceptedUploads = parseResult.acceptedUploads;
         acceptedCount = acceptedUploads.length;
         parseRejectedCount = parseResult.parseRejectedCount;
-        if (parseRejectedCount > 0) {
-          reportSystemFailure(new Error("audio upload parsing failed"), "upload");
+        const rejectedUploads = parsedUploads.filter((upload) => upload.file.status === "error");
+        if (rejectedUploads.length > 0) {
+          toast.error(
+            `${rejectedUploads.length} ${rejectedUploads.length === 1 ? "file" : "files"} could not be imported`,
+            { description: getUploadRejectionMessage(rejectedUploads) },
+          );
         }
         if (acceptedUploads.length === 0) return;
         const orderedUploads = sortUploadedTracksByTrackNumber(acceptedUploads);
@@ -843,7 +851,7 @@ export default function AudioTagger() {
         yield* Effect.sync(() => signal.throwIfAborted());
         const [parsedUpload] = yield* parseUploads([downloadedFile]);
         yield* Effect.sync(() => signal.throwIfAborted());
-        if (!parsedUpload) {
+        if (!parsedUpload || parsedUpload.file.status === "error") {
           return yield* Effect.fail(new Error("downloaded track could not be parsed."));
         }
 

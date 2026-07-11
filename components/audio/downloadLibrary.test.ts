@@ -150,7 +150,7 @@ describe("downloadLibrary", () => {
     expect(entries[1]?.file.type).toBe("image/png");
   });
 
-  it("preserves cover-like track filenames when adding album cover files", () => {
+  it("normalizes a cover-like track filename without colliding with album art", () => {
     const entries = getLibraryDownloadEntries({
       albums: [{ ...album("album", "Album", ["track"]), cover }],
       looseTrackIds: [],
@@ -158,8 +158,8 @@ describe("downloadLibrary", () => {
     });
 
     expect(entries.map((entry) => entry.path)).toEqual([
+      "albums/Album/cover.mp3",
       "albums/Album/cover.jpg",
-      "albums/Album/cover-2.jpg",
     ]);
   });
 

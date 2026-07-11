@@ -35,7 +35,7 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
     e.preventDefault();
     dragCounterRef.current = 0;
     setIsDragging(false);
-    const dropped = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("audio/"));
+    const dropped = Array.from(e.dataTransfer.files);
     if (dropped.length > 0) void onAudioUpload(dropped);
   };
 
@@ -82,7 +82,6 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
               <h1 className="text-7xl font-bold tracking-tighter text-foreground">tagium</h1>
               <p className="text-muted-foreground mt-3 text-base">tag your music</p>
             </div>
-
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -105,7 +104,9 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
                 <p className="text-lg font-semibold text-foreground">
                   {isDragging ? "drop to import" : "drop your mp3s here"}
                 </p>
-                <p className="text-sm text-muted-foreground mt-1">or click to browse files</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  MP3 files only · or click to browse
+                </p>
               </div>
             </button>
           </>

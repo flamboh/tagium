@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   createDirtyMetadataPatch,
   getAcceptedUploadParseResult,
+  getUploadRejectionMessage,
   getFileImportKey,
   getSubmittedAudioMetadata,
   getTagiumFileImportKey,
@@ -51,6 +52,26 @@ describe("audioTagger metadata patches", () => {
       acceptedUploads: [accepted],
       parseRejectedCount: 1,
     });
+  });
+
+  it("consolidates every rejected file error into one presentation", () => {
+    const rejectedUploads = ["empty.mp3 is empty.", "song.wav is not an MP3."].map(
+      (downloadError, index) =>
+        ({
+          file: {
+            id: `rejected-${index}`,
+            filename: index === 0 ? "empty.mp3" : "song.wav",
+            status: "error",
+            downloadStatus: "ready",
+            downloadError,
+          },
+          albumSeed: { title: "", artist: "", genre: "" },
+        }) satisfies UploadedTrack,
+    );
+
+    expect(getUploadRejectionMessage(rejectedUploads)).toBe(
+      "empty.mp3 is empty.\nsong.wav is not an MP3.",
+    );
   });
 
   it("keeps a lightweight source identity after releasing the original file", () => {

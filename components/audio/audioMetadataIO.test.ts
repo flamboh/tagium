@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 import { AudioMetadataIO, AudioMetadataIOLive } from "./audioMetadataIO";
 import { makeAudioRuntime } from "./audioRuntime";
 import type { AudioMetadata, TagiumFile } from "./types";
+import { validMp3Bytes } from "./mp3TestFixtures";
 
 const mp3tagMock = vi.hoisted(() => ({
   instances: [] as Array<{
@@ -79,8 +80,8 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
 
 const tagiumFile = (overrides: Partial<TagiumFile> = {}): TagiumFile => ({
   id: "track-1",
-  file: new File(["audio"], "track-1.mp3", { type: "audio/mpeg" }),
-  originalFile: new File(["audio"], "track-1.mp3", { type: "audio/mpeg" }),
+  file: new File([validMp3Bytes()], "track-1.mp3", { type: "audio/mpeg" }),
+  originalFile: new File([validMp3Bytes()], "track-1.mp3", { type: "audio/mpeg" }),
   filename: "track-1.mp3",
   status: "pending",
   downloadStatus: "ready",
@@ -139,7 +140,7 @@ afterEach(() => {
 describe("AudioMetadataIO", () => {
   it("parses uploaded tracks through mp3tag and converts APIC bytes", async () => {
     const [upload] = await parseUploadedTracks([
-      new File(["audio"], "artist.track.mp3", { type: "audio/mpeg" }),
+      new File([validMp3Bytes()], "artist.track.mp3", { type: "audio/mpeg" }),
     ]);
 
     expect(upload.file.status).toBe("pending");
@@ -158,6 +159,28 @@ describe("AudioMetadataIO", () => {
     expect(upload.albumSeed.cover).toBe(upload.file.metadata?.picture);
   });
 
+  it("accepts a valid MP3 while returning actionable errors for mixed invalid inputs", async () => {
+    const uploads = await parseUploadedTracks([
+      new File([validMp3Bytes()], "valid.mp3"),
+      new File([], "empty.mp3", { type: "audio/mpeg" }),
+      new File(["not audio"], "corrupt.mp3", { type: "audio/mpeg" }),
+      new File(["fLaC0000"], "unsupported.flac", { type: "audio/flac" }),
+    ]);
+
+    expect(uploads.map((upload) => upload.file.status)).toEqual([
+      "pending",
+      "error",
+      "error",
+      "error",
+    ]);
+    expect(uploads[0]?.file.filename).toBe("valid.mp3");
+    expect(uploads.slice(1).map((upload) => upload.file.downloadError)).toEqual([
+      "empty.mp3 is empty. Choose a valid MP3 file.",
+      "corrupt.mp3 is not a valid MP3. The file may be corrupt or renamed.",
+      "unsupported.flac is not an MP3. Tagium currently supports MP3 files only.",
+    ]);
+  });
+
   it("normalizes missing numeric tags to null in parsed metadata snapshots", async () => {
     const originalTags = structuredClone(mp3tagMock.nextTags);
     const nextTags = mp3tagMock.nextTags as Partial<typeof mp3tagMock.nextTags>;
@@ -165,7 +188,7 @@ describe("AudioMetadataIO", () => {
     delete nextTags.track;
 
     const [upload] = await parseUploadedTracks([
-      new File(["audio"], "untagged.mp3", { type: "audio/mpeg" }),
+      new File([validMp3Bytes()], "untagged.mp3", { type: "audio/mpeg" }),
     ]);
 
     mp3tagMock.nextTags = originalTags;
@@ -179,7 +202,7 @@ describe("AudioMetadataIO", () => {
     mp3tagMock.nextReadError = "Invalid ID3 tag";
 
     const [upload] = await parseUploadedTracks([
-      new File(["audio"], "broken.mp3", { type: "audio/mpeg" }),
+      new File([validMp3Bytes()], "broken.mp3", { type: "audio/mpeg" }),
     ]);
 
     expect(upload.file.status).toBe("error");
@@ -196,7 +219,7 @@ describe("AudioMetadataIO", () => {
     });
 
     const [upload] = await parseUploadedTracks([
-      new File(["audio"], "duration-failure.mp3", { type: "audio/mpeg" }),
+      new File([validMp3Bytes()], "duration-failure.mp3", { type: "audio/mpeg" }),
     ]);
 
     expect(upload.file.status).toBe("error");

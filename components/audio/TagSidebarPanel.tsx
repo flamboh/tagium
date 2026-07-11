@@ -126,10 +126,7 @@ export default function TagSidebarPanel({
     event.preventDefault();
     dragCounterRef.current = 0;
     setIsDraggingFile(false);
-    const audioFiles = files.filter((file) => file.type.startsWith("audio/"));
-    if (audioFiles.length > 0) {
-      onAudioUpload(audioFiles);
-    }
+    onAudioUpload(files);
   };
 
   return (
