@@ -82,7 +82,6 @@ import { resolveTrackMetadata, type TrackMetadata } from "./trackMetadata";
 import { isYouTubePlaylistUrl, resolveYouTubePlaylist } from "./youtubePlaylist";
 import { getSystemFailurePresentation, reportSystemFailure } from "./systemFailure";
 import { isValidFilenameBase, sanitizeFilenameBase } from "./filename";
-import { toast } from "sonner";
 import {
   AlbumGroup,
   AppSettings,
