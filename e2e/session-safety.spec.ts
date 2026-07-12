@@ -2,11 +2,15 @@ import { expect, test, type Page } from "@playwright/test";
 import { Buffer } from "node:buffer";
 
 const uploadTrack = async (page: Page) => {
+  const mp3Bytes = new Uint8Array(834);
+  mp3Bytes.set([0xff, 0xfb, 0x90, 0x00], 0);
+  mp3Bytes.set([0xff, 0xfb, 0x90, 0x00], 417);
+
   await page.goto("/");
   await page.locator('input[type="file"]').setInputFiles({
     name: "walk-away-track.mp3",
     mimeType: "audio/mpeg",
-    buffer: Buffer.from("ID3\u0004\u0000\u0000\u0000\u0000\u0000\u0000", "binary"),
+    buffer: Buffer.from(mp3Bytes),
   });
   await expect(page.getByRole("button", { name: "remove track" })).toBeAttached();
 };
