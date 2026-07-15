@@ -1,4 +1,19 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { Buffer } from "node:buffer";
+
+const uploadTrack = async (page: Page) => {
+  const mp3Bytes = new Uint8Array(834);
+  mp3Bytes.set([0xff, 0xfb, 0x90, 0x00], 0);
+  mp3Bytes.set([0xff, 0xfb, 0x90, 0x00], 417);
+
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "crossfade-track.mp3",
+    mimeType: "audio/mpeg",
+    buffer: Buffer.from(mp3Bytes),
+  });
+  await expect(page.getByRole("button", { name: "remove track" })).toBeAttached();
+};
 
 test("keeps the media entry within its return transition endpoints", async ({ page }) => {
   await page.goto("/");
@@ -51,4 +66,40 @@ test("keeps the media entry within its return transition endpoints", async ({ pa
   const minimumLeft = Math.min(transition.startLeft, transition.endLeft) - 2;
   const maximumLeft = Math.max(transition.startLeft, transition.endLeft) + 2;
   expect(transition.samples.every((left) => left >= minimumLeft && left <= maximumLeft)).toBe(true);
+});
+
+test("crossfades the metadata editor and settings without unmounting either panel", async ({
+  page,
+}) => {
+  await uploadTrack(page);
+
+  const editor = page.locator('[data-view="metadata-editor"]');
+  const settings = page.locator('[data-view="settings"]');
+  await expect(editor).toHaveAttribute("aria-hidden", "false");
+  await expect(settings).toHaveAttribute("aria-hidden", "true");
+
+  await page.getByRole("button", { name: "settings" }).click();
+  await expect(editor).toHaveAttribute("aria-hidden", "true");
+  await expect(settings).toHaveAttribute("aria-hidden", "false");
+  await page.waitForTimeout(100);
+
+  const midpoint = await Promise.all([
+    editor.evaluate((element) =>
+      Number.parseFloat(
+        element.ownerDocument.defaultView?.getComputedStyle(element).opacity ?? "0",
+      ),
+    ),
+    settings.evaluate((element) =>
+      Number.parseFloat(
+        element.ownerDocument.defaultView?.getComputedStyle(element).opacity ?? "0",
+      ),
+    ),
+  ]);
+  expect(midpoint[0]).toBeGreaterThan(0);
+  expect(midpoint[0]).toBeLessThan(1);
+  expect(midpoint[1]).toBeGreaterThan(0);
+  expect(midpoint[1]).toBeLessThan(1);
+
+  await expect(editor).toHaveCSS("opacity", "0");
+  await expect(settings).toHaveCSS("opacity", "1");
 });

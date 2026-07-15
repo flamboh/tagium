@@ -2026,29 +2026,58 @@ export default function AudioTagger() {
                 : "h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1"
             }
           >
-            {activeView === "settings" ? (
+            {!libraryIsEmpty ? (
+              <div className="relative min-h-0 flex-1">
+                <div
+                  data-view="metadata-editor"
+                  aria-hidden={activeView !== "editor"}
+                  inert={activeView !== "editor"}
+                  className={`absolute inset-0 flex min-h-0 flex-col bg-background transition-opacity duration-200 motion-reduce:transition-none ${
+                    activeView === "editor"
+                      ? "z-10 opacity-100"
+                      : "pointer-events-none z-0 opacity-0"
+                  }`}
+                >
+                  <TrackMetadataEditor
+                    selectedFile={selectedFile}
+                    selectedFileId={selectedFileId}
+                    register={register}
+                    control={control}
+                    handleSubmit={handleSubmit}
+                    onTrackCoverUpload={handleTrackCoverUpload}
+                    onTrackCoverProcessingChange={setIsTrackCoverProcessing}
+                    isTrackCoverProcessing={isTrackCoverProcessing}
+                    onDownloadUpdatedFile={handleDownloadUpdatedFile}
+                    selectedFileAlbum={selectedFileAlbum}
+                    syncFilenames={settings.syncFilenames}
+                    syncTrackNumbers={settings.syncTrackNumbers}
+                    onPreviewMetadataChange={(field, event) =>
+                      handlePreviewMetadataChange(field, event.target.value)
+                    }
+                  />
+                </div>
+                <div
+                  data-view="settings"
+                  aria-hidden={activeView !== "settings"}
+                  inert={activeView !== "settings"}
+                  className={`absolute inset-0 flex min-h-0 flex-col bg-background transition-opacity duration-200 motion-reduce:transition-none ${
+                    activeView === "settings"
+                      ? "z-10 opacity-100"
+                      : "pointer-events-none z-0 opacity-0"
+                  }`}
+                >
+                  <SettingsPage
+                    settings={settings}
+                    onChange={handleSettingsChange}
+                    onBack={toggleSettings}
+                  />
+                </div>
+              </div>
+            ) : activeView === "settings" ? (
               <SettingsPage
                 settings={settings}
                 onChange={handleSettingsChange}
                 onBack={toggleSettings}
-              />
-            ) : !libraryIsEmpty ? (
-              <TrackMetadataEditor
-                selectedFile={selectedFile}
-                selectedFileId={selectedFileId}
-                register={register}
-                control={control}
-                handleSubmit={handleSubmit}
-                onTrackCoverUpload={handleTrackCoverUpload}
-                onTrackCoverProcessingChange={setIsTrackCoverProcessing}
-                isTrackCoverProcessing={isTrackCoverProcessing}
-                onDownloadUpdatedFile={handleDownloadUpdatedFile}
-                selectedFileAlbum={selectedFileAlbum}
-                syncFilenames={settings.syncFilenames}
-                syncTrackNumbers={settings.syncTrackNumbers}
-                onPreviewMetadataChange={(field, event) =>
-                  handlePreviewMetadataChange(field, event.target.value)
-                }
               />
             ) : null}
           </div>

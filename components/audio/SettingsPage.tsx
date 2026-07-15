@@ -19,7 +19,7 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
   const [bitrateOpen, setBitrateOpen] = useState(false);
 
   return (
-    <div className="min-h-0 flex-1 flex flex-col overflow-hidden animate-in fade-in duration-200 motion-reduce:animate-none">
+    <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
       <div className="p-6 h-[104px] border-b flex-shrink-0 flex flex-col justify-center gap-1">
         <div className="flex min-w-0 items-center gap-2">
           <button
