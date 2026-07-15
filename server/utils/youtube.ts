@@ -5,8 +5,71 @@ export const YOUTUBE_USER_AGENT =
 
 type JsonRecord = Record<string, unknown>;
 
+type YouTubeRequestStage = "config" | "continuation" | "playlist" | "upload_year";
+
+const MAX_YOUTUBE_FETCH_ATTEMPTS = 2;
+const YOUTUBE_RETRY_DELAY_MS = 100;
+const TRANSIENT_YOUTUBE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
 const isRecord = (value: unknown): value is JsonRecord =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+
+const isAbortError = (error: unknown) => error instanceof Error && error.name === "AbortError";
+
+const logYouTubeUpstreamFailure = (
+  stage: YouTubeRequestStage,
+  attempt: number,
+  retrying: boolean,
+  details: { errorType?: string; status?: number },
+) => {
+  console.warn(
+    JSON.stringify({
+      event: "youtube_upstream_failure",
+      stage,
+      attempt,
+      retrying,
+      ...details,
+    }),
+  );
+};
+
+export const fetchYouTubeWithRetry = async (
+  input: string | URL | Request,
+  init: RequestInit,
+  options: {
+    stage: YouTubeRequestStage;
+    fetch?: typeof globalThis.fetch;
+  },
+) => {
+  const fetch = options.fetch ?? globalThis.fetch;
+
+  for (let attempt = 1; attempt <= MAX_YOUTUBE_FETCH_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(input, init);
+      if (response.ok) return response;
+
+      const retrying =
+        attempt < MAX_YOUTUBE_FETCH_ATTEMPTS && TRANSIENT_YOUTUBE_STATUSES.has(response.status);
+      logYouTubeUpstreamFailure(options.stage, attempt, retrying, { status: response.status });
+      if (!retrying) return response;
+
+      await response.body?.cancel().catch(() => undefined);
+    } catch (error) {
+      const retrying = attempt < MAX_YOUTUBE_FETCH_ATTEMPTS && !isAbortError(error);
+      logYouTubeUpstreamFailure(options.stage, attempt, retrying, {
+        errorType: error instanceof Error ? error.name : "UnknownError",
+      });
+      if (!retrying) throw error;
+    }
+
+    await wait(YOUTUBE_RETRY_DELAY_MS);
+  }
+
+  throw new Error("youtube.retry_exhausted");
+};
 
 const videoIdPattern = /^[A-Za-z0-9_-]{11}$/;
 
@@ -118,10 +181,14 @@ export const resolveYouTubeUploadYear = async (
 
   let config = options.config;
   if (!config) {
-    const homepageResponse = await fetch(YOUTUBE_ORIGIN, {
-      headers: { "user-agent": YOUTUBE_USER_AGENT },
-      signal: options.signal,
-    });
+    const homepageResponse = await fetchYouTubeWithRetry(
+      YOUTUBE_ORIGIN,
+      {
+        headers: { "user-agent": YOUTUBE_USER_AGENT },
+        signal: options.signal,
+      },
+      { fetch, stage: "config" },
+    );
     if (!homepageResponse.ok) {
       throw new Error(`youtube.config_failed (${homepageResponse.status})`);
     }
@@ -138,17 +205,21 @@ export const resolveYouTubeUploadYear = async (
   const nextUrl = new URL("/youtubei/v1/next", YOUTUBE_ORIGIN);
   nextUrl.searchParams.set("prettyPrint", "false");
   nextUrl.searchParams.set("key", apiKey);
-  const response = await fetch(nextUrl, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "user-agent": YOUTUBE_USER_AGENT,
-      "x-youtube-client-name": "1",
-      "x-youtube-client-version": clientVersion,
+  const response = await fetchYouTubeWithRetry(
+    nextUrl,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "user-agent": YOUTUBE_USER_AGENT,
+        "x-youtube-client-name": "1",
+        "x-youtube-client-version": clientVersion,
+      },
+      body: JSON.stringify({ videoId, context }),
+      signal: options.signal,
     },
-    body: JSON.stringify({ videoId, context }),
-    signal: options.signal,
-  });
+    { fetch, stage: "upload_year" },
+  );
   if (!response.ok) throw new Error(`youtube.video_failed (${response.status})`);
 
   const data = await response.json();
