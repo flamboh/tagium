@@ -50,8 +50,11 @@ If Cobalt emits `X-Cobalt-Machine-Id`, Tagium signs machine-bound tunnel URLs. S
 wrangler secret put COBALT_MACHINE_AFFINITY_SECRET
 ```
 
-Preview deployments should leave `COBALT_ALLOWED_ORIGIN` unset so each preview URL can use the same-origin fallback.
-Production can set `COBALT_ALLOWED_ORIGIN` to the final public Tagium origin once the domain is fixed.
+The canonical production origin is `https://tagium.app`. `nitro.config.ts` manages its Cloudflare
+custom domain along with permanent redirects from `https://www.tagium.app` and
+`https://tagium.oli.boo`. Keep `COBALT_ALLOWED_ORIGIN` unset: production requests are already
+same-origin, and the request-origin fallback lets isolated preview URLs use Cobalt without
+masquerading as production.
 
 ## Fly scaling
 
