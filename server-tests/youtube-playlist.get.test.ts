@@ -35,6 +35,7 @@ const lockupVideo = (videoId: string, title: string, duration: string) => ({
 
 describe("youtube playlist endpoint", () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -163,6 +164,58 @@ describe("youtube playlist endpoint", () => {
       ],
     });
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("recovers when YouTube transiently rejects the playlist request", async () => {
+    const initialData = {
+      metadata: { playlistMetadataRenderer: { title: "Recovered Playlist" } },
+      contents: [lockupVideo("first-video", "First Track", "4:14")],
+    };
+    const html = `<script>var ytInitialData = ${JSON.stringify(initialData)};</script>`;
+    const fetchMock = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response("temporarily unavailable", { status: 503 }))
+      .mockResolvedValueOnce(new Response(html));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const playlist = await handler(makeEvent());
+
+    expect(playlist).toMatchObject({
+      title: "Recovered Playlist",
+      tracks: [{ title: "First Track" }],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns playable tracks when optional upload-year enrichment fails", async () => {
+    const initialData = {
+      metadata: { playlistMetadataRenderer: { title: "Playlist Without Year" } },
+      contents: [lockupVideo("first-video", "First Track", "4:14")],
+    };
+    const html = [
+      `<script>var ytInitialData = ${JSON.stringify(initialData)};</script>`,
+      `<script>ytcfg.set(${JSON.stringify({
+        INNERTUBE_API_KEY: "api-key",
+        INNERTUBE_CLIENT_VERSION: "2.20260708.00.00",
+        INNERTUBE_CONTEXT: { client: { clientName: "WEB" } },
+      })});</script>`,
+    ].join("");
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = input instanceof Request ? input.url : new URL(input).toString();
+      if (url.startsWith("https://www.youtube.com/playlist?")) return new Response(html);
+      return new Response("temporarily unavailable", { status: 503 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const playlist = await handler(makeEvent());
+
+    expect(playlist).toMatchObject({
+      title: "Playlist Without Year",
+      tracks: [{ title: "First Track" }],
+    });
+    expect(playlist).not.toHaveProperty("year");
   });
 
   it("rejects non-playlist YouTube URLs without fetching them", async () => {

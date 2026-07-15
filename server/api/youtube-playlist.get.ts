@@ -2,6 +2,7 @@ import { defineHandler } from "nitro";
 import { z } from "zod";
 import {
   extractYouTubeJsonObject,
+  fetchYouTubeWithRetry,
   getYouTubeConfig,
   resolveYouTubeUploadYear,
   YOUTUBE_ORIGIN,
@@ -226,7 +227,7 @@ const getDeclaredTrackCount = (initialData: unknown) => {
   return undefined;
 };
 
-const fetchContinuation = async (token: string, config: JsonRecord) => {
+const fetchContinuation = async (token: string, config: JsonRecord, signal: AbortSignal) => {
   const apiKey = config.INNERTUBE_API_KEY;
   const context = config.INNERTUBE_CONTEXT;
   const clientVersion = config.INNERTUBE_CLIENT_VERSION;
@@ -236,16 +237,21 @@ const fetchContinuation = async (token: string, config: JsonRecord) => {
 
   const endpoint = new URL("/youtubei/v1/browse", YOUTUBE_ORIGIN);
   endpoint.searchParams.set("key", apiKey);
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "user-agent": YOUTUBE_USER_AGENT,
-      "x-youtube-client-name": "1",
-      "x-youtube-client-version": clientVersion,
+  const response = await fetchYouTubeWithRetry(
+    endpoint,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "user-agent": YOUTUBE_USER_AGENT,
+        "x-youtube-client-name": "1",
+        "x-youtube-client-version": clientVersion,
+      },
+      body: JSON.stringify({ context, continuation: token }),
+      signal,
     },
-    body: JSON.stringify({ context, continuation: token }),
-  });
+    { stage: "continuation" },
+  );
   if (!response.ok) throw new Error(`youtube.continuation_failed (${response.status})`);
   return response.json() as Promise<unknown>;
 };
@@ -271,12 +277,17 @@ export default defineHandler(async (event) => {
   playlistUrl.searchParams.set("list", playlistId);
   playlistUrl.searchParams.set("hl", "en");
 
-  const response = await fetch(playlistUrl, {
-    headers: {
-      "accept-language": "en-US,en;q=0.9",
-      "user-agent": YOUTUBE_USER_AGENT,
+  const response = await fetchYouTubeWithRetry(
+    playlistUrl,
+    {
+      headers: {
+        "accept-language": "en-US,en;q=0.9",
+        "user-agent": YOUTUBE_USER_AGENT,
+      },
+      signal: event.req.signal,
     },
-  });
+    { stage: "playlist" },
+  );
   if (!response.ok) throw new Error(`youtube.playlist_failed (${response.status})`);
   const html = await response.text();
   const initialData = extractYouTubeJsonObject(html, "var ytInitialData =")?.value;
@@ -300,7 +311,7 @@ export default defineHandler(async (event) => {
       if (!token || visitedTokens.has(token)) continue;
       visitedTokens.add(token);
 
-      const continuation = await fetchContinuation(token, config);
+      const continuation = await fetchContinuation(token, config, event.req.signal);
       if (!continuation) break;
       collectTracks(continuation, seenVideoIds, tracks);
       if (declaredTrackCount !== undefined && tracks.length >= declaredTrackCount) break;
@@ -309,10 +320,21 @@ export default defineHandler(async (event) => {
   }
 
   if (tracks.length === 0) throw new Error("youtube.no_resolvable_tracks");
-  const year = await resolveYouTubeUploadYear(tracks[0]!.url, {
-    config,
-    signal: event.req.signal,
-  });
+  let year: number | undefined;
+  try {
+    year = await resolveYouTubeUploadYear(tracks[0]!.url, {
+      config,
+      signal: event.req.signal,
+    });
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        event: "youtube_playlist_enrichment_skipped",
+        stage: "upload_year",
+        errorType: error instanceof Error ? error.name : "UnknownError",
+      }),
+    );
+  }
 
   return {
     title,
