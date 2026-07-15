@@ -1,15 +1,17 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowRight, Link2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getMediaUrlEntryMotionKeyframes } from "./mediaUrlEntryMotion";
 import { getSystemFailurePresentation, reportSystemFailure } from "./systemFailure";
 
 interface MediaUrlEntryProps {
   layout: "landing" | "editor";
   hidden: boolean;
+  docked?: boolean;
   onUrlImport: (sourceUrl: string) => void | Promise<void>;
 }
 
@@ -24,52 +26,105 @@ const validateMediaUrl = (value: string) => {
   return "enter a complete http or https url";
 };
 
-export default function MediaUrlEntry({ layout, hidden, onUrlImport }: MediaUrlEntryProps) {
+const prefersReducedMotion = () =>
+  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+
+export default function MediaUrlEntry({
+  layout,
+  hidden,
+  docked = false,
+  onUrlImport,
+}: MediaUrlEntryProps) {
   const [sourceUrl, setSourceUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const feedbackRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const motionRef = useRef<HTMLDivElement>(null);
   const previousRectRef = useRef<DOMRect | null>(null);
   const previousLayoutRef = useRef(layout);
+  const animationRef = useRef<Animation | null>(null);
+
+  const clearMotionStyles = () => {
+    const anchor = anchorRef.current;
+    const motion = motionRef.current;
+    if (anchor) anchor.style.height = "";
+    if (!motion) return;
+
+    motion.style.position = "";
+    motion.style.left = "";
+    motion.style.top = "";
+    motion.style.width = "";
+    motion.style.zIndex = "";
+  };
 
   useLayoutEffect(() => {
-    const form = formRef.current;
-    if (!form || hidden) {
+    const anchor = anchorRef.current;
+    const motion = motionRef.current;
+    if (!anchor || !motion || hidden) {
+      animationRef.current?.cancel();
+      animationRef.current = null;
+      clearMotionStyles();
       previousRectRef.current = null;
       previousLayoutRef.current = layout;
       return;
     }
 
-    const nextRect = form.getBoundingClientRect();
-    const previousRect = previousRectRef.current;
+    const runningAnimation = animationRef.current;
+    const previousRect = runningAnimation
+      ? motion.getBoundingClientRect()
+      : previousRectRef.current;
     const layoutChanged = previousLayoutRef.current !== layout;
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    runningAnimation?.cancel();
+    animationRef.current = null;
+    clearMotionStyles();
 
-    if (previousRect && layoutChanged && !reducedMotion) {
-      const deltaX = previousRect.left - nextRect.left;
-      const deltaY = previousRect.top - nextRect.top;
-      const scaleX = previousRect.width / Math.max(1, nextRect.width);
-      form.animate(
-        [
-          {
-            transform: `translate(${deltaX}px, ${deltaY}px) scaleX(${scaleX})`,
-            transformOrigin: "top left",
-          },
-          { transform: "translate(0, 0) scaleX(1)", transformOrigin: "top left" },
-        ],
-        { duration: 420, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
-      );
+    const nextRect = motion.getBoundingClientRect();
+    const reducedMotion = prefersReducedMotion();
+
+    if (previousRect && layoutChanged && !reducedMotion && typeof motion.animate === "function") {
+      anchor.style.height = `${nextRect.height}px`;
+      motion.style.position = "fixed";
+      motion.style.left = `${previousRect.left}px`;
+      motion.style.top = `${previousRect.top}px`;
+      motion.style.width = `${previousRect.width}px`;
+      motion.style.zIndex = "30";
+
+      const animation = motion.animate(getMediaUrlEntryMotionKeyframes(previousRect, nextRect), {
+        duration: 420,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      });
+      animationRef.current = animation;
+      animation.onfinish = () => {
+        if (animationRef.current !== animation) return;
+        animationRef.current = null;
+        clearMotionStyles();
+        previousRectRef.current = motion.getBoundingClientRect();
+      };
     }
 
     previousRectRef.current = nextRect;
     previousLayoutRef.current = layout;
-  }, [hidden, layout]);
+  }, [docked, hidden, layout]);
+
+  useEffect(() => {
+    const settleMotion = () => {
+      animationRef.current?.cancel();
+      animationRef.current = null;
+      clearMotionStyles();
+      previousRectRef.current = motionRef.current?.getBoundingClientRect() ?? null;
+    };
+
+    window.addEventListener("resize", settleMotion);
+    return () => {
+      window.removeEventListener("resize", settleMotion);
+      settleMotion();
+    };
+  }, []);
 
   const showValidationError = (message: string) => {
     setValidationError(message);
-    const feedback = feedbackRef.current;
-    if (!feedback || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const feedback = motionRef.current;
+    if (!feedback || prefersReducedMotion() || typeof feedback.animate !== "function") return;
     feedback.animate(
       [
         { transform: "translateX(0)" },
@@ -122,72 +177,66 @@ export default function MediaUrlEntry({ layout, hidden, onUrlImport }: MediaUrlE
       inert={hidden || undefined}
       className={cn(
         hidden && "hidden",
-        layout === "landing" && "flex w-full justify-center",
+        layout === "landing" &&
+          "flex w-full flex-col gap-10 max-lg:[@media(max-height:700px)]:gap-6",
         layout === "editor" &&
           "flex-shrink-0 border-t bg-background/95 p-3 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-4 lg:z-10 lg:flex lg:justify-center lg:border-t-0 lg:bg-transparent lg:px-4 lg:p-0",
+        docked &&
+          "pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center lg:bottom-4",
       )}
     >
-      <div
-        ref={feedbackRef}
-        className={cn(
-          "pointer-events-auto flex w-full flex-col",
-          layout === "landing"
-            ? "max-w-md gap-10 max-lg:[@media(max-height:700px)]:gap-6"
-            : "max-w-3xl gap-1",
-        )}
-      >
-        {layout === "landing" && (
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <div className="h-px flex-1 bg-border" />
-            <span>or import from a url</span>
-            <div className="h-px flex-1 bg-border" />
-          </div>
-        )}
-        <form ref={formRef} noValidate onSubmit={handleSubmit} className="flex items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="relative">
-              <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="url"
-                name="media-url"
-                autoComplete="url"
-                value={sourceUrl}
-                aria-label="media url"
-                aria-invalid={Boolean(validationError)}
-                aria-describedby={validationError ? "media-url-error" : undefined}
-                onChange={(event) => {
-                  setSourceUrl(event.target.value);
-                  setValidationError(null);
-                }}
-                placeholder="soundcloud or youtube url"
-                disabled={submitting}
+      {layout === "landing" && (
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="h-px flex-1 bg-border" />
+          <span>or import from a url</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+      )}
+      <div ref={anchorRef} className={cn("w-full", layout === "editor" && "max-w-3xl")}>
+        <div ref={motionRef} className="pointer-events-auto w-full bg-background">
+          <form noValidate onSubmit={handleSubmit} className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="relative">
+                <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="url"
+                  name="media-url"
+                  autoComplete="url"
+                  value={sourceUrl}
+                  aria-label="media url"
+                  aria-invalid={Boolean(validationError)}
+                  aria-describedby={validationError ? "media-url-error" : undefined}
+                  onChange={(event) => {
+                    setSourceUrl(event.target.value);
+                    setValidationError(null);
+                  }}
+                  placeholder="soundcloud or youtube url"
+                  disabled={submitting}
+                  className="h-10 rounded-lg pl-9 placeholder:text-muted-foreground/45"
+                />
+              </div>
+              <p
+                id="media-url-error"
                 className={cn(
-                  "pl-9 placeholder:text-muted-foreground/45",
-                  layout === "landing" && "h-10 rounded-lg",
+                  "h-4 pt-0.5 text-xs leading-4 text-destructive",
+                  layout === "landing" && "text-center",
                 )}
-              />
+                aria-live="polite"
+              >
+                {validationError ?? ""}
+              </p>
             </div>
-            <p
-              id="media-url-error"
-              className={cn(
-                "h-4 pt-0.5 text-xs leading-4 text-destructive",
-                layout === "landing" && "text-center",
-              )}
-              aria-live="polite"
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!canSubmit}
+              aria-label="start media import"
+              className="size-10 rounded-lg"
             >
-              {validationError ?? ""}
-            </p>
-          </div>
-          <Button
-            type="submit"
-            size="icon"
-            disabled={!canSubmit}
-            aria-label="start media import"
-            className={cn(layout === "landing" && "size-10 rounded-lg")}
-          >
-            {submitting ? <Loader2 className="animate-spin" /> : <ArrowRight />}
-          </Button>
-        </form>
+              {submitting ? <Loader2 className="animate-spin" /> : <ArrowRight />}
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   );

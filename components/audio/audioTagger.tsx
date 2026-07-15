@@ -59,6 +59,7 @@ import LandingScreen from "./LandingScreen";
 import TrackMetadataEditor from "./TrackMetadataEditor";
 import SettingsPage from "./SettingsPage";
 import MediaUrlEntry from "./MediaUrlEntry";
+import { getMediaUrlEntryPresentation } from "./mediaUrlEntryPresentation";
 import MetadataCleanupDialog from "./MetadataCleanupDialog";
 import {
   applyMetadataCleanupSuggestions,
@@ -1845,6 +1846,10 @@ export default function AudioTagger() {
 
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
   const landingIsActive = libraryIsEmpty && activeView === "editor";
+  const mediaUrlEntryPresentation = getMediaUrlEntryPresentation(
+    libraryIsEmpty,
+    activeView === "settings",
+  );
   const playlistQueueDownloaded = playlistDownloadQueue ? playlistDownloadQueue.completed : 0;
   const playlistQueueEta = playlistDownloadQueue
     ? formatPlaylistQueueEta(playlistDownloadQueue.etaMs)
@@ -1936,6 +1941,11 @@ export default function AudioTagger() {
     });
   };
 
+  const toggleSettings = () => {
+    if (isTrackCoverProcessing) return;
+    setActiveView((currentView) => (currentView === "settings" ? "editor" : "settings"));
+  };
+
   return (
     <>
       <MetadataCleanupDialog
@@ -2004,10 +2014,7 @@ export default function AudioTagger() {
           onReorderAlbums={handleReorderAlbums}
           playlistDownloadQueue={playlistSidebarQueue}
           onDownloadAll={handleDownloadAll}
-          onOpenSettings={() => {
-            if (isTrackCoverProcessing) return;
-            setActiveView((currentView) => (currentView === "settings" ? "editor" : "settings"));
-          }}
+          onOpenSettings={toggleSettings}
           onCancelPlaylistDownloadQueue={handleCancelPlaylistDownloads}
           onRetryPlaylistDownloadQueue={handleRetryPlaylistDownloads}
         />
@@ -2023,7 +2030,7 @@ export default function AudioTagger() {
               <SettingsPage
                 settings={settings}
                 onChange={handleSettingsChange}
-                onBack={() => setActiveView("editor")}
+                onBack={toggleSettings}
               />
             ) : !libraryIsEmpty ? (
               <TrackMetadataEditor
@@ -2047,8 +2054,9 @@ export default function AudioTagger() {
           </div>
           <LandingScreen active={landingIsActive} onAudioUpload={handleAudioUpload}>
             <MediaUrlEntry
-              layout={libraryIsEmpty ? "landing" : "editor"}
-              hidden={activeView !== "editor"}
+              layout={mediaUrlEntryPresentation.layout}
+              hidden={mediaUrlEntryPresentation.hidden}
+              docked={mediaUrlEntryPresentation.docked}
               onUrlImport={handleUrlImport}
             />
           </LandingScreen>

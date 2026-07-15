@@ -6,6 +6,7 @@ import mediaUrlEntrySource from "./MediaUrlEntry.tsx?raw";
 import MediaUrlEntry from "./MediaUrlEntry";
 
 const reactHookMocks = vi.hoisted(() => ({
+  useEffect: vi.fn(),
   useLayoutEffect: vi.fn(),
   useRef: vi.fn(),
   useState: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
   return {
     ...actual,
+    useEffect: reactHookMocks.useEffect,
     useLayoutEffect: reactHookMocks.useLayoutEffect,
     useRef: reactHookMocks.useRef,
     useState: reactHookMocks.useState,
@@ -71,6 +73,7 @@ const createHookHarness = () => {
   let refCursor = 0;
 
   reactHookMocks.useLayoutEffect.mockImplementation(() => undefined);
+  reactHookMocks.useEffect.mockImplementation(() => undefined);
   reactHookMocks.useRef.mockImplementation((initial: unknown) => {
     const index = refCursor++;
     refs[index] ??= { current: initial };
@@ -135,10 +138,6 @@ describe("media URL entry", () => {
     });
 
     expect(onUrlImport).toHaveBeenCalledWith("https://soundcloud.com/user/track");
-  });
-
-  it("anchors width-changing layout motion to the measured left edge", () => {
-    expect(mediaUrlEntrySource.match(/transformOrigin: "top left"/g)).toHaveLength(2);
   });
 
   it("keeps malformed URL feedback local to the input", async () => {
