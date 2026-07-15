@@ -59,6 +59,7 @@ import LandingScreen from "./LandingScreen";
 import TrackMetadataEditor from "./TrackMetadataEditor";
 import SettingsPage from "./SettingsPage";
 import MediaUrlEntry from "./MediaUrlEntry";
+import { getMediaUrlEntryPresentation } from "./mediaUrlEntryPresentation";
 import MetadataCleanupDialog from "./MetadataCleanupDialog";
 import {
   applyMetadataCleanupSuggestions,
@@ -1845,6 +1846,10 @@ export default function AudioTagger() {
 
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
   const landingIsActive = libraryIsEmpty && activeView === "editor";
+  const mediaUrlEntryPresentation = getMediaUrlEntryPresentation(
+    libraryIsEmpty,
+    activeView === "settings",
+  );
   const playlistQueueDownloaded = playlistDownloadQueue ? playlistDownloadQueue.completed : 0;
   const playlistQueueEta = playlistDownloadQueue
     ? formatPlaylistQueueEta(playlistDownloadQueue.etaMs)
@@ -1936,6 +1941,11 @@ export default function AudioTagger() {
     });
   };
 
+  const toggleSettings = () => {
+    if (isTrackCoverProcessing) return;
+    setActiveView((currentView) => (currentView === "settings" ? "editor" : "settings"));
+  };
+
   return (
     <>
       <MetadataCleanupDialog
@@ -2004,10 +2014,7 @@ export default function AudioTagger() {
           onReorderAlbums={handleReorderAlbums}
           playlistDownloadQueue={playlistSidebarQueue}
           onDownloadAll={handleDownloadAll}
-          onOpenSettings={() => {
-            if (isTrackCoverProcessing) return;
-            setActiveView((currentView) => (currentView === "settings" ? "editor" : "settings"));
-          }}
+          onOpenSettings={toggleSettings}
           onCancelPlaylistDownloadQueue={handleCancelPlaylistDownloads}
           onRetryPlaylistDownloadQueue={handleRetryPlaylistDownloads}
         />
@@ -2019,36 +2026,66 @@ export default function AudioTagger() {
                 : "h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1"
             }
           >
-            {activeView === "settings" ? (
+            {!libraryIsEmpty ? (
+              <div className="relative min-h-0 flex-1">
+                <div
+                  data-view="metadata-editor"
+                  aria-hidden={activeView !== "editor"}
+                  inert={activeView !== "editor"}
+                  className={`absolute inset-0 flex min-h-0 flex-col bg-background transition-opacity duration-200 motion-reduce:transition-none ${
+                    activeView === "editor"
+                      ? "z-10 opacity-100"
+                      : "pointer-events-none z-0 opacity-0"
+                  }`}
+                >
+                  <TrackMetadataEditor
+                    selectedFile={selectedFile}
+                    selectedFileId={selectedFileId}
+                    register={register}
+                    control={control}
+                    handleSubmit={handleSubmit}
+                    onTrackCoverUpload={handleTrackCoverUpload}
+                    onTrackCoverProcessingChange={setIsTrackCoverProcessing}
+                    isTrackCoverProcessing={isTrackCoverProcessing}
+                    onDownloadUpdatedFile={handleDownloadUpdatedFile}
+                    selectedFileAlbum={selectedFileAlbum}
+                    syncFilenames={settings.syncFilenames}
+                    syncTrackNumbers={settings.syncTrackNumbers}
+                    onPreviewMetadataChange={(field, event) =>
+                      handlePreviewMetadataChange(field, event.target.value)
+                    }
+                  />
+                </div>
+                <div
+                  data-view="settings"
+                  aria-hidden={activeView !== "settings"}
+                  inert={activeView !== "settings"}
+                  className={`absolute inset-0 flex min-h-0 flex-col bg-background transition-opacity duration-200 motion-reduce:transition-none ${
+                    activeView === "settings"
+                      ? "z-10 opacity-100"
+                      : "pointer-events-none z-0 opacity-0"
+                  }`}
+                >
+                  <SettingsPage
+                    settings={settings}
+                    onChange={handleSettingsChange}
+                    onBack={toggleSettings}
+                  />
+                </div>
+              </div>
+            ) : activeView === "settings" ? (
               <SettingsPage
                 settings={settings}
                 onChange={handleSettingsChange}
-                onBack={() => setActiveView("editor")}
-              />
-            ) : !libraryIsEmpty ? (
-              <TrackMetadataEditor
-                selectedFile={selectedFile}
-                selectedFileId={selectedFileId}
-                register={register}
-                control={control}
-                handleSubmit={handleSubmit}
-                onTrackCoverUpload={handleTrackCoverUpload}
-                onTrackCoverProcessingChange={setIsTrackCoverProcessing}
-                isTrackCoverProcessing={isTrackCoverProcessing}
-                onDownloadUpdatedFile={handleDownloadUpdatedFile}
-                selectedFileAlbum={selectedFileAlbum}
-                syncFilenames={settings.syncFilenames}
-                syncTrackNumbers={settings.syncTrackNumbers}
-                onPreviewMetadataChange={(field, event) =>
-                  handlePreviewMetadataChange(field, event.target.value)
-                }
+                onBack={toggleSettings}
               />
             ) : null}
           </div>
           <LandingScreen active={landingIsActive} onAudioUpload={handleAudioUpload}>
             <MediaUrlEntry
-              layout={libraryIsEmpty ? "landing" : "editor"}
-              hidden={activeView !== "editor"}
+              layout={mediaUrlEntryPresentation.layout}
+              hidden={mediaUrlEntryPresentation.hidden}
+              docked={mediaUrlEntryPresentation.docked}
               onUrlImport={handleUrlImport}
             />
           </LandingScreen>

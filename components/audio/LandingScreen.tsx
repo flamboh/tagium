@@ -77,7 +77,7 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
         }
       >
         {active && (
-          <>
+          <div className="flex w-full flex-col items-center gap-10 animate-in fade-in motion-reduce:animate-none max-lg:[@media(max-height:700px)]:gap-6">
             <div className="text-center select-none">
               <h1 className="text-7xl font-bold tracking-tighter text-foreground">tagium</h1>
               <p className="text-muted-foreground mt-3 text-base">tag your music</p>
@@ -109,7 +109,7 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
                 </p>
               </div>
             </button>
-          </>
+          </div>
         )}
         {children}
       </div>
