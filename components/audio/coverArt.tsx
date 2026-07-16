@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useId, useRef } from "react";
+import { useEffect, useId, useReducer, useRef, useState } from "react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import ImageCropper from "../ui/image-cropper";
 import { Crop, Upload } from "lucide-react";
 import { runCoverArtUploadTransaction } from "./coverArtProcessing";
+import { coverArtReducer, initialCoverArtState, type CropSource } from "./coverArtState";
 import type { AudioMetadata } from "./types";
 
 interface CoverArtProps {
@@ -37,12 +38,15 @@ export default function CoverArt({
   resetKey,
   className,
 }: CoverArtProps) {
-  const [uploadedCover, setUploadedCover] = useState<File | null>(null);
-  const [tempImageForCropping, setTempImageForCropping] = useState<string | null>(null);
-  const [showCropper, setShowCropper] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [coverError, setCoverError] = useState<string | null>(null);
-  const [coverErrorOpen, setCoverErrorOpen] = useState(false);
+  const [state, dispatch] = useReducer(coverArtReducer, initialCoverArtState);
+  const {
+    uploadedCover,
+    cropSource,
+    isCropperOpen,
+    isProcessing,
+    error: coverError,
+    isErrorOpen: coverErrorOpen,
+  } = state;
   const coverErrorId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverUploadIdRef = useRef(0);
@@ -51,13 +55,9 @@ export default function CoverArt({
     processingChangeRef.current = onProcessingChange;
   }, [onProcessingChange]);
 
-  const reportProcessing = (processing: boolean) => {
-    setIsProcessing(processing);
-    processingChangeRef.current?.(processing);
-  };
-
-  const processCover = async (file: File, uploadId: number) => {
-    reportProcessing(true);
+  const processCover = async (file: File, uploadId: number, closeCropper = false) => {
+    dispatch({ type: "uploadStarted", uploadId, closeCropper });
+    processingChangeRef.current?.(true);
 
     try {
       const optimizedFile = await runCoverArtUploadTransaction(file, {
@@ -65,15 +65,16 @@ export default function CoverArt({
         commit: (picture) => onCoverUpload?.(picture, resetKey),
       });
       if (!optimizedFile || uploadId !== coverUploadIdRef.current) return;
-      setUploadedCover(optimizedFile);
-      setCoverError(null);
-      setCoverErrorOpen(false);
+      dispatch({ type: "uploadSucceeded", uploadId, file: optimizedFile });
     } catch (error) {
       if (uploadId !== coverUploadIdRef.current) return;
-      setCoverError(error instanceof Error ? error.message : "could not load cover art.");
-      setCoverErrorOpen(true);
+      dispatch({
+        type: "uploadFailed",
+        uploadId,
+        message: error instanceof Error ? error.message : "could not load cover art.",
+      });
     } finally {
-      if (uploadId === coverUploadIdRef.current) reportProcessing(false);
+      if (uploadId === coverUploadIdRef.current) processingChangeRef.current?.(false);
     }
   };
 
@@ -90,20 +91,11 @@ export default function CoverArt({
       type: "image/jpeg",
     });
     const uploadId = ++coverUploadIdRef.current;
-    void processCover(croppedFile, uploadId);
-    setShowCropper(false);
-    if (tempImageForCropping) {
-      URL.revokeObjectURL(tempImageForCropping);
-      setTempImageForCropping(null);
-    }
+    void processCover(croppedFile, uploadId, true);
   };
 
   const handleCropCancel = () => {
-    setShowCropper(false);
-    if (tempImageForCropping) {
-      URL.revokeObjectURL(tempImageForCropping);
-      setTempImageForCropping(null);
-    }
+    dispatch({ type: "cropClosed" });
   };
 
   const [coverSrc, setCoverSrc] = useState<string | null>(null);
@@ -113,19 +105,15 @@ export default function CoverArt({
     : "flex-shrink-0 flex flex-col items-center gap-2 lg:grid lg:grid-rows-2 lg:items-start";
 
   useEffect(() => {
-    coverUploadIdRef.current += 1;
-    reportProcessing(false);
-    setUploadedCover(null);
-    setCoverError(null);
-    setCoverErrorOpen(false);
-    setShowCropper(false);
-    setTempImageForCropping((previous) => {
-      if (previous) {
-        URL.revokeObjectURL(previous);
-      }
-      return null;
-    });
+    const uploadId = ++coverUploadIdRef.current;
+    dispatch({ type: "reset", uploadId });
+    processingChangeRef.current?.(false);
   }, [resetKey]);
+
+  useEffect(() => {
+    if (!cropSource?.owned) return;
+    return () => URL.revokeObjectURL(cropSource.url);
+  }, [cropSource]);
 
   useEffect(
     () => () => {
@@ -183,7 +171,19 @@ export default function CoverArt({
           </div>
         )}
         {coverSrc && (
-          <Popover open={showCropper} onOpenChange={setShowCropper}>
+          <Popover
+            open={isCropperOpen}
+            onOpenChange={(open) => {
+              if (!open) {
+                dispatch({ type: "cropClosed" });
+                return;
+              }
+              const source: CropSource = uploadedCover
+                ? { url: URL.createObjectURL(uploadedCover), owned: true }
+                : { url: coverSrc, owned: false };
+              dispatch({ type: "cropOpened", source });
+            }}
+          >
             <Tooltip>
               <PopoverTrigger asChild>
                 <TooltipTrigger asChild>
@@ -194,16 +194,6 @@ export default function CoverArt({
                     aria-label="crop cover art"
                     disabled={isProcessing}
                     className="absolute top-2 right-2 size-10 p-0 max-lg:[@media(max-height:700px)]:top-1.5 max-lg:[@media(max-height:700px)]:right-1.5"
-                    onClick={() => {
-                      if (tempImageForCropping) {
-                        URL.revokeObjectURL(tempImageForCropping);
-                      }
-                      // Use uploaded cover first, then fall back to original picture
-                      const imageUrl = uploadedCover
-                        ? URL.createObjectURL(uploadedCover)
-                        : coverSrc;
-                      setTempImageForCropping(imageUrl);
-                    }}
                   >
                     <Crop className="h-4 w-4" />
                   </Button>
@@ -216,9 +206,9 @@ export default function CoverArt({
               side="bottom"
               align="start"
             >
-              {tempImageForCropping && (
+              {cropSource && (
                 <ImageCropper
-                  src={tempImageForCropping}
+                  src={cropSource.url}
                   onCrop={handleCropComplete}
                   onCancel={handleCropCancel}
                 />
@@ -242,7 +232,10 @@ export default function CoverArt({
           className="hidden"
           ref={fileInputRef}
         />
-        <Tooltip open={Boolean(coverError) && coverErrorOpen} onOpenChange={setCoverErrorOpen}>
+        <Tooltip
+          open={Boolean(coverError) && coverErrorOpen}
+          onOpenChange={(open) => dispatch({ type: "errorOpenChanged", open })}
+        >
           <TooltipTrigger asChild>
             <Button
               type="button"
