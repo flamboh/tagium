@@ -48,13 +48,13 @@ const compareTrackNumbers = (
 };
 
 export const sortUploadedTracksByTrackNumber = (uploads: UploadedTrack[]) =>
-  [...uploads].sort((left, right) => {
+  uploads.toSorted((left, right) => {
     return compareTrackNumbers(left.file.metadata?.trackNumber, right.file.metadata?.trackNumber);
   });
 
 export const sortTrackIdsByTrackNumber = (trackIds: string[], files: TagiumFile[]) => {
   const filesById = new Map(files.map((file) => [file.id, file]));
-  return [...trackIds].sort((leftId, rightId) => {
+  return trackIds.toSorted((leftId, rightId) => {
     return compareTrackNumbers(
       filesById.get(leftId)?.metadata?.trackNumber,
       filesById.get(rightId)?.metadata?.trackNumber,

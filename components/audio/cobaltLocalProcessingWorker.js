@@ -8,7 +8,7 @@ import EncodeLibAV from "@imput/libav.js-encode-cli";
 const inputName = "tagium-audio-input";
 const outputName = (format) => `tagium-output.${format}`;
 const progressName = "tagium-progress.txt";
-const cobaltFileMetadataKeys = [
+const cobaltFileMetadataKeys = new Set([
   "album",
   "composer",
   "genre",
@@ -19,7 +19,7 @@ const cobaltFileMetadataKeys = [
   "track",
   "date",
   "sublanguage",
-];
+]);
 
 const postLocalProcessingMessage = (message) => {
   globalThis.self.postMessage({
@@ -98,7 +98,7 @@ const makeMetadataArgs = (metadata) => {
   }
 
   return Object.entries(metadata).flatMap(([name, value]) => {
-    if (!cobaltFileMetadataKeys.includes(name) || !value) {
+    if (!cobaltFileMetadataKeys.has(name) || !value) {
       return [];
     }
 

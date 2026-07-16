@@ -134,9 +134,10 @@ export const removePlaylistDownloadTracks = <Track extends PlaylistDownloadRunti
 
   const removedTrackIds = new Set(removedItems.map((item) => item.id));
   const pendingTracks = run.pending.filter((track) => removedTrackIds.has(track.fileId));
-  const activeTrackIds = run.active
-    .filter((track) => removedTrackIds.has(track.fileId))
-    .map((track) => track.fileId);
+  const activeTrackIds: string[] = [];
+  for (const track of run.active) {
+    if (removedTrackIds.has(track.fileId)) activeTrackIds.push(track.fileId);
+  }
 
   run.pending = run.pending.filter((track) => !removedTrackIds.has(track.fileId));
   run.trackIds = run.trackIds.filter((trackId) => !removedTrackIds.has(trackId));
