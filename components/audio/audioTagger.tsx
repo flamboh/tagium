@@ -14,7 +14,7 @@ import { SubmitHandler, useForm } from "react-hook-form";
 import filenamify from "filenamify";
 import { toast } from "sonner";
 import { analytics } from "@/src/analytics";
-import AlbumMetadataDialog, { AlbumMetadataDraft } from "./AlbumMetadataDialog";
+import AlbumMetadataDialog from "./AlbumMetadataDialog";
 import DestructiveActionDialog from "./DestructiveActionDialog";
 import {
   downloadFromCobalt,
@@ -75,11 +75,7 @@ import {
   undoMetadataCleanupSuggestions,
   type MetadataCleanupSuggestion,
 } from "./metadataCleanup";
-import {
-  sortTrackIdsByTrackNumber,
-  sortUploadedTracksByTrackNumber,
-  toGenreString,
-} from "./mp3Utils";
+import { sortTrackIdsByTrackNumber, sortUploadedTracksByTrackNumber } from "./mp3Utils";
 import {
   createDirtyMetadataPatch,
   getAcceptedUploadParseResult,
@@ -104,6 +100,12 @@ import { isValidFilenameBase } from "./filename";
 import { writeExportMetadata } from "./exportMetadataWrites";
 import { createLibraryState, libraryReducer, type LibraryAction } from "./libraryState";
 import {
+  albumDialogReducer,
+  createAlbumDialogState,
+  createOpenAlbumDialogAction,
+  getAlbumDialogSubmission,
+} from "./albumDialogState";
+import {
   subscribeToEditorKeyboardShortcuts,
   type EditorKeyboardShortcutActions,
 } from "./editorKeyboardShortcuts";
@@ -120,13 +122,6 @@ type ActiveView = "editor" | "settings";
 type ManagedDownloadTrack = QueuedDownloadTrack & { importOperationId?: string };
 type PlaylistDownloadQueueState = PlaylistDownloadControllerSnapshot;
 
-const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
-  title: "",
-  artist: "",
-  genre: "",
-  year: undefined,
-  cover: undefined,
-};
 const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
 const getManagedDownloadTrackTitle = (file: TagiumFile) => {
   if (file.metadata?.title) return file.metadata.title;
@@ -219,14 +214,13 @@ export default function AudioTagger() {
   } = library;
   const [loading, setLoading] = useState(false);
   const [urlImporting, setUrlImporting] = useState(false);
-  const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
-  const [albumDialogMode, setAlbumDialogMode] = useState<"create" | "edit">("create");
+  const [albumDialog, dispatchAlbumDialog] = useReducer(
+    albumDialogReducer,
+    undefined,
+    createAlbumDialogState,
+  );
   const [pendingTrackRemoval, setPendingTrackRemoval] = useState<string[] | null>(null);
   const [isTrackCoverProcessing, setIsTrackCoverProcessing] = useState(false);
-  const [albumDraft, setAlbumDraft] = useState<AlbumMetadataDraft>(EMPTY_ALBUM_DRAFT);
-  const [albumPlaceholderSeed, setAlbumPlaceholderSeed] = useState("new-album");
-  const [editingAlbumId, setEditingAlbumId] = useState<string | null>(null);
-  const [createSeedTrackIds, setCreateSeedTrackIds] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<ActiveView>("editor");
   const [settings, setSettings] = useState<AppSettings>(loadAppSettings);
   const [metadataCleanupSuggestions, setMetadataCleanupSuggestions] = useState<
@@ -1314,9 +1308,6 @@ export default function AudioTagger() {
     if (!albumToRemove) return;
     playlistDownloadControllerRef.current?.remove(albumToRemove.trackIds);
     dispatchLibrary({ type: "album-removed", albumId });
-    if (editingAlbumId === albumId) {
-      closeAlbumDialog();
-    }
   };
   const handleSelectAlbum = (albumId: string, event?: ReactMouseEvent) => {
     if (isTrackCoverProcessing) return;
@@ -1412,25 +1403,13 @@ export default function AudioTagger() {
   );
 
   const openCreateAlbumDialog = (seedTrackIds: string[]) => {
-    const uniqueSeedTrackIds = asUniqueTrackIds(seedTrackIds);
-    const seedTrack = filesRef.current.find((file) => file.id === uniqueSeedTrackIds[0]);
-    setAlbumDialogMode("create");
-    setEditingAlbumId(null);
-    setCreateSeedTrackIds(uniqueSeedTrackIds);
-    setAlbumPlaceholderSeed(uniqueSeedTrackIds[0] ?? crypto.randomUUID());
-    setAlbumDraft({
-      title: "",
-      artist: uniqueSeedTrackIds.length > 0 ? seedTrack?.metadata?.artist || "" : "",
-      genre: uniqueSeedTrackIds.length > 0 ? toGenreString(seedTrack?.metadata?.genre) : "",
-      cover:
-        uniqueSeedTrackIds.length > 0 &&
-        seedTrack?.metadata?.picture &&
-        seedTrack.metadata.picture.length > 0
-          ? seedTrack.metadata.picture
-          : undefined,
-      year: uniqueSeedTrackIds.length > 0 ? (seedTrack?.metadata?.year ?? undefined) : undefined,
-    });
-    setAlbumDialogOpen(true);
+    dispatchAlbumDialog(
+      createOpenAlbumDialogAction(
+        seedTrackIds,
+        filesRef.current,
+        seedTrackIds[0] ?? crypto.randomUUID(),
+      ),
+    );
   };
   const handleOpenCreateAlbumDialog = () => {
     bufferCurrentFormMetadata();
@@ -1447,34 +1426,29 @@ export default function AudioTagger() {
   const handleOpenEditAlbumDialog = (albumId: string) => {
     const album = albums.find((entry) => entry.id === albumId);
     if (!album) return;
-    setAlbumDialogMode("edit");
-    setEditingAlbumId(albumId);
-    setAlbumPlaceholderSeed(albumId);
-    setCreateSeedTrackIds([]);
-    setAlbumDraft({
-      title: album.title,
-      artist: album.artist,
-      genre: album.genre,
-      cover: album.cover,
-      year: album.year,
-    });
-    setAlbumDialogOpen(true);
+    dispatchAlbumDialog({ type: "edit-opened", album });
   };
   const closeAlbumDialog = () => {
-    setAlbumDialogOpen(false);
+    dispatchAlbumDialog({ type: "closed" });
+  };
+  const deleteEditingAlbum = () => {
+    if (!albumDialog.editingAlbumId) return;
+    handleRemoveAlbum(albumDialog.editingAlbumId);
+    dispatchAlbumDialog({ type: "deleted" });
   };
   const syncAlbumDraftCoverToTracks = () => {
-    if (albumDialogMode !== "edit" || !editingAlbumId || !albumDraft.cover) return;
-    if (albumDraft.cover.length === 0) return;
+    if (albumDialog.mode !== "edit" || !albumDialog.editingAlbumId || !albumDialog.draft.cover)
+      return;
+    if (albumDialog.draft.cover.length === 0) return;
 
-    const album = albumsRef.current.find((entry) => entry.id === editingAlbumId);
+    const album = albumsRef.current.find((entry) => entry.id === albumDialog.editingAlbumId);
     if (!album) return;
 
     const bufferedFiles = applyCurrentFormMetadataToFiles(filesRef.current, album.trackIds);
     const covered = applyAlbumCoverToFilesWithSelectedMetadata(
       bufferedFiles,
       album.trackIds,
-      albumDraft.cover,
+      albumDialog.draft.cover,
       selectedFileIdRef.current,
     );
     const coveredFiles = covered.files;
@@ -1484,20 +1458,16 @@ export default function AudioTagger() {
     }
   };
   const saveAlbumDialog = () => {
-    const title = albumDraft.title.trim() || "untitled album";
-    const artist = albumDraft.artist.trim();
-    const genre = albumDraft.genre.trim();
-    const metadata = {
-      title,
-      artist,
-      genre,
-      cover: albumDraft.cover,
-      year: albumDraft.year,
-    };
-    if (albumDialogMode === "edit" && editingAlbumId) {
-      const currentAlbum = albumsRef.current.find((album) => album.id === editingAlbumId);
-      const updatedAlbums = updateAlbumMetadata(albumsRef.current, editingAlbumId, metadata);
-      const updatedAlbum = updatedAlbums.find((album) => album.id === editingAlbumId) ?? null;
+    const submission = getAlbumDialogSubmission(albumDialog);
+    if (!submission) return;
+    if (submission.mode === "edit") {
+      const currentAlbum = albumsRef.current.find((album) => album.id === submission.albumId);
+      const updatedAlbums = updateAlbumMetadata(
+        albumsRef.current,
+        submission.albumId,
+        submission.metadata,
+      );
+      const updatedAlbum = updatedAlbums.find((album) => album.id === submission.albumId) ?? null;
       let finalFiles = filesRef.current;
       if (updatedAlbum) {
         const bufferedFiles = applyCurrentFormMetadataToFiles(
@@ -1538,51 +1508,49 @@ export default function AudioTagger() {
         files: finalFiles,
         albums: updatedAlbums,
       });
-      closeAlbumDialog();
+      dispatchAlbumDialog({ type: "saved" });
       return;
     }
-    if (albumDialogMode === "create") {
-      const created = createAlbumFromTracks(
-        albumsRef.current,
-        libraryRef.current.looseTrackIds,
-        createSeedTrackIds,
-        metadata,
-        settings,
-      );
-      let finalFiles = filesRef.current;
-      if (created.syncAlbums.length > 0) {
-        finalFiles = applyTrackOrderNumbersToFiles(finalFiles, created.albums, created.syncAlbums);
-      }
-      if (created.newAlbumId) {
-        const createdAlbum = created.albums.find((album) => album.id === created.newAlbumId);
-        if (createdAlbum) {
-          const taggedFiles = applyAlbumSharedTagsToFiles(finalFiles, createdAlbum);
-          finalFiles = settings.syncFilenames
-            ? applySyncedFilenamesToFiles(taggedFiles, createdAlbum.trackIds)
-            : taggedFiles;
-          analytics.capture({
-            type: "album_created",
-            trackCount: createdAlbum.trackIds.length,
-            hasCover: Boolean(createdAlbum.cover?.length),
-          });
-        }
-      }
-      dispatchLibrary({
-        type: "content-replaced",
-        files: finalFiles,
-        albums: created.albums,
-        looseTrackIds: created.looseTrackIds,
-        ...(created.newAlbumId
-          ? {
-              selection: {
-                selectedAlbumId: created.newAlbumId,
-                selectedFileId: createSeedTrackIds[0] ?? null,
-              },
-            }
-          : {}),
-      });
+    const created = createAlbumFromTracks(
+      albumsRef.current,
+      libraryRef.current.looseTrackIds,
+      submission.seedTrackIds,
+      submission.metadata,
+      settings,
+    );
+    let finalFiles = filesRef.current;
+    if (created.syncAlbums.length > 0) {
+      finalFiles = applyTrackOrderNumbersToFiles(finalFiles, created.albums, created.syncAlbums);
     }
-    closeAlbumDialog();
+    if (created.newAlbumId) {
+      const createdAlbum = created.albums.find((album) => album.id === created.newAlbumId);
+      if (createdAlbum) {
+        const taggedFiles = applyAlbumSharedTagsToFiles(finalFiles, createdAlbum);
+        finalFiles = settings.syncFilenames
+          ? applySyncedFilenamesToFiles(taggedFiles, createdAlbum.trackIds)
+          : taggedFiles;
+        analytics.capture({
+          type: "album_created",
+          trackCount: createdAlbum.trackIds.length,
+          hasCover: Boolean(createdAlbum.cover?.length),
+        });
+      }
+    }
+    dispatchLibrary({
+      type: "content-replaced",
+      files: finalFiles,
+      albums: created.albums,
+      looseTrackIds: created.looseTrackIds,
+      ...(created.newAlbumId
+        ? {
+            selection: {
+              selectedAlbumId: created.newAlbumId,
+              selectedFileId: submission.seedTrackIds[0] ?? null,
+            },
+          }
+        : {}),
+    });
+    dispatchAlbumDialog({ type: "saved" });
   };
   const handleMoveTrackToAlbum = (
     trackId: string,
@@ -1779,26 +1747,21 @@ export default function AudioTagger() {
         }}
       />
       <AlbumMetadataDialog
-        open={albumDialogOpen}
-        mode={albumDialogMode}
-        draft={albumDraft}
-        placeholder={getSampleAlbum(albumPlaceholderSeed)}
+        open={albumDialog.open}
+        mode={albumDialog.mode}
+        draft={albumDialog.draft}
+        placeholder={getSampleAlbum(albumDialog.placeholderSeed)}
         trackCount={
-          albumDialogMode === "edit" && editingAlbumId
-            ? (albums.find((a) => a.id === editingAlbumId)?.trackIds.length ?? 0)
+          albumDialog.mode === "edit" && albumDialog.editingAlbumId
+            ? (albums.find((a) => a.id === albumDialog.editingAlbumId)?.trackIds.length ?? 0)
             : 0
         }
-        onChange={setAlbumDraft}
+        onChange={(update) => dispatchAlbumDialog({ type: "draft-changed", update })}
         onClose={closeAlbumDialog}
         onSave={saveAlbumDialog}
         onSyncCoverToTracks={syncAlbumDraftCoverToTracks}
         onDelete={
-          albumDialogMode === "edit" && editingAlbumId
-            ? () => {
-                handleRemoveAlbum(editingAlbumId);
-                closeAlbumDialog();
-              }
-            : undefined
+          albumDialog.mode === "edit" && albumDialog.editingAlbumId ? deleteEditingAlbum : undefined
         }
       />
       <div className="min-h-svh flex flex-col bg-background md:h-svh md:flex-row md:overflow-hidden">
