@@ -93,6 +93,11 @@ import { resolveTrackMetadata, type TrackMetadata } from "./trackMetadata";
 import { isYouTubePlaylistUrl, resolveYouTubePlaylist } from "./youtubePlaylist";
 import { getSystemFailurePresentation, reportSystemFailure } from "./systemFailure";
 import { isValidFilenameBase } from "./filename";
+import { writeExportMetadata } from "./exportMetadataWrites";
+import {
+  subscribeToEditorKeyboardShortcuts,
+  type EditorKeyboardShortcutActions,
+} from "./editorKeyboardShortcuts";
 import {
   AlbumGroup,
   AppSettings,
@@ -538,13 +543,8 @@ export default function AudioTagger() {
     return syncedFiles;
   };
 
-  const writeFilesForExport = async (filesToExport: TagiumFile[]) => {
-    for (const file of filesToExport) {
-      if (!file.file) continue;
-      if (!file.metadata) continue;
-      await handleTagUpdate(file, file.metadata);
-    }
-  };
+  const writeFilesForExport = (filesToExport: TagiumFile[]) =>
+    writeExportMetadata(filesToExport, handleTagUpdate);
 
   const handleAudioUpload = async (
     uploadedFiles: File[],
@@ -1490,40 +1490,32 @@ export default function AudioTagger() {
     setAlbums((prevAlbums) => reorderAlbums(prevAlbums, albumId, targetIndex));
   };
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const isModifierPressed = event.ctrlKey || event.metaKey;
-      const target = event.target as HTMLElement;
-      const isInputFocused =
-        target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
-
-      if (isInputFocused) {
-        return;
-      }
-
-      if (isModifierPressed && event.key === "a") {
-        event.preventDefault();
-        handleSelectAllFiles();
-        return;
-      }
-
-      if (event.key === "Delete" || event.key === "Backspace") {
-        if (selectedFileIds.size > 0) {
-          event.preventDefault();
-          requestRemoveSelectedFiles();
-          return;
-        }
-      }
-
-      if (event.key === "Escape") {
-        handleClearSelection();
-        return;
-      }
+  const keyboardShortcutActionsRef = useRef<EditorKeyboardShortcutActions>({
+    selectedFileCount: selectedFileIds.size,
+    isTrackCoverProcessing,
+    selectAllFiles: handleSelectAllFiles,
+    requestRemoveSelectedFiles,
+    clearSelection: handleClearSelection,
+  });
+  useLayoutEffect(() => {
+    keyboardShortcutActionsRef.current = {
+      selectedFileCount: selectedFileIds.size,
+      isTrackCoverProcessing,
+      selectAllFiles: handleSelectAllFiles,
+      requestRemoveSelectedFiles,
+      clearSelection: handleClearSelection,
     };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedFileIds, handleSelectAllFiles, requestRemoveSelectedFiles, handleClearSelection]);
+  }, [
+    handleClearSelection,
+    handleSelectAllFiles,
+    isTrackCoverProcessing,
+    requestRemoveSelectedFiles,
+    selectedFileIds.size,
+  ]);
+  useEffect(
+    () => subscribeToEditorKeyboardShortcuts(window, () => keyboardShortcutActionsRef.current),
+    [],
+  );
 
   const openCreateAlbumDialog = (seedTrackIds: string[]) => {
     const uniqueSeedTrackIds = asUniqueTrackIds(seedTrackIds);
