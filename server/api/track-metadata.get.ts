@@ -1,16 +1,19 @@
+import { Effect, Schema } from "effect";
 import { defineHandler } from "nitro";
-import { z } from "zod";
 import { getSoundCloudClientId } from "../utils/soundcloud";
+import { urlStringSchema } from "../utils/schema";
 
-const oEmbedSchema = z.object({
-  title: z.string().min(1),
-  author_name: z.string().optional(),
-  thumbnail_url: z.string().url().optional(),
+const nonEmptyStringSchema = Schema.String.check(Schema.isNonEmpty());
+
+const oEmbedSchema = Schema.Struct({
+  title: nonEmptyStringSchema,
+  author_name: Schema.optionalKey(Schema.String),
+  thumbnail_url: Schema.optionalKey(urlStringSchema),
 });
-const soundCloudTrackSchema = z.object({
-  title: z.string().min(1),
-  artwork_url: z.string().url().nullable().optional(),
-  user: z.object({ username: z.string().optional() }).optional(),
+const soundCloudTrackSchema = Schema.Struct({
+  title: nonEmptyStringSchema,
+  artwork_url: Schema.optionalKey(Schema.NullOr(urlStringSchema)),
+  user: Schema.optionalKey(Schema.Struct({ username: Schema.optionalKey(Schema.String) })),
 });
 
 const isSoundCloudUrl = (url: URL) =>
@@ -31,7 +34,9 @@ export const resolveSoundCloudTrackMetadata = async (
   resolveUrl.searchParams.set("client_id", clientId);
   const response = await fetch(resolveUrl, { signal: options.signal });
   if (!response.ok) throw new Error(`track_metadata.fetch_failed (${response.status})`);
-  const metadata = soundCloudTrackSchema.parse(await response.json());
+  const metadata = await Effect.runPromise(
+    Schema.decodeUnknownEffect(soundCloudTrackSchema)(await response.json()),
+  );
   return {
     title: metadata.title.trim(),
     artist: metadata.user?.username?.trim() ?? "",
@@ -72,7 +77,9 @@ export default defineHandler(async (event) => {
 
   const response = await fetch(endpoint, { signal: event.req.signal });
   if (!response.ok) throw new Error(`track_metadata.fetch_failed (${response.status})`);
-  const metadata = oEmbedSchema.parse(await response.json());
+  const metadata = await Effect.runPromise(
+    Schema.decodeUnknownEffect(oEmbedSchema)(await response.json()),
+  );
 
   return {
     title: metadata.title.trim(),

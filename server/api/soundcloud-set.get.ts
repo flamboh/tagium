@@ -2,43 +2,44 @@
  * SoundCloud client id discovery adapted from imputnet/cobalt:
  * api/src/processing/services/soundcloud.js
  */
+import { Effect, Option, Schema } from "effect";
 import { defineHandler } from "nitro";
-import { z } from "zod";
 import { getSoundCloudClientId } from "../utils/soundcloud";
+import { urlStringSchema } from "../utils/schema";
 
 const TRACK_RESOLVE_CONCURRENCY = 4;
 
-const soundCloudTrackSchema = z.object({
-  id: z.number(),
-  kind: z.literal("track"),
-  title: z.string().optional(),
-  permalink_url: z.string().url().optional(),
-  duration: z.number().optional(),
+const soundCloudTrackSchema = Schema.Struct({
+  id: Schema.Finite,
+  kind: Schema.Literal("track"),
+  title: Schema.optionalKey(Schema.String),
+  permalink_url: Schema.optionalKey(urlStringSchema),
+  duration: Schema.optionalKey(Schema.Finite),
 });
-const soundCloudTrackListEntrySchema = z.unknown().transform((entry) => {
-  const parsedEntry = soundCloudTrackSchema.safeParse(entry);
-  return parsedEntry.success ? parsedEntry.data : undefined;
-});
+const decodeSoundCloudTrackOption = Schema.decodeUnknownOption(soundCloudTrackSchema);
 
-const soundCloudPlaylistSchema = z.object({
-  kind: z.literal("playlist"),
-  title: z.string(),
-  genre: z.string().optional(),
-  display_date: z.string().optional(),
-  release_date: z.string().nullable().optional(),
-  is_album: z.boolean().optional(),
-  set_type: z.string().optional(),
-  artwork_url: z.string().nullable().optional(),
-  user: z
-    .object({
-      username: z.string().optional(),
-    })
-    .optional(),
-  tracks: z.array(soundCloudTrackListEntrySchema),
+const soundCloudPlaylistSchema = Schema.Struct({
+  kind: Schema.Literal("playlist"),
+  title: Schema.String,
+  genre: Schema.optionalKey(Schema.String),
+  display_date: Schema.optionalKey(Schema.String),
+  release_date: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  is_album: Schema.optionalKey(Schema.Boolean),
+  set_type: Schema.optionalKey(Schema.String),
+  artwork_url: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  user: Schema.optionalKey(
+    Schema.Struct({
+      username: Schema.optionalKey(Schema.String),
+    }),
+  ),
+  tracks: Schema.Array(Schema.Unknown),
 });
-const soundCloudResolvedTrackSchema = soundCloudTrackSchema.extend({
-  title: z.string(),
-  permalink_url: z.string().url(),
+const soundCloudResolvedTrackSchema = Schema.Struct({
+  id: Schema.Finite,
+  kind: Schema.Literal("track"),
+  title: Schema.String,
+  permalink_url: urlStringSchema,
+  duration: Schema.optionalKey(Schema.Finite),
 });
 
 const getCoverUrl = (artworkUrl: string | null | undefined) => {
@@ -54,20 +55,28 @@ const getYear = (displayDate: string | undefined) => {
   return Number.isNaN(year) ? undefined : year;
 };
 
-const resolveTrack = async (clientId: string, track: z.infer<typeof soundCloudTrackSchema>) => {
+const resolveTrack = async (
+  clientId: string,
+  track: Schema.Schema.Type<typeof soundCloudTrackSchema>,
+) => {
   if (track.title && track.permalink_url) {
-    return soundCloudResolvedTrackSchema.parse(track);
+    return Effect.runPromise(Schema.decodeUnknownEffect(soundCloudResolvedTrackSchema)(track));
   }
 
   const trackUrl = new URL(`https://api-v2.soundcloud.com/tracks/${track.id}`);
   trackUrl.searchParams.set("client_id", clientId);
-  return soundCloudResolvedTrackSchema.parse(
-    await fetch(trackUrl).then((response) => response.json()),
+  return Effect.runPromise(
+    Schema.decodeUnknownEffect(soundCloudResolvedTrackSchema)(
+      await fetch(trackUrl).then((response) => response.json()),
+    ),
   );
 };
 
-const resolveTracks = async (clientId: string, tracks: z.infer<typeof soundCloudTrackSchema>[]) => {
-  const resolvedTracks: z.infer<typeof soundCloudResolvedTrackSchema>[] = [];
+const resolveTracks = async (
+  clientId: string,
+  tracks: ReadonlyArray<Schema.Schema.Type<typeof soundCloudTrackSchema>>,
+) => {
+  const resolvedTracks: Array<Schema.Schema.Type<typeof soundCloudResolvedTrackSchema>> = [];
 
   for (let index = 0; index < tracks.length; index += TRACK_RESOLVE_CONCURRENCY) {
     const chunk = tracks.slice(index, index + TRACK_RESOLVE_CONCURRENCY);
@@ -102,10 +111,15 @@ export default defineHandler(async (event) => {
   resolveUrl.searchParams.set("url", sourceUrl);
   resolveUrl.searchParams.set("client_id", clientId);
 
-  const playlist = soundCloudPlaylistSchema.parse(
-    await fetch(resolveUrl).then((response) => response.json()),
+  const playlist = await Effect.runPromise(
+    Schema.decodeUnknownEffect(soundCloudPlaylistSchema)(
+      await fetch(resolveUrl).then((response) => response.json()),
+    ),
   );
-  const trackEntries = playlist.tracks.filter((track) => track !== undefined);
+  const trackEntries = playlist.tracks.flatMap((entry) => {
+    const track = decodeSoundCloudTrackOption(entry);
+    return Option.isSome(track) ? [track.value] : [];
+  });
   const tracks = await resolveTracks(clientId, trackEntries);
   const isAlbum = [playlist.is_album, playlist.set_type === "album"].includes(true);
   let yearDate = playlist.display_date;

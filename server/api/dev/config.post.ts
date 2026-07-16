@@ -7,6 +7,7 @@ import {
   updateDevConfig,
   type CobaltRuntimeEnv,
 } from "../../utils/dev-controls";
+import { decodeRequestBody } from "../../utils/schema";
 
 type CloudflareRequest = Request & {
   runtime?: {
@@ -27,7 +28,7 @@ export default defineHandler(async (event) => {
     return new Response("Not found.", { status: 404 });
   }
 
-  const body = devConfigUpdateSchema.parse(await event.req.json());
+  const body = await decodeRequestBody(event.req, devConfigUpdateSchema);
   updateDevConfig(body);
   return Response.json(getDevControlSnapshot(event.req, runtimeEnv));
 });

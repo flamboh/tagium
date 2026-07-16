@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
 export type CobaltRuntimeEnv = {
   CF_PAGES?: string;
@@ -35,24 +35,32 @@ const devState: DevState = {
   nextTunnelFault: undefined,
 };
 
-export const devConfigUpdateSchema = z.object({
-  rateLimit: z
-    .object({
-      windowMs: z.number().int().min(1_000).max(600_000),
-      maxRequests: z.number().int().min(1).max(500),
-    })
-    .optional(),
-  resetRateLimitBuckets: z.boolean().optional(),
+export const devConfigUpdateSchema = Schema.Struct({
+  rateLimit: Schema.optionalKey(
+    Schema.Struct({
+      windowMs: Schema.Number.check(
+        Schema.isInt(),
+        Schema.isBetween({ minimum: 1_000, maximum: 600_000 }),
+      ),
+      maxRequests: Schema.Number.check(
+        Schema.isInt(),
+        Schema.isBetween({ minimum: 1, maximum: 500 }),
+      ),
+    }),
+  ),
+  resetRateLimitBuckets: Schema.optionalKey(Schema.Boolean),
 });
 
-export const devFaultUpdateSchema = z.discriminatedUnion("target", [
-  z.object({
-    target: z.literal("audio"),
-    fault: z.enum(["rate-limit", "capacity", "timeout", "unreachable", "malformed"]).nullable(),
+export const devFaultUpdateSchema = Schema.Union([
+  Schema.Struct({
+    target: Schema.Literal("audio"),
+    fault: Schema.NullOr(
+      Schema.Literals(["rate-limit", "capacity", "timeout", "unreachable", "malformed"]),
+    ),
   }),
-  z.object({
-    target: z.literal("tunnel"),
-    fault: z.enum(["rate-limit", "capacity", "timeout", "empty-body"]).nullable(),
+  Schema.Struct({
+    target: Schema.Literal("tunnel"),
+    fault: Schema.NullOr(Schema.Literals(["rate-limit", "capacity", "timeout", "empty-body"])),
   }),
 ]);
 
@@ -109,7 +117,7 @@ export const resetRateLimitBuckets = () => {
   rateLimitBuckets.clear();
 };
 
-export const updateDevConfig = (input: z.infer<typeof devConfigUpdateSchema>) => {
+export const updateDevConfig = (input: Schema.Schema.Type<typeof devConfigUpdateSchema>) => {
   if (input.rateLimit) {
     devState.rateLimitWindowMs = input.rateLimit.windowMs;
     devState.rateLimitMaxRequests = input.rateLimit.maxRequests;
@@ -120,7 +128,7 @@ export const updateDevConfig = (input: z.infer<typeof devConfigUpdateSchema>) =>
   }
 };
 
-export const setDevFault = (input: z.infer<typeof devFaultUpdateSchema>) => {
+export const setDevFault = (input: Schema.Schema.Type<typeof devFaultUpdateSchema>) => {
   if (input.target === "audio") {
     devState.nextAudioFault = input.fault ?? undefined;
     return;

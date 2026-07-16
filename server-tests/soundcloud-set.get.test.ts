@@ -36,6 +36,7 @@ describe("soundcloud set endpoint", () => {
         return Response.json({
           kind: "playlist",
           title: " Album ",
+          future_playlist_field: { is: "ignored" },
           genre: " Electronic ",
           display_date: "2024-05-01T00:00:00Z",
           release_date: "2023-09-15T00:00:00Z",
@@ -52,6 +53,7 @@ describe("soundcloud set endpoint", () => {
               title: " Track ",
               permalink_url: "https://soundcloud.com/artist/track",
               duration: 123,
+              future_track_field: true,
             },
           ],
         });
