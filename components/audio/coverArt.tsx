@@ -47,7 +47,9 @@ export default function CoverArt({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverUploadIdRef = useRef(0);
   const processingChangeRef = useRef(onProcessingChange);
-  processingChangeRef.current = onProcessingChange;
+  useEffect(() => {
+    processingChangeRef.current = onProcessingChange;
+  }, [onProcessingChange]);
 
   const reportProcessing = (processing: boolean) => {
     setIsProcessing(processing);

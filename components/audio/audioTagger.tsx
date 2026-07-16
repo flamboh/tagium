@@ -5,7 +5,7 @@ import { Cause, Effect, Exit } from "effect";
 import { SubmitHandler, useForm } from "react-hook-form";
 import filenamify from "filenamify";
 import { toast } from "sonner";
-import { analytics, type TrackSourceMix } from "@/src/analytics";
+import { analytics } from "@/src/analytics";
 import AlbumMetadataDialog, { AlbumMetadataDraft } from "./AlbumMetadataDialog";
 import DestructiveActionDialog from "./DestructiveActionDialog";
 import {
@@ -71,18 +71,28 @@ import {
   sortTrackIdsByTrackNumber,
   sortUploadedTracksByTrackNumber,
   toGenreString,
-  type UploadedTrack,
 } from "./mp3Utils";
+import {
+  createDirtyMetadataPatch,
+  getAcceptedUploadParseResult,
+  getFileImportKey,
+  getNullableNumericMetadataValue,
+  getNullableNumericPatchValue,
+  getSubmittedAudioMetadata,
+  getTagiumFileImportKey,
+  getTrackSourceMix,
+  getUploadRejectionMessage,
+} from "./audioTaggerUtils";
 import { loadAppSettings, saveAppSettings } from "./settings";
 import { getSampleAlbum } from "./sampleMetadata";
 import { hasRecoverableSessionWork, useBeforeUnloadProtection } from "./sessionSafety";
-import { createImportLifecycleTracker, type ImportLifecycleTracker } from "./importLifecycle";
+import { createImportLifecycleTracker } from "./importLifecycle";
 import { isSoundCloudSetUrl, resolveSoundCloudSet } from "./soundcloudSet";
 import type { Playlist } from "./playlist";
 import { resolveTrackMetadata, type TrackMetadata } from "./trackMetadata";
 import { isYouTubePlaylistUrl, resolveYouTubePlaylist } from "./youtubePlaylist";
 import { getSystemFailurePresentation, reportSystemFailure } from "./systemFailure";
-import { isValidFilenameBase, sanitizeFilenameBase } from "./filename";
+import { isValidFilenameBase } from "./filename";
 import {
   AlbumGroup,
   AppSettings,
@@ -104,27 +114,6 @@ const EMPTY_ALBUM_DRAFT: AlbumMetadataDraft = {
   cover: undefined,
 };
 const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
-export const getFileImportKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
-export const getTagiumFileImportKey = (file: TagiumFile) =>
-  file.sourceImportKey ?? (file.originalFile ? getFileImportKey(file.originalFile) : undefined);
-export const getTrackSourceMix = (files: TagiumFile[]): TrackSourceMix => {
-  if (files.length === 0) return "unknown";
-  const importedCount = files.filter((file) => Boolean(file.downloadRequest)).length;
-  if (importedCount === 0) return "local";
-  if (importedCount === files.length) return "imported";
-  return "mixed";
-};
-export const getAcceptedUploadParseResult = (uploads: UploadedTrack[]) => {
-  const acceptedUploads = uploads.filter((upload) => upload.file.status !== "error");
-  return {
-    acceptedUploads,
-    parseRejectedCount: uploads.length - acceptedUploads.length,
-  };
-};
-export const getUploadRejectionMessage = (rejectedUploads: UploadedTrack[]) =>
-  rejectedUploads
-    .map((upload) => upload.file.downloadError ?? `${upload.file.filename} could not be imported.`)
-    .join("\n");
 const getManagedDownloadTrackTitle = (file: TagiumFile) => {
   if (file.metadata?.title) return file.metadata.title;
   return file.filename;
@@ -146,27 +135,8 @@ const createPlaylistDownloadModelTrack = (track: ManagedDownloadTrack) => ({
   title: track.title,
   sourceUrl: track.downloadRequest.sourceUrl,
 });
-type MetadataPatchField = keyof MetadataPatch;
-type DirtyMetadataFields = Partial<Record<keyof AudioMetadata, unknown>>;
-
-const metadataPatchFields = [
-  "filename",
-  "title",
-  "artist",
-  "album",
-  "year",
-  "genre",
-  "picture",
-  "trackNumber",
-] as const satisfies readonly MetadataPatchField[];
 const hasOwn = <Key extends PropertyKey>(object: object, key: Key) =>
   Object.prototype.hasOwnProperty.call(object, key);
-const getNullableNumericMetadataValue = (
-  value: AudioMetadata["year"] | undefined,
-): AudioMetadata["year"] => (value === undefined || Number.isNaN(value) ? null : value);
-const getNullableNumericPatchValue = (
-  value: AudioMetadata["year"] | undefined,
-): MetadataPatch["year"] => (value === undefined || Number.isNaN(value) ? null : value);
 const getPendingMetadataPatch = (file: TagiumFile): MetadataPatch | undefined =>
   file.pendingMetadataPatch;
 const firstCauseError = (cause: Cause.Cause<unknown>) => {
@@ -186,74 +156,6 @@ const createSubmittedMetadataPatch = (metadata: AudioMetadata): MetadataPatch =>
   picture: metadata.picture,
   trackNumber: getNullableNumericPatchValue(metadata.trackNumber),
 });
-export const getSubmittedAudioMetadata = (
-  data: AudioMetadata,
-  syncFilenames: boolean,
-): AudioMetadata => ({
-  ...data,
-  filename: sanitizeFilenameBase(syncFilenames ? data.title : data.filename),
-  year: getNullableNumericMetadataValue(data.year),
-  trackNumber: getNullableNumericMetadataValue(data.trackNumber),
-});
-export const createSparseMetadataPatch = (
-  metadata: AudioMetadata,
-  fields: Iterable<MetadataPatchField>,
-  syncFilenames: boolean,
-): MetadataPatch | undefined => {
-  const patchFields = new Set(fields);
-  if (syncFilenames && patchFields.has("title")) {
-    patchFields.add("filename");
-  }
-
-  const patch: MetadataPatch = {};
-  for (const field of metadataPatchFields) {
-    if (!patchFields.has(field)) continue;
-
-    switch (field) {
-      case "filename":
-        patch.filename = metadata.filename;
-        break;
-      case "title":
-        patch.title = metadata.title;
-        break;
-      case "artist":
-        patch.artist = metadata.artist;
-        break;
-      case "album":
-        patch.album = metadata.album;
-        break;
-      case "year":
-        patch.year = getNullableNumericPatchValue(metadata.year);
-        break;
-      case "genre":
-        patch.genre = metadata.genre;
-        break;
-      case "picture":
-        patch.picture = metadata.picture;
-        break;
-      case "trackNumber":
-        patch.trackNumber = getNullableNumericPatchValue(metadata.trackNumber);
-        break;
-    }
-  }
-
-  return Object.keys(patch).length > 0 ? patch : undefined;
-};
-export const createDirtyMetadataPatch = (
-  metadata: AudioMetadata,
-  dirtyFields: DirtyMetadataFields,
-  syncFilenames: boolean,
-  extraFields: Iterable<MetadataPatchField> = [],
-): MetadataPatch | undefined => {
-  const fields = new Set<MetadataPatchField>(extraFields);
-  for (const field of metadataPatchFields) {
-    if (dirtyFields[field]) {
-      fields.add(field);
-    }
-  }
-
-  return createSparseMetadataPatch(metadata, fields, syncFilenames);
-};
 const applyMetadataPatch = (metadata: AudioMetadata, patch: MetadataPatch): AudioMetadata => ({
   ...metadata,
   ...(hasOwn(patch, "filename") ? { filename: patch.filename } : {}),
@@ -324,17 +226,13 @@ export default function AudioTagger() {
   const playlistDownloadQueueRef = useRef<PlaylistDownloadQueueState | null>(null);
   const playlistDownloadControllerRef =
     useRef<PlaylistDownloadController<ManagedDownloadTrack> | null>(null);
-  const importLifecycleTrackerRef = useRef<ImportLifecycleTracker | null>(null);
-  if (!importLifecycleTrackerRef.current) {
-    importLifecycleTrackerRef.current = createImportLifecycleTracker({
+  const [importLifecycleTracker] = useState(() =>
+    createImportLifecycleTracker({
       capture: analytics.capture,
       createId: () => crypto.randomUUID(),
       now: () => Date.now(),
-    });
-  }
-  filesRef.current = files;
-  albumsRef.current = albums;
-  selectedFileIdRef.current = selectedFileId;
+    }),
+  );
   const {
     register,
     handleSubmit,
@@ -344,7 +242,13 @@ export default function AudioTagger() {
     getValues,
     formState: { dirtyFields },
   } = useForm<AudioMetadata>();
-  formDirtyRef.current = Object.keys(dirtyFields).length > 0;
+  const formIsDirty = Object.keys(dirtyFields).length > 0;
+  useLayoutEffect(() => {
+    filesRef.current = files;
+    albumsRef.current = albums;
+    selectedFileIdRef.current = selectedFileId;
+    formDirtyRef.current = formIsDirty;
+  }, [albums, files, formIsDirty, selectedFileId]);
   const selectedFile = useMemo(
     () => files.find((file) => file.id === selectedFileId) ?? null,
     [files, selectedFileId],
@@ -995,7 +899,7 @@ export default function AudioTagger() {
       markFailed: markDownloadError,
       onTrackSettled: ({ track, outcome, error }) => {
         if (!track.importOperationId) return;
-        importLifecycleTrackerRef.current?.settle(track.importOperationId, {
+        importLifecycleTracker.settle(track.importOperationId, {
           trackId: track.fileId,
           outcome,
           ...(error === undefined ? {} : { error }),
@@ -1064,7 +968,7 @@ export default function AudioTagger() {
     setSelectedFileId(plan.selection.selectedFileId);
     setSelectedFileIds(plan.selection.selectedFileIds);
     setLastSelectedFileId(plan.selection.lastSelectedFileId);
-    importLifecycleTrackerRef.current?.resolve(importOperationId, {
+    importLifecycleTracker.resolve(importOperationId, {
       trackIds: plan.queuedTracks.map((track) => track.fileId),
       hasCover: false,
     });
@@ -1136,7 +1040,7 @@ export default function AudioTagger() {
       })();
     }
 
-    importLifecycleTrackerRef.current?.resolve(importOperationId, {
+    importLifecycleTracker.resolve(importOperationId, {
       trackIds: plan.queuedTracks.map((track) => track.fileId),
       hasCover: Boolean(playlist.coverUrl),
     });
@@ -1152,7 +1056,7 @@ export default function AudioTagger() {
         ? "youtube"
         : null;
     const importKind = playlistProvider ? "set" : "single";
-    const importOperationId = importLifecycleTrackerRef.current!.start({
+    const importOperationId = importLifecycleTracker.start({
       sourceUrl: trimmedUrl,
       importKind,
     });
@@ -1166,7 +1070,7 @@ export default function AudioTagger() {
               : await resolveYouTubePlaylist(trimmedUrl);
           handlePlaylistDownload(playlist, importOperationId);
         } catch (error) {
-          importLifecycleTrackerRef.current?.fail(importOperationId, error, "resolve");
+          importLifecycleTracker.fail(importOperationId, error, "resolve");
           throw error;
         }
         return;

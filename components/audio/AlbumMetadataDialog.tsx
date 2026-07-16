@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +31,7 @@ interface AlbumMetadataDialogProps {
   mode: "create" | "edit";
   draft: AlbumMetadataDraft;
   trackCount: number;
-  onChange: (draft: AlbumMetadataDraft) => void;
+  onChange: Dispatch<SetStateAction<AlbumMetadataDraft>>;
   onClose: () => void;
   onSave: () => void;
   onDelete?: () => void;
@@ -55,8 +56,6 @@ export default function AlbumMetadataDialog({
   const [isSyncingCover, setIsSyncingCover] = useState(false);
   const [isProcessingCover, setIsProcessingCover] = useState(false);
   const [syncCoverRotation, setSyncCoverRotation] = useState(0);
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
   const canSyncCoverToTracks =
     mode === "edit" && draft.cover && draft.cover.length > 0 && onSyncCoverToTracks;
   const syncCoverLabel = isSyncingCover ? "syncing cover to tracks" : "sync cover to tracks";
@@ -79,7 +78,7 @@ export default function AlbumMetadataDialog({
   };
 
   const handleCoverUpload = (cover: NonNullable<AudioMetadata["picture"]>) => {
-    onChange({ ...draftRef.current, cover });
+    onChange((currentDraft) => ({ ...currentDraft, cover }));
   };
 
   return (

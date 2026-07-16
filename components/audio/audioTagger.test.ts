@@ -7,7 +7,7 @@ import {
   getSubmittedAudioMetadata,
   getTagiumFileImportKey,
   getTrackSourceMix,
-} from "./audioTagger";
+} from "./audioTaggerUtils";
 import type { AudioMetadata } from "./types";
 import type { UploadedTrack } from "./mp3Utils";
 
