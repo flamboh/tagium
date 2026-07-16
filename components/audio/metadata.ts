@@ -9,7 +9,7 @@ const metadataPictureDataSchema = Schema.declare<Uint8Array<ArrayBuffer>>(
   { expected: "Uint8Array" },
 );
 
-export const metadataPictureSchema = Schema.Struct({
+const metadataPictureSchema = Schema.Struct({
   format: Schema.mutableKey(Schema.String),
   type: Schema.mutableKey(Schema.Number),
   description: Schema.mutableKey(Schema.String),
@@ -23,7 +23,7 @@ const metadataGenreSchema = Schema.Union([
 
 const metadataPictureArraySchema = Schema.mutable(Schema.Array(metadataPictureSchema));
 
-export const metadataSnapshotSchema = Schema.Struct({
+const metadataSnapshotSchema = Schema.Struct({
   filename: Schema.mutableKey(Schema.String),
   title: Schema.mutableKey(Schema.String),
   artist: Schema.mutableKey(Schema.String),
@@ -37,7 +37,7 @@ export const metadataSnapshotSchema = Schema.Struct({
   trackNumber: Schema.mutableKey(Schema.NullOr(Schema.Number)),
 });
 
-export const metadataPatchSchema = Schema.Struct({
+const metadataPatchSchema = Schema.Struct({
   filename: optionalMutableKey(Schema.String),
   title: optionalMutableKey(Schema.String),
   artist: optionalMutableKey(Schema.String),
@@ -50,7 +50,5 @@ export const metadataPatchSchema = Schema.Struct({
 
 export const audioMetadataSchema = metadataSnapshotSchema;
 
-export type MetadataPicture = Schema.Schema.Type<typeof metadataPictureSchema>;
-export type MetadataSnapshot = Schema.Schema.Type<typeof metadataSnapshotSchema>;
 export type MetadataPatch = Schema.Schema.Type<typeof metadataPatchSchema>;
-export type AudioMetadata = MetadataSnapshot;
+export type AudioMetadata = Schema.Schema.Type<typeof metadataSnapshotSchema>;

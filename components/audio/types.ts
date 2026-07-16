@@ -1,13 +1,7 @@
 import type { AudioDownloadBitrate } from "./cobaltAudio";
 import type { AudioMetadata, MetadataPatch } from "./metadata";
 
-export {
-  audioMetadataSchema,
-  metadataPatchSchema,
-  metadataPictureSchema,
-  metadataSnapshotSchema,
-} from "./metadata";
-export type { AudioMetadata, MetadataPatch, MetadataPicture, MetadataSnapshot } from "./metadata";
+export type { AudioMetadata, MetadataPatch } from "./metadata";
 
 export interface TagiumFile {
   id: string;

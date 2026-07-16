@@ -1,4 +1,4 @@
-import { decodePlaylist, toImportedAlbumMetadata, type Playlist } from "./playlist";
+import { decodePlaylist, type Playlist } from "./playlist";
 
 export type SoundCloudSet = Playlist;
 
@@ -29,5 +29,3 @@ export const resolveSoundCloudSet = async (url: string) => {
 
   return decodePlaylist(await response.json(), "SoundCloud");
 };
-
-export { toImportedAlbumMetadata };

@@ -1,8 +1,5 @@
 import {
-  createDownloadMetadata,
-  createPendingDownloadTrack,
   createSoundCloudSetDownloadPlan,
-  fetchImportedCover as fetchImportedCoverFromDownloadTrack,
   startDownloadTrackPlan,
   type SoundCloudSetDownloadWorkflowDeps,
   type SoundCloudSetDownloadPlan,
@@ -10,10 +7,6 @@ import {
 import { applySoundCloudSetImportedCover } from "./fileMetadataOps";
 import type { SoundCloudSet } from "./soundcloudSet";
 import type { AppSettings, AudioMetadata, TagiumFile } from "./types";
-
-export { createDownloadMetadata, createPendingDownloadTrack };
-
-export const fetchImportedCover = fetchImportedCoverFromDownloadTrack;
 
 interface SoundCloudSetImportDeps extends SoundCloudSetDownloadWorkflowDeps {
   settings: Pick<AppSettings, "audioBitrate" | "applySoundCloudAlbumCoverToTracks">;
@@ -25,7 +18,7 @@ interface SoundCloudSetImportDeps extends SoundCloudSetDownloadWorkflowDeps {
   setSelectedMetadata?: (metadata: AudioMetadata) => void;
 }
 
-export const startSoundCloudSetCoverImport = (
+const startSoundCloudSetCoverImport = (
   plan: SoundCloudSetDownloadPlan,
   deps: Pick<
     SoundCloudSetImportDeps,
