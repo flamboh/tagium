@@ -26,7 +26,7 @@ export interface AlbumMetadataDraft {
   cover?: AudioMetadata["picture"];
 }
 
-interface AlbumMetadataDialogProps {
+export interface AlbumMetadataDialogProps {
   open: boolean;
   mode: "create" | "edit";
   draft: AlbumMetadataDraft;

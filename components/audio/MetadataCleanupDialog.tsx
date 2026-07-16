@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import type { MetadataCleanupSuggestion } from "./metadataCleanup";
 
-interface MetadataCleanupDialogProps {
+export interface MetadataCleanupDialogProps {
   open: boolean;
   suggestions: MetadataCleanupSuggestion[];
   onOpenChange: (open: boolean) => void;

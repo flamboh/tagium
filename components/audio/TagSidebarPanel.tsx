@@ -14,7 +14,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { allTracksReadyForDownload } from "./downloadLibrary";
 import { isValidFilenameBase } from "./filename";
 
-interface TagSidebarPanelProps {
+export interface TagSidebarPanelProps {
   loading: boolean;
   files: TagiumFile[];
   albums: AlbumGroup[];
