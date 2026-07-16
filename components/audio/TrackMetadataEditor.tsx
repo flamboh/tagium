@@ -41,6 +41,8 @@ interface TrackMetadataEditorProps {
   ) => void;
 }
 
+const fieldLabelClassName = "mb-1 block text-xs font-medium md:text-sm";
+
 function DisabledReason({
   disabled,
   reason,
@@ -226,9 +228,12 @@ export default function TrackMetadataEditor({
             />
             <div className="flex flex-1 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium md:text-sm">title:</label>
+                <label htmlFor="track-title" className={fieldLabelClassName}>
+                  title:
+                </label>
                 <Input
                   {...titleInputRegistration}
+                  id="track-title"
                   ref={titleInputRef}
                   aria-invalid={syncFilenames && filenameInvalid}
                   aria-describedby={
@@ -239,10 +244,13 @@ export default function TrackMetadataEditor({
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium md:text-sm">artist:</label>
+                <label htmlFor="track-artist" className={fieldLabelClassName}>
+                  artist:
+                </label>
                 <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
                   <Input
                     {...artistRegistration}
+                    id="track-artist"
                     placeholder={placeholder.artist}
                     disabled={inAlbum}
                     className={`${placeholderClassName} ${syncedInputClassName}`}
@@ -250,10 +258,13 @@ export default function TrackMetadataEditor({
                 </DisabledReason>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium md:text-sm">album:</label>
+                <label htmlFor="track-album" className={fieldLabelClassName}>
+                  album:
+                </label>
                 <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
                   <Input
                     {...register("album")}
+                    id="track-album"
                     placeholder={placeholder.album}
                     disabled={inAlbum}
                     className={`${placeholderClassName} ${syncedInputClassName}`}
@@ -262,11 +273,14 @@ export default function TrackMetadataEditor({
               </div>
               <div className="grid grid-cols-[minmax(4.5rem,0.8fr)_minmax(0,1.4fr)_minmax(4.5rem,0.8fr)] gap-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium md:text-sm">year:</label>
+                  <label htmlFor="track-year" className={fieldLabelClassName}>
+                    year:
+                  </label>
                   <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
                     <Input
                       type="number"
                       {...register("year", { valueAsNumber: true })}
+                      id="track-year"
                       placeholder={placeholder.year}
                       disabled={inAlbum}
                       className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
@@ -274,10 +288,13 @@ export default function TrackMetadataEditor({
                   </DisabledReason>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium md:text-sm">genre:</label>
+                  <label htmlFor="track-genre" className={fieldLabelClassName}>
+                    genre:
+                  </label>
                   <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
                     <Input
                       {...register("genre")}
+                      id="track-genre"
                       placeholder={placeholder.genre}
                       disabled={inAlbum}
                       className={`${placeholderClassName} ${syncedInputClassName}`}
@@ -285,7 +302,9 @@ export default function TrackMetadataEditor({
                   </DisabledReason>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium md:text-sm">track:</label>
+                  <label htmlFor="track-number" className={fieldLabelClassName}>
+                    track:
+                  </label>
                   <DisabledReason
                     disabled={inAlbum && syncTrackNumbers}
                     reason="follows album order"
@@ -293,6 +312,7 @@ export default function TrackMetadataEditor({
                     <Input
                       type="number"
                       {...register("trackNumber", { valueAsNumber: true })}
+                      id="track-number"
                       placeholder={placeholder.trackNumber}
                       disabled={inAlbum && syncTrackNumbers}
                       className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}

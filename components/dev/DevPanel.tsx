@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, BellRing, RotateCcw, SlidersHorizontal, Zap } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { devToastKinds, spawnDevToast } from "./devToast";
 
 type DevConfig = {
   enabled: boolean;
@@ -31,21 +31,6 @@ type DevConfig = {
 
 type AudioFault = "rate-limit" | "capacity" | "timeout" | "unreachable" | "malformed";
 type TunnelFault = "rate-limit" | "capacity" | "timeout" | "empty-body";
-export type DevToastKind = "neutral" | "success" | "error" | "info" | "warning";
-
-const devToastKinds: DevToastKind[] = ["neutral", "success", "error", "info", "warning"];
-
-export const spawnDevToast = (kind: DevToastKind) => {
-  const title = `${kind} toast`;
-  const options = { description: "previewing Tagium's notification styling" };
-
-  if (kind === "neutral") {
-    toast(title, options);
-    return;
-  }
-
-  toast[kind](title, options);
-};
 
 const audioFaults: Array<{ value: AudioFault; label: string }> = [
   { value: "rate-limit", label: "429" },

@@ -3,6 +3,24 @@ import coverArtSource from "./coverArt.tsx?raw";
 import trackMetadataEditorSource from "./TrackMetadataEditor.tsx?raw";
 
 describe("local error presentation", () => {
+  it("associates every track field label with its input", () => {
+    for (const id of [
+      "track-title",
+      "track-artist",
+      "track-album",
+      "track-year",
+      "track-genre",
+      "track-number",
+    ]) {
+      expect(trackMetadataEditorSource).toContain(`<label htmlFor="${id}"`);
+      expect(trackMetadataEditorSource).toContain(`id="${id}"`);
+    }
+
+    expect(trackMetadataEditorSource).toContain(
+      'syncFilenames && filenameInvalid ? "track-filename-error" : undefined',
+    );
+  });
+
   it("keeps an empty filename visible when a durable track failure also exists", () => {
     expect(trackMetadataEditorSource).toContain("{filenameInvalid ? (");
     expect(trackMetadataEditorSource).toContain("track error");

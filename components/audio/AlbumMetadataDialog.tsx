@@ -116,8 +116,11 @@ export default function AlbumMetadataDialog({
               <div className="order-2 min-w-0 h-full flex flex-col justify-between gap-3 md:order-2">
                 <div className="flex flex-col gap-0">
                   <div>
-                    <label className="block text-sm font-medium mb-1">album title:</label>
+                    <label htmlFor="album-title" className="block text-sm font-medium mb-1">
+                      album title:
+                    </label>
                     <Input
+                      id="album-title"
                       value={draft.title}
                       onChange={(event) =>
                         onChange({
@@ -139,8 +142,11 @@ export default function AlbumMetadataDialog({
                     </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">artist:</label>
+                    <label htmlFor="album-artist" className="block text-sm font-medium mb-1">
+                      artist:
+                    </label>
                     <Input
+                      id="album-artist"
                       value={draft.artist}
                       onChange={(event) =>
                         onChange({
@@ -162,8 +168,11 @@ export default function AlbumMetadataDialog({
                     </p>
                   </div>
                   <div className="mb-3">
-                    <label className="block text-sm font-medium mb-1">genre:</label>
+                    <label htmlFor="album-genre" className="block text-sm font-medium mb-1">
+                      genre:
+                    </label>
                     <Input
+                      id="album-genre"
                       value={draft.genre}
                       onChange={(event) =>
                         onChange({
@@ -176,8 +185,11 @@ export default function AlbumMetadataDialog({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">year:</label>
+                    <label htmlFor="album-year" className="block text-sm font-medium mb-1">
+                      year:
+                    </label>
                     <Input
+                      id="album-year"
                       type="number"
                       value={draft.year ?? ""}
                       onChange={(event) =>
