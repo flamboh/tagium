@@ -17,7 +17,8 @@
     "prepare": "vp config",
     "deploy:preview": "bun run scripts/deploy-preview.ts",
     "deploy:production": "bun run scripts/deploy-production.ts",
-    "load-test:cobalt": "bun run scripts/load-test-cobalt.ts"
+    "load-test:cobalt": "bun run scripts/load-test-cobalt.ts",
+    "doctor": "bunx react-doctor@latest"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

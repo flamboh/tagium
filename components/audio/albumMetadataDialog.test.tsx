@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import AlbumMetadataDialog from "./AlbumMetadataDialog";
+import AlbumMetadataDialog, { type AlbumMetadataDraft } from "./AlbumMetadataDialog";
 
 const reactHookMocks = vi.hoisted(() => ({ useRef: vi.fn(), useState: vi.fn() }));
 
@@ -106,5 +106,39 @@ describe("album metadata validation layout", () => {
     expect(
       textContent(findElement(tree, (element) => element.props.id === "album-artist-error")),
     ).toBe("artist is required");
+  });
+
+  it("adds an uploaded cover to the latest draft", () => {
+    const hooks = createHookHarness();
+    const onChange = vi.fn();
+    const tree = hooks.render(() =>
+      AlbumMetadataDialog({
+        open: true,
+        mode: "create",
+        draft: { title: "album", artist: "first artist", genre: "" },
+        trackCount: 0,
+        onChange,
+        onClose: vi.fn(),
+        onSave: vi.fn(),
+        placeholder: { title: "Album", artist: "Artist", genre: "Genre", year: "2026" },
+      }),
+    );
+    const coverArt = findElement(
+      tree,
+      (element) => typeof element.props.onCoverUpload === "function",
+    );
+    const cover = [{ format: "image/jpeg", data: new Uint8Array([1]) }];
+
+    (coverArt.props.onCoverUpload as (picture: typeof cover) => void)(cover);
+
+    const updateDraft = onChange.mock.calls[0][0] as (
+      draft: AlbumMetadataDraft,
+    ) => AlbumMetadataDraft;
+    expect(updateDraft({ title: "album", artist: "newer artist", genre: "" })).toEqual({
+      title: "album",
+      artist: "newer artist",
+      genre: "",
+      cover,
+    });
   });
 });

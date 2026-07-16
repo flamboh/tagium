@@ -76,7 +76,7 @@ import {
 import { loadAppSettings, saveAppSettings } from "./settings";
 import { getSampleAlbum } from "./sampleMetadata";
 import { hasRecoverableSessionWork, useBeforeUnloadProtection } from "./sessionSafety";
-import { createImportLifecycleTracker, type ImportLifecycleTracker } from "./importLifecycle";
+import { createImportLifecycleTracker } from "./importLifecycle";
 import { isSoundCloudSetUrl, resolveSoundCloudSet } from "./soundcloudSet";
 import type { Playlist } from "./playlist";
 import { resolveTrackMetadata, type TrackMetadata } from "./trackMetadata";
@@ -324,17 +324,13 @@ export default function AudioTagger() {
   const playlistDownloadQueueRef = useRef<PlaylistDownloadQueueState | null>(null);
   const playlistDownloadControllerRef =
     useRef<PlaylistDownloadController<ManagedDownloadTrack> | null>(null);
-  const importLifecycleTrackerRef = useRef<ImportLifecycleTracker | null>(null);
-  if (!importLifecycleTrackerRef.current) {
-    importLifecycleTrackerRef.current = createImportLifecycleTracker({
+  const [importLifecycleTracker] = useState(() =>
+    createImportLifecycleTracker({
       capture: analytics.capture,
       createId: () => crypto.randomUUID(),
       now: () => Date.now(),
-    });
-  }
-  filesRef.current = files;
-  albumsRef.current = albums;
-  selectedFileIdRef.current = selectedFileId;
+    }),
+  );
   const {
     register,
     handleSubmit,
@@ -344,7 +340,13 @@ export default function AudioTagger() {
     getValues,
     formState: { dirtyFields },
   } = useForm<AudioMetadata>();
-  formDirtyRef.current = Object.keys(dirtyFields).length > 0;
+  const formIsDirty = Object.keys(dirtyFields).length > 0;
+  useLayoutEffect(() => {
+    filesRef.current = files;
+    albumsRef.current = albums;
+    selectedFileIdRef.current = selectedFileId;
+    formDirtyRef.current = formIsDirty;
+  }, [albums, files, formIsDirty, selectedFileId]);
   const selectedFile = useMemo(
     () => files.find((file) => file.id === selectedFileId) ?? null,
     [files, selectedFileId],
@@ -995,7 +997,7 @@ export default function AudioTagger() {
       markFailed: markDownloadError,
       onTrackSettled: ({ track, outcome, error }) => {
         if (!track.importOperationId) return;
-        importLifecycleTrackerRef.current?.settle(track.importOperationId, {
+        importLifecycleTracker.settle(track.importOperationId, {
           trackId: track.fileId,
           outcome,
           ...(error === undefined ? {} : { error }),
@@ -1064,7 +1066,7 @@ export default function AudioTagger() {
     setSelectedFileId(plan.selection.selectedFileId);
     setSelectedFileIds(plan.selection.selectedFileIds);
     setLastSelectedFileId(plan.selection.lastSelectedFileId);
-    importLifecycleTrackerRef.current?.resolve(importOperationId, {
+    importLifecycleTracker.resolve(importOperationId, {
       trackIds: plan.queuedTracks.map((track) => track.fileId),
       hasCover: false,
     });
@@ -1136,7 +1138,7 @@ export default function AudioTagger() {
       })();
     }
 
-    importLifecycleTrackerRef.current?.resolve(importOperationId, {
+    importLifecycleTracker.resolve(importOperationId, {
       trackIds: plan.queuedTracks.map((track) => track.fileId),
       hasCover: Boolean(playlist.coverUrl),
     });
@@ -1152,7 +1154,7 @@ export default function AudioTagger() {
         ? "youtube"
         : null;
     const importKind = playlistProvider ? "set" : "single";
-    const importOperationId = importLifecycleTrackerRef.current!.start({
+    const importOperationId = importLifecycleTracker.start({
       sourceUrl: trimmedUrl,
       importKind,
     });
@@ -1166,7 +1168,7 @@ export default function AudioTagger() {
               : await resolveYouTubePlaylist(trimmedUrl);
           handlePlaylistDownload(playlist, importOperationId);
         } catch (error) {
-          importLifecycleTrackerRef.current?.fail(importOperationId, error, "resolve");
+          importLifecycleTracker.fail(importOperationId, error, "resolve");
           throw error;
         }
         return;
