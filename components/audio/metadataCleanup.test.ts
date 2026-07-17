@@ -5,7 +5,7 @@ import {
   suggestTitleCleanup,
   undoMetadataCleanupSuggestions,
 } from "./metadataCleanup";
-import type { AudioMetadata, TagiumFile } from "./types";
+import type { AlbumGroup, AudioMetadata, TagiumFile } from "./types";
 
 const metadata = (title: string, artist = "Burial"): AudioMetadata => ({
   filename: title,
@@ -29,6 +29,14 @@ const file = (title: string): TagiumFile => ({
   metadata: metadata(title),
 });
 
+const album = (title: string, trackId = "track-1"): AlbumGroup => ({
+  id: "album-1",
+  title,
+  artist: "Burial",
+  genre: "Electronic",
+  trackIds: [trackId],
+});
+
 describe("metadata cleanup suggestions", () => {
   it("removes a matching artist prefix and known trailing video label", () => {
     expect(suggestTitleCleanup("Burial - Archangel (Official Audio)", ["Burial"])).toEqual({
@@ -40,6 +48,56 @@ describe("metadata cleanup suggestions", () => {
   it("keeps ambiguous labels and non-matching artist prefixes unchanged", () => {
     expect(suggestTitleCleanup("Audio", ["Burial"])).toBeNull();
     expect(suggestTitleCleanup("Four Tet - Audio (Live)", ["Burial"])).toBeNull();
+  });
+
+  it.each([
+    "Good Girls (XCX WORLD)",
+    "Good Girls [XCX WORLD]",
+    "Good Girls - XCX WORLD",
+    "Good Girls – XCX WORLD",
+    "Good Girls — XCX WORLD",
+  ])("removes a trailing album title from %s", (title) => {
+    expect(suggestTitleCleanup(title, [], "XCX WORLD")).toEqual({
+      afterTitle: "Good Girls",
+      reasons: ["album"],
+    });
+  });
+
+  it("matches album titles using NFKC, case, and whitespace normalization", () => {
+    expect(suggestTitleCleanup("Good Girls (ｘｃｘ   ｗｏｒｌｄ)", [], "XCX WORLD")).toEqual({
+      afterTitle: "Good Girls",
+      reasons: ["album"],
+    });
+  });
+
+  it("does not remove a title that only consists of the album title", () => {
+    expect(suggestTitleCleanup("THIS IS FOR", [], "THIS IS FOR")).toBeNull();
+  });
+
+  it("keeps tight dashes, missing album context, and non-matching suffixes unchanged", () => {
+    expect(suggestTitleCleanup("Good Girls-XCX WORLD", [], "XCX WORLD")).toBeNull();
+    expect(suggestTitleCleanup("Good Girls -XCX WORLD", [], "XCX WORLD")).toBeNull();
+    expect(suggestTitleCleanup("Good Girls- XCX WORLD", [], "XCX WORLD")).toBeNull();
+    expect(suggestTitleCleanup("Good Girls - XCX WORLD", [])).toBeNull();
+    expect(suggestTitleCleanup("Good Girls - BRAT", [], "XCX WORLD")).toBeNull();
+  });
+
+  it.each([
+    "Good Girls (XCX WORLD) (Official Audio)",
+    "Good Girls (Official Audio) (XCX WORLD)",
+    "Good Girls - XCX WORLD (Official Audio)",
+    "Good Girls (Official Audio) - XCX WORLD",
+  ])("composes album cleanup with recognized labels in %s", (title) => {
+    expect(suggestTitleCleanup(title, [], "XCX WORLD")).toEqual({
+      afterTitle: "Good Girls",
+      reasons: ["album", "label"],
+    });
+  });
+
+  it("uses the containing album group's title", () => {
+    expect(
+      findMetadataCleanupSuggestions([file("Good Girls (XCX WORLD)")], [album("XCX WORLD")]),
+    ).toEqual([expect.objectContaining({ afterTitle: "Good Girls", reasons: ["album"] })]);
   });
 
   it("uses album artist metadata as a confident prefix match", () => {
