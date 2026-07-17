@@ -37,14 +37,19 @@ const normalizeComparable = (value: string) =>
 
 const removeMatchingArtistPrefix = (title: string, artists: string[]) => {
   const comparableTitle = normalizeComparable(title);
-  const matchingArtist = artists
-    .map((artist) => artist.trim())
-    .filter(Boolean)
-    .find((artist) =>
+  let matchingArtist: string | undefined;
+  for (const artist of artists) {
+    const trimmedArtist = artist.trim();
+    if (
+      trimmedArtist &&
       artistSeparators.some((separator) =>
-        comparableTitle.startsWith(`${normalizeComparable(artist)}${separator}`),
-      ),
-    );
+        comparableTitle.startsWith(`${normalizeComparable(trimmedArtist)}${separator}`),
+      )
+    ) {
+      matchingArtist = trimmedArtist;
+      break;
+    }
+  }
   if (!matchingArtist) return title;
 
   const separator = artistSeparators.find((candidate) =>

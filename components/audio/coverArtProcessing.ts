@@ -6,9 +6,19 @@ export const MAX_COVER_ART_UPLOAD_BYTES = 25 * 1024 * 1024;
 const COVER_ART_REENCODE_THRESHOLD_BYTES = 2 * 1024 * 1024;
 const COVER_ART_HEADER_BYTES = 1024 * 1024;
 const supportedCoverArtTypes = new Set(["image/jpeg", "image/jpg", "image/png"]);
+const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10] as const;
 const jpegStartOfFrameMarkers = new Set([
   0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf,
 ]);
+
+const startsWithBytes = (bytes: Uint8Array, prefix: readonly number[]) => {
+  if (bytes.length < prefix.length) return false;
+
+  for (let index = 0; index < prefix.length; index += 1) {
+    if (bytes[index] !== prefix[index]) return false;
+  }
+  return true;
+};
 
 export const getCoverArtTargetSize = (
   width: number,
@@ -46,8 +56,7 @@ export const validateCoverArtDimensions = (width: number, height: number) => {
 };
 
 const readPngDimensions = (bytes: Uint8Array) => {
-  const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
-  if (bytes.length < 24 || !pngSignature.every((byte, index) => bytes[index] === byte)) {
+  if (bytes.length < 24 || !startsWithBytes(bytes, pngSignature)) {
     return undefined;
   }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);

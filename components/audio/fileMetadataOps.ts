@@ -195,10 +195,11 @@ export function applyTrackOrderNumbersToFiles(
   albums: AlbumGroup[],
   albumIdsToSync: string[],
 ) {
+  const albumsById = new Map(albums.map((album) => [album.id, album]));
   const numbersByTrackId = new Map<string, number>();
 
   for (const albumId of albumIdsToSync) {
-    const album = albums.find((entry) => entry.id === albumId);
+    const album = albumsById.get(albumId);
     if (!album) continue;
     album.trackIds.forEach((trackId, index) => {
       numbersByTrackId.set(trackId, index + 1);

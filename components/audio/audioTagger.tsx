@@ -118,6 +118,15 @@ const getManagedDownloadTrackTitle = (file: TagiumFile) => {
   if (file.metadata?.title) return file.metadata.title;
   return file.filename;
 };
+const managedDownloadTrackFromFile = (file: TagiumFile): ManagedDownloadTrack | null => {
+  if (!file.downloadRequest) return null;
+
+  return {
+    fileId: file.id,
+    title: getManagedDownloadTrackTitle(file),
+    downloadRequest: file.downloadRequest,
+  };
+};
 const formatPlaylistQueueEta = (etaMs?: number) => {
   if (etaMs === undefined) return null;
 
@@ -220,7 +229,7 @@ export default function AudioTagger() {
   const selectedFileIdRef = useRef<string | null>(selectedFileId);
   const lastResetFileIdRef = useRef<string | null>(null);
   const formDirtyRef = useRef(false);
-  const importQueueRef = useRef(Promise.resolve());
+  const importQueueRef = useRef<Promise<void> | null>(null);
   const pendingImportKeysRef = useRef(new Set<string>());
   const offeredCleanupKeysRef = useRef(new Set<string>());
   const playlistDownloadQueueRef = useRef<PlaylistDownloadQueueState | null>(null);
@@ -504,8 +513,9 @@ export default function AudioTagger() {
   );
 
   const prepareFilesForExport = (albumIds?: string[]) => {
-    const albumsToSync = albumIds
-      ? albumsRef.current.filter((album) => albumIds.includes(album.id))
+    const albumIdSet = albumIds && new Set(albumIds);
+    const albumsToSync = albumIdSet
+      ? albumsRef.current.filter((album) => albumIdSet.has(album.id))
       : albumsRef.current;
     const trackIds = albumIds ? albumsToSync.flatMap((album) => album.trackIds) : undefined;
     let syncedFiles = applyCurrentFormMetadataToFiles(filesRef.current, trackIds);
@@ -725,7 +735,7 @@ export default function AudioTagger() {
       }
     };
 
-    const queuedImport = importQueueRef.current.then(runImport, runImport);
+    const queuedImport = (importQueueRef.current ?? Promise.resolve()).then(runImport, runImport);
     importQueueRef.current = queuedImport.catch(() => undefined);
     await queuedImport;
   };
@@ -892,8 +902,13 @@ export default function AudioTagger() {
       hydrateTrack: (track, downloadedFile) =>
         provideAudioBackend(hydrateDownloadedTrack(track.fileId, downloadedFile)),
       hasTrack: (trackId) => filesRef.current.some((file) => file.id === trackId),
-      getFileErrorTrackIds: () =>
-        new Set(filesRef.current.filter((file) => file.status === "error").map((file) => file.id)),
+      getFileErrorTrackIds: () => {
+        const errorTrackIds = new Set<string>();
+        for (const file of filesRef.current) {
+          if (file.status === "error") errorTrackIds.add(file.id);
+        }
+        return errorTrackIds;
+      },
       markQueued: markDownloadsQueued,
       markCanceled: markDownloadsCanceled,
       markFailed: markDownloadError,
@@ -935,15 +950,6 @@ export default function AudioTagger() {
   const queueDownloadTracks = (tracks: ManagedDownloadTrack[]) => {
     if (tracks.length === 0) return;
     getPlaylistDownloadController().enqueue(tracks);
-  };
-  const managedDownloadTrackFromFile = (file: TagiumFile): ManagedDownloadTrack | null => {
-    if (!file.downloadRequest) return null;
-
-    return {
-      fileId: file.id,
-      title: getManagedDownloadTrackTitle(file),
-      downloadRequest: file.downloadRequest,
-    };
   };
   const handleAudioDownload = (
     sourceUrl: string,
@@ -1022,18 +1028,21 @@ export default function AudioTagger() {
             reset(selectedMetadata);
           }
           const trackIdSet = new Set(coverImport.trackIds);
-          await Promise.all(
-            coveredFiles
-              .filter((file) => trackIdSet.has(file.id) && Boolean(file.file) && file.metadata)
-              .map(async (file) => {
-                if (!file.metadata) return;
+          const coverWriteJobs: Promise<void>[] = [];
+          for (const file of coveredFiles) {
+            const metadata = file.metadata;
+            if (!trackIdSet.has(file.id) || !file.file || !metadata) continue;
+            coverWriteJobs.push(
+              (async () => {
                 try {
-                  await handleTagUpdate(file, file.metadata);
+                  await handleTagUpdate(file, metadata);
                 } catch {
                   // handleTagUpdate records the per-track error state.
                 }
-              }),
-          );
+              })(),
+            );
+          }
+          await Promise.all(coverWriteJobs);
         } catch (error) {
           reportSystemFailure(error, "cover-import");
         }
@@ -1105,10 +1114,12 @@ export default function AudioTagger() {
     if (currentQueue.active.length > 0) return;
 
     const trackIdSet = new Set(currentQueue.trackIds);
-    const tracksToRetry = filesRef.current
-      .filter((file) => trackIdSet.has(file.id) && !file.file)
-      .map((file) => managedDownloadTrackFromFile(file))
-      .filter((track): track is ManagedDownloadTrack => Boolean(track));
+    const tracksToRetry: ManagedDownloadTrack[] = [];
+    for (const file of filesRef.current) {
+      if (!trackIdSet.has(file.id) || file.file) continue;
+      const track = managedDownloadTrackFromFile(file);
+      if (track) tracksToRetry.push(track);
+    }
     getPlaylistDownloadController().retry(tracksToRetry);
   };
   const handleDownloadAll = async () => {
@@ -1269,9 +1280,12 @@ export default function AudioTagger() {
       const idSet = new Set(idsToRemove);
       const removedFiles = filesRef.current.filter((file) => idSet.has(file.id));
       playlistDownloadControllerRef.current?.remove(idsToRemove);
-      const affectedAlbumIds = albumsRef.current
-        .filter((album) => album.trackIds.some((trackId) => idSet.has(trackId)))
-        .map((album) => album.id);
+      const affectedAlbumIds: string[] = [];
+      for (const album of albumsRef.current) {
+        if (album.trackIds.some((trackId) => idSet.has(trackId))) {
+          affectedAlbumIds.push(album.id);
+        }
+      }
       const nextAlbums = idsToRemove.reduce(
         (currentAlbums, fileId) => removeTrackFromAlbums(currentAlbums, fileId),
         albumsRef.current,

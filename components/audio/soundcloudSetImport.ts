@@ -63,18 +63,21 @@ const startSoundCloudSetCoverImport = (
       }
 
       const trackIdSet = new Set(coverImport.trackIds);
-      await Promise.all(
-        coveredFiles
-          .filter((file) => trackIdSet.has(file.id) && Boolean(file.file) && file.metadata)
-          .map(async (file) => {
-            if (!file.metadata) return;
+      const tagUpdates: Promise<void>[] = [];
+      for (const file of coveredFiles) {
+        if (!trackIdSet.has(file.id) || !file.file || !file.metadata) continue;
+        const metadata = file.metadata;
+        tagUpdates.push(
+          (async () => {
             try {
-              await deps.updateTags(file, file.metadata);
+              await deps.updateTags(file, metadata);
             } catch {
               // updateTags records the per-track error state.
             }
-          }),
-      );
+          })(),
+        );
+      }
+      await Promise.all(tagUpdates);
     } catch (error) {
       deps.warn("failed to import album cover:", error);
     }

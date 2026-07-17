@@ -43,7 +43,7 @@ export const createDownloadAdmissionWindow = ({
       }
 
       let releasedCost = 0;
-      const orderedReservations = [...reservations].sort(
+      const orderedReservations = reservations.toSorted(
         (left, right) => left.reservedAtMs - right.reservedAtMs,
       );
       for (const reservation of orderedReservations) {
