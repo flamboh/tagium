@@ -131,8 +131,9 @@ export default function TagSidebarPanel({
 
   return (
     <div
+      data-slot="sidebar-panel"
       className={cn(
-        "order-2 h-svh w-full flex-shrink-0 flex flex-col border-t bg-card overflow-hidden transition-colors duration-200 md:order-none md:h-auto md:min-h-0 md:w-72 md:border-t-0 md:border-r",
+        "order-2 h-svh w-full flex-shrink-0 flex flex-col border-t bg-sidebar text-sidebar-foreground overflow-hidden transition-colors duration-200 md:order-none md:h-auto md:min-h-0 md:w-72 md:border-t-0 md:border-r",
         isDraggingFile && "bg-primary/5 shadow-[inset_0_0_0_2px_var(--primary)]",
       )}
       onDragEnter={handleSidebarDragEnter}
@@ -152,7 +153,9 @@ export default function TagSidebarPanel({
       onDrop={handleSidebarFileDrop}
     >
       <div className="h-14 flex items-center px-5 border-b flex-shrink-0">
-        <span className="font-bold text-xl tracking-tight select-none">tagium</span>
+        <span className="wordmark text-xl select-none">
+          tagium<span className="select-none text-(--wordmark-dot)">.</span>
+        </span>
       </div>
 
       <AlbumSidebar

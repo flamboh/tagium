@@ -1,8 +1,35 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      try {
+        const storedSettings = JSON.parse(localStorage.getItem("tagium:app-settings") || "null");
+        const hasMode =
+          storedSettings !== null && typeof storedSettings === "object" && "mode" in storedSettings;
+        const mode = ["light", "dark"].includes(storedSettings?.mode)
+          ? storedSettings.mode
+          : !hasMode && storedSettings?.theme === "signal"
+            ? "dark"
+            : "light";
+        const accentA = /^#[\da-f]{6}$/i.test(storedSettings?.accentA)
+          ? storedSettings.accentA
+          : "#114cbf";
+        const accentB = /^#[\da-f]{6}$/i.test(storedSettings?.accentB)
+          ? storedSettings.accentB
+          : "#e93f2d";
+        document.documentElement.dataset.theme = mode;
+        document.documentElement.classList.toggle("dark", mode === "dark");
+        document.documentElement.style.setProperty("--accent-a", accentA);
+        document.documentElement.style.setProperty("--accent-b", accentB);
+      } catch {
+        document.documentElement.dataset.theme = "light";
+        document.documentElement.classList.remove("dark");
+        document.documentElement.style.setProperty("--accent-a", "#114cbf");
+        document.documentElement.style.setProperty("--accent-b", "#e93f2d");
+      }
+    </script>
     <title>tagium</title>
     <meta
       name="description"

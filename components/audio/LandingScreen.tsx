@@ -79,24 +79,26 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
         {active && (
           <div className="flex w-full flex-col items-center gap-10 animate-in fade-in motion-reduce:animate-none max-lg:[@media(max-height:700px)]:gap-6">
             <div className="text-center select-none">
-              <h1 className="text-7xl font-bold tracking-tighter text-foreground">tagium</h1>
+              <h1 className="wordmark text-7xl text-foreground">
+                tagium<span className="select-none text-(--wordmark-dot)">.</span>
+              </h1>
               <p className="text-muted-foreground mt-3 text-base">tag your music</p>
             </div>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className={cn(
-                "w-full rounded-3xl border-2 border-dashed transition-all duration-200 cursor-pointer",
+                "w-full rounded-(--radius-hero) border-2 border-dashed transition-all duration-200 cursor-pointer",
                 "flex flex-col items-center justify-center gap-5 py-16 px-8 outline-none max-lg:[@media(max-height:700px)]:gap-3 max-lg:[@media(max-height:700px)]:py-8",
                 isDragging
-                  ? "border-primary bg-primary/10 scale-[1.015] shadow-xl shadow-primary/10"
+                  ? "border-primary bg-primary/10 scale-[1.015]"
                   : "border-border hover:border-primary/50 hover:bg-accent/20 focus-visible:border-primary/50",
               )}
             >
               {isDragging ? (
                 <Music4 className="h-14 w-14 text-primary" />
               ) : (
-                <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center">
+                <div className="h-16 w-16 rounded-(--radius-hero-inner) bg-muted flex items-center justify-center">
                   <Upload className="h-7 w-7 text-muted-foreground" />
                 </div>
               )}

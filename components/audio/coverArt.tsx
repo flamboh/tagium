@@ -163,8 +163,8 @@ export default function CoverArt({
           <div
             className={
               isCompact
-                ? "size-24 bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs md:size-44"
-                : "size-full bg-gray-200 rounded-lg border flex items-center justify-center text-gray-500 text-xs lg:size-64"
+                ? "size-24 bg-muted rounded-lg border flex items-center justify-center text-muted-foreground text-xs md:size-44"
+                : "size-full bg-muted rounded-lg border flex items-center justify-center text-muted-foreground text-xs lg:size-64"
             }
           >
             no cover

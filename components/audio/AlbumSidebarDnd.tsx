@@ -105,20 +105,22 @@ export function SortableTrackRow({
             {container === "loose" ? (
               <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
             ) : (
-              <span className="min-w-3 text-[11px] text-muted-foreground">{index}</span>
+              <span className="min-w-3 font-mono text-[0.9em] tabular-nums text-muted-foreground">
+                {index}
+              </span>
             )}
             <span className="truncate text-sm flex-1">{track.filename}</span>
             {track.downloadStatus === "downloading" && (
               <Loader2 className="h-3 w-3 text-muted-foreground flex-shrink-0 animate-spin" />
             )}
             {track.downloadStatus !== "downloading" && track.status === "saved" && (
-              <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+              <Check className="h-3 w-3 text-success flex-shrink-0" />
             )}
             {(track.downloadStatus === "error" || track.status === "error") && (
               <AlertCircle
                 aria-label="track has an error"
                 className={cn(
-                  "h-3 w-3 text-red-500 flex-shrink-0",
+                  "h-3 w-3 text-destructive flex-shrink-0",
                   retryable ? "group-hover:opacity-0" : "",
                 )}
               />

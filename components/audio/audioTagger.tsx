@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AlbumMetadataDialog from "./AlbumMetadataDialog";
 import DestructiveActionDialog from "./DestructiveActionDialog";
 import LandingScreen from "./LandingScreen";
@@ -12,6 +12,7 @@ import TrackMetadataEditor from "./TrackMetadataEditor";
 import { getMediaUrlEntryPresentation } from "./mediaUrlEntryPresentation";
 import { hasRecoverableSessionWork, useBeforeUnloadProtection } from "./sessionSafety";
 import { loadAppSettings } from "./settings";
+import { getAccentForeground, WORDMARK_FONT_STYLES } from "./theme";
 import { useAudioImportSession } from "./useAudioImportSession";
 import { useAudioWorkspace, type ActiveView } from "./useAudioWorkspace";
 import { useExportSession } from "./useExportSession";
@@ -23,6 +24,26 @@ export default function AudioTagger() {
   const library = useLibraryStore();
   const [activeView, setActiveView] = useState<ActiveView>("editor");
   const [settings, setSettings] = useState<AppSettings>(loadAppSettings);
+  useEffect(() => {
+    const root = document.documentElement;
+    const wordmark = WORDMARK_FONT_STYLES[settings.wordmarkFont];
+    root.dataset.theme = settings.mode;
+    root.dataset.darkenAccents = String(settings.darkenAccentsInDarkMode);
+    root.classList.toggle("dark", settings.mode === "dark");
+    root.style.setProperty("--accent-a", settings.accentA);
+    root.style.setProperty("--accent-b", settings.accentB);
+    root.style.setProperty("--accent-a-fg", getAccentForeground(settings.accentA));
+    root.style.setProperty("--accent-b-fg", getAccentForeground(settings.accentB));
+    root.style.setProperty("--font-wordmark", wordmark.family);
+    root.style.setProperty("--wordmark-tracking", wordmark.tracking);
+    root.style.setProperty("--wordmark-scale", wordmark.scale);
+  }, [
+    settings.mode,
+    settings.accentA,
+    settings.accentB,
+    settings.darkenAccentsInDarkMode,
+    settings.wordmarkFont,
+  ]);
   const activateEditor = useCallback(() => setActiveView("editor"), []);
   const editor = useTrackEditorSession({ library, settings });
   const exporting = useExportSession({ library, editor: editor.commands, settings });

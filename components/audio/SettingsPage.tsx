@@ -1,18 +1,93 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { AUDIO_BITRATE_OPTIONS } from "./settings";
+import {
+  ACCENT_PRESETS,
+  AUDIO_BITRATE_OPTIONS,
+  MODE_OPTIONS,
+  WORDMARK_FONT_OPTIONS,
+  isSupportedAccentColor,
+} from "./settings";
+import { cssColorToHex } from "./theme";
 import type { AppSettings } from "./types";
+
+const modeDescriptions: Record<AppSettings["mode"], string> = {
+  light: "bright, sharp, ink on paper",
+  dark: "deep, flat, low-light liner",
+};
 
 export interface SettingsPageProps {
   settings: AppSettings;
   onChange: (settings: AppSettings) => void;
   onBack: () => void;
+}
+
+interface AccentColorInputProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function AccentColorInput({ label, value, onChange }: AccentColorInputProps) {
+  const [draft, setDraft] = useState(value);
+  const [invalid, setInvalid] = useState(false);
+
+  useEffect(() => {
+    setDraft(value);
+    setInvalid(false);
+  }, [value]);
+
+  const commit = (nextValue: string) => {
+    const color = nextValue.trim();
+    const valid = isSupportedAccentColor(color) && CSS.supports("color", color);
+    setInvalid(!valid);
+    if (valid) onChange(color);
+  };
+
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5 rounded-sm border border-input px-3 py-2">
+      <div className="flex items-center justify-between gap-3">
+        <label htmlFor={`${label}-color-value`} className="text-sm font-medium">
+          {label}
+        </label>
+        <input
+          type="color"
+          value={cssColorToHex(value)}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-7 w-10 shrink-0 cursor-pointer border-0 bg-transparent p-0"
+          aria-label={`choose ${label}`}
+        />
+      </div>
+      <input
+        id={`${label}-color-value`}
+        type="text"
+        value={draft}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          commit(event.target.value);
+        }}
+        onBlur={() => commit(draft)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") commit(draft);
+        }}
+        aria-invalid={invalid}
+        aria-describedby={invalid ? `${label}-color-error` : undefined}
+        spellCheck={false}
+        placeholder="oklch(0.6 0.2 260) or rgb(20 80 190)"
+        className="h-8 min-w-0 rounded-sm border border-input bg-background px-2 font-mono text-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20"
+      />
+      {invalid && (
+        <span id={`${label}-color-error`} className="text-xs text-destructive">
+          enter a valid OKLCH, RGB, or hex color
+        </span>
+      )}
+    </div>
+  );
 }
 
 export default function SettingsPage({ settings, onChange, onBack }: SettingsPageProps) {
@@ -37,6 +112,134 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
       </div>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-xl flex flex-col gap-6">
+          <fieldset className="flex flex-col gap-3">
+            <legend className="text-base font-semibold">appearance</legend>
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium">mode</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {MODE_OPTIONS.map((mode) => (
+                    <label
+                      key={mode}
+                      className="flex cursor-pointer items-start gap-3 rounded-sm border border-input px-3 py-2.5 transition-colors hover:bg-accent/50 has-checked:border-primary has-checked:bg-accent"
+                    >
+                      <input
+                        type="radio"
+                        name="mode"
+                        value={mode}
+                        checked={settings.mode === mode}
+                        onChange={() => onChange({ ...settings, mode })}
+                        className="mt-0.5 size-4 shrink-0 accent-primary"
+                      />
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="text-sm font-medium leading-none">{mode}</span>
+                        <span className="text-xs leading-4 text-muted-foreground">
+                          {modeDescriptions[mode]}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium">accents</span>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {ACCENT_PRESETS.map((preset) => {
+                    const selected =
+                      settings.accentA.toLowerCase() === preset.accentA &&
+                      settings.accentB.toLowerCase() === preset.accentB;
+                    return (
+                      <label
+                        key={preset.name}
+                        className="flex cursor-pointer items-center gap-3 rounded-sm border border-input px-3 py-2.5 transition-colors hover:bg-accent/50 has-checked:border-primary has-checked:bg-accent"
+                      >
+                        <input
+                          type="radio"
+                          name="accent-preset"
+                          value={preset.name}
+                          checked={selected}
+                          onChange={() =>
+                            onChange({
+                              ...settings,
+                              accentA: preset.accentA,
+                              accentB: preset.accentB,
+                            })
+                          }
+                          className="sr-only"
+                        />
+                        <span className="flex shrink-0 gap-1" aria-hidden="true">
+                          <span
+                            className="size-5 border border-foreground/20"
+                            style={{ backgroundColor: preset.accentA }}
+                          />
+                          <span
+                            className="size-5 border border-foreground/20"
+                            style={{ backgroundColor: preset.accentB }}
+                          />
+                        </span>
+                        <span className="text-sm leading-tight">{preset.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">
+                  {(["accentA", "accentB"] as const).map((key, index) => (
+                    <AccentColorInput
+                      key={key}
+                      label={`accent ${index === 0 ? "a" : "b"}`}
+                      value={settings[key]}
+                      onChange={(value) => onChange({ ...settings, [key]: value })}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-start gap-3 py-1">
+                  <Checkbox
+                    id="darken-accents-in-dark-mode"
+                    checked={settings.darkenAccentsInDarkMode}
+                    onCheckedChange={(checked) =>
+                      onChange({
+                        ...settings,
+                        darkenAccentsInDarkMode: checked === true,
+                      })
+                    }
+                    className="mt-0.5"
+                  />
+                  <Label htmlFor="darken-accents-in-dark-mode" className="flex flex-col gap-0.5">
+                    <span>darken accents in dark mode</span>
+                    <span className="text-xs font-normal leading-4 text-muted-foreground">
+                      blends the sidebar accent into the dark background
+                    </span>
+                  </Label>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium">wordmark</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {WORDMARK_FONT_OPTIONS.map((font) => (
+                    <label
+                      key={font}
+                      className="flex cursor-pointer items-center gap-3 rounded-sm border border-input px-3 py-2.5 transition-colors hover:bg-accent/50 has-checked:border-primary has-checked:bg-accent"
+                    >
+                      <input
+                        type="radio"
+                        name="wordmark-font"
+                        value={font}
+                        checked={settings.wordmarkFont === font}
+                        onChange={() => onChange({ ...settings, wordmarkFont: font })}
+                        className="sr-only"
+                      />
+                      <span className="wordmark-option text-lg" data-font={font}>
+                        tagium.
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </fieldset>
+
           <section className="flex flex-col gap-3">
             <h3 className="text-base font-semibold">metadata</h3>
             <div className="flex items-start gap-3 py-1">
