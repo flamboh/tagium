@@ -186,6 +186,47 @@ describe("track editor session", () => {
     hook.unmount();
   });
 
+  it("preserves hidden advanced values while normal metadata is edited", () => {
+    const hook = renderHook(() => {
+      const library = useLibraryStore();
+      return { library, editor: useTrackEditorSession({ library, settings }) };
+    }, undefined);
+    const file = readyFile("track", "Track");
+    file.metadata = {
+      ...file.metadata!,
+      discNumber: 2,
+      composer: "Composer",
+      bpm: 134,
+      comment: "Keep this note",
+    };
+    act(() => {
+      hook.result.library.dispatch({
+        type: "content-replaced",
+        files: [file],
+        looseTrackIds: [file.id],
+        selection: { selectedAlbumId: null, selectedFileId: file.id },
+      });
+    });
+
+    const title = hook.result.editor.form.register("title");
+    act(() => {
+      void title.onChange({ target: { name: "title", value: "Edited" }, type: "change" });
+    });
+    act(() => {
+      hook.result.editor.commands.flush();
+    });
+
+    expect(hook.result.library.getSnapshot().files[0].metadata).toMatchObject({
+      title: "Edited",
+      albumArtist: "Artist",
+      discNumber: 2,
+      composer: "Composer",
+      bpm: 134,
+      comment: "Keep this note",
+    });
+    hook.unmount();
+  });
+
   it("mirrors album artist when the advanced gate is turned off before hydration writes", async () => {
     const advancedSettings: AppSettings = {
       ...settings,

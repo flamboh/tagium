@@ -7,6 +7,7 @@ import LandingScreen from "@/features/import/LandingScreen";
 import MediaUrlEntry from "@/features/import/MediaUrlEntry";
 import MetadataCleanupDialog from "@/features/library/MetadataCleanupDialog";
 import SettingsPage from "@/features/settings/SettingsPage";
+import { getMetadataLinkState } from "@/features/library/metadataLinks";
 import TagSidebarPanel from "@/features/library/TagSidebarPanel";
 import TrackMetadataEditor from "@/features/editor/TrackMetadataEditor";
 import { getMediaUrlEntryPresentation } from "@/features/import/mediaUrlEntryPresentation";
@@ -113,14 +114,18 @@ export default function AudioTagger() {
                     selectedFileId={selectedFileId}
                     register={editor.form.register}
                     control={editor.form.control}
-                    handleSubmit={editor.form.handleSubmit}
+                    getValues={editor.form.getValues}
+                    setError={editor.form.setError}
+                    clearErrors={editor.form.clearErrors}
+                    setFocus={editor.form.setFocus}
                     onTrackCoverUpload={editor.commands.uploadCover}
                     onTrackCoverProcessingChange={editor.commands.setCoverProcessing}
                     isTrackCoverProcessing={editor.isCoverProcessing}
                     onDownloadUpdatedFile={exporting.downloadTrack}
                     selectedFileAlbum={editor.selectedFileAlbum}
                     syncFilenames={settings.syncFilenames}
-                    syncTrackNumbers={settings.syncTrackNumbers}
+                    advancedMetadata={settings.advancedMetadata}
+                    metadataLinks={getMetadataLinkState(settings)}
                     onPreviewMetadataChange={(field, event) =>
                       editor.commands.preview(field, event.target.value)
                     }

@@ -432,10 +432,18 @@ describe("analytics", () => {
 
     analytics.capture({
       type: "settings_changed",
-      syncTrackNumbers: true,
       syncFilenames: false,
       audioBitrate: "256",
       applySoundCloudCover: true,
+      advancedMetadata: true,
+      metadataLinks: {
+        artist: true,
+        year: false,
+        genre: true,
+        artwork: false,
+        trackNumber: true,
+        albumArtist: true,
+      },
     });
     analytics.capture({ type: "album_created", trackCount: 4, hasCover: true });
     analytics.capture({ type: "album_edited", trackCount: 4, hasCover: false });
@@ -463,6 +471,12 @@ describe("analytics", () => {
           sync_filenames: false,
           audio_bitrate: "256",
           apply_soundcloud_cover: true,
+          advanced_metadata: true,
+          link_artist: true,
+          link_year: false,
+          link_genre: true,
+          link_artwork: false,
+          link_album_artist: true,
         }),
       ],
       ["album_created", expect.objectContaining({ track_count: 4, has_cover: true })],
@@ -487,6 +501,13 @@ describe("analytics", () => {
         }),
       ],
     ]);
+    const settingsProperties = capture.mock.calls[0][1];
+    expect(settingsProperties).not.toHaveProperty("metadataLinks");
+    expect(
+      Object.entries(settingsProperties)
+        .filter(([key]) => key.startsWith("link_") || key === "sync_track_numbers")
+        .every(([, value]) => typeof value === "boolean"),
+    ).toBe(true);
     expect(JSON.stringify(capture.mock.calls)).not.toContain("private-one");
   });
 

@@ -36,19 +36,21 @@ export interface AlbumGroup {
   year?: number;
 }
 
+export interface MetadataLinks {
+  artist: boolean;
+  year: boolean;
+  genre: boolean;
+  artwork: boolean;
+  albumArtist: boolean;
+}
+
 export interface AppSettings {
   syncTrackNumbers: boolean;
   syncFilenames: boolean;
   audioBitrate: AudioDownloadBitrate;
   applySoundCloudAlbumCoverToTracks: boolean;
   advancedMetadata: boolean;
-  metadataLinks: {
-    artist: boolean;
-    year: boolean;
-    genre: boolean;
-    artwork: boolean;
-    albumArtist: boolean;
-  };
+  metadataLinks: MetadataLinks;
 }
 
 export interface ImportedAlbumMetadata {

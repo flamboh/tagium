@@ -1,12 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AUDIO_BITRATE_OPTIONS } from "@/features/settings/settings";
+import {
+  METADATA_LINK_DESCRIPTORS,
+  isMetadataLinkEnabled,
+  isMetadataLinkVisible,
+  withMetadataLinkEnabled,
+} from "@/features/library/metadataLinks";
 import type { AppSettings } from "@/features/library/types";
 
 export interface SettingsPageProps {
@@ -17,6 +23,8 @@ export interface SettingsPageProps {
 
 export default function SettingsPage({ settings, onChange, onBack }: SettingsPageProps) {
   const [bitrateOpen, setBitrateOpen] = useState(false);
+
+  const checkboxRowClassName = "flex cursor-pointer select-none items-start gap-3 py-1";
 
   return (
     <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
@@ -36,24 +44,15 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-xl flex flex-col gap-6">
+        <div className="max-w-xl flex flex-col gap-8">
           <section className="flex flex-col gap-3">
-            <h3 className="text-base font-semibold">metadata</h3>
-            <div className="flex items-start gap-3 py-1">
-              <Checkbox
-                id="sync-track-numbers"
-                checked={settings.syncTrackNumbers}
-                onCheckedChange={(checked) =>
-                  onChange({
-                    ...settings,
-                    syncTrackNumbers: checked === true,
-                  })
-                }
-                className="mt-0.5"
-              />
-              <Label htmlFor="sync-track-numbers">use album sidebar order as track number</Label>
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold">general</h3>
+              <p className="text-sm leading-5 text-muted-foreground">
+                choose how files are named while you edit.
+              </p>
             </div>
-            <div className="flex items-start gap-3 py-1">
+            <div className={checkboxRowClassName}>
               <Checkbox
                 id="sync-filenames"
                 checked={settings.syncFilenames}
@@ -65,11 +64,86 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
                 }
                 className="mt-0.5"
               />
-              <Label htmlFor="sync-filenames">sync all filenames with track titles</Label>
+              <Label htmlFor="sync-filenames" className="cursor-pointer leading-5">
+                keep filenames in sync with track titles
+              </Label>
             </div>
           </section>
 
           <section className="flex flex-col gap-3">
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold">metadata</h3>
+              <p className="text-sm leading-5 text-muted-foreground">
+                control which tags appear in the editor and follow their album.
+              </p>
+            </div>
+            <div className={checkboxRowClassName}>
+              <Checkbox
+                id="advanced-metadata"
+                checked={settings.advancedMetadata}
+                onCheckedChange={(checked) =>
+                  onChange({
+                    ...settings,
+                    advancedMetadata: checked === true,
+                  })
+                }
+                className="mt-0.5"
+              />
+              <div className="space-y-0.5">
+                <Label htmlFor="advanced-metadata" className="cursor-pointer leading-5">
+                  enable advanced metadata
+                </Label>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  adds album artist, disc number, composer, BPM, and comments to the track editor.
+                </p>
+              </div>
+            </div>
+
+            <details className="group mt-1 border-t pt-3">
+              <summary className="flex cursor-pointer select-none list-none items-center justify-between rounded-md py-1 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+                <span>advanced linking</span>
+                <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" />
+              </summary>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                linked tags follow album changes. unlink a tag to edit it per track without changing
+                the rest of the album.
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                {METADATA_LINK_DESCRIPTORS.filter((descriptor) =>
+                  isMetadataLinkVisible(descriptor, settings),
+                ).map((descriptor) => (
+                  <label key={descriptor.id} className={checkboxRowClassName}>
+                    <Checkbox
+                      checked={isMetadataLinkEnabled(settings, descriptor)}
+                      onCheckedChange={(checked) =>
+                        onChange(withMetadataLinkEnabled(settings, descriptor, checked === true))
+                      }
+                      className="mt-0.5"
+                    />
+                    <span className="space-y-0.5">
+                      <span className="block text-sm font-medium leading-5">
+                        {descriptor.label}
+                      </span>
+                      <span className="block text-xs leading-5 text-muted-foreground">
+                        {descriptor.relation}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+                <p className="text-xs leading-5 text-muted-foreground">
+                  album title always follows the album and cannot be unlinked.
+                </p>
+              </div>
+            </details>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold">downloads</h3>
+              <p className="text-sm leading-5 text-muted-foreground">
+                choose the defaults used for imported audio.
+              </p>
+            </div>
             <div className="flex flex-col gap-2">
               <span id="download-bitrate-label" className="text-sm font-medium">
                 download bitrate
@@ -112,7 +186,7 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
                 </PopoverContent>
               </Popover>
             </div>
-            <label className="flex cursor-pointer items-start gap-3 py-1">
+            <label className={checkboxRowClassName}>
               <Checkbox
                 checked={settings.applySoundCloudAlbumCoverToTracks}
                 onCheckedChange={(checked) =>

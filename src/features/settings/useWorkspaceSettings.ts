@@ -7,6 +7,7 @@ import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type { AppSettings } from "@/features/library/types";
 import type { SetActiveView } from "@/features/workspace/audioWorkspaceTypes";
+import { getMetadataLinkState } from "@/features/library/metadataLinks";
 
 type SettingsEditor = Pick<TrackEditorSession, "isCoverProcessing">;
 
@@ -49,10 +50,11 @@ export const useWorkspaceSettings = ({
       if (saved && changed) {
         analytics.capture({
           type: "settings_changed",
-          syncTrackNumbers: nextSettings.syncTrackNumbers,
           syncFilenames: nextSettings.syncFilenames,
           audioBitrate: nextSettings.audioBitrate,
           applySoundCloudCover: nextSettings.applySoundCloudAlbumCoverToTracks,
+          advancedMetadata: nextSettings.advancedMetadata,
+          metadataLinks: getMetadataLinkState(nextSettings),
         });
       }
     },
