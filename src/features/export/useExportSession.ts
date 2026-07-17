@@ -22,15 +22,25 @@ import { reportSystemFailure } from "@/features/workspace/systemFailure";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type { AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
+import {
+  deriveExportConfirmationSummary,
+  exportConfirmationSummariesMatch,
+  type ExportConfirmationSummary,
+} from "@/features/export/exportConfirmation";
 
 export interface ExportSession {
   exporting: boolean;
-  downloadAll: () => Promise<void>;
-  downloadAlbum: (albumId: string) => Promise<void>;
+  confirmation: ExportConfirmationSummary | null;
+  confirmationStatus: "ready" | "changed" | "unavailable";
+  downloadAll: () => void;
+  downloadAlbum: (albumId: string) => void;
   downloadTrack: SubmitHandler<AudioMetadata>;
+  cancelConfirmation: () => void;
+  confirmDownload: () => Promise<void>;
+  restoreConfirmationFocus: () => void;
 }
 
-type ExportEditor = Pick<TrackEditorSession["commands"], "flush" | "updateTags">;
+type ExportEditor = Pick<TrackEditorSession["commands"], "projectFiles" | "flush" | "updateTags">;
 
 export const useExportSession = ({
   library,
@@ -42,6 +52,12 @@ export const useExportSession = ({
   settings: AppSettings;
 }): ExportSession => {
   const [exporting, setExporting] = useState(false);
+  const [confirmation, setConfirmation] = useState<ExportConfirmationSummary | null>(null);
+  const [confirmationStatus, setConfirmationStatus] = useState<"ready" | "changed" | "unavailable">(
+    "ready",
+  );
+  const confirmingRef = useRef(false);
+  const confirmationTriggerRef = useRef<{ focus: () => void; isConnected?: boolean } | null>(null);
   const settingsRef = useRef(settings);
   useLayoutEffect(() => {
     settingsRef.current = settings;
@@ -83,88 +99,77 @@ export const useExportSession = ({
     [updateTags],
   );
 
-  const downloadAll = useCallback(async () => {
-    const before = library.getSnapshot();
-    if (before.files.length === 0 || !allTracksReadyForDownload(before.files)) return;
-    const trackCount = before.files.length;
-    const albumCount = before.albums.length;
-    analytics.capture({ type: "export_started", exportKind: "library", trackCount, albumCount });
-    setExporting(true);
-    try {
-      const syncedFiles = prepareFiles();
-      if (!allTracksReadyForDownload(syncedFiles)) return;
-      await writeFiles(syncedFiles);
-      const snapshot = library.getSnapshot();
-      const entries = getLibraryDownloadEntries(snapshot);
-      if (entries.length === 0) throw new Error("library export had no entries.");
-
-      const blob = await createZipBlob(entries);
-      downloadBlob(blob, createLibraryDownloadFilename());
-      analytics.capture({
-        type: "export_prepared",
-        exportKind: "library",
-        trackCount,
-        albumCount,
-        sizeBytes: blob.size,
-      });
-    } catch (error) {
-      analytics.capture({ type: "export_failed", exportKind: "library", error });
-      reportSystemFailure(error, "export");
-    } finally {
-      setExporting(false);
-    }
-  }, [library, prepareFiles, writeFiles]);
-
-  const downloadAlbum = useCallback(
-    async (albumId: string) => {
+  const executeConfirmedExport = useCallback(
+    async (target: ExportConfirmationSummary["target"]) => {
       const before = library.getSnapshot();
-      const album = before.albums.find((entry) => entry.id === albumId);
-      if (!album) return;
-      const currentAlbumFiles = album.trackIds
-        .map((trackId) => before.files.find((file) => file.id === trackId))
-        .filter((file): file is TagiumFile => Boolean(file));
+      const album =
+        target.kind === "album"
+          ? before.albums.find((entry) => entry.id === target.albumId)
+          : undefined;
+      if (target.kind === "album" && !album) return;
+      const targetFiles = album
+        ? album.trackIds
+            .map((trackId) => before.files.find((file) => file.id === trackId))
+            .filter((file): file is TagiumFile => Boolean(file))
+        : before.files;
       if (
-        currentAlbumFiles.length !== album.trackIds.length ||
-        !allTracksReadyForDownload(currentAlbumFiles)
+        targetFiles.length === 0 ||
+        (album && targetFiles.length !== album.trackIds.length) ||
+        !allTracksReadyForDownload(targetFiles)
       ) {
         return;
       }
-      const trackCount = album.trackIds.length;
-      analytics.capture({ type: "export_started", exportKind: "album", trackCount, albumCount: 1 });
+      const trackCount = targetFiles.length;
+      const albumCount = target.kind === "album" ? 1 : before.albums.length;
+      analytics.capture({
+        type: "export_started",
+        exportKind: target.kind,
+        trackCount,
+        albumCount,
+      });
       setExporting(true);
       try {
-        const syncedFiles = prepareFiles([albumId]);
-        const albumFiles = album.trackIds
-          .map((id) => syncedFiles.find((file) => file.id === id))
-          .filter((file): file is TagiumFile & { file: File; metadata: AudioMetadata } =>
-            Boolean(file && isTrackReadyForDownload(file)),
-          );
-        if (albumFiles.length !== album.trackIds.length) {
-          throw new Error("album export tracks were not ready.");
+        const syncedFiles = prepareFiles(album ? [album.id] : undefined);
+        const filesToWrite = album
+          ? album.trackIds
+              .map((id) => syncedFiles.find((file) => file.id === id))
+              .filter((file): file is TagiumFile & { file: File; metadata: AudioMetadata } =>
+                Boolean(file && isTrackReadyForDownload(file)),
+              )
+          : syncedFiles;
+        if (filesToWrite.length !== trackCount || !allTracksReadyForDownload(filesToWrite)) {
+          throw new Error(`${target.kind} export tracks were not ready.`);
         }
-        await writeFiles(albumFiles);
+        await writeFiles(filesToWrite);
 
-        const entries = getLibraryDownloadEntries({
-          albums: [album],
-          looseTrackIds: [],
-          files: library.getSnapshot().files,
-          albumRoot: "",
-          includeUnassignedFiles: false,
-        });
-        if (entries.length === 0) throw new Error("album export had no entries.");
+        const entries = album
+          ? getLibraryDownloadEntries({
+              albums: [album],
+              looseTrackIds: [],
+              files: library.getSnapshot().files,
+              albumRoot: "",
+              includeUnassignedFiles: false,
+            })
+          : getLibraryDownloadEntries(library.getSnapshot());
+        if (entries.length === 0) throw new Error(`${target.kind} export had no entries.`);
 
         const blob = await createZipBlob(entries);
-        const albumFilename = filenamify(album.title, { replacement: "-" });
-        downloadBlob(blob, albumFilename ? `${albumFilename}.zip` : "album.zip");
+        const albumFilename = album && filenamify(album.title, { replacement: "-" });
+        const filename = album
+          ? albumFilename
+            ? `${albumFilename}.zip`
+            : "album.zip"
+          : createLibraryDownloadFilename();
+        downloadBlob(blob, filename);
         analytics.capture({
           type: "export_prepared",
-          exportKind: "album",
+          exportKind: target.kind,
           trackCount,
-          albumCount: 1,
+          albumCount,
           sizeBytes: blob.size,
         });
       } catch (error) {
-        analytics.capture({ type: "export_failed", exportKind: "album", error });
+        analytics.capture({ type: "export_failed", exportKind: target.kind, error });
         reportSystemFailure(error, "export");
       } finally {
         setExporting(false);
@@ -172,6 +177,91 @@ export const useExportSession = ({
     },
     [library, prepareFiles, writeFiles],
   );
+
+  const deriveConfirmation = useCallback(
+    (target: ExportConfirmationSummary["target"]) => {
+      const snapshot = library.getSnapshot();
+      const trackIds =
+        target.kind === "album"
+          ? snapshot.albums.find(({ id }) => id === target.albumId)?.trackIds
+          : undefined;
+      return deriveExportConfirmationSummary(
+        { ...snapshot, files: editor.projectFiles(trackIds) },
+        target,
+        settingsRef.current,
+      );
+    },
+    [editor, library],
+  );
+
+  const rememberConfirmationTrigger = useCallback(() => {
+    if (typeof document === "undefined") return;
+    const activeElement = document.activeElement;
+    if (activeElement && "focus" in activeElement && typeof activeElement.focus === "function") {
+      confirmationTriggerRef.current = activeElement as {
+        focus: () => void;
+        isConnected?: boolean;
+      };
+    }
+  }, []);
+
+  const restoreConfirmationFocus = useCallback(() => {
+    const trigger = confirmationTriggerRef.current;
+    confirmationTriggerRef.current = null;
+    if (trigger && trigger.isConnected !== false) trigger.focus();
+  }, []);
+
+  const downloadAll = useCallback(() => {
+    if (exporting || confirmingRef.current) return;
+    const summary = deriveConfirmation({ kind: "library" });
+    if (summary) {
+      rememberConfirmationTrigger();
+      setConfirmationStatus("ready");
+      setConfirmation(summary);
+    }
+  }, [deriveConfirmation, exporting, rememberConfirmationTrigger]);
+
+  const downloadAlbum = useCallback(
+    (albumId: string) => {
+      if (exporting || confirmingRef.current) return;
+      const summary = deriveConfirmation({
+        kind: "album",
+        albumId,
+      });
+      if (summary) {
+        rememberConfirmationTrigger();
+        setConfirmationStatus("ready");
+        setConfirmation(summary);
+      }
+    },
+    [deriveConfirmation, exporting, rememberConfirmationTrigger],
+  );
+
+  const cancelConfirmation = useCallback(() => {
+    if (!confirmingRef.current) setConfirmation(null);
+  }, []);
+
+  const confirmDownload = useCallback(async () => {
+    if (!confirmation || confirmingRef.current) return;
+    const latest = deriveConfirmation(confirmation.target);
+    if (!latest) {
+      setConfirmationStatus("unavailable");
+      return;
+    }
+    if (!exportConfirmationSummariesMatch(confirmation, latest)) {
+      setConfirmation(latest);
+      setConfirmationStatus("changed");
+      return;
+    }
+
+    confirmingRef.current = true;
+    try {
+      await executeConfirmedExport(confirmation.target);
+    } finally {
+      confirmingRef.current = false;
+      setConfirmation(null);
+    }
+  }, [confirmation, deriveConfirmation, executeConfirmedExport]);
 
   const downloadTrack = useCallback<SubmitHandler<AudioMetadata>>(
     async (data) => {
@@ -210,5 +300,15 @@ export const useExportSession = ({
     [library, updateTags],
   );
 
-  return { exporting, downloadAll, downloadAlbum, downloadTrack };
+  return {
+    exporting,
+    confirmation,
+    confirmationStatus,
+    downloadAll,
+    downloadAlbum,
+    downloadTrack,
+    cancelConfirmation,
+    confirmDownload,
+    restoreConfirmationFocus,
+  };
 };
