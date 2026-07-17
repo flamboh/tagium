@@ -115,7 +115,7 @@ export const albumDialogReducer = (
     case "closed":
     case "saved":
     case "deleted":
-      return createAlbumDialogState();
+      return { ...state, open: false };
   }
 };
 
