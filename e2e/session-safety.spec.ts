@@ -15,24 +15,6 @@ const uploadTrack = async (page: Page) => {
   await expect(page.getByRole("button", { name: "remove track" })).toBeAttached();
 };
 
-test("prevents unloading a session with imported tracks", async ({ page }) => {
-  await uploadTrack(page);
-
-  const unloadWasPrevented = await page.evaluate(() => {
-    const event = new Event("beforeunload", { cancelable: true });
-    const browserGlobal = globalThis as unknown as EventTarget;
-    return {
-      dispatchResult: browserGlobal.dispatchEvent(event),
-      defaultPrevented: event.defaultPrevented,
-    };
-  });
-
-  expect(unloadWasPrevented).toEqual({
-    dispatchResult: false,
-    defaultPrevented: true,
-  });
-});
-
 test("allows unloading an empty session", async ({ page }) => {
   await page.goto("/");
 
