@@ -138,4 +138,48 @@ describe("soundcloud set endpoint", () => {
       ],
     });
   });
+
+  it("falls back to track artwork when the playlist artwork is null", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        let url = "";
+        if (input instanceof Request) {
+          url = input.url;
+        } else {
+          url = new URL(input).toString();
+        }
+
+        if (url === "https://soundcloud.com/") {
+          return new Response(
+            '<script>window.__sc_version="1234567890"</script>{"hydratable":"apiClient","data":{"id":"client-id"}}',
+          );
+        }
+
+        expect(url).toContain("https://api-v2.soundcloud.com/resolve");
+
+        return Response.json({
+          kind: "playlist",
+          title: "XCX WORLD",
+          artwork_url: null,
+          user: {
+            username: "twvnkxcx",
+          },
+          tracks: [
+            {
+              id: 686556559,
+              kind: "track",
+              title: "Good Girls (XCX WORLD)",
+              permalink_url: "https://soundcloud.com/siafan/good-girls-xcx-world",
+              artwork_url: "https://i1.sndcdn.com/artworks-000603058507-5buc5j-large.jpg",
+            },
+          ],
+        });
+      }),
+    );
+
+    await expect(handler(makeEvent())).resolves.toMatchObject({
+      coverUrl: "https://i1.sndcdn.com/artworks-000603058507-5buc5j-t1080x1080.jpg",
+    });
+  });
 });
