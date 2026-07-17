@@ -41,7 +41,10 @@ const cover: AudioMetadata["picture"] = [
 ];
 
 const defaultSettings: AppSettings = {
-  theme: "signal",
+  mode: "light",
+  accentA: "#114cbf",
+  accentB: "#e93f2d",
+  wordmarkFont: "archivo-black",
   audioBitrate: "320",
   syncFilenames: false,
   syncTrackNumbers: false,

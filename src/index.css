@@ -1,8 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./themes/liner.css";
-@import "./themes/signal.css";
-@import "./themes/pressing.css";
 
 @custom-variant dark (&:is(.dark *));
 

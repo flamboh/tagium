@@ -35,7 +35,10 @@ export interface AlbumGroup {
 }
 
 export interface AppSettings {
-  theme: "liner" | "signal" | "pressing";
+  mode: "light" | "dark";
+  accentA: string;
+  accentB: string;
+  wordmarkFont: "archivo-black" | "krona-one" | "anton" | "rajdhani";
   syncTrackNumbers: boolean;
   syncFilenames: boolean;
   audioBitrate: AudioDownloadBitrate;

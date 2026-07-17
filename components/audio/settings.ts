@@ -10,14 +10,31 @@ export const AUDIO_BITRATE_OPTIONS = [
   "64",
 ] as const satisfies readonly AudioDownloadBitrate[];
 
-export const THEME_OPTIONS = [
-  "liner",
-  "signal",
-  "pressing",
-] as const satisfies readonly AppSettings["theme"][];
+export const MODE_OPTIONS = ["light", "dark"] as const satisfies readonly AppSettings["mode"][];
+export const WORDMARK_FONT_OPTIONS = [
+  "archivo-black",
+  "krona-one",
+  "anton",
+  "rajdhani",
+] as const satisfies readonly AppSettings["wordmarkFont"][];
+
+export const ACCENT_PRESETS = [
+  // Source colors, in order: oklch(0.46 0.19 262), oklch(0.62 0.21 30),
+  // oklch(0.45 0.12 155), oklch(0.68 0.16 75), oklch(0.42 0.16 25),
+  // oklch(0.60 0.11 200), oklch(0.42 0.14 310), oklch(0.72 0.17 125),
+  // oklch(0.32 0.05 264), oklch(0.60 0.21 33).
+  { name: "cobalt & coral", accentA: "#114cbf", accentB: "#e93f2d" },
+  { name: "forest & marigold", accentA: "#006836", accentB: "#d08600" },
+  { name: "oxblood & teal", accentA: "#90101a", accentB: "#00939a" },
+  { name: "aubergine & chartreuse", accentA: "#643185", accentB: "#8cb623" },
+  { name: "ink & vermilion", accentA: "#26324c", accentB: "#e23915" },
+] as const;
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
-  theme: "signal",
+  mode: "light",
+  accentA: ACCENT_PRESETS[0].accentA,
+  accentB: ACCENT_PRESETS[0].accentB,
+  wordmarkFont: "archivo-black",
   syncTrackNumbers: true,
   syncFilenames: true,
   audioBitrate: "320",
@@ -32,10 +49,23 @@ const booleanWithDefault = (value: boolean) =>
     Schema.withDecodingDefaultKey(Effect.succeed(value)),
   );
 
+const hexColorWithDefault = (value: string) =>
+  Schema.String.pipe(
+    Schema.refine((color): color is string => /^#[\da-f]{6}$/i.test(color)),
+    Schema.catchDecoding(() => Effect.succeed(Option.some(value))),
+    Schema.withDecodingDefaultKey(Effect.succeed(value)),
+  );
+
 const storedAppSettingsSchema = Schema.Struct({
-  theme: Schema.Literals(THEME_OPTIONS).pipe(
-    Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_APP_SETTINGS.theme))),
-    Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_APP_SETTINGS.theme)),
+  mode: Schema.Literals(MODE_OPTIONS).pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_APP_SETTINGS.mode))),
+    Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_APP_SETTINGS.mode)),
+  ),
+  accentA: hexColorWithDefault(DEFAULT_APP_SETTINGS.accentA),
+  accentB: hexColorWithDefault(DEFAULT_APP_SETTINGS.accentB),
+  wordmarkFont: Schema.Literals(WORDMARK_FONT_OPTIONS).pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_APP_SETTINGS.wordmarkFont))),
+    Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_APP_SETTINGS.wordmarkFont)),
   ),
   syncTrackNumbers: booleanWithDefault(DEFAULT_APP_SETTINGS.syncTrackNumbers),
   syncFilenames: booleanWithDefault(DEFAULT_APP_SETTINGS.syncFilenames),
@@ -56,9 +86,17 @@ export const loadAppSettings = (storage?: Pick<Storage, "getItem">): AppSettings
     const storedSettings = targetStorage.getItem(APP_SETTINGS_STORAGE_KEY);
     if (storedSettings === null) return DEFAULT_APP_SETTINGS;
 
+    const parsedSettings: unknown = JSON.parse(storedSettings);
+    const decodedSettings = decodeStoredAppSettings(parsedSettings);
+    const legacyTheme =
+      typeof parsedSettings === "object" && parsedSettings !== null && !("mode" in parsedSettings)
+        ? (parsedSettings as { theme?: unknown }).theme
+        : undefined;
+
     return {
       ...DEFAULT_APP_SETTINGS,
-      ...decodeStoredAppSettings(JSON.parse(storedSettings)),
+      ...decodedSettings,
+      mode: legacyTheme === "signal" ? "dark" : decodedSettings.mode,
     };
   } catch {
     return DEFAULT_APP_SETTINGS;

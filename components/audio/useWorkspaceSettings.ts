@@ -35,7 +35,10 @@ export const useWorkspaceSettings = ({
     (nextSettings: AppSettings) => {
       const previous = settingsRef.current;
       const changed =
-        previous.theme !== nextSettings.theme ||
+        previous.mode !== nextSettings.mode ||
+        previous.accentA !== nextSettings.accentA ||
+        previous.accentB !== nextSettings.accentB ||
+        previous.wordmarkFont !== nextSettings.wordmarkFont ||
         previous.syncTrackNumbers !== nextSettings.syncTrackNumbers ||
         previous.syncFilenames !== nextSettings.syncFilenames ||
         previous.audioBitrate !== nextSettings.audioBitrate ||

@@ -13,9 +13,7 @@ const storageWith = (initialValue: string | null) => {
   return {
     getItem: (key: string) => (key === APP_SETTINGS_STORAGE_KEY ? savedValue : null),
     setItem: (key: string, value: string) => {
-      if (key === APP_SETTINGS_STORAGE_KEY) {
-        savedValue = value;
-      }
+      if (key === APP_SETTINGS_STORAGE_KEY) savedValue = value;
     },
     savedValue: () => savedValue,
   };
@@ -32,39 +30,61 @@ describe("settings", () => {
         throw new Error("storage unavailable");
       },
     };
-
     expect(loadAppSettings(storage)).toEqual(DEFAULT_APP_SETTINGS);
   });
 
   it("fills new default keys when stored settings are incomplete", () => {
-    const storage = storageWith(JSON.stringify({ syncTrackNumbers: false }));
-
-    expect(loadAppSettings(storage)).toEqual({
+    expect(loadAppSettings(storageWith(JSON.stringify({ syncTrackNumbers: false })))).toEqual({
       ...DEFAULT_APP_SETTINGS,
       syncTrackNumbers: false,
     });
   });
 
-  it("loads a stored theme", () => {
-    const storage = storageWith(JSON.stringify({ theme: "pressing" }));
-
-    expect(loadAppSettings(storage)).toEqual({
+  it("loads stored appearance settings", () => {
+    const appearance = {
+      mode: "dark",
+      accentA: "#90101a",
+      accentB: "#00939a",
+      wordmarkFont: "rajdhani",
+    } as const;
+    expect(loadAppSettings(storageWith(JSON.stringify(appearance)))).toEqual({
       ...DEFAULT_APP_SETTINGS,
-      theme: "pressing",
+      ...appearance,
     });
+  });
+
+  it("migrates the old dark theme and defaults the new appearance keys", () => {
+    expect(loadAppSettings(storageWith(JSON.stringify({ theme: "signal" })))).toEqual({
+      ...DEFAULT_APP_SETTINGS,
+      mode: "dark",
+    });
+  });
+
+  it("migrates every other old theme to light", () => {
+    expect(loadAppSettings(storageWith(JSON.stringify({ theme: "liner" })))).toEqual(
+      DEFAULT_APP_SETTINGS,
+    );
+  });
+
+  it("does not consult the old theme when mode is present but invalid", () => {
+    expect(
+      loadAppSettings(storageWith(JSON.stringify({ mode: "bogus", theme: "signal" }))),
+    ).toEqual(DEFAULT_APP_SETTINGS);
   });
 
   it("ignores invalid stored setting values", () => {
     const storage = storageWith(
       JSON.stringify({
-        theme: "neon",
+        mode: "dim",
+        accentA: "blue",
+        accentB: "#123",
+        wordmarkFont: "comic-sans",
         syncTrackNumbers: false,
         syncFilenames: "no",
         audioBitrate: "999",
         applySoundCloudAlbumCoverToTracks: "yes",
       }),
     );
-
     expect(loadAppSettings(storage)).toEqual({
       ...DEFAULT_APP_SETTINGS,
       syncTrackNumbers: false,
@@ -74,16 +94,17 @@ describe("settings", () => {
   it("saves app settings", () => {
     const storage = storageWith(null);
     const settings: AppSettings = {
-      theme: "liner",
+      ...DEFAULT_APP_SETTINGS,
+      mode: "dark",
+      accentA: "#90101a",
+      accentB: "#00939a",
+      wordmarkFont: "anton",
       syncTrackNumbers: false,
       syncFilenames: false,
       audioBitrate: "256",
       applySoundCloudAlbumCoverToTracks: false,
     };
-
-    const saved = saveAppSettings(settings, storage);
-
-    expect(saved).toBe(true);
+    expect(saveAppSettings(settings, storage)).toBe(true);
     expect(storage.savedValue()).toBe(JSON.stringify(settings));
   });
 
@@ -93,14 +114,6 @@ describe("settings", () => {
         throw new Error("storage unavailable");
       },
     };
-    const settings: AppSettings = {
-      theme: "pressing",
-      syncTrackNumbers: false,
-      syncFilenames: false,
-      audioBitrate: "256",
-      applySoundCloudAlbumCoverToTracks: false,
-    };
-
-    expect(saveAppSettings(settings, storage)).toBe(false);
+    expect(saveAppSettings(DEFAULT_APP_SETTINGS, storage)).toBe(false);
   });
 });

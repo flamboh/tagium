@@ -6,17 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { AUDIO_BITRATE_OPTIONS } from "./settings";
+import {
+  ACCENT_PRESETS,
+  AUDIO_BITRATE_OPTIONS,
+  MODE_OPTIONS,
+  WORDMARK_FONT_OPTIONS,
+} from "./settings";
 import type { AppSettings } from "./types";
 
-const themeChoices = [
-  { name: "liner", description: "bright, sharp, ink on paper" },
-  { name: "signal", description: "dark, warm, amber glow" },
-  { name: "pressing", description: "bold two-ink print" },
-] as const satisfies readonly {
-  name: AppSettings["theme"];
-  description: string;
-}[];
+const modeDescriptions: Record<AppSettings["mode"], string> = {
+  light: "bright, sharp, ink on paper",
+  dark: "deep, flat, low-light liner",
+};
 
 export interface SettingsPageProps {
   settings: AppSettings;
@@ -48,26 +49,117 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
         <div className="max-w-xl flex flex-col gap-6">
           <fieldset className="flex flex-col gap-3">
             <legend className="text-base font-semibold">appearance</legend>
-            <div className="flex flex-col gap-2">
-              {themeChoices.map(({ name, description }) => (
-                <label
-                  key={name}
-                  className="flex cursor-pointer items-start gap-3 rounded-md border border-input px-3 py-2.5 transition-colors hover:bg-accent/50 has-checked:border-primary has-checked:bg-accent"
-                >
-                  <input
-                    type="radio"
-                    name="theme"
-                    value={name}
-                    checked={settings.theme === name}
-                    onChange={() => onChange({ ...settings, theme: name })}
-                    className="mt-0.5 size-4 shrink-0 accent-primary"
-                  />
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="text-sm font-medium leading-none">{name}</span>
-                    <span className="text-sm text-muted-foreground">{description}</span>
-                  </span>
-                </label>
-              ))}
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium">mode</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {MODE_OPTIONS.map((mode) => (
+                    <label
+                      key={mode}
+                      className="flex cursor-pointer items-start gap-3 rounded-sm border border-input px-3 py-2.5 transition-colors hover:bg-accent/50 has-checked:border-primary has-checked:bg-accent"
+                    >
+                      <input
+                        type="radio"
+                        name="mode"
+                        value={mode}
+                        checked={settings.mode === mode}
+                        onChange={() => onChange({ ...settings, mode })}
+                        className="mt-0.5 size-4 shrink-0 accent-primary"
+                      />
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="text-sm font-medium leading-none">{mode}</span>
+                        <span className="text-xs leading-4 text-muted-foreground">
+                          {modeDescriptions[mode]}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium">accents</span>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {ACCENT_PRESETS.map((preset) => {
+                    const selected =
+                      settings.accentA.toLowerCase() === preset.accentA &&
+                      settings.accentB.toLowerCase() === preset.accentB;
+                    return (
+                      <label
+                        key={preset.name}
+                        className="flex cursor-pointer items-center gap-3 rounded-sm border border-input px-3 py-2.5 transition-colors hover:bg-accent/50 has-checked:border-primary has-checked:bg-accent"
+                      >
+                        <input
+                          type="radio"
+                          name="accent-preset"
+                          value={preset.name}
+                          checked={selected}
+                          onChange={() =>
+                            onChange({
+                              ...settings,
+                              accentA: preset.accentA,
+                              accentB: preset.accentB,
+                            })
+                          }
+                          className="sr-only"
+                        />
+                        <span className="flex shrink-0 gap-1" aria-hidden="true">
+                          <span
+                            className="size-5 border border-foreground/20"
+                            style={{ backgroundColor: preset.accentA }}
+                          />
+                          <span
+                            className="size-5 border border-foreground/20"
+                            style={{ backgroundColor: preset.accentB }}
+                          />
+                        </span>
+                        <span className="text-sm leading-tight">{preset.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  {(["accentA", "accentB"] as const).map((key, index) => (
+                    <label
+                      key={key}
+                      className="flex cursor-pointer items-center justify-between gap-3 rounded-sm border border-input px-3 py-2"
+                    >
+                      <span className="text-sm font-medium">accent {index === 0 ? "a" : "b"}</span>
+                      <input
+                        type="color"
+                        value={settings[key]}
+                        onChange={(event) => onChange({ ...settings, [key]: event.target.value })}
+                        className="h-7 w-10 cursor-pointer border-0 bg-transparent p-0"
+                        aria-label={`accent ${index === 0 ? "a" : "b"}`}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium">wordmark</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {WORDMARK_FONT_OPTIONS.map((font) => (
+                    <label
+                      key={font}
+                      className="flex cursor-pointer items-center gap-3 rounded-sm border border-input px-3 py-2.5 transition-colors hover:bg-accent/50 has-checked:border-primary has-checked:bg-accent"
+                    >
+                      <input
+                        type="radio"
+                        name="wordmark-font"
+                        value={font}
+                        checked={settings.wordmarkFont === font}
+                        onChange={() => onChange({ ...settings, wordmarkFont: font })}
+                        className="sr-only"
+                      />
+                      <span className="wordmark-option text-lg" data-font={font}>
+                        tagium.
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
           </fieldset>
 

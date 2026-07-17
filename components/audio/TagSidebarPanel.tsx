@@ -153,7 +153,7 @@ export default function TagSidebarPanel({
       onDrop={handleSidebarFileDrop}
     >
       <div className="h-14 flex items-center px-5 border-b flex-shrink-0">
-        <span className="wordmark font-bold text-xl tracking-tight select-none">
+        <span className="wordmark text-xl select-none">
           tagium<span className="select-none text-(--wordmark-dot)">.</span>
         </span>
       </div>

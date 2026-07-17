@@ -38,7 +38,10 @@ const metadata: AudioMetadata = {
   trackNumber: null,
 };
 const settings: AppSettings = {
-  theme: "signal",
+  mode: "light",
+  accentA: "#114cbf",
+  accentB: "#e93f2d",
+  wordmarkFont: "archivo-black",
   syncTrackNumbers: false,
   syncFilenames: false,
   audioBitrate: "320",
