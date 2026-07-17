@@ -24,6 +24,7 @@ type SelectionSidebarProps = Pick<
   | "onSelectAlbum"
   | "onSelectFile"
   | "onSelectLooseTrack"
+  | "onClearSelection"
   | "onRemoveFile"
   | "onMoveTrackToAlbum"
   | "onMoveTrackToLoose"
@@ -213,6 +214,7 @@ export const useWorkspaceSelection = ({
       },
     },
     sidebarProps: {
+      onClearSelection: clearSelection,
       onSelectAlbum: (albumId, event) => {
         if (editorRef.current.isCoverProcessing) return;
         setActiveView("editor");

@@ -25,6 +25,7 @@ type WorkspaceSidebarProps = Pick<
   | "onSelectAlbum"
   | "onSelectFile"
   | "onSelectLooseTrack"
+  | "onClearSelection"
   | "onRemoveFile"
   | "onAddAlbum"
   | "onEditAlbum"

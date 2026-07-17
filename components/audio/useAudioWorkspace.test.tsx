@@ -145,6 +145,13 @@ describe("audio workspace", () => {
     );
     expect(hook.result.settings.syncFilenames).toBe(true);
 
+    act(() => hook.result.workspace.sidebarProps.onClearSelection());
+    expect(hook.result.activeView).toBe("editor");
+    expect(hook.result.library.getSnapshot()).toMatchObject({
+      selectedAlbumId: null,
+      selectedFileId: null,
+    });
+
     act(() => {
       window.dispatchEvent(keyboardEvent("a", true));
     });

@@ -33,6 +33,7 @@ interface AlbumSidebarProps {
   onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
   onSelectFile: (albumId: string, fileId: string, event?: ReactMouseEvent) => void;
   onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
+  onClearSelection: () => void;
   onRemoveFile: (fileId: string) => void;
   onRetryDownload: (fileId: string) => void;
   onAddAlbum: () => void;
@@ -71,6 +72,7 @@ export default function AlbumSidebar({
   onSelectAlbum,
   onSelectFile,
   onSelectLooseTrack,
+  onClearSelection,
   onRemoveFile,
   onRetryDownload,
   onAddAlbum,
@@ -111,7 +113,7 @@ export default function AlbumSidebar({
   };
 
   if (albums.length === 0 && looseTracks.length === 0) {
-    return <AlbumSidebarEmptyState onAddAlbum={onAddAlbum} />;
+    return <AlbumSidebarEmptyState onAddAlbum={onAddAlbum} onClearSelection={onClearSelection} />;
   }
 
   return (
@@ -226,7 +228,15 @@ export default function AlbumSidebar({
             id={LOOSE_APPEND_CONTAINER_ID}
             data={{ type: "container", container: "loose" }}
             className="flex-1 min-h-16"
-          />
+          >
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label="clear track selection and return to editor"
+              className="min-h-16 flex-1 cursor-default"
+              onClick={onClearSelection}
+            />
+          </DroppableTrackContainer>
         </div>
         <DragOverlay dropAnimation={null}>
           {activeDrag ? (

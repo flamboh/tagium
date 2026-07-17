@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useRef } from "react";
-import type { ChangeEvent, ReactNode, RefObject } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ChangeEvent, ReactNode, RefObject, TransitionEvent } from "react";
 import {
   Controller,
   useWatch,
@@ -459,22 +459,76 @@ function LoadedTrackMetadataEditor({
 
 export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
   const focusedTitleFileIdRef = useRef<string | null>(null);
+  const selectedFile = hasMetadata(props.selectedFile) ? props.selectedFile : null;
+  const currentSelection = selectedFile
+    ? { selectedFile, selectedFileAlbum: props.selectedFileAlbum }
+    : null;
+  const [retainedSelection, setRetainedSelection] = useState(currentSelection);
+  if (
+    currentSelection &&
+    (retainedSelection?.selectedFile !== currentSelection.selectedFile ||
+      retainedSelection.selectedFileAlbum !== currentSelection.selectedFileAlbum)
+  ) {
+    setRetainedSelection(currentSelection);
+  }
+  const displayedSelection = currentSelection ?? retainedSelection;
+  const trackIsSelected = currentSelection !== null;
+  useEffect(() => {
+    if (trackIsSelected || !retainedSelection) return;
 
-  if (!hasMetadata(props.selectedFile)) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-muted/5">
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const timeoutId = globalThis.setTimeout(
+      () => setRetainedSelection(null),
+      reduceMotion ? 0 : 250,
+    );
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [retainedSelection, trackIsSelected]);
+
+  const releaseExitedSelection = (event: TransitionEvent<HTMLDivElement>) => {
+    if (
+      !trackIsSelected &&
+      event.target === event.currentTarget &&
+      event.propertyName === "opacity"
+    ) {
+      setRetainedSelection(null);
+    }
+  };
+
+  return (
+    <div className="relative min-h-0 flex-1">
+      <div
+        data-editor-state="empty-selection"
+        aria-hidden={trackIsSelected}
+        inert={trackIsSelected}
+        className={`absolute inset-0 flex items-center justify-center bg-muted/5 transition-opacity duration-200 motion-reduce:transition-none ${
+          trackIsSelected ? "pointer-events-none opacity-0" : "opacity-100"
+        }`}
+      >
         <div className="text-center">
           <p className="text-muted-foreground">select a track to edit its tags</p>
         </div>
       </div>
-    );
-  }
-
-  return (
-    <LoadedTrackMetadataEditor
-      {...props}
-      selectedFile={props.selectedFile}
-      focusedTitleFileIdRef={focusedTitleFileIdRef}
-    />
+      <div
+        data-editor-state="loaded-track"
+        aria-hidden={!trackIsSelected}
+        inert={!trackIsSelected}
+        onTransitionEnd={releaseExitedSelection}
+        className={`absolute inset-0 flex min-h-0 flex-col transition-opacity duration-200 motion-reduce:transition-none ${
+          trackIsSelected ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      >
+        {displayedSelection ? (
+          <LoadedTrackMetadataEditor
+            {...props}
+            selectedFile={displayedSelection.selectedFile}
+            selectedFileId={displayedSelection.selectedFile.id}
+            selectedFileAlbum={displayedSelection.selectedFileAlbum}
+            focusedTitleFileIdRef={focusedTitleFileIdRef}
+          />
+        ) : null}
+      </div>
+    </div>
   );
 }
