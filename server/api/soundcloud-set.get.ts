@@ -15,6 +15,7 @@ const soundCloudTrackSchema = Schema.Struct({
   title: Schema.optionalKey(Schema.String),
   permalink_url: Schema.optionalKey(urlStringSchema),
   duration: Schema.optionalKey(Schema.Finite),
+  artwork_url: Schema.optionalKey(Schema.NullOr(urlStringSchema)),
 });
 const decodeSoundCloudTrackOption = Schema.decodeUnknownOption(soundCloudTrackSchema);
 
@@ -40,6 +41,7 @@ const soundCloudResolvedTrackSchema = Schema.Struct({
   title: Schema.String,
   permalink_url: urlStringSchema,
   duration: Schema.optionalKey(Schema.Finite),
+  artwork_url: Schema.optionalKey(Schema.NullOr(urlStringSchema)),
 });
 
 const getCoverUrl = (artworkUrl: string | null | undefined) => {
@@ -126,6 +128,7 @@ export default defineHandler(async (event) => {
   if (isAlbum && playlist.release_date) {
     yearDate = playlist.release_date;
   }
+  const artworkUrl = playlist.artwork_url ?? tracks.find((track) => track.artwork_url)?.artwork_url;
 
   return {
     title: playlist.title.trim(),
@@ -133,7 +136,7 @@ export default defineHandler(async (event) => {
     genre: playlist.genre?.trim() ?? "",
     year: getYear(yearDate),
     isAlbum,
-    coverUrl: getCoverUrl(playlist.artwork_url),
+    coverUrl: getCoverUrl(artworkUrl),
     tracks: tracks.map((track, index) => ({
       title: track.title.trim(),
       url: track.permalink_url,
