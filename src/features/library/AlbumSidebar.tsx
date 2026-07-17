@@ -30,6 +30,7 @@ interface AlbumSidebarProps {
   selectedAlbumId: string | null;
   selectedFileId: string | null;
   selectedFileIds: Set<string>;
+  albumIdsWithCleanupSuggestions: ReadonlySet<string>;
   onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
   onSelectFile: (albumId: string, fileId: string, event?: ReactMouseEvent) => void;
   onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
@@ -38,6 +39,7 @@ interface AlbumSidebarProps {
   onRetryDownload: (fileId: string) => void;
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
+  onReviewAlbumCleanup: (albumId: string) => void;
   onDownloadAlbum: (albumId: string) => void;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
@@ -69,6 +71,7 @@ export default function AlbumSidebar({
   selectedAlbumId,
   selectedFileId,
   selectedFileIds,
+  albumIdsWithCleanupSuggestions,
   onSelectAlbum,
   onSelectFile,
   onSelectLooseTrack,
@@ -77,6 +80,7 @@ export default function AlbumSidebar({
   onRetryDownload,
   onAddAlbum,
   onEditAlbum,
+  onReviewAlbumCleanup,
   onDownloadAlbum,
   onUploadToAlbum,
   onMoveTrackToAlbum,
@@ -175,8 +179,10 @@ export default function AlbumSidebar({
                   album={album}
                   selected={selectedAlbumId === album.id}
                   canDownload={canDownloadAlbum}
+                  hasCleanupSuggestions={albumIdsWithCleanupSuggestions.has(album.id)}
                   onSelect={(event) => onSelectAlbum(album.id, event)}
                   onEdit={() => onEditAlbum(album.id)}
+                  onReviewCleanup={() => onReviewAlbumCleanup(album.id)}
                   onDownload={() => onDownloadAlbum(album.id)}
                   {...fileDropProps}
                 >

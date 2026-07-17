@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,22 +14,23 @@ import type { MetadataCleanupSuggestion } from "@/features/library/metadataClean
 
 export interface MetadataCleanupDialogProps {
   open: boolean;
+  selectionSessionKey: number;
   suggestions: MetadataCleanupSuggestion[];
   onOpenChange: (open: boolean) => void;
   onApply: (suggestions: MetadataCleanupSuggestion[]) => void;
 }
 
-export default function MetadataCleanupDialog({
+type MetadataCleanupDialogSessionProps = Omit<MetadataCleanupDialogProps, "selectionSessionKey">;
+
+function MetadataCleanupDialogSession({
   open,
   suggestions,
   onOpenChange,
   onApply,
-}: MetadataCleanupDialogProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (open) setSelectedIds(new Set(suggestions.map((suggestion) => suggestion.trackId)));
-  }, [open, suggestions]);
+}: MetadataCleanupDialogSessionProps) {
+  const [selectedIds, setSelectedIds] = useState(
+    () => new Set(suggestions.map((suggestion) => suggestion.trackId)),
+  );
 
   const selectedSuggestions = suggestions.filter((suggestion) =>
     selectedIds.has(suggestion.trackId),
@@ -91,4 +92,11 @@ export default function MetadataCleanupDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+export default function MetadataCleanupDialog({
+  selectionSessionKey,
+  ...dialogProps
+}: MetadataCleanupDialogProps) {
+  return <MetadataCleanupDialogSession key={selectionSessionKey} {...dialogProps} />;
 }

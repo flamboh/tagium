@@ -22,6 +22,7 @@ export interface TagSidebarPanelProps {
   selectedAlbumId: string | null;
   selectedFileId: string | null;
   selectedFileIds: Set<string>;
+  albumIdsWithCleanupSuggestions: ReadonlySet<string>;
   settingsOpen: boolean;
   onAudioUpload: (files: File[]) => void;
   onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
@@ -32,6 +33,7 @@ export interface TagSidebarPanelProps {
   onRetryDownload: (fileId: string) => void;
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
+  onReviewAlbumCleanup: (albumId: string) => void;
   onDownloadAlbum: (albumId: string) => void;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
@@ -65,6 +67,7 @@ export default function TagSidebarPanel({
   selectedAlbumId,
   selectedFileId,
   selectedFileIds,
+  albumIdsWithCleanupSuggestions,
   settingsOpen,
   onAudioUpload,
   onSelectAlbum,
@@ -75,6 +78,7 @@ export default function TagSidebarPanel({
   onRetryDownload,
   onAddAlbum,
   onEditAlbum,
+  onReviewAlbumCleanup,
   onDownloadAlbum,
   onUploadToAlbum,
   onMoveTrackToAlbum,
@@ -162,6 +166,7 @@ export default function TagSidebarPanel({
         selectedAlbumId={selectedAlbumId}
         selectedFileId={selectedFileId}
         selectedFileIds={selectedFileIds}
+        albumIdsWithCleanupSuggestions={albumIdsWithCleanupSuggestions}
         onSelectAlbum={onSelectAlbum}
         onSelectFile={onSelectFile}
         onSelectLooseTrack={onSelectLooseTrack}
@@ -170,6 +175,7 @@ export default function TagSidebarPanel({
         onRetryDownload={onRetryDownload}
         onAddAlbum={onAddAlbum}
         onEditAlbum={onEditAlbum}
+        onReviewAlbumCleanup={onReviewAlbumCleanup}
         onDownloadAlbum={onDownloadAlbum}
         onUploadToAlbum={onUploadToAlbum}
         onMoveTrackToAlbum={onMoveTrackToAlbum}

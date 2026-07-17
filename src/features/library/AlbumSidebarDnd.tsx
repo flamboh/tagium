@@ -6,6 +6,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import {
   AlertCircle,
+  CircleAlert,
   Ban,
   Check,
   Download,
@@ -207,9 +208,11 @@ type AlbumCardProps = {
   album: AlbumGroup;
   selected: boolean;
   canDownload: boolean;
+  hasCleanupSuggestions: boolean;
   children: ReactNode;
   onSelect: (event: ReactMouseEvent) => void;
   onEdit: () => void;
+  onReviewCleanup: () => void;
   onDownload: () => void;
   onFileDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
   onFileDrop: (event: React.DragEvent<HTMLDivElement>) => void;
@@ -219,9 +222,11 @@ export function SortableAlbumCard({
   album,
   selected,
   canDownload,
+  hasCleanupSuggestions,
   children,
   onSelect,
   onEdit,
+  onReviewCleanup,
   onDownload,
   onFileDragOver,
   onFileDrop,
@@ -269,6 +274,23 @@ export function SortableAlbumCard({
             </div>
           </div>
         </button>
+        {hasCleanupSuggestions && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                onClick={onReviewCleanup}
+                aria-label={`apply suggested edits to ${album.title}`}
+              >
+                <CircleAlert className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>apply edits?</TooltipContent>
+          </Tooltip>
+        )}
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="inline-flex">
