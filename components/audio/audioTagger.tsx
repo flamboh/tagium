@@ -1,6 +1,14 @@
 "use client";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  useReducer,
+} from "react";
 import { Cause, Effect, Exit } from "effect";
 import { SubmitHandler, useForm } from "react-hook-form";
 import filenamify from "filenamify";
@@ -94,6 +102,7 @@ import { isYouTubePlaylistUrl, resolveYouTubePlaylist } from "./youtubePlaylist"
 import { getSystemFailurePresentation, reportSystemFailure } from "./systemFailure";
 import { isValidFilenameBase } from "./filename";
 import { writeExportMetadata } from "./exportMetadataWrites";
+import { createLibraryState, libraryReducer, type LibraryAction } from "./libraryState";
 import {
   subscribeToEditorKeyboardShortcuts,
   type EditorKeyboardShortcutActions,
@@ -198,13 +207,16 @@ const withMergedPendingMetadataPatch = (file: TagiumFile, patch: MetadataPatch |
 const clearPendingMetadataPatch = (file: TagiumFile) => withPendingMetadataPatch(file, undefined);
 
 export default function AudioTagger() {
-  const [files, setFiles] = useState<TagiumFile[]>([]);
-  const [albums, setAlbums] = useState<AlbumGroup[]>([]);
-  const [looseTrackIds, setLooseTrackIds] = useState<string[]>([]);
-  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-  const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
-  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
-  const [lastSelectedFileId, setLastSelectedFileId] = useState<string | null>(null);
+  const [library, dispatchLibraryState] = useReducer(libraryReducer, undefined, createLibraryState);
+  const {
+    files,
+    albums,
+    looseTrackIds,
+    selectedFileId,
+    selectedAlbumId,
+    selectedFileIds,
+    rangeAnchorFileId,
+  } = library;
   const [loading, setLoading] = useState(false);
   const [urlImporting, setUrlImporting] = useState(false);
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
@@ -232,6 +244,7 @@ export default function AudioTagger() {
   const filesRef = useRef<TagiumFile[]>(files);
   const albumsRef = useRef<AlbumGroup[]>(albums);
   const selectedFileIdRef = useRef<string | null>(selectedFileId);
+  const libraryRef = useRef(library);
   const lastResetFileIdRef = useRef<string | null>(null);
   const formDirtyRef = useRef(false);
   const importQueueRef = useRef<Promise<void> | null>(null);
@@ -257,12 +270,16 @@ export default function AudioTagger() {
     formState: { dirtyFields },
   } = useForm<AudioMetadata>();
   const formIsDirty = Object.keys(dirtyFields).length > 0;
-  useLayoutEffect(() => {
-    filesRef.current = files;
-    albumsRef.current = albums;
-    selectedFileIdRef.current = selectedFileId;
-    formDirtyRef.current = formIsDirty;
-  }, [albums, files, formIsDirty, selectedFileId]);
+  const dispatchLibrary = useCallback(
+    (action: LibraryAction) => {
+      const nextLibrary = libraryReducer(libraryRef.current, action);
+      libraryRef.current = nextLibrary;
+      filesRef.current = nextLibrary.files;
+      albumsRef.current = nextLibrary.albums;
+      dispatchLibraryState(action);
+    },
+    [dispatchLibraryState],
+  );
   const selectedFile = useMemo(
     () => files.find((file) => file.id === selectedFileId) ?? null,
     [files, selectedFileId],
@@ -271,55 +288,25 @@ export default function AudioTagger() {
     () => (selectedFile ? albums.find((a) => a.trackIds.includes(selectedFile.id)) : undefined),
     [selectedFile, albums],
   );
+  const availableMetadataCleanupSuggestions = useMemo(
+    () => (loading ? [] : findMetadataCleanupSuggestions(files, albums)),
+    [albums, files, loading],
+  );
   useLayoutEffect(() => {
+    let nextFormIsDirty = formIsDirty;
     if (selectedFile?.metadata) {
       const selectedFileChanged = lastResetFileIdRef.current !== selectedFile.id;
-      if (!selectedFileChanged && formDirtyRef.current) {
-        return;
+      if (selectedFileChanged || !formIsDirty) {
+        lastResetFileIdRef.current = selectedFile.id;
+        reset(selectedFile.metadata);
+        nextFormIsDirty = false;
       }
-      lastResetFileIdRef.current = selectedFile.id;
-      reset(selectedFile.metadata);
     }
-  }, [selectedFile, reset]);
+    selectedFileIdRef.current = selectedFileId;
+    formDirtyRef.current = nextFormIsDirty;
+  }, [formIsDirty, reset, selectedFile, selectedFileId]);
   useEffect(() => {
-    const fileIdSet = new Set(files.map((file) => file.id));
-    setLooseTrackIds((prevLooseTrackIds) =>
-      asUniqueTrackIds(prevLooseTrackIds.filter((trackId) => fileIdSet.has(trackId))),
-    );
-  }, [files]);
-  useEffect(() => {
-    const hasSelectedAlbum =
-      !!selectedAlbumId && albums.some((album) => album.id === selectedAlbumId);
-    const hasSelectedFile = !!selectedFileId && files.some((file) => file.id === selectedFileId);
-    const isManuallyDeselected = selectedAlbumId === null && selectedFileId === null;
-    if (isManuallyDeselected) {
-      return;
-    }
-    if (hasSelectedFile) {
-      return;
-    }
-    if (!selectedFileId && hasSelectedAlbum) {
-      return;
-    }
-    if (looseTrackIds.length > 0 && !hasSelectedAlbum) {
-      setSelectedAlbumId(null);
-      setSelectedFileId(looseTrackIds[0]);
-      return;
-    }
-    const firstAlbumWithTrack = albums.find((album) => album.trackIds.length > 0);
-    if (firstAlbumWithTrack) {
-      setSelectedAlbumId(firstAlbumWithTrack.id);
-      setSelectedFileId(firstAlbumWithTrack.trackIds[0]);
-      return;
-    }
-    setSelectedFileId(null);
-    setSelectedAlbumId(null);
-  }, [albums, files, looseTrackIds, selectedAlbumId, selectedFileId]);
-
-  useEffect(() => {
-    if (loading) return;
-
-    const suggestions = findMetadataCleanupSuggestions(files, albums).filter((suggestion) => {
+    const suggestions = availableMetadataCleanupSuggestions.filter((suggestion) => {
       const key = `${suggestion.trackId}:${suggestion.beforeTitle}:${suggestion.afterTitle}`;
       if (offeredCleanupKeysRef.current.has(key)) return false;
       offeredCleanupKeysRef.current.add(key);
@@ -327,16 +314,18 @@ export default function AudioTagger() {
     });
     if (suggestions.length === 0) return;
 
-    setMetadataCleanupSuggestions(suggestions);
     const noun = suggestions.length === 1 ? "track" : "tracks";
     toast(`we found ${suggestions.length} ${noun} that could be cleaned up`, {
       description: `${suggestions[0].beforeTitle} → ${suggestions[0].afterTitle}`,
       action: {
         label: "review",
-        onClick: () => setMetadataCleanupOpen(true),
+        onClick: () => {
+          setMetadataCleanupSuggestions(suggestions);
+          setMetadataCleanupOpen(true);
+        },
       },
     });
-  }, [albums, files, loading]);
+  }, [availableMetadataCleanupSuggestions]);
 
   const handleTagUpdate = async (fileToUpdate: TagiumFile, newTags: AudioMetadata) => {
     const latestFileToUpdate =
@@ -365,8 +354,7 @@ export default function AudioTagger() {
             )
           : file,
       );
-      filesRef.current = nextFiles;
-      setFiles(nextFiles);
+      dispatchLibrary({ type: "content-replaced", files: nextFiles });
       if (selectedFileIdRef.current === fileToUpdate.id) {
         reset(metadata);
       }
@@ -398,8 +386,7 @@ export default function AudioTagger() {
             })
           : file,
       );
-      filesRef.current = nextFiles;
-      setFiles(nextFiles);
+      dispatchLibrary({ type: "content-replaced", files: nextFiles });
       if (selectedFileIdRef.current === fileToUpdate.id) {
         reset(metadata);
       }
@@ -427,8 +414,7 @@ export default function AudioTagger() {
             )
           : file,
       );
-      filesRef.current = nextFiles;
-      setFiles(nextFiles);
+      dispatchLibrary({ type: "content-replaced", files: nextFiles });
       throw error;
     }
   };
@@ -501,20 +487,18 @@ export default function AudioTagger() {
             )
           : file,
       );
-      filesRef.current = nextFiles;
-      setFiles(nextFiles);
+      dispatchLibrary({ type: "content-replaced", files: nextFiles });
     },
-    [dirtyFields, getSubmittedMetadata, getValues, settings.syncFilenames],
+    [dirtyFields, dispatchLibrary, getSubmittedMetadata, getValues, settings.syncFilenames],
   );
 
   const bufferCurrentFormMetadata = useCallback(
     (trackIds?: string[]) => {
       const nextFiles = applyCurrentFormMetadataToFiles(filesRef.current, trackIds);
       if (nextFiles === filesRef.current) return;
-      filesRef.current = nextFiles;
-      setFiles(nextFiles);
+      dispatchLibrary({ type: "content-replaced", files: nextFiles });
     },
-    [applyCurrentFormMetadataToFiles],
+    [applyCurrentFormMetadataToFiles, dispatchLibrary],
   );
 
   const prepareFilesForExport = (albumIds?: string[]) => {
@@ -538,8 +522,7 @@ export default function AudioTagger() {
     if (settings.syncFilenames) {
       syncedFiles = applySyncedFilenamesToFiles(syncedFiles, trackIds);
     }
-    filesRef.current = syncedFiles;
-    setFiles(syncedFiles);
+    dispatchLibrary({ type: "content-replaced", files: syncedFiles });
     return syncedFiles;
   };
 
@@ -615,8 +598,7 @@ export default function AudioTagger() {
               : undefined,
           })),
         ];
-        filesRef.current = nextFiles;
-        setFiles(nextFiles);
+        dispatchLibrary({ type: "content-replaced", files: nextFiles });
 
         const currentAlbums = albumsRef.current;
         const hasTargetAlbum = Boolean(
@@ -640,8 +622,7 @@ export default function AudioTagger() {
                 }
               : album,
           );
-          albumsRef.current = nextAlbums;
-          setAlbums(nextAlbums);
+          let finalFiles = filesRef.current;
           const targetAlbum = nextAlbums.find((album) => album.id === targetAlbumId);
           if (targetAlbum) {
             let taggedFiles = applyAlbumSharedTagsToFiles(filesRef.current, targetAlbum);
@@ -651,11 +632,17 @@ export default function AudioTagger() {
             if (settings.syncTrackNumbers) {
               taggedFiles = applyTrackOrderNumbersToFiles(taggedFiles, nextAlbums, [targetAlbumId]);
             }
-            filesRef.current = taggedFiles;
-            setFiles(taggedFiles);
+            finalFiles = taggedFiles;
           }
-          setSelectedFileId(orderedUploads[0].file.id);
-          setSelectedAlbumId(targetAlbumId);
+          dispatchLibrary({
+            type: "content-replaced",
+            files: finalFiles,
+            albums: nextAlbums,
+            selection: {
+              selectedFileId: orderedUploads[0].file.id,
+              selectedAlbumId: targetAlbumId,
+            },
+          });
         } else if (importedAlbum) {
           let importedCover: AudioMetadata["picture"] | undefined;
           if (importedAlbum.coverUrl) {
@@ -676,9 +663,7 @@ export default function AudioTagger() {
             trackIds: orderedUploads.map((upload) => upload.file.id),
             year: importedAlbum.year,
           };
-          const nextAlbums = [...currentAlbums, downloadedAlbum];
-          albumsRef.current = nextAlbums;
-          setAlbums(nextAlbums);
+          const nextAlbums = [...albumsRef.current, downloadedAlbum];
           let taggedFiles = applyAlbumSharedTagsToFiles(filesRef.current, downloadedAlbum);
           if (settings.syncFilenames) {
             taggedFiles = applySyncedFilenamesToFiles(taggedFiles, downloadedAlbum.trackIds);
@@ -688,10 +673,15 @@ export default function AudioTagger() {
               downloadedAlbum.id,
             ]);
           }
-          filesRef.current = taggedFiles;
-          setFiles(taggedFiles);
-          setSelectedFileId(orderedUploads[0].file.id);
-          setSelectedAlbumId(downloadedAlbum.id);
+          dispatchLibrary({
+            type: "content-replaced",
+            files: taggedFiles,
+            albums: nextAlbums,
+            selection: {
+              selectedFileId: orderedUploads[0].file.id,
+              selectedAlbumId: downloadedAlbum.id,
+            },
+          });
         } else {
           const merged = mergeUploadedTracksIntoAlbums(currentAlbums, orderedUploads, {
             forceSingleAlbum,
@@ -699,13 +689,13 @@ export default function AudioTagger() {
             settings,
           });
           firstSelectedAlbumId = merged.firstSelectedAlbumId;
-          albumsRef.current = merged.albums;
-          setAlbums(merged.albums);
-          if (!forceSingleAlbum && merged.unassignedTrackIds.length > 0) {
-            setLooseTrackIds((prevLooseTrackIds) =>
-              asUniqueTrackIds([...prevLooseTrackIds, ...merged.unassignedTrackIds]),
-            );
-          }
+          const nextLooseTrackIds =
+            !forceSingleAlbum && merged.unassignedTrackIds.length > 0
+              ? asUniqueTrackIds([
+                  ...libraryRef.current.looseTrackIds,
+                  ...merged.unassignedTrackIds,
+                ])
+              : libraryRef.current.looseTrackIds;
           let syncedFiles = filesRef.current;
           const uploadedTrackIds = orderedUploads.map((upload) => upload.file.id);
           if (settings.syncFilenames) {
@@ -718,15 +708,19 @@ export default function AudioTagger() {
               merged.albumsToSync,
             );
           }
-          if (syncedFiles !== filesRef.current) {
-            filesRef.current = syncedFiles;
-            setFiles(syncedFiles);
-          }
           const firstUploadedTrack = orderedUploads[0];
           const firstTrackIsLoose = merged.unassignedTrackIds.includes(firstUploadedTrack.file.id);
           targetKind = firstTrackIsLoose ? "loose" : "album";
-          setSelectedFileId(firstUploadedTrack.file.id);
-          setSelectedAlbumId(firstTrackIsLoose ? null : firstSelectedAlbumId);
+          dispatchLibrary({
+            type: "content-replaced",
+            files: syncedFiles,
+            albums: merged.albums,
+            looseTrackIds: nextLooseTrackIds,
+            selection: {
+              selectedFileId: firstUploadedTrack.file.id,
+              selectedAlbumId: firstTrackIsLoose ? null : firstSelectedAlbumId,
+            },
+          });
         }
       } finally {
         reservedImportKeys.forEach((importKey) => pendingImportKeysRef.current.delete(importKey));
@@ -741,8 +735,7 @@ export default function AudioTagger() {
   };
   const replaceFileById = (fileId: string, nextFile: TagiumFile) => {
     const nextFiles = filesRef.current.map((file) => (file.id === fileId ? nextFile : file));
-    filesRef.current = nextFiles;
-    setFiles(nextFiles);
+    dispatchLibrary({ type: "content-replaced", files: nextFiles });
   };
   const markDownloadError = (fileId: string, error: unknown) => {
     const message = reportSystemFailure(error, "download").trackDescription;
@@ -756,8 +749,7 @@ export default function AudioTagger() {
           }
         : file,
     );
-    filesRef.current = nextFiles;
-    setFiles(nextFiles);
+    dispatchLibrary({ type: "content-replaced", files: nextFiles });
   };
   const hydrateDownloadedTrack = (fileId: string, downloadedFile: File) =>
     Effect.scoped(
@@ -876,8 +868,7 @@ export default function AudioTagger() {
           }
         : file,
     );
-    filesRef.current = nextFiles;
-    setFiles(nextFiles);
+    dispatchLibrary({ type: "content-replaced", files: nextFiles });
   };
   const markDownloadsCanceled = (trackIds: string[]) => {
     const trackIdSet = new Set(trackIds);
@@ -890,8 +881,7 @@ export default function AudioTagger() {
           }
         : file,
     );
-    filesRef.current = nextFiles;
-    setFiles(nextFiles);
+    dispatchLibrary({ type: "content-replaced", files: nextFiles });
   };
   const getPlaylistDownloadController = () => {
     if (playlistDownloadControllerRef.current) return playlistDownloadControllerRef.current;
@@ -965,15 +955,17 @@ export default function AudioTagger() {
       metadata,
     });
     const nextFiles = [...filesRef.current, ...plan.pendingFiles];
-    filesRef.current = nextFiles;
-    setFiles(nextFiles);
-    setLooseTrackIds((prevLooseTrackIds) =>
-      asUniqueTrackIds([...prevLooseTrackIds, ...plan.looseTrackIds]),
-    );
-    setSelectedAlbumId(plan.selection.selectedAlbumId);
-    setSelectedFileId(plan.selection.selectedFileId);
-    setSelectedFileIds(plan.selection.selectedFileIds);
-    setLastSelectedFileId(plan.selection.lastSelectedFileId);
+    dispatchLibrary({
+      type: "content-replaced",
+      files: nextFiles,
+      looseTrackIds: asUniqueTrackIds([...libraryRef.current.looseTrackIds, ...plan.looseTrackIds]),
+      selection: {
+        selectedAlbumId: plan.selection.selectedAlbumId,
+        selectedFileId: plan.selection.selectedFileId,
+        selectedFileIds: plan.selection.selectedFileIds,
+        rangeAnchorFileId: plan.selection.lastSelectedFileId,
+      },
+    });
     importLifecycleTracker.resolve(importOperationId, {
       trackIds: plan.queuedTracks.map((track) => track.fileId),
       hasCover: false,
@@ -990,14 +982,17 @@ export default function AudioTagger() {
     });
     const nextFiles = [...filesRef.current, ...plan.pendingFiles];
     const nextAlbums = [...albumsRef.current, plan.album];
-    filesRef.current = nextFiles;
-    albumsRef.current = nextAlbums;
-    setFiles(nextFiles);
-    setAlbums(nextAlbums);
-    setSelectedAlbumId(plan.selection.selectedAlbumId);
-    setSelectedFileId(plan.selection.selectedFileId);
-    setSelectedFileIds(plan.selection.selectedFileIds);
-    setLastSelectedFileId(plan.selection.lastSelectedFileId);
+    dispatchLibrary({
+      type: "content-replaced",
+      files: nextFiles,
+      albums: nextAlbums,
+      selection: {
+        selectedAlbumId: plan.selection.selectedAlbumId,
+        selectedFileId: plan.selection.selectedFileId,
+        selectedFileIds: plan.selection.selectedFileIds,
+        rangeAnchorFileId: plan.selection.lastSelectedFileId,
+      },
+    });
 
     const coverImport = plan.coverImport;
     if (coverImport) {
@@ -1018,12 +1013,13 @@ export default function AudioTagger() {
             cover,
             selectedFileIdRef.current,
           );
-          albumsRef.current = coveredAlbums;
-          setAlbums(coveredAlbums);
-          if (coveredFiles === filesRef.current) return;
-
-          filesRef.current = coveredFiles;
-          setFiles(coveredFiles);
+          const filesChanged = coveredFiles !== filesRef.current;
+          dispatchLibrary({
+            type: "content-replaced",
+            albums: coveredAlbums,
+            files: coveredFiles,
+          });
+          if (!filesChanged) return;
           if (selectedMetadata) {
             reset(selectedMetadata);
           }
@@ -1189,8 +1185,7 @@ export default function AudioTagger() {
       syncedFiles = applySyncedFilenamesToFiles(syncedFiles);
     }
     if (syncedFiles !== filesRef.current) {
-      filesRef.current = syncedFiles;
-      setFiles(syncedFiles);
+      dispatchLibrary({ type: "content-replaced", files: syncedFiles });
     }
   };
   const handleTrackCoverUpload = (
@@ -1294,22 +1289,12 @@ export default function AudioTagger() {
       if (settings.syncTrackNumbers && affectedAlbumIds.length > 0) {
         nextFiles = applyTrackOrderNumbersToFiles(nextFiles, nextAlbums, affectedAlbumIds);
       }
-      filesRef.current = nextFiles;
-      albumsRef.current = nextAlbums;
-      setFiles(nextFiles);
-      setAlbums(nextAlbums);
-      setLooseTrackIds((prevLooseTrackIds) =>
-        prevLooseTrackIds.filter((trackId) => !idSet.has(trackId)),
-      );
-      setSelectedFileIds((prev) => {
-        return new Set(Array.from(prev).filter((fileId) => !idSet.has(fileId)));
+      dispatchLibrary({
+        type: "tracks-removed",
+        trackIds: idsToRemove,
+        files: nextFiles,
+        albums: nextAlbums,
       });
-      setSelectedFileId((currentFileId) =>
-        currentFileId && idSet.has(currentFileId) ? null : currentFileId,
-      );
-      setLastSelectedFileId((currentFileId) =>
-        currentFileId && idSet.has(currentFileId) ? null : currentFileId,
-      );
       if (removedFiles.length > 0) {
         analytics.capture({
           type: "tracks_removed",
@@ -1318,21 +1303,17 @@ export default function AudioTagger() {
         });
       }
     },
-    [settings.syncTrackNumbers],
+    [dispatchLibrary, settings.syncTrackNumbers],
   );
   const requestRemoveFile = (idToRemove: string) => {
     if (isTrackCoverProcessing) return;
     setPendingTrackRemoval([idToRemove]);
   };
   const handleRemoveAlbum = (albumId: string) => {
-    const albumToRemove = albums.find((album) => album.id === albumId);
+    const albumToRemove = albumsRef.current.find((album) => album.id === albumId);
     if (!albumToRemove) return;
-    const trackIdSet = new Set(albumToRemove.trackIds);
-    setFiles((prevFiles) => prevFiles.filter((file) => !trackIdSet.has(file.id)));
-    setAlbums((prevAlbums) => prevAlbums.filter((album) => album.id !== albumId));
-    setLooseTrackIds((prevLooseTrackIds) =>
-      prevLooseTrackIds.filter((trackId) => !trackIdSet.has(trackId)),
-    );
+    playlistDownloadControllerRef.current?.remove(albumToRemove.trackIds);
+    dispatchLibrary({ type: "album-removed", albumId });
     if (editingAlbumId === albumId) {
       closeAlbumDialog();
     }
@@ -1342,32 +1323,11 @@ export default function AudioTagger() {
     setActiveView("editor");
     bufferCurrentFormMetadata();
     const isMultiSelect = event?.ctrlKey || event?.metaKey;
-
-    if (isMultiSelect) {
-      setSelectedAlbumId(albumId);
-      const album = albums.find((entry) => entry.id === albumId);
-      const firstTrackId = album?.trackIds[0];
-      if (firstTrackId) {
-        setSelectedFileIds((prev) => {
-          const next = new Set(prev);
-          if (next.has(firstTrackId)) {
-            next.delete(firstTrackId);
-          } else {
-            next.add(firstTrackId);
-          }
-          return next;
-        });
-        setSelectedFileId(firstTrackId);
-        setLastSelectedFileId(firstTrackId);
-      }
-    } else {
-      setSelectedAlbumId(albumId);
-      const album = albums.find((entry) => entry.id === albumId);
-      const firstTrackId = album?.trackIds[0] ?? null;
-      setSelectedFileId(firstTrackId);
-      setSelectedFileIds(firstTrackId ? new Set([firstTrackId]) : new Set());
-      setLastSelectedFileId(firstTrackId);
-    }
+    dispatchLibrary({
+      type: "album-selected",
+      albumId,
+      mode: isMultiSelect ? "toggle" : "replace",
+    });
   };
 
   const handleSelectFile = (albumId: string, fileId: string, event?: ReactMouseEvent) => {
@@ -1375,45 +1335,13 @@ export default function AudioTagger() {
     setActiveView("editor");
     bufferCurrentFormMetadata();
     const isMultiSelect = event?.ctrlKey || event?.metaKey;
-    const isRangeSelect = event?.shiftKey && lastSelectedFileId;
-
-    if (isRangeSelect) {
-      const album = albums.find((entry) => entry.id === albumId);
-      if (!album) return;
-      const trackIds = album.trackIds;
-      const startIndex = trackIds.indexOf(lastSelectedFileId);
-      const endIndex = trackIds.indexOf(fileId);
-      if (startIndex >= 0 && endIndex >= 0) {
-        const minIndex = Math.min(startIndex, endIndex);
-        const maxIndex = Math.max(startIndex, endIndex);
-        const rangeIds = trackIds.slice(minIndex, maxIndex + 1);
-        setSelectedFileIds((prev) => {
-          const next = new Set(prev);
-          rangeIds.forEach((id) => next.add(id));
-          return next;
-        });
-        setSelectedFileId(fileId);
-        setLastSelectedFileId(fileId);
-      }
-    } else if (isMultiSelect) {
-      setSelectedAlbumId(albumId);
-      setSelectedFileIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(fileId)) {
-          next.delete(fileId);
-        } else {
-          next.add(fileId);
-        }
-        return next;
-      });
-      setSelectedFileId(fileId);
-      setLastSelectedFileId(fileId);
-    } else {
-      setSelectedAlbumId(albumId);
-      setSelectedFileId(fileId);
-      setSelectedFileIds(new Set([fileId]));
-      setLastSelectedFileId(fileId);
-    }
+    const isRangeSelect = Boolean(event?.shiftKey && rangeAnchorFileId);
+    dispatchLibrary({
+      type: "track-selected",
+      albumId,
+      fileId,
+      mode: isRangeSelect ? "range" : isMultiSelect ? "toggle" : "replace",
+    });
   };
 
   const handleSelectLooseTrack = (fileId: string, event?: ReactMouseEvent) => {
@@ -1421,53 +1349,21 @@ export default function AudioTagger() {
     setActiveView("editor");
     bufferCurrentFormMetadata();
     const isMultiSelect = event?.ctrlKey || event?.metaKey;
-    const isRangeSelect = event?.shiftKey && lastSelectedFileId;
-
-    if (isRangeSelect) {
-      const startIndex = looseTrackIds.indexOf(lastSelectedFileId);
-      const endIndex = looseTrackIds.indexOf(fileId);
-      if (startIndex >= 0 && endIndex >= 0) {
-        const minIndex = Math.min(startIndex, endIndex);
-        const maxIndex = Math.max(startIndex, endIndex);
-        const rangeIds = looseTrackIds.slice(minIndex, maxIndex + 1);
-        setSelectedFileIds((prev) => {
-          const next = new Set(prev);
-          rangeIds.forEach((id) => next.add(id));
-          return next;
-        });
-        setSelectedFileId(fileId);
-        setLastSelectedFileId(fileId);
-      }
-    } else if (isMultiSelect) {
-      setSelectedAlbumId(null);
-      setSelectedFileIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(fileId)) {
-          next.delete(fileId);
-        } else {
-          next.add(fileId);
-        }
-        return next;
-      });
-      setSelectedFileId(fileId);
-      setLastSelectedFileId(fileId);
-    } else {
-      setSelectedAlbumId(null);
-      setSelectedFileId(fileId);
-      setSelectedFileIds(new Set([fileId]));
-      setLastSelectedFileId(fileId);
-    }
+    const isRangeSelect = Boolean(event?.shiftKey && rangeAnchorFileId);
+    dispatchLibrary({
+      type: "track-selected",
+      albumId: null,
+      fileId,
+      mode: isRangeSelect ? "range" : isMultiSelect ? "toggle" : "replace",
+    });
   };
 
   const handleClearSelection = useCallback(() => {
     if (isTrackCoverProcessing) return;
     setActiveView("editor");
     bufferCurrentFormMetadata();
-    setSelectedAlbumId(null);
-    setSelectedFileId(null);
-    setSelectedFileIds(new Set());
-    setLastSelectedFileId(null);
-  }, [bufferCurrentFormMetadata, isTrackCoverProcessing]);
+    dispatchLibrary({ type: "selection-cleared" });
+  }, [bufferCurrentFormMetadata, dispatchLibrary, isTrackCoverProcessing]);
 
   const requestRemoveSelectedFiles = useCallback(() => {
     if (isTrackCoverProcessing) return;
@@ -1478,16 +1374,14 @@ export default function AudioTagger() {
   const handleSelectAllFiles = useCallback(() => {
     if (isTrackCoverProcessing) return;
     bufferCurrentFormMetadata();
-    const allFileIds = new Set(files.map((file) => file.id));
-    setSelectedFileIds(allFileIds);
-    if (files.length > 0) {
-      setSelectedFileId(files[0].id);
-      setLastSelectedFileId(files[0].id);
-    }
-  }, [files, bufferCurrentFormMetadata, isTrackCoverProcessing]);
+    dispatchLibrary({ type: "all-tracks-selected" });
+  }, [bufferCurrentFormMetadata, dispatchLibrary, isTrackCoverProcessing]);
 
   const handleReorderAlbums = (albumId: string, targetIndex: number) => {
-    setAlbums((prevAlbums) => reorderAlbums(prevAlbums, albumId, targetIndex));
+    dispatchLibrary({
+      type: "content-replaced",
+      albums: reorderAlbums(albumsRef.current, albumId, targetIndex),
+    });
   };
 
   const keyboardShortcutActionsRef = useRef<EditorKeyboardShortcutActions>({
@@ -1584,8 +1478,7 @@ export default function AudioTagger() {
       selectedFileIdRef.current,
     );
     const coveredFiles = covered.files;
-    filesRef.current = coveredFiles;
-    setFiles(coveredFiles);
+    dispatchLibrary({ type: "content-replaced", files: coveredFiles });
     if (covered.selectedMetadata) {
       reset(covered.selectedMetadata);
     }
@@ -1604,9 +1497,8 @@ export default function AudioTagger() {
     if (albumDialogMode === "edit" && editingAlbumId) {
       const currentAlbum = albumsRef.current.find((album) => album.id === editingAlbumId);
       const updatedAlbums = updateAlbumMetadata(albumsRef.current, editingAlbumId, metadata);
-      albumsRef.current = updatedAlbums;
-      setAlbums(updatedAlbums);
       const updatedAlbum = updatedAlbums.find((album) => album.id === editingAlbumId) ?? null;
+      let finalFiles = filesRef.current;
       if (updatedAlbum) {
         const bufferedFiles = applyCurrentFormMetadataToFiles(
           filesRef.current,
@@ -1634,44 +1526,40 @@ export default function AudioTagger() {
           }
         }
 
-        filesRef.current = taggedFiles;
-        setFiles(taggedFiles);
+        finalFiles = taggedFiles;
         analytics.capture({
           type: "album_edited",
           trackCount: updatedAlbum.trackIds.length,
           hasCover: Boolean(updatedAlbum.cover?.length),
         });
       }
+      dispatchLibrary({
+        type: "content-replaced",
+        files: finalFiles,
+        albums: updatedAlbums,
+      });
       closeAlbumDialog();
       return;
     }
     if (albumDialogMode === "create") {
       const created = createAlbumFromTracks(
-        albums,
-        looseTrackIds,
+        albumsRef.current,
+        libraryRef.current.looseTrackIds,
         createSeedTrackIds,
         metadata,
         settings,
       );
-      setAlbums(created.albums);
-      setLooseTrackIds(created.looseTrackIds);
+      let finalFiles = filesRef.current;
       if (created.syncAlbums.length > 0) {
-        setFiles((prevFiles) =>
-          applyTrackOrderNumbersToFiles(prevFiles, created.albums, created.syncAlbums),
-        );
+        finalFiles = applyTrackOrderNumbersToFiles(finalFiles, created.albums, created.syncAlbums);
       }
       if (created.newAlbumId) {
-        setSelectedAlbumId(created.newAlbumId);
-        setSelectedFileId(createSeedTrackIds[0] ?? null);
         const createdAlbum = created.albums.find((album) => album.id === created.newAlbumId);
         if (createdAlbum) {
-          setFiles((prevFiles) => {
-            const taggedFiles = applyAlbumSharedTagsToFiles(prevFiles, createdAlbum);
-            if (settings.syncFilenames) {
-              return applySyncedFilenamesToFiles(taggedFiles, createdAlbum.trackIds);
-            }
-            return taggedFiles;
-          });
+          const taggedFiles = applyAlbumSharedTagsToFiles(finalFiles, createdAlbum);
+          finalFiles = settings.syncFilenames
+            ? applySyncedFilenamesToFiles(taggedFiles, createdAlbum.trackIds)
+            : taggedFiles;
           analytics.capture({
             type: "album_created",
             trackCount: createdAlbum.trackIds.length,
@@ -1679,6 +1567,20 @@ export default function AudioTagger() {
           });
         }
       }
+      dispatchLibrary({
+        type: "content-replaced",
+        files: finalFiles,
+        albums: created.albums,
+        looseTrackIds: created.looseTrackIds,
+        ...(created.newAlbumId
+          ? {
+              selection: {
+                selectedAlbumId: created.newAlbumId,
+                selectedFileId: createSeedTrackIds[0] ?? null,
+              },
+            }
+          : {}),
+      });
     }
     closeAlbumDialog();
   };
@@ -1709,15 +1611,17 @@ export default function AudioTagger() {
           },
       settings,
     );
-    setAlbums(moved.albums);
-    setLooseTrackIds(moved.looseTrackIds);
-    setSelectedAlbumId(targetAlbumId);
-    setSelectedFileId(trackId);
+    let finalFiles = filesRef.current;
     if (moved.albumsToSync.length > 0) {
-      setFiles((prevFiles) =>
-        applyTrackOrderNumbersToFiles(prevFiles, moved.albums, moved.albumsToSync),
-      );
+      finalFiles = applyTrackOrderNumbersToFiles(finalFiles, moved.albums, moved.albumsToSync);
     }
+    dispatchLibrary({
+      type: "content-replaced",
+      files: finalFiles,
+      albums: moved.albums,
+      looseTrackIds: moved.looseTrackIds,
+      selection: { selectedAlbumId: targetAlbumId, selectedFileId: trackId },
+    });
   };
   const handleMoveTrackToLoose = (
     trackId: string,
@@ -1743,15 +1647,17 @@ export default function AudioTagger() {
           },
       settings,
     );
-    setAlbums(moved.albums);
-    setLooseTrackIds(moved.looseTrackIds);
-    setSelectedAlbumId(null);
-    setSelectedFileId(trackId);
+    let finalFiles = filesRef.current;
     if (moved.albumsToSync.length > 0) {
-      setFiles((prevFiles) =>
-        applyTrackOrderNumbersToFiles(prevFiles, moved.albums, moved.albumsToSync),
-      );
+      finalFiles = applyTrackOrderNumbersToFiles(finalFiles, moved.albums, moved.albumsToSync);
     }
+    dispatchLibrary({
+      type: "content-replaced",
+      files: finalFiles,
+      albums: moved.albums,
+      looseTrackIds: moved.looseTrackIds,
+      selection: { selectedAlbumId: null, selectedFileId: trackId },
+    });
   };
 
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
@@ -1821,8 +1727,7 @@ export default function AudioTagger() {
       suggestions,
       settings.syncFilenames,
     );
-    filesRef.current = result.files;
-    setFiles(result.files);
+    dispatchLibrary({ type: "content-replaced", files: result.files });
     setMetadataCleanupOpen(false);
 
     const selectedAfterCleanup = result.files.find((file) => file.id === selectedFileIdRef.current);
@@ -1840,8 +1745,7 @@ export default function AudioTagger() {
             filesRef.current,
             result.undoEntries,
           );
-          filesRef.current = restoredFiles;
-          setFiles(restoredFiles);
+          dispatchLibrary({ type: "content-replaced", files: restoredFiles });
           const selectedAfterUndo = restoredFiles.find(
             (file) => file.id === selectedFileIdRef.current,
           );
