@@ -10,7 +10,14 @@ export const AUDIO_BITRATE_OPTIONS = [
   "64",
 ] as const satisfies readonly AudioDownloadBitrate[];
 
+export const THEME_OPTIONS = [
+  "liner",
+  "signal",
+  "pressing",
+] as const satisfies readonly AppSettings["theme"][];
+
 export const DEFAULT_APP_SETTINGS: AppSettings = {
+  theme: "signal",
   syncTrackNumbers: true,
   syncFilenames: true,
   audioBitrate: "320",
@@ -26,6 +33,10 @@ const booleanWithDefault = (value: boolean) =>
   );
 
 const storedAppSettingsSchema = Schema.Struct({
+  theme: Schema.Literals(THEME_OPTIONS).pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_APP_SETTINGS.theme))),
+    Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_APP_SETTINGS.theme)),
+  ),
   syncTrackNumbers: booleanWithDefault(DEFAULT_APP_SETTINGS.syncTrackNumbers),
   syncFilenames: booleanWithDefault(DEFAULT_APP_SETTINGS.syncFilenames),
   audioBitrate: Schema.Literals(AUDIO_BITRATE_OPTIONS).pipe(

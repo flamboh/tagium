@@ -35,6 +35,7 @@ export interface AlbumGroup {
 }
 
 export interface AppSettings {
+  theme: "liner" | "signal" | "pressing";
   syncTrackNumbers: boolean;
   syncFilenames: boolean;
   audioBitrate: AudioDownloadBitrate;

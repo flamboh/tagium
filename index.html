@@ -1,8 +1,22 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      try {
+        const storedSettings = JSON.parse(localStorage.getItem("tagium:app-settings") || "null");
+        const storedTheme = storedSettings?.theme;
+        const theme = ["liner", "signal", "pressing"].includes(storedTheme)
+          ? storedTheme
+          : "signal";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.classList.toggle("dark", theme === "signal");
+      } catch {
+        document.documentElement.dataset.theme = "signal";
+        document.documentElement.classList.add("dark");
+      }
+    </script>
     <title>tagium</title>
     <meta
       name="description"

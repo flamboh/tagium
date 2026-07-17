@@ -41,6 +41,7 @@ const cover: AudioMetadata["picture"] = [
 ];
 
 const defaultSettings: AppSettings = {
+  theme: "signal",
   audioBitrate: "320",
   syncFilenames: false,
   syncTrackNumbers: false,

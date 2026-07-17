@@ -9,6 +9,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { AUDIO_BITRATE_OPTIONS } from "./settings";
 import type { AppSettings } from "./types";
 
+const themeChoices = [
+  { name: "liner", description: "bright, sharp, ink on paper" },
+  { name: "signal", description: "dark, warm, amber glow" },
+  { name: "pressing", description: "bold two-ink print" },
+] as const satisfies readonly {
+  name: AppSettings["theme"];
+  description: string;
+}[];
+
 export interface SettingsPageProps {
   settings: AppSettings;
   onChange: (settings: AppSettings) => void;
@@ -37,6 +46,31 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
       </div>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-xl flex flex-col gap-6">
+          <fieldset className="flex flex-col gap-3">
+            <legend className="text-base font-semibold">appearance</legend>
+            <div className="flex flex-col gap-2">
+              {themeChoices.map(({ name, description }) => (
+                <label
+                  key={name}
+                  className="flex cursor-pointer items-start gap-3 rounded-md border border-input px-3 py-2.5 transition-colors hover:bg-accent/50 has-checked:border-primary has-checked:bg-accent"
+                >
+                  <input
+                    type="radio"
+                    name="theme"
+                    value={name}
+                    checked={settings.theme === name}
+                    onChange={() => onChange({ ...settings, theme: name })}
+                    className="mt-0.5 size-4 shrink-0 accent-primary"
+                  />
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-sm font-medium leading-none">{name}</span>
+                    <span className="text-sm text-muted-foreground">{description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
           <section className="flex flex-col gap-3">
             <h3 className="text-base font-semibold">metadata</h3>
             <div className="flex items-start gap-3 py-1">

@@ -45,9 +45,19 @@ describe("settings", () => {
     });
   });
 
+  it("loads a stored theme", () => {
+    const storage = storageWith(JSON.stringify({ theme: "pressing" }));
+
+    expect(loadAppSettings(storage)).toEqual({
+      ...DEFAULT_APP_SETTINGS,
+      theme: "pressing",
+    });
+  });
+
   it("ignores invalid stored setting values", () => {
     const storage = storageWith(
       JSON.stringify({
+        theme: "neon",
         syncTrackNumbers: false,
         syncFilenames: "no",
         audioBitrate: "999",
@@ -64,6 +74,7 @@ describe("settings", () => {
   it("saves app settings", () => {
     const storage = storageWith(null);
     const settings: AppSettings = {
+      theme: "liner",
       syncTrackNumbers: false,
       syncFilenames: false,
       audioBitrate: "256",
@@ -83,6 +94,7 @@ describe("settings", () => {
       },
     };
     const settings: AppSettings = {
+      theme: "pressing",
       syncTrackNumbers: false,
       syncFilenames: false,
       audioBitrate: "256",

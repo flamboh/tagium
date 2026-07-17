@@ -20,6 +20,7 @@ import { useLibraryStore } from "./useLibraryStore";
 import { useTrackEditorSession } from "./useTrackEditorSession";
 
 const settings = (audioBitrate: AppSettings["audioBitrate"]): AppSettings => ({
+  theme: "signal",
   syncTrackNumbers: false,
   syncFilenames: false,
   audioBitrate,

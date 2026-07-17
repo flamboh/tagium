@@ -38,6 +38,7 @@ const metadata: AudioMetadata = {
   trackNumber: null,
 };
 const settings: AppSettings = {
+  theme: "signal",
   syncTrackNumbers: false,
   syncFilenames: false,
   audioBitrate: "320",

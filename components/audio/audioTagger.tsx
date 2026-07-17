@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AlbumMetadataDialog from "./AlbumMetadataDialog";
 import DestructiveActionDialog from "./DestructiveActionDialog";
 import LandingScreen from "./LandingScreen";
@@ -23,6 +23,10 @@ export default function AudioTagger() {
   const library = useLibraryStore();
   const [activeView, setActiveView] = useState<ActiveView>("editor");
   const [settings, setSettings] = useState<AppSettings>(loadAppSettings);
+  useEffect(() => {
+    document.documentElement.dataset.theme = settings.theme;
+    document.documentElement.classList.toggle("dark", settings.theme === "signal");
+  }, [settings.theme]);
   const activateEditor = useCallback(() => setActiveView("editor"), []);
   const editor = useTrackEditorSession({ library, settings });
   const exporting = useExportSession({ library, editor: editor.commands, settings });

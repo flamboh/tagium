@@ -35,6 +35,7 @@ export const useWorkspaceSettings = ({
     (nextSettings: AppSettings) => {
       const previous = settingsRef.current;
       const changed =
+        previous.theme !== nextSettings.theme ||
         previous.syncTrackNumbers !== nextSettings.syncTrackNumbers ||
         previous.syncFilenames !== nextSettings.syncFilenames ||
         previous.audioBitrate !== nextSettings.audioBitrate ||

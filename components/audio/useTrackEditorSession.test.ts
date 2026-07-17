@@ -8,6 +8,7 @@ import { useTrackEditorSession } from "./useTrackEditorSession";
 import type { AppSettings, AudioMetadata, TagiumFile } from "./types";
 
 const settings: AppSettings = {
+  theme: "signal",
   syncTrackNumbers: false,
   syncFilenames: false,
   audioBitrate: "320",
