@@ -97,16 +97,21 @@ export const useWorkspaceAlbumDialog = ({
         const shouldSyncCover =
           Boolean(updatedAlbum.cover?.length) &&
           areAlbumTrackCoversSynced(bufferedFiles, updatedAlbum.trackIds, currentAlbum?.cover);
-        let taggedFiles = applyAlbumSharedTagsToFiles(bufferedFiles, updatedAlbum);
+        let taggedFiles = applyAlbumSharedTagsToFiles(
+          bufferedFiles,
+          updatedAlbum,
+          settingsRef.current,
+        );
         if (settingsRef.current.syncFilenames) {
           taggedFiles = applySyncedFilenamesToFiles(taggedFiles, updatedAlbum.trackIds);
         }
-        if (shouldSyncCover && updatedAlbum.cover) {
+        if (shouldSyncCover && settingsRef.current.metadataLinks.artwork && updatedAlbum.cover) {
           const covered = applyAlbumCoverToFilesWithSelectedMetadata(
             taggedFiles,
             updatedAlbum.trackIds,
             updatedAlbum.cover,
             library.getSnapshot().selectedFileId,
+            settingsRef.current,
           );
           taggedFiles = covered.files;
           if (covered.selectedMetadata) {
@@ -134,12 +139,21 @@ export const useWorkspaceAlbumDialog = ({
     );
     let finalFiles = snapshot.files;
     if (created.syncAlbums.length > 0) {
-      finalFiles = applyTrackOrderNumbersToFiles(finalFiles, created.albums, created.syncAlbums);
+      finalFiles = applyTrackOrderNumbersToFiles(
+        finalFiles,
+        created.albums,
+        created.syncAlbums,
+        settingsRef.current,
+      );
     }
     if (created.newAlbumId) {
       const createdAlbum = created.albums.find((album) => album.id === created.newAlbumId);
       if (createdAlbum) {
-        const taggedFiles = applyAlbumSharedTagsToFiles(finalFiles, createdAlbum);
+        const taggedFiles = applyAlbumSharedTagsToFiles(
+          finalFiles,
+          createdAlbum,
+          settingsRef.current,
+        );
         finalFiles = settingsRef.current.syncFilenames
           ? applySyncedFilenamesToFiles(taggedFiles, createdAlbum.trackIds)
           : taggedFiles;
@@ -168,7 +182,13 @@ export const useWorkspaceAlbumDialog = ({
   }, [dialog, library]);
 
   const syncCover = useCallback(() => {
-    if (dialog.mode !== "edit" || !dialog.editingAlbumId || !dialog.draft.cover?.length) return;
+    if (
+      dialog.mode !== "edit" ||
+      !dialog.editingAlbumId ||
+      !dialog.draft.cover?.length ||
+      !settingsRef.current.metadataLinks.artwork
+    )
+      return;
     const album = library.getSnapshot().albums.find((entry) => entry.id === dialog.editingAlbumId);
     if (!album) return;
     const bufferedFiles = editorRef.current.commands.flush(album.trackIds);
@@ -177,6 +197,7 @@ export const useWorkspaceAlbumDialog = ({
       album.trackIds,
       dialog.draft.cover,
       library.getSnapshot().selectedFileId,
+      settingsRef.current,
     );
     library.dispatch({ type: "content-replaced", files: covered.files });
     if (covered.selectedMetadata) {

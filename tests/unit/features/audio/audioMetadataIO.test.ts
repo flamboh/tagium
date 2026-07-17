@@ -14,6 +14,7 @@ const mp3tagMock = vi.hoisted(() => ({
       year?: string;
       genre?: string;
       track?: string;
+      comment?: string;
       v2?: {
         APIC?: Array<{
           format: string;
@@ -21,7 +22,13 @@ const mp3tagMock = vi.hoisted(() => ({
           description: string;
           data: number[];
         }>;
+        TPE2?: string;
+        TCOM?: string;
+        TBPM?: string;
+        TPOS?: string;
+        [key: string]: unknown;
       };
+      v2Details?: { version: number[] };
     };
     error?: string;
     buffer?: ArrayBuffer;
@@ -35,7 +42,18 @@ const mp3tagMock = vi.hoisted(() => ({
     year: "2024",
     genre: "Electronic",
     track: "3/12",
+    comment: "Field notes",
+    v2Details: { version: [4] },
     v2: {
+      TPE2: "Album Artist",
+      TCOM: "Composer",
+      TBPM: "128",
+      TPOS: "2/3",
+      TXXX: [{ description: "KEEP", text: "unmodeled" }],
+      COMM: [
+        { language: "eng", descriptor: "", text: "Field notes" },
+        { language: "spa", descriptor: "archivo", text: "Conservar" },
+      ],
       APIC: [
         {
           format: "image/png",
@@ -67,6 +85,7 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   filename: "track",
   title: "Track",
   artist: "Artist",
+  albumArtist: "Artist",
   album: "Album",
   year: 2024,
   genre: "",
@@ -75,6 +94,10 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   sampleRate: 0,
   picture: [],
   trackNumber: null,
+  discNumber: null,
+  composer: "",
+  bpm: null,
+  comment: "",
   ...overrides,
 });
 
@@ -155,6 +178,11 @@ describe("AudioMetadataIO", () => {
       genre: "Electronic",
       duration: 123,
       trackNumber: 3,
+      albumArtist: "Album Artist",
+      composer: "Composer",
+      bpm: 128,
+      discNumber: 2,
+      comment: "Field notes",
     });
     expect(upload.file.metadata?.picture[0]?.data).toBeInstanceOf(Uint8Array);
     expect(Array.from(upload.file.metadata?.picture[0]?.data ?? [])).toEqual([1, 2, 3]);
@@ -257,6 +285,11 @@ describe("AudioMetadataIO", () => {
         filename: "written",
         year: Number.NaN,
         trackNumber: null,
+        discNumber: null,
+        bpm: null,
+        albumArtist: "New Album Artist",
+        composer: "New Composer",
+        comment: "New comment",
         picture: [
           {
             format: "image/jpeg",
@@ -276,6 +309,15 @@ describe("AudioMetadataIO", () => {
       year: "",
       track: "",
       v2: {
+        TPE2: "New Album Artist",
+        TCOM: "New Composer",
+        TBPM: "",
+        TPOS: "",
+        TXXX: [{ description: "KEEP", text: "unmodeled" }],
+        COMM: [
+          { language: "eng", descriptor: "", text: "New comment" },
+          { language: "spa", descriptor: "archivo", text: "Conservar" },
+        ],
         APIC: [
           {
             format: "image/jpeg",
@@ -292,6 +334,26 @@ describe("AudioMetadataIO", () => {
     await expect(writeMetadataToFile(tagiumFile({ file: undefined }), metadata())).rejects.toThrow(
       "audio file is still downloading.",
     );
+  });
+
+  it("uses the supported short frame names for ID3v2.2 files", async () => {
+    const originalVersion = mp3tagMock.nextTags.v2Details.version;
+    mp3tagMock.nextTags.v2Details.version = [2];
+
+    await writeMetadataToFile(
+      tagiumFile(),
+      metadata({ albumArtist: "Album Artist", composer: "Composer", bpm: 120, discNumber: 3 }),
+    );
+    mp3tagMock.nextTags.v2Details.version = originalVersion;
+
+    expect(mp3tagMock.instances[0]?.tags.v2).toMatchObject({
+      TP2: "Album Artist",
+      TCM: "Composer",
+      TBP: "120",
+      TPA: "3",
+    });
+    expect(mp3tagMock.instances[0]?.tags.v2).not.toHaveProperty("TPE2");
+    expect(mp3tagMock.instances[0]?.tags.v2).not.toHaveProperty("TCOM");
   });
 
   it("preserves the current filename when a write does not request a rename", async () => {

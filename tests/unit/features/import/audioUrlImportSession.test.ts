@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import { act } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { AppSettings } from "@/features/library/types";
+import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 
 const mocks = vi.hoisted(() => ({ resolveTrackMetadata: vi.fn() }));
 
@@ -22,6 +23,7 @@ import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
 
 const settings = (audioBitrate: AppSettings["audioBitrate"]): AppSettings => ({
+  ...DEFAULT_APP_SETTINGS,
   syncTrackNumbers: false,
   syncFilenames: false,
   audioBitrate,

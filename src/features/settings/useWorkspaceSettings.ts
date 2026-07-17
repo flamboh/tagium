@@ -1,9 +1,5 @@
 import { useCallback, useLayoutEffect, useRef } from "react";
 import { analytics } from "@/analytics";
-import {
-  applySyncedFilenamesToFiles,
-  applyTrackOrderNumbersToFiles,
-} from "@/features/library/fileMetadataOps";
 import { saveAppSettings } from "@/features/settings/settings";
 import type { SettingsPageProps } from "@/features/settings/SettingsPage";
 import { reportSystemFailure } from "@/features/workspace/systemFailure";
@@ -15,7 +11,6 @@ import type { SetActiveView } from "@/features/workspace/audioWorkspaceTypes";
 type SettingsEditor = Pick<TrackEditorSession, "isCoverProcessing">;
 
 export const useWorkspaceSettings = ({
-  library,
   editor,
   settings,
   setSettings,
@@ -42,7 +37,9 @@ export const useWorkspaceSettings = ({
         previous.syncFilenames !== nextSettings.syncFilenames ||
         previous.audioBitrate !== nextSettings.audioBitrate ||
         previous.applySoundCloudAlbumCoverToTracks !==
-          nextSettings.applySoundCloudAlbumCoverToTracks;
+          nextSettings.applySoundCloudAlbumCoverToTracks ||
+        previous.advancedMetadata !== nextSettings.advancedMetadata ||
+        JSON.stringify(previous.metadataLinks) !== JSON.stringify(nextSettings.metadataLinks);
       const saved = saveAppSettings(nextSettings);
       setSettings(nextSettings);
       settingsRef.current = nextSettings;
@@ -58,23 +55,8 @@ export const useWorkspaceSettings = ({
           applySoundCloudCover: nextSettings.applySoundCloudAlbumCoverToTracks,
         });
       }
-      const snapshot = library.getSnapshot();
-      let syncedFiles = snapshot.files;
-      if (!previous.syncTrackNumbers && nextSettings.syncTrackNumbers) {
-        syncedFiles = applyTrackOrderNumbersToFiles(
-          syncedFiles,
-          snapshot.albums,
-          snapshot.albums.map((album) => album.id),
-        );
-      }
-      if (!previous.syncFilenames && nextSettings.syncFilenames) {
-        syncedFiles = applySyncedFilenamesToFiles(syncedFiles);
-      }
-      if (syncedFiles !== snapshot.files) {
-        library.dispatch({ type: "content-replaced", files: syncedFiles });
-      }
     },
-    [library, setSettings],
+    [setSettings],
   );
 
   const onBack = useCallback(() => {

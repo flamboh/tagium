@@ -10,11 +10,16 @@ const metadataPatchFields = [
   "filename",
   "title",
   "artist",
+  "albumArtist",
   "album",
   "year",
   "genre",
   "picture",
   "trackNumber",
+  "discNumber",
+  "composer",
+  "bpm",
+  "comment",
 ] as const satisfies readonly MetadataPatchField[];
 
 export const getFileImportKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
@@ -54,11 +59,16 @@ export const getNullableNumericPatchValue = (
 export const getSubmittedAudioMetadata = (
   data: AudioMetadata,
   syncFilenames: boolean,
+  advancedMetadata = true,
+  linkAlbumArtist = false,
 ): AudioMetadata => ({
   ...data,
   filename: sanitizeFilenameBase(syncFilenames ? data.title : data.filename),
+  albumArtist: !advancedMetadata || linkAlbumArtist ? data.artist : data.albumArtist,
   year: getNullableNumericMetadataValue(data.year),
   trackNumber: getNullableNumericMetadataValue(data.trackNumber),
+  discNumber: getNullableNumericMetadataValue(data.discNumber),
+  bpm: getNullableNumericMetadataValue(data.bpm),
 });
 
 export const createSparseMetadataPatch = (
@@ -85,6 +95,9 @@ export const createSparseMetadataPatch = (
       case "artist":
         patch.artist = metadata.artist;
         break;
+      case "albumArtist":
+        patch.albumArtist = metadata.albumArtist;
+        break;
       case "album":
         patch.album = metadata.album;
         break;
@@ -99,6 +112,18 @@ export const createSparseMetadataPatch = (
         break;
       case "trackNumber":
         patch.trackNumber = getNullableNumericPatchValue(metadata.trackNumber);
+        break;
+      case "discNumber":
+        patch.discNumber = getNullableNumericPatchValue(metadata.discNumber);
+        break;
+      case "composer":
+        patch.composer = metadata.composer;
+        break;
+      case "bpm":
+        patch.bpm = getNullableNumericPatchValue(metadata.bpm);
+        break;
+      case "comment":
+        patch.comment = metadata.comment;
         break;
     }
   }

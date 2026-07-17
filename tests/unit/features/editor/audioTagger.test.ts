@@ -15,6 +15,7 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   filename: "old-title",
   title: "Old Title",
   artist: "Artist",
+  albumArtist: "Artist",
   album: "Album",
   year: 2024,
   genre: "Genre",
@@ -23,6 +24,10 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   sampleRate: 44_100,
   picture: [],
   trackNumber: 7,
+  discNumber: null,
+  composer: "",
+  bpm: null,
+  comment: "",
   ...overrides,
 });
 
@@ -181,6 +186,26 @@ describe("audioTagger metadata patches", () => {
     );
 
     expect(patch).toEqual({ title: "New Title" });
+  });
+
+  it("patches advanced fields and normalizes cleared advanced numbers", () => {
+    const patch = createDirtyMetadataPatch(
+      metadata({ composer: "New Composer", discNumber: Number.NaN, bpm: 124 }),
+      { composer: true, discNumber: true, bpm: true },
+      false,
+    );
+
+    expect(patch).toEqual({ discNumber: null, composer: "New Composer", bpm: 124 });
+  });
+
+  it("mirrors album artist only when the advanced policy requires it", () => {
+    const data = metadata({ artist: "Track Artist", albumArtist: "Custom Album Artist" });
+
+    expect(getSubmittedAudioMetadata(data, false, false, false).albumArtist).toBe("Track Artist");
+    expect(getSubmittedAudioMetadata(data, false, true, true).albumArtist).toBe("Track Artist");
+    expect(getSubmittedAudioMetadata(data, false, true, false).albumArtist).toBe(
+      "Custom Album Artist",
+    );
   });
 
   it("summarizes removed track sources without exposing their URLs", () => {

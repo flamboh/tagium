@@ -12,7 +12,10 @@ import {
   subscribeToEditorKeyboardShortcuts,
   type EditorKeyboardShortcutActions,
 } from "@/features/editor/editorKeyboardShortcuts";
-import { applyTrackOrderNumbersToFiles } from "@/features/library/fileMetadataOps";
+import {
+  applyAlbumSharedTagsToFiles,
+  applyTrackOrderNumbersToFiles,
+} from "@/features/library/fileMetadataOps";
 import type { TagSidebarPanelProps } from "@/features/library/TagSidebarPanel";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
@@ -82,7 +85,12 @@ export const useWorkspaceSelection = ({
       );
       let nextFiles = snapshot.files.filter((file) => !idSet.has(file.id));
       if (settingsRef.current.syncTrackNumbers && affectedAlbumIds.length > 0) {
-        nextFiles = applyTrackOrderNumbersToFiles(nextFiles, nextAlbums, affectedAlbumIds);
+        nextFiles = applyTrackOrderNumbersToFiles(
+          nextFiles,
+          nextAlbums,
+          affectedAlbumIds,
+          settingsRef.current,
+        );
       }
       library.dispatch({
         type: "tracks-removed",
@@ -177,7 +185,18 @@ export const useWorkspaceSelection = ({
       );
       let finalFiles = snapshot.files;
       if (moved.albumsToSync.length > 0) {
-        finalFiles = applyTrackOrderNumbersToFiles(finalFiles, moved.albums, moved.albumsToSync);
+        finalFiles = applyTrackOrderNumbersToFiles(
+          finalFiles,
+          moved.albums,
+          moved.albumsToSync,
+          settingsRef.current,
+        );
+      }
+      if (destination.type === "album") {
+        const targetAlbum = moved.albums.find((album) => album.id === destination.albumId);
+        if (targetAlbum) {
+          finalFiles = applyAlbumSharedTagsToFiles(finalFiles, targetAlbum, settingsRef.current);
+        }
       }
       library.dispatch({
         type: "content-replaced",

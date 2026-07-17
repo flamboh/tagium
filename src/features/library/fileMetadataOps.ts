@@ -3,6 +3,7 @@ import type { Playlist } from "@/features/import/playlist";
 import type { SoundCloudSet } from "@/features/import/soundcloudSet";
 import type {
   AlbumGroup,
+  AppSettings,
   AudioMetadata,
   MetadataPatch,
   TagiumFile,
@@ -27,14 +28,19 @@ const patchFields = [
   "filename",
   "title",
   "artist",
+  "albumArtist",
   "album",
   "year",
   "genre",
   "picture",
   "trackNumber",
+  "discNumber",
+  "composer",
+  "bpm",
+  "comment",
 ] as const satisfies readonly DownloadedTrackWritableMetadataField[];
 
-const nullableNumericPatchFields = ["year", "trackNumber"] as const;
+const nullableNumericPatchFields = ["year", "trackNumber", "discNumber", "bpm"] as const;
 
 const markPendingMetadataPatch = (
   file: TagiumFile,
@@ -56,11 +62,16 @@ const createMetadataPatch = (metadata: AudioMetadata): DownloadedTrackMetadataPa
   filename: metadata.filename,
   title: metadata.title,
   artist: metadata.artist,
+  albumArtist: metadata.albumArtist,
   album: metadata.album,
   year: metadata.year,
   genre: metadata.genre,
   picture: metadata.picture,
   trackNumber: metadata.trackNumber,
+  discNumber: metadata.discNumber,
+  composer: metadata.composer,
+  bpm: metadata.bpm,
+  comment: metadata.comment,
 });
 
 const mergeLatestMetadataWithHydratedTechnicalFields = (
@@ -105,11 +116,16 @@ const areWritableMetadataFieldsEqual = (
   firstMetadata.filename === secondMetadata.filename &&
   firstMetadata.title === secondMetadata.title &&
   firstMetadata.artist === secondMetadata.artist &&
+  firstMetadata.albumArtist === secondMetadata.albumArtist &&
   firstMetadata.album === secondMetadata.album &&
   firstMetadata.year === secondMetadata.year &&
   areGenresEqual(firstMetadata.genre, secondMetadata.genre) &&
   arePicturesEqual(firstMetadata.picture, secondMetadata.picture) &&
-  firstMetadata.trackNumber === secondMetadata.trackNumber;
+  firstMetadata.trackNumber === secondMetadata.trackNumber &&
+  firstMetadata.discNumber === secondMetadata.discNumber &&
+  firstMetadata.composer === secondMetadata.composer &&
+  firstMetadata.bpm === secondMetadata.bpm &&
+  firstMetadata.comment === secondMetadata.comment;
 
 const applyProviderDisplayMetadata = (
   parsedMetadata: AudioMetadata,
@@ -200,36 +216,19 @@ export function applyTrackOrderNumbersToFiles(
   files: TagiumFile[],
   albums: AlbumGroup[],
   albumIdsToSync: string[],
+  settings: MetadataPolicySettings = defaultMetadataPolicySettings,
 ) {
-  const albumsById = new Map(albums.map((album) => [album.id, album]));
-  const numbersByTrackId = new Map<string, number>();
-
-  for (const albumId of albumIdsToSync) {
-    const album = albumsById.get(albumId);
-    if (!album) continue;
-    album.trackIds.forEach((trackId, index) => {
-      numbersByTrackId.set(trackId, index + 1);
-    });
-  }
-
-  if (numbersByTrackId.size === 0) return files;
-
-  return files.map((file) => {
-    const trackNumber = numbersByTrackId.get(file.id);
-    if (trackNumber === undefined || !file.metadata) return file;
-
-    return markPendingMetadataPatch(
-      {
-        ...file,
-        status: file.status === "saved" ? "pending" : file.status,
-        metadata: {
-          ...file.metadata,
-          trackNumber,
-        },
-      },
-      { trackNumber },
-    );
-  });
+  const albumIds = new Set(albumIdsToSync);
+  return albums.reduce(
+    (nextFiles, album) =>
+      albumIds.has(album.id)
+        ? applyAlbumMetadataPolicyToFiles(nextFiles, album, settings, {
+            shared: false,
+            trackNumbers: true,
+          })
+        : nextFiles,
+    files,
+  );
 }
 
 export function applySyncedFilenamesToFiles(files: TagiumFile[], trackIds?: string[]) {
@@ -261,15 +260,63 @@ export function applySyncedFilenamesToFiles(files: TagiumFile[], trackIds?: stri
   });
 }
 
-export function applyAlbumSharedTagsToFiles(files: TagiumFile[], album: AlbumGroup) {
+type MetadataPolicySettings = Pick<
+  AppSettings,
+  "advancedMetadata" | "metadataLinks" | "syncTrackNumbers"
+>;
+
+const defaultMetadataPolicySettings: MetadataPolicySettings = {
+  advancedMetadata: false,
+  syncTrackNumbers: true,
+  metadataLinks: {
+    artist: true,
+    year: true,
+    genre: true,
+    artwork: true,
+    albumArtist: true,
+  },
+};
+
+interface AlbumMetadataPolicyOptions {
+  shared?: boolean;
+  artwork?: boolean;
+  trackNumbers?: boolean;
+}
+
+/** Applies every album-to-track link decision through one non-destructive policy. */
+export function applyAlbumMetadataPolicyToFiles(
+  files: TagiumFile[],
+  album: AlbumGroup,
+  settings: MetadataPolicySettings = defaultMetadataPolicySettings,
+  options: AlbumMetadataPolicyOptions = {},
+) {
   if (album.trackIds.length === 0) return files;
 
   const trackSet = new Set(album.trackIds);
+  const shared = options.shared ?? true;
 
   return files.map((file) => {
     if (!trackSet.has(file.id) || !file.metadata) return file;
+    const patch: MetadataPatch = {};
+    if (shared) {
+      patch.album = album.title;
+      if (settings.metadataLinks.artist) patch.artist = album.artist;
+      if (settings.metadataLinks.genre) patch.genre = album.genre;
+      if (settings.metadataLinks.year && album.year !== undefined) patch.year = album.year;
+    }
+    if (options.artwork && settings.metadataLinks.artwork && album.cover?.length) {
+      patch.picture = album.cover;
+    }
+    if (options.trackNumbers && settings.syncTrackNumbers) {
+      patch.trackNumber = album.trackIds.indexOf(file.id) + 1;
+    }
 
-    const yearPatch = album.year !== undefined ? { year: album.year } : {};
+    const nextArtist = patch.artist ?? file.metadata.artist;
+    if (shared && (!settings.advancedMetadata || settings.metadataLinks.albumArtist)) {
+      patch.albumArtist = nextArtist;
+    }
+
+    if (Object.keys(patch).length === 0) return file;
 
     return markPendingMetadataPatch(
       {
@@ -277,46 +324,35 @@ export function applyAlbumSharedTagsToFiles(files: TagiumFile[], album: AlbumGro
         status: file.status === "saved" ? "pending" : file.status,
         metadata: {
           ...file.metadata,
-          artist: album.artist,
-          album: album.title,
-          genre: album.genre,
-          year: album.year !== undefined ? album.year : file.metadata.year,
+          ...patch,
         },
       },
-      {
-        artist: album.artist,
-        album: album.title,
-        genre: album.genre,
-        ...yearPatch,
-      },
+      patch,
     );
   });
+}
+
+export function applyAlbumSharedTagsToFiles(
+  files: TagiumFile[],
+  album: AlbumGroup,
+  settings?: MetadataPolicySettings,
+) {
+  return applyAlbumMetadataPolicyToFiles(files, album, settings);
 }
 
 export function applyAlbumCoverToFiles(
   files: TagiumFile[],
   trackIds: string[],
   cover: AudioMetadata["picture"],
+  settings?: MetadataPolicySettings,
 ) {
   if (trackIds.length === 0 || cover.length === 0) return files;
-
-  const trackSet = new Set(trackIds);
-
-  return files.map((file) => {
-    if (!trackSet.has(file.id) || !file.metadata) return file;
-
-    return markPendingMetadataPatch(
-      {
-        ...file,
-        status: file.status === "saved" ? "pending" : file.status,
-        metadata: {
-          ...file.metadata,
-          picture: cover,
-        },
-      },
-      { picture: cover },
-    );
-  });
+  return applyAlbumMetadataPolicyToFiles(
+    files,
+    { id: "cover-sync", title: "", artist: "", genre: "", trackIds, cover },
+    settings,
+    { shared: false, artwork: true },
+  );
 }
 
 export function applyAlbumCoverToFilesWithSelectedMetadata(
@@ -324,8 +360,9 @@ export function applyAlbumCoverToFilesWithSelectedMetadata(
   trackIds: string[],
   cover: AudioMetadata["picture"],
   selectedFileId: string | null,
+  settings?: MetadataPolicySettings,
 ): { files: TagiumFile[]; selectedMetadata?: AudioMetadata } {
-  const coveredFiles = applyAlbumCoverToFiles(files, trackIds, cover);
+  const coveredFiles = applyAlbumCoverToFiles(files, trackIds, cover, settings);
   if (!selectedFileId) {
     return { files: coveredFiles };
   }
@@ -379,7 +416,7 @@ export function applyPlaylistImportedCover(
   albumId: string,
   trackIds: string[],
   playlist: Pick<Playlist, "isAlbum">,
-  settings: { applySoundCloudAlbumCoverToTracks: boolean },
+  settings: AppSettings,
   cover: AudioMetadata["picture"],
   selectedFileId: string | null,
 ) {
@@ -387,13 +424,17 @@ export function applyPlaylistImportedCover(
     currentAlbum.id === albumId ? { ...currentAlbum, cover } : currentAlbum,
   );
 
-  if (!playlist.isAlbum || !settings.applySoundCloudAlbumCoverToTracks) {
+  if (
+    !playlist.isAlbum ||
+    !settings.applySoundCloudAlbumCoverToTracks ||
+    settings.metadataLinks?.artwork === false
+  ) {
     return { albums: coveredAlbums, files };
   }
 
   return {
     albums: coveredAlbums,
-    ...applyAlbumCoverToFilesWithSelectedMetadata(files, trackIds, cover, selectedFileId),
+    ...applyAlbumCoverToFilesWithSelectedMetadata(files, trackIds, cover, selectedFileId, settings),
   };
 }
 
@@ -403,7 +444,7 @@ export const applySoundCloudSetImportedCover = (
   albumId: string,
   trackIds: string[],
   set: Pick<SoundCloudSet, "isAlbum">,
-  settings: { applySoundCloudAlbumCoverToTracks: boolean },
+  settings: AppSettings,
   cover: AudioMetadata["picture"],
   selectedFileId: string | null,
 ) =>

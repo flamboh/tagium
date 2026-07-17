@@ -11,11 +11,13 @@ import {
   resolveDownloadedTrackHydrationWriteError,
 } from "@/features/library/fileMetadataOps";
 import { AudioMetadata, TagiumFile } from "@/features/library/types";
+import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 
 const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   filename: "track",
   title: "Track",
   artist: "Artist",
+  albumArtist: "Artist",
   album: "Album",
   year: 2024,
   genre: "",
@@ -24,6 +26,10 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   sampleRate: 0,
   picture: [],
   trackNumber: null,
+  discNumber: null,
+  composer: "",
+  bpm: null,
+  comment: "",
   ...overrides,
 });
 
@@ -52,19 +58,7 @@ describe("fileMetadataOps", () => {
         status: "saved" as const,
         downloadStatus: "ready" as const,
         hasBufferedChanges: false,
-        metadata: {
-          filename: "track-1",
-          title: "Track 1",
-          artist: "Artist",
-          album: "Album",
-          year: 2024,
-          genre: "",
-          duration: 0,
-          bitrate: 0,
-          sampleRate: 0,
-          picture: [],
-          trackNumber: null,
-        },
+        metadata: metadata({ filename: "track-1", title: "Track 1" }),
       },
       {
         id: "track-2",
@@ -75,19 +69,7 @@ describe("fileMetadataOps", () => {
         status: "pending" as const,
         downloadStatus: "ready" as const,
         hasBufferedChanges: false,
-        metadata: {
-          filename: "track-2",
-          title: "Track 2",
-          artist: "Artist",
-          album: "Album",
-          year: 2024,
-          genre: "",
-          duration: 0,
-          bitrate: 0,
-          sampleRate: 0,
-          picture: [],
-          trackNumber: null,
-        },
+        metadata: metadata({ filename: "track-2", title: "Track 2" }),
       },
     ];
 
@@ -111,6 +93,48 @@ describe("fileMetadataOps", () => {
     expect(result[1].pendingMetadataPatch?.trackNumber).toBe(1);
   });
 
+  it("does not rewrite unlinked album artist during track reordering or cover sync", () => {
+    const file = readyFile({
+      metadata: metadata({ albumArtist: "Custom Album Artist", trackNumber: 9 }),
+    });
+    const album = {
+      id: "album-1",
+      title: "Album",
+      artist: "Album Artist",
+      genre: "",
+      trackIds: [file.id],
+    };
+    const unlinkedSettings = {
+      ...DEFAULT_APP_SETTINGS,
+      advancedMetadata: true,
+      metadataLinks: { ...DEFAULT_APP_SETTINGS.metadataLinks, albumArtist: false },
+    };
+
+    const [reordered] = applyTrackOrderNumbersToFiles(
+      [file],
+      [album],
+      [album.id],
+      unlinkedSettings,
+    );
+    const [covered] = applyAlbumCoverToFiles(
+      [reordered],
+      [file.id],
+      [
+        {
+          format: "image/jpeg",
+          type: 3,
+          description: "cover",
+          data: new Uint8Array([1]),
+        },
+      ],
+      unlinkedSettings,
+    );
+
+    expect(covered.metadata?.albumArtist).toBe("Custom Album Artist");
+    expect(covered.pendingMetadataPatch).toMatchObject({ trackNumber: 1 });
+    expect(covered.pendingMetadataPatch).not.toHaveProperty("albumArtist");
+  });
+
   it("applies shared album metadata without applying album cover", () => {
     const originalCover = [
       {
@@ -131,19 +155,14 @@ describe("fileMetadataOps", () => {
         status: "saved" as const,
         downloadStatus: "ready" as const,
         hasBufferedChanges: false,
-        metadata: {
+        metadata: metadata({
           filename: "track-1",
           title: "Track 1",
           artist: "Old Artist",
           album: "Old Album",
-          year: 2024,
-          genre: "",
-          duration: 0,
-          bitrate: 0,
-          sampleRate: 0,
           picture: originalCover,
           trackNumber: 9,
-        },
+        }),
       },
     ];
 
@@ -180,6 +199,77 @@ describe("fileMetadataOps", () => {
     expect(
       Object.prototype.hasOwnProperty.call(updatedFile.pendingMetadataPatch ?? {}, "year"),
     ).toBe(false);
+  });
+
+  it("keeps album title linked while respecting every unlinkable shared field", () => {
+    const file = readyFile({
+      metadata: metadata({
+        artist: "Track Artist",
+        albumArtist: "Custom Album Artist",
+        album: "Old Album",
+        year: 1999,
+        genre: "Track Genre",
+        composer: "Hidden Composer",
+        discNumber: 2,
+        bpm: 123,
+        comment: "Hidden comment",
+      }),
+    });
+    const album = {
+      id: "album-1",
+      title: "New Album",
+      artist: "Album Artist",
+      genre: "Album Genre",
+      year: 2026,
+      trackIds: [file.id],
+    };
+
+    const [updated] = applyAlbumSharedTagsToFiles([file], album, {
+      ...DEFAULT_APP_SETTINGS,
+      advancedMetadata: true,
+      metadataLinks: {
+        artist: false,
+        year: false,
+        genre: false,
+        artwork: false,
+        albumArtist: false,
+      },
+    });
+
+    expect(updated.metadata).toMatchObject({
+      album: "New Album",
+      artist: "Track Artist",
+      albumArtist: "Custom Album Artist",
+      year: 1999,
+      genre: "Track Genre",
+      composer: "Hidden Composer",
+      discNumber: 2,
+      bpm: 123,
+      comment: "Hidden comment",
+    });
+    expect(updated.pendingMetadataPatch).toEqual({ album: "New Album" });
+  });
+
+  it("mirrors album artist from the resulting track artist when advanced metadata is off", () => {
+    const file = readyFile({
+      metadata: metadata({ artist: "Track Artist", albumArtist: "Custom Album Artist" }),
+    });
+    const album = {
+      id: "album-1",
+      title: "Album",
+      artist: "Album Artist",
+      genre: "",
+      trackIds: [file.id],
+    };
+
+    const [linkedArtist] = applyAlbumSharedTagsToFiles([file], album, DEFAULT_APP_SETTINGS);
+    const [unlinkedArtist] = applyAlbumSharedTagsToFiles([file], album, {
+      ...DEFAULT_APP_SETTINGS,
+      metadataLinks: { ...DEFAULT_APP_SETTINGS.metadataLinks, artist: false },
+    });
+
+    expect(linkedArtist.metadata?.albumArtist).toBe("Album Artist");
+    expect(unlinkedArtist.metadata?.albumArtist).toBe("Track Artist");
   });
 
   it("explicitly applies album cover to album tracks", () => {

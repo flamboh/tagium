@@ -41,6 +41,14 @@ export interface AppSettings {
   syncFilenames: boolean;
   audioBitrate: AudioDownloadBitrate;
   applySoundCloudAlbumCoverToTracks: boolean;
+  advancedMetadata: boolean;
+  metadataLinks: {
+    artist: boolean;
+    year: boolean;
+    genre: boolean;
+    artwork: boolean;
+    albumArtist: boolean;
+  };
 }
 
 export interface ImportedAlbumMetadata {

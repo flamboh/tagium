@@ -59,13 +59,14 @@ export const useExportSession = ({
       let syncedFiles = editor.flush(trackIds);
 
       for (const album of albumsToSync) {
-        syncedFiles = applyAlbumSharedTagsToFiles(syncedFiles, album);
+        syncedFiles = applyAlbumSharedTagsToFiles(syncedFiles, album, settingsRef.current);
       }
       if (settingsRef.current.syncTrackNumbers) {
         syncedFiles = applyTrackOrderNumbersToFiles(
           syncedFiles,
           snapshot.albums,
           albumsToSync.map((album) => album.id),
+          settingsRef.current,
         );
       }
       if (settingsRef.current.syncFilenames) {
@@ -178,7 +179,12 @@ export const useExportSession = ({
         .getSnapshot()
         .files.find((file) => file.id === library.getSnapshot().selectedFileId);
       if (!selectedFile) return;
-      const submittedData = getSubmittedAudioMetadata(data, settingsRef.current.syncFilenames);
+      const submittedData = getSubmittedAudioMetadata(
+        data,
+        settingsRef.current.syncFilenames,
+        settingsRef.current.advancedMetadata,
+        settingsRef.current.metadataLinks.albumArtist,
+      );
       if (!isValidFilenameBase(submittedData.filename)) return;
       const fileId = selectedFile.id;
       analytics.capture({ type: "export_started", exportKind: "track", trackCount: 1 });
