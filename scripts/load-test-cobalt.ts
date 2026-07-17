@@ -152,7 +152,7 @@ const parseArgs = (argv: string[]): CliOptions => {
 };
 
 // Real downloads fetch every tunnel Cobalt returns concurrently (audio + cover art when
-// present) - see components/audio/localAudioProcessor.ts's Effect.all([audio, cover]).
+// present) - see src/features/import/localAudioProcessor.ts's Effect.all([audio, cover]).
 // A single "download" therefore usually means 2 concurrent /tunnel requests, not 1.
 const pickTunnelUrls = (plan: CobaltPlan): string[] => {
   switch (plan.status) {

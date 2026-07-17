@@ -1,4 +1,4 @@
-import AudioTagger from "@/components/audio/audioTagger";
+import AudioTagger from "@/features/workspace/audioTagger";
 import { DevPanel } from "@/components/dev/DevPanel";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";

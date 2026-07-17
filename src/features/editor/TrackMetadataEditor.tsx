@@ -1,0 +1,534 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ChangeEvent, ReactNode, RefObject, TransitionEvent } from "react";
+import {
+  Controller,
+  useWatch,
+  type Control,
+  type SubmitHandler,
+  type UseFormHandleSubmit,
+  type UseFormRegister,
+  type UseFormRegisterReturn,
+} from "react-hook-form";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import CoverArt from "@/features/editor/coverArt";
+import { isValidFilenameBase, sanitizeFilenameBase } from "@/features/library/filename";
+import { getSampleTrack, type SampleTrackMetadata } from "@/features/editor/sampleMetadata";
+import { getTrackFailureDisplay } from "@/features/workspace/systemFailure";
+import type { AlbumGroup, AudioMetadata, TagiumFile } from "@/features/library/types";
+
+type LoadedTrack = TagiumFile & { metadata: AudioMetadata };
+
+interface TrackMetadataEditorProps {
+  selectedFile: TagiumFile | null;
+  selectedFileId: string | null;
+  register: UseFormRegister<AudioMetadata>;
+  control: Control<AudioMetadata>;
+  handleSubmit: UseFormHandleSubmit<AudioMetadata>;
+  onTrackCoverUpload: (
+    picture: NonNullable<AudioMetadata["picture"]>,
+    resetKey?: string | null,
+  ) => void;
+  onTrackCoverProcessingChange: (processing: boolean) => void;
+  isTrackCoverProcessing: boolean;
+  onDownloadUpdatedFile: SubmitHandler<AudioMetadata>;
+  selectedFileAlbum: AlbumGroup | undefined;
+  syncFilenames: boolean;
+  syncTrackNumbers: boolean;
+  onPreviewMetadataChange: (
+    field: "filename" | "title" | "artist",
+    event: ChangeEvent<HTMLInputElement>,
+  ) => void;
+}
+
+interface LoadedTrackMetadataEditorProps extends Omit<TrackMetadataEditorProps, "selectedFile"> {
+  selectedFile: LoadedTrack;
+  focusedTitleFileIdRef: RefObject<string | null>;
+}
+
+const hasMetadata = (selectedFile: TagiumFile | null): selectedFile is LoadedTrack =>
+  Boolean(selectedFile?.metadata);
+
+const fieldLabelClassName = "mb-1 block text-xs font-medium md:text-sm";
+const placeholderClassName = "placeholder:text-muted-foreground/45";
+const syncedInputClassName =
+  "disabled:pointer-events-auto disabled:cursor-not-allowed disabled:border-dashed disabled:bg-muted/10 disabled:text-muted-foreground disabled:opacity-100 dark:disabled:bg-muted/10";
+
+function DisabledReason({
+  disabled,
+  reason,
+  children,
+}: {
+  disabled: boolean;
+  reason: string;
+  children: ReactNode;
+}) {
+  if (!disabled) return children;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="block">{children}</span>
+      </TooltipTrigger>
+      <TooltipContent>{reason}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+interface TrackFailure {
+  title: string;
+  description: string;
+}
+
+function TrackFilenameHeader({
+  syncFilenames,
+  watchedFilename,
+  sanitizedFilename,
+  filenamePlaceholder,
+  filenameInvalid,
+  filenameRegistration,
+  failure,
+}: {
+  syncFilenames: boolean;
+  watchedFilename: string;
+  sanitizedFilename: string;
+  filenamePlaceholder: string;
+  filenameInvalid: boolean;
+  filenameRegistration: UseFormRegisterReturn<"filename">;
+  failure: TrackFailure | null;
+}) {
+  return (
+    <div className="relative h-16 border-b flex-shrink-0 px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6">
+      <div className="flex h-full min-w-0 items-center">
+        {syncFilenames ? (
+          <h2 className="inline-flex min-w-0 max-w-full items-center text-base font-semibold text-muted-foreground max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="min-w-0 cursor-not-allowed truncate">
+                  {sanitizedFilename || filenamePlaceholder}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>filename follows the title</TooltipContent>
+            </Tooltip>
+            <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
+          </h2>
+        ) : (
+          <label className="inline-flex min-w-0 max-w-full items-center text-base font-semibold max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
+            <span className="grid w-fit max-w-[calc(100%-2.25rem)] overflow-hidden">
+              <span className="invisible col-start-1 row-start-1 whitespace-pre" aria-hidden>
+                {watchedFilename || filenamePlaceholder}
+              </span>
+              <input
+                {...filenameRegistration}
+                aria-label="filename"
+                aria-invalid={filenameInvalid}
+                aria-describedby={filenameInvalid ? "track-filename-error" : undefined}
+                size={1}
+                className="col-start-1 row-start-1 min-w-0 truncate bg-transparent outline-none placeholder:text-muted-foreground/45"
+                placeholder={filenamePlaceholder}
+              />
+            </span>
+            <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
+          </label>
+        )}
+      </div>
+      <div className="absolute inset-x-4 bottom-1 h-4 min-w-0 overflow-hidden text-xs leading-4 text-destructive max-lg:[@media(max-height:700px)]:inset-x-3 max-lg:[@media(max-height:700px)]:bottom-0 lg:inset-x-6 lg:h-8">
+        {filenameInvalid ? (
+          <div className="flex min-w-0 items-center gap-2">
+            <p
+              id="track-filename-error"
+              className="min-w-0 truncate font-medium"
+              aria-live="polite"
+            >
+              filename is required
+            </p>
+            {failure && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="shrink-0 underline decoration-dotted underline-offset-2"
+                    aria-label={`${failure.title}: ${failure.description}`}
+                  >
+                    track error
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="font-medium">{failure.title}</p>
+                  <p>{failure.description}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        ) : failure ? (
+          <div className="min-w-0 text-xs text-destructive" aria-live="polite">
+            <p className="truncate font-medium">{failure.title}</p>
+            <p className="sr-only truncate lg:not-sr-only">{failure.description}</p>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function TrackDetailsFields({
+  selectedFileId,
+  focusedTitleFileIdRef,
+  register,
+  placeholder,
+  inAlbum,
+  syncFilenames,
+  syncTrackNumbers,
+  filenameInvalid,
+  onPreviewMetadataChange,
+}: {
+  selectedFileId: string | null;
+  focusedTitleFileIdRef: RefObject<string | null>;
+  register: UseFormRegister<AudioMetadata>;
+  placeholder: SampleTrackMetadata;
+  inAlbum: boolean;
+  syncFilenames: boolean;
+  syncTrackNumbers: boolean;
+  filenameInvalid: boolean;
+  onPreviewMetadataChange: TrackMetadataEditorProps["onPreviewMetadataChange"];
+}) {
+  const titleRegistration = register("title", {
+    onChange: (event) => onPreviewMetadataChange("title", event),
+  });
+  const artistRegistration = register("artist", {
+    onChange: (event) => onPreviewMetadataChange("artist", event),
+  });
+  const { ref: titleRegistrationRef, ...titleInputRegistration } = titleRegistration;
+  const titleInputRef = useCallback(
+    (node: HTMLInputElement | null) => {
+      titleRegistrationRef(node);
+      if (!node || !selectedFileId) return;
+      if (focusedTitleFileIdRef.current === selectedFileId) return;
+
+      focusedTitleFileIdRef.current = selectedFileId;
+      node.focus({ preventScroll: true });
+    },
+    [focusedTitleFileIdRef, selectedFileId, titleRegistrationRef],
+  );
+  const albumFieldReason = "controlled by the album";
+
+  return (
+    <>
+      <div>
+        <label htmlFor="track-title" className={fieldLabelClassName}>
+          title:
+        </label>
+        <Input
+          {...titleInputRegistration}
+          id="track-title"
+          ref={titleInputRef}
+          aria-invalid={syncFilenames && filenameInvalid}
+          aria-describedby={syncFilenames && filenameInvalid ? "track-filename-error" : undefined}
+          placeholder={placeholder.title}
+          className={placeholderClassName}
+        />
+      </div>
+      <div>
+        <label htmlFor="track-artist" className={fieldLabelClassName}>
+          artist:
+        </label>
+        <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
+          <Input
+            {...artistRegistration}
+            id="track-artist"
+            placeholder={placeholder.artist}
+            disabled={inAlbum}
+            className={`${placeholderClassName} ${syncedInputClassName}`}
+          />
+        </DisabledReason>
+      </div>
+      <div>
+        <label htmlFor="track-album" className={fieldLabelClassName}>
+          album:
+        </label>
+        <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
+          <Input
+            {...register("album")}
+            id="track-album"
+            placeholder={placeholder.album}
+            disabled={inAlbum}
+            className={`${placeholderClassName} ${syncedInputClassName}`}
+          />
+        </DisabledReason>
+      </div>
+      <div className="grid grid-cols-[minmax(4.5rem,0.8fr)_minmax(0,1.4fr)_minmax(4.5rem,0.8fr)] gap-2">
+        <div>
+          <label htmlFor="track-year" className={fieldLabelClassName}>
+            year:
+          </label>
+          <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
+            <Input
+              type="number"
+              {...register("year", { valueAsNumber: true })}
+              id="track-year"
+              placeholder={placeholder.year}
+              disabled={inAlbum}
+              className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+            />
+          </DisabledReason>
+        </div>
+        <div>
+          <label htmlFor="track-genre" className={fieldLabelClassName}>
+            genre:
+          </label>
+          <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
+            <Input
+              {...register("genre")}
+              id="track-genre"
+              placeholder={placeholder.genre}
+              disabled={inAlbum}
+              className={`${placeholderClassName} ${syncedInputClassName}`}
+            />
+          </DisabledReason>
+        </div>
+        <div>
+          <label htmlFor="track-number" className={fieldLabelClassName}>
+            track:
+          </label>
+          <DisabledReason disabled={inAlbum && syncTrackNumbers} reason="follows album order">
+            <Input
+              type="number"
+              {...register("trackNumber", { valueAsNumber: true })}
+              id="track-number"
+              placeholder={placeholder.trackNumber}
+              disabled={inAlbum && syncTrackNumbers}
+              className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+            />
+          </DisabledReason>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function TrackFileSummary({ selectedFile }: { selectedFile: LoadedTrack }) {
+  return (
+    <div className="grid grid-cols-2 gap-2 text-xs md:text-sm">
+      <div>
+        <span className="font-medium">duration: </span>
+        {`${Math.floor(selectedFile.metadata.duration / 60)}:${String(Math.round(selectedFile.metadata.duration % 60)).padStart(2, "0")}`}
+      </div>
+      <div className="justify-self-end text-right">
+        <span className="font-medium">size: </span>
+        {selectedFile.file &&
+          selectedFile.status !== "error" &&
+          `${(selectedFile.file.size / (1024 * 1024)).toFixed(2)} MB`}
+        {selectedFile.file &&
+          selectedFile.status === "error" &&
+          `${(selectedFile.file.size / (1024 * 1024)).toFixed(2)} MB (metadata failed)`}
+        {!selectedFile.file && selectedFile.downloadStatus === "downloading" && "downloading"}
+        {!selectedFile.file && selectedFile.downloadStatus === "error" && "download failed"}
+        {!selectedFile.file && selectedFile.downloadStatus === "canceled" && "download canceled"}
+      </div>
+    </div>
+  );
+}
+
+function DownloadTrackButton({
+  handleSubmit,
+  onDownloadUpdatedFile,
+  disabled,
+  disabledReason,
+}: {
+  handleSubmit: UseFormHandleSubmit<AudioMetadata>;
+  onDownloadUpdatedFile: SubmitHandler<AudioMetadata>;
+  disabled: boolean;
+  disabledReason: string;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-end gap-2 pt-1 max-lg:[@media(max-height:700px)]:flex-none max-lg:[@media(max-height:700px)]:pt-0 lg:flex-none lg:pt-2">
+      <DisabledReason disabled={disabled} reason={disabledReason}>
+        <Button
+          type="button"
+          onClick={handleSubmit(onDownloadUpdatedFile)}
+          disabled={disabled}
+          className="min-w-36 max-lg:[@media(max-height:700px)]:h-10 max-lg:[@media(max-height:700px)]:text-xs"
+        >
+          download track
+        </Button>
+      </DisabledReason>
+    </div>
+  );
+}
+
+function LoadedTrackMetadataEditor({
+  selectedFile,
+  selectedFileId,
+  focusedTitleFileIdRef,
+  register,
+  control,
+  handleSubmit,
+  onTrackCoverUpload,
+  onTrackCoverProcessingChange,
+  isTrackCoverProcessing,
+  onDownloadUpdatedFile,
+  selectedFileAlbum,
+  syncFilenames,
+  syncTrackNumbers,
+  onPreviewMetadataChange,
+}: LoadedTrackMetadataEditorProps) {
+  const watchedTitle = useWatch({ control, name: "title", defaultValue: "" });
+  const watchedFilename = useWatch({ control, name: "filename", defaultValue: "" });
+  const filenameValue = syncFilenames ? watchedTitle : watchedFilename;
+  const filenameInvalid = !isValidFilenameBase(filenameValue);
+  const canDownloadTrack =
+    Boolean(selectedFile.file) && !isTrackCoverProcessing && !filenameInvalid;
+  const placeholder = getSampleTrack(selectedFile.id);
+  const downloadErrorDisplay = selectedFile.downloadError
+    ? getTrackFailureDisplay(selectedFile.downloadError)
+    : null;
+  const failure =
+    (selectedFile.downloadStatus === "error" || selectedFile.status === "error") &&
+    downloadErrorDisplay
+      ? downloadErrorDisplay
+      : null;
+  const filenameRegistration = register("filename", {
+    onChange: (event) => onPreviewMetadataChange("filename", event),
+  });
+  const downloadDisabledReason = isTrackCoverProcessing
+    ? "cover art is still processing"
+    : filenameInvalid
+      ? "filename is required"
+      : "track file is not ready";
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+        }}
+        className="flex min-h-0 flex-col h-full"
+      >
+        <TrackFilenameHeader
+          syncFilenames={syncFilenames}
+          watchedFilename={watchedFilename}
+          sanitizedFilename={sanitizeFilenameBase(filenameValue)}
+          filenamePlaceholder={placeholder.filename}
+          filenameInvalid={filenameInvalid}
+          filenameRegistration={filenameRegistration}
+          failure={failure}
+        />
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 max-lg:[@media(max-height:700px)]:p-2 lg:p-6 lg:pb-28">
+          <div className="flex min-h-full flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:min-h-0 lg:flex-row lg:gap-4">
+            <Controller
+              name="picture"
+              control={control}
+              render={({ field }) => (
+                <CoverArt
+                  resetKey={selectedFileId}
+                  picture={field.value}
+                  onCoverUpload={onTrackCoverUpload}
+                  onProcessingChange={onTrackCoverProcessingChange}
+                />
+              )}
+            />
+            <div className="flex flex-1 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3">
+              <TrackDetailsFields
+                selectedFileId={selectedFileId}
+                focusedTitleFileIdRef={focusedTitleFileIdRef}
+                register={register}
+                placeholder={placeholder}
+                inAlbum={Boolean(selectedFileAlbum)}
+                syncFilenames={syncFilenames}
+                syncTrackNumbers={syncTrackNumbers}
+                filenameInvalid={filenameInvalid}
+                onPreviewMetadataChange={onPreviewMetadataChange}
+              />
+              <TrackFileSummary selectedFile={selectedFile} />
+              <DownloadTrackButton
+                handleSubmit={handleSubmit}
+                onDownloadUpdatedFile={onDownloadUpdatedFile}
+                disabled={!canDownloadTrack}
+                disabledReason={downloadDisabledReason}
+              />
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
+  const focusedTitleFileIdRef = useRef<string | null>(null);
+  const selectedFile = hasMetadata(props.selectedFile) ? props.selectedFile : null;
+  const currentSelection = selectedFile
+    ? { selectedFile, selectedFileAlbum: props.selectedFileAlbum }
+    : null;
+  const [retainedSelection, setRetainedSelection] = useState(currentSelection);
+  if (
+    currentSelection &&
+    (retainedSelection?.selectedFile !== currentSelection.selectedFile ||
+      retainedSelection.selectedFileAlbum !== currentSelection.selectedFileAlbum)
+  ) {
+    setRetainedSelection(currentSelection);
+  }
+  const displayedSelection = currentSelection ?? retainedSelection;
+  const trackIsSelected = currentSelection !== null;
+  useEffect(() => {
+    if (trackIsSelected || !retainedSelection) return;
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const timeoutId = globalThis.setTimeout(
+      () => setRetainedSelection(null),
+      reduceMotion ? 0 : 250,
+    );
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [retainedSelection, trackIsSelected]);
+
+  const releaseExitedSelection = (event: TransitionEvent<HTMLDivElement>) => {
+    if (
+      !trackIsSelected &&
+      event.target === event.currentTarget &&
+      event.propertyName === "opacity"
+    ) {
+      setRetainedSelection(null);
+    }
+  };
+
+  return (
+    <div className="relative min-h-0 flex-1">
+      <div
+        data-editor-state="empty-selection"
+        aria-hidden={trackIsSelected}
+        inert={trackIsSelected}
+        className={`absolute inset-0 flex items-center justify-center bg-muted/5 transition-opacity duration-200 motion-reduce:transition-none ${
+          trackIsSelected ? "pointer-events-none opacity-0" : "opacity-100"
+        }`}
+      >
+        <div className="text-center">
+          <p className="text-muted-foreground">select a track to edit its tags</p>
+        </div>
+      </div>
+      <div
+        data-editor-state="loaded-track"
+        aria-hidden={!trackIsSelected}
+        inert={!trackIsSelected}
+        onTransitionEnd={releaseExitedSelection}
+        className={`absolute inset-0 flex min-h-0 flex-col transition-opacity duration-200 motion-reduce:transition-none ${
+          trackIsSelected ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      >
+        {displayedSelection ? (
+          <LoadedTrackMetadataEditor
+            {...props}
+            selectedFile={displayedSelection.selectedFile}
+            selectedFileId={displayedSelection.selectedFile.id}
+            selectedFileAlbum={displayedSelection.selectedFileAlbum}
+            focusedTitleFileIdRef={focusedTitleFileIdRef}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
