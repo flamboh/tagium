@@ -108,6 +108,30 @@ describe("album metadata validation layout", () => {
     ).toBe("artist is required");
   });
 
+  it("associates every field label with its input", () => {
+    const hooks = createHookHarness();
+    const tree = hooks.render(() =>
+      AlbumMetadataDialog({
+        open: true,
+        mode: "create",
+        draft: { title: "", artist: "", genre: "" },
+        trackCount: 0,
+        onChange: vi.fn(),
+        onClose: vi.fn(),
+        onSave: vi.fn(),
+        placeholder: { title: "Album", artist: "Artist", genre: "Genre", year: "2026" },
+      }),
+    );
+
+    for (const id of ["album-title", "album-artist", "album-genre", "album-year"]) {
+      findElement(tree, (element) => element.type === "label" && element.props.htmlFor === id);
+      findElement(tree, (element) => element.props.id === id);
+    }
+
+    const titleInput = findElement(tree, (element) => element.props.id === "album-title");
+    expect(titleInput.props["aria-describedby"]).toBe("album-title-error");
+  });
+
   it("adds an uploaded cover to the latest draft", () => {
     const hooks = createHookHarness();
     const onChange = vi.fn();

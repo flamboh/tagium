@@ -1905,7 +1905,6 @@ export default function AudioTagger() {
           onSelectAlbum={handleSelectAlbum}
           onSelectFile={handleSelectFile}
           onSelectLooseTrack={handleSelectLooseTrack}
-          onClearSelection={handleClearSelection}
           onRemoveFile={requestRemoveFile}
           onRetryDownload={handleRetryDownload}
           onAddAlbum={handleOpenCreateAlbumDialog}

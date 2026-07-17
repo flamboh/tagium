@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { spawnDevToast, type DevToastKind } from "./DevPanel";
+import { spawnDevToast, type DevToastKind } from "./devToast";
 
 const toastMocks = vi.hoisted(() => {
   const neutral = vi.fn();

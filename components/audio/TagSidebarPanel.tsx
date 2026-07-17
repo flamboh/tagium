@@ -27,7 +27,6 @@ interface TagSidebarPanelProps {
   onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
   onSelectFile: (albumId: string, fileId: string, event?: ReactMouseEvent) => void;
   onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
-  onClearSelection: () => void;
   onRemoveFile: (fileId: string) => void;
   onRetryDownload: (fileId: string) => void;
   onAddAlbum: () => void;
@@ -54,6 +53,9 @@ interface TagSidebarPanelProps {
   onRetryPlaylistDownloadQueue?: () => void;
 }
 
+const isFileDrag = (event: React.DragEvent<HTMLDivElement>) =>
+  event.dataTransfer.types.includes("Files");
+
 export default function TagSidebarPanel({
   loading,
   files,
@@ -67,7 +69,6 @@ export default function TagSidebarPanel({
   onSelectAlbum,
   onSelectFile,
   onSelectLooseTrack,
-  onClearSelection,
   onRemoveFile,
   onRetryDownload,
   onAddAlbum,
@@ -97,9 +98,6 @@ export default function TagSidebarPanel({
       : hasInvalidFilename
         ? "every track needs a filename"
         : "tracks need files and metadata";
-
-  const isFileDrag = (event: React.DragEvent<HTMLDivElement>) =>
-    event.dataTransfer.types.includes("Files");
 
   const handleSidebarDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
     if (!isFileDrag(event)) return;
@@ -165,7 +163,6 @@ export default function TagSidebarPanel({
         onSelectAlbum={onSelectAlbum}
         onSelectFile={onSelectFile}
         onSelectLooseTrack={onSelectLooseTrack}
-        onClearSelection={onClearSelection}
         onRemoveFile={onRemoveFile}
         onRetryDownload={onRetryDownload}
         onAddAlbum={onAddAlbum}

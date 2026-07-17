@@ -23,23 +23,25 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AlbumSidebarEmptyState } from "./AlbumSidebarEmptyState";
 import {
+  DroppableTrackContainer,
+  SidebarDragPreview,
+  SortableAlbumCard,
+  SortableTrackRow,
+} from "./AlbumSidebarDnd";
+import {
   albumIdFromDrop,
   albumContainerId,
   albumItemId,
   dragStartY,
-  DroppableTrackContainer,
   isCenteredLooseDrop,
   LOOSE_APPEND_CONTAINER_ID,
   LOOSE_CONTAINER_ID,
   rowPlacement,
   sidebarCollisionDetection,
-  SidebarDragPreview,
-  SortableAlbumCard,
-  SortableTrackRow,
   trackItemId,
   type SidebarDragData,
   type SidebarDropData,
-} from "./AlbumSidebarDnd";
+} from "./sidebarDnd";
 import type { AlbumGroup, TagiumFile } from "./types";
 import { isTrackReadyForDownload } from "./downloadLibrary";
 
@@ -53,7 +55,6 @@ interface AlbumSidebarProps {
   onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
   onSelectFile: (albumId: string, fileId: string, event?: ReactMouseEvent) => void;
   onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
-  onClearSelection: () => void;
   onRemoveFile: (fileId: string) => void;
   onRetryDownload: (fileId: string) => void;
   onAddAlbum: () => void;
@@ -78,6 +79,21 @@ interface AlbumSidebarProps {
 
 const isFileDrag = (event: React.DragEvent) => event.dataTransfer.types.includes("Files");
 
+const isRetryableError = (track: TagiumFile) =>
+  Boolean(track.downloadRequest) &&
+  (track.downloadStatus === "error" ||
+    track.downloadStatus === "canceled" ||
+    track.status === "error");
+
+const handleFileDrop = (event: React.DragEvent, onUpload: (files: File[]) => void) => {
+  const droppedFiles = Array.from(event.dataTransfer.files);
+  if (droppedFiles.length === 0) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  onUpload(droppedFiles);
+};
+
 export default function AlbumSidebar({
   albums,
   looseTrackIds,
@@ -88,7 +104,6 @@ export default function AlbumSidebar({
   onSelectAlbum,
   onSelectFile,
   onSelectLooseTrack,
-  onClearSelection,
   onRemoveFile,
   onRetryDownload,
   onAddAlbum,
@@ -119,11 +134,6 @@ export default function AlbumSidebar({
     .map((trackId) => filesById.get(trackId))
     .filter((track): track is TagiumFile => Boolean(track));
 
-  const isRetryableError = (track: TagiumFile) =>
-    Boolean(track.downloadRequest) &&
-    (track.downloadStatus === "error" ||
-      track.downloadStatus === "canceled" ||
-      track.status === "error");
   const selectedTone = (trackId: string) => {
     if (selectedFileIds.has(trackId)) return "primary";
     if (selectedFileId === trackId) return "secondary";
@@ -236,17 +246,8 @@ export default function AlbumSidebar({
     setActiveDrag(null);
   };
 
-  const handleFileDrop = (event: React.DragEvent, onUpload: (files: File[]) => void) => {
-    const droppedFiles = Array.from(event.dataTransfer.files);
-    if (droppedFiles.length === 0) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    onUpload(droppedFiles);
-  };
-
   if (albums.length === 0 && looseTracks.length === 0) {
-    return <AlbumSidebarEmptyState onAddAlbum={onAddAlbum} onClearSelection={onClearSelection} />;
+    return <AlbumSidebarEmptyState onAddAlbum={onAddAlbum} />;
   }
 
   return (
@@ -274,9 +275,6 @@ export default function AlbumSidebar({
       >
         <div
           className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) onClearSelection();
-          }}
           onDragOver={(event) => {
             if (!isFileDrag(event)) return;
             event.preventDefault();
@@ -352,10 +350,7 @@ export default function AlbumSidebar({
                       data={{ type: "container", container: "album", albumId: album.id }}
                     >
                       {album.trackIds.length === 0 ? (
-                        <div
-                          className="text-xs text-muted-foreground px-4 py-3 text-center"
-                          onClick={onClearSelection}
-                        >
+                        <div className="text-xs text-muted-foreground px-4 py-3 text-center">
                           drag tracks here
                         </div>
                       ) : (

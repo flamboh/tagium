@@ -10,6 +10,11 @@ interface LandingScreenProps {
   onAudioUpload: (files: File[]) => void | Promise<void>;
 }
 
+const handleDragOver = (e: React.DragEvent) => {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "copy";
+};
+
 export default function LandingScreen({ active, children, onAudioUpload }: LandingScreenProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
@@ -24,11 +29,6 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
   const handleDragLeave = () => {
     dragCounterRef.current--;
     if (dragCounterRef.current === 0) setIsDragging(false);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
   };
 
   const handleDrop = (e: React.DragEvent) => {
