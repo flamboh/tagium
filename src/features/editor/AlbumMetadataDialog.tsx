@@ -52,7 +52,7 @@ export default function AlbumMetadataDialog({
   placeholder,
 }: AlbumMetadataDialogProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showErrors, setShowErrors] = useState(false);
+  const [touchedFields, setTouchedFields] = useState({ title: false, artist: false });
   const [isSyncingCover, setIsSyncingCover] = useState(false);
   const [isProcessingCover, setIsProcessingCover] = useState(false);
   const [syncCoverRotation, setSyncCoverRotation] = useState(0);
@@ -60,6 +60,9 @@ export default function AlbumMetadataDialog({
     mode === "edit" && draft.cover && draft.cover.length > 0 && onSyncCoverToTracks;
   const syncCoverLabel = isSyncingCover ? "syncing cover to tracks" : "sync cover to tracks";
   const placeholderClassName = "placeholder:text-muted-foreground/45";
+  const titleInvalid = !draft.title.trim();
+  const artistInvalid = !draft.artist.trim();
+  const formInvalid = titleInvalid || artistInvalid;
 
   const handleSyncCoverToTracks = () => {
     if (!onSyncCoverToTracks) return;
@@ -87,7 +90,7 @@ export default function AlbumMetadataDialog({
       onOpenChange={(nextOpen) => {
         if (!nextOpen && !isProcessingCover) {
           setShowDeleteConfirm(false);
-          setShowErrors(false);
+          setTouchedFields({ title: false, artist: false });
           onClose();
         }
       }}
@@ -98,10 +101,7 @@ export default function AlbumMetadataDialog({
           onSubmit={(event) => {
             event.preventDefault();
             if (isProcessingCover) return;
-            if (!draft.title.trim() || !draft.artist.trim()) {
-              setShowErrors(true);
-              return;
-            }
+            if (formInvalid) return;
             onSave();
           }}
         >
@@ -117,10 +117,16 @@ export default function AlbumMetadataDialog({
                 <div className="flex flex-col gap-0">
                   <div>
                     <label htmlFor="album-title" className="block text-sm font-medium mb-1">
-                      album title:
+                      album title:{" "}
+                      <span className="text-destructive" aria-hidden="true">
+                        *
+                      </span>
+                      <span className="sr-only"> required</span>
                     </label>
                     <Input
                       id="album-title"
+                      required
+                      aria-required="true"
                       value={draft.title}
                       onChange={(event) =>
                         onChange({
@@ -128,9 +134,12 @@ export default function AlbumMetadataDialog({
                           title: event.target.value,
                         })
                       }
+                      onBlur={() => setTouchedFields((current) => ({ ...current, title: true }))}
                       placeholder={placeholder.title}
-                      aria-invalid={showErrors && !draft.title.trim()}
-                      aria-describedby="album-title-error"
+                      aria-invalid={touchedFields.title && titleInvalid}
+                      aria-describedby={
+                        touchedFields.title && titleInvalid ? "album-title-error" : undefined
+                      }
                       className={placeholderClassName}
                     />
                     <p
@@ -138,15 +147,21 @@ export default function AlbumMetadataDialog({
                       className="h-4 text-xs leading-4 text-destructive"
                       aria-live="polite"
                     >
-                      {showErrors && !draft.title.trim() ? "album title is required" : ""}
+                      {touchedFields.title && titleInvalid ? "album title is required" : ""}
                     </p>
                   </div>
                   <div>
                     <label htmlFor="album-artist" className="block text-sm font-medium mb-1">
-                      artist:
+                      artist:{" "}
+                      <span className="text-destructive" aria-hidden="true">
+                        *
+                      </span>
+                      <span className="sr-only"> required</span>
                     </label>
                     <Input
                       id="album-artist"
+                      required
+                      aria-required="true"
                       value={draft.artist}
                       onChange={(event) =>
                         onChange({
@@ -154,9 +169,12 @@ export default function AlbumMetadataDialog({
                           artist: event.target.value,
                         })
                       }
+                      onBlur={() => setTouchedFields((current) => ({ ...current, artist: true }))}
                       placeholder={placeholder.artist}
-                      aria-invalid={showErrors && !draft.artist.trim()}
-                      aria-describedby="album-artist-error"
+                      aria-invalid={touchedFields.artist && artistInvalid}
+                      aria-describedby={
+                        touchedFields.artist && artistInvalid ? "album-artist-error" : undefined
+                      }
                       className={placeholderClassName}
                     />
                     <p
@@ -164,7 +182,7 @@ export default function AlbumMetadataDialog({
                       className="h-4 text-xs leading-4 text-destructive"
                       aria-live="polite"
                     >
-                      {showErrors && !draft.artist.trim() ? "artist is required" : ""}
+                      {touchedFields.artist && artistInvalid ? "artist is required" : ""}
                     </p>
                   </div>
                   <div className="mb-3">
@@ -287,7 +305,11 @@ export default function AlbumMetadataDialog({
                 >
                   cancel
                 </Button>
-                <Button type="submit" disabled={isProcessingCover}>
+                <Button
+                  type="submit"
+                  disabled={isProcessingCover || formInvalid}
+                  aria-busy={isProcessingCover}
+                >
                   {isProcessingCover
                     ? "processing cover"
                     : mode === "create"

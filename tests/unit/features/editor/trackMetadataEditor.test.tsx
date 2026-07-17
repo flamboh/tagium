@@ -127,6 +127,7 @@ function EditorHarness({
           },
         })}
         onPreviewMetadataChange={vi.fn()}
+        onAudioUpload={vi.fn()}
       />
     </TooltipProvider>
   );
@@ -228,7 +229,8 @@ describe("track metadata editor form seam", () => {
   it("routes an unavailable track to the empty editor state", () => {
     const markup = renderToStaticMarkup(<EditorHarness selectedFile={null} />);
 
-    expect(markup).toContain("select a track to edit its tags");
+    expect(markup).toContain("drop your mp3s here");
+    expect(markup).not.toContain("tag your music");
     expect(markup).not.toContain('id="track-title"');
   });
 

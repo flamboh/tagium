@@ -10,11 +10,10 @@ import {
   getSystemFailurePresentation,
   reportSystemFailure,
 } from "@/features/workspace/systemFailure";
+import type { MediaUrlEntryLayout } from "@/features/import/mediaUrlEntryPresentation";
 
 interface MediaUrlEntryProps {
-  layout: "landing" | "editor";
-  hidden: boolean;
-  docked?: boolean;
+  layout: MediaUrlEntryLayout;
   onUrlImport: (sourceUrl: string) => void | Promise<void>;
 }
 
@@ -32,12 +31,7 @@ const validateMediaUrl = (value: string) => {
 const prefersReducedMotion = () =>
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
-export default function MediaUrlEntry({
-  layout,
-  hidden,
-  docked = false,
-  onUrlImport,
-}: MediaUrlEntryProps) {
+export default function MediaUrlEntry({ layout, onUrlImport }: MediaUrlEntryProps) {
   const [sourceUrl, setSourceUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -63,7 +57,7 @@ export default function MediaUrlEntry({
   useLayoutEffect(() => {
     const anchor = anchorRef.current;
     const motion = motionRef.current;
-    if (!anchor || !motion || hidden) {
+    if (!anchor || !motion) {
       animationRef.current?.cancel();
       animationRef.current = null;
       clearMotionStyles();
@@ -107,7 +101,7 @@ export default function MediaUrlEntry({
 
     previousRectRef.current = nextRect;
     previousLayoutRef.current = layout;
-  }, [docked, hidden, layout]);
+  }, [layout]);
 
   useEffect(() => {
     const settleMotion = () => {
@@ -176,26 +170,23 @@ export default function MediaUrlEntry({
   return (
     <div
       data-layout={layout}
-      aria-hidden={hidden || undefined}
-      inert={hidden || undefined}
       className={cn(
-        hidden && "hidden",
         layout === "landing" &&
           "flex w-full flex-col gap-10 max-lg:[@media(max-height:700px)]:gap-6",
         layout === "editor" &&
           "flex-shrink-0 border-t bg-background/95 p-3 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-4 lg:z-10 lg:flex lg:justify-center lg:border-t-0 lg:bg-transparent lg:px-4 lg:p-0",
-        docked &&
-          "pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center lg:bottom-4",
+        layout === "empty-editor" &&
+          "pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center px-4 lg:bottom-[calc(50%-13rem)]",
       )}
     >
-      {layout === "landing" && (
+      {layout !== "editor" && (
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <div className="h-px flex-1 bg-border" />
           <span>or import from a url</span>
           <div className="h-px flex-1 bg-border" />
         </div>
       )}
-      <div ref={anchorRef} className={cn("w-full", layout === "editor" && "max-w-3xl")}>
+      <div ref={anchorRef} className={cn("w-full", layout === "editor" ? "max-w-3xl" : "max-w-md")}>
         <div ref={motionRef} className="pointer-events-auto w-full bg-background">
           <form noValidate onSubmit={handleSubmit} className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
@@ -222,7 +213,7 @@ export default function MediaUrlEntry({
                 id="media-url-error"
                 className={cn(
                   "h-4 pt-0.5 text-xs leading-4 text-destructive",
-                  layout === "landing" && "text-center",
+                  layout !== "editor" && "text-center",
                 )}
                 aria-live="polite"
               >

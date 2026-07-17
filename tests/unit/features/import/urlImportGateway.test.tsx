@@ -125,7 +125,7 @@ describe("media URL entry", () => {
     const hooks = createHookHarness();
     const onUrlImport = vi.fn(async () => undefined);
     const render = (layout: "landing" | "editor") =>
-      hooks.render(() => MediaUrlEntry({ layout, hidden: false, onUrlImport }));
+      hooks.render(() => MediaUrlEntry({ layout, onUrlImport }));
 
     let tree = render("landing");
     changeInputValue(tree, "  https://soundcloud.com/user/track  ");
@@ -143,8 +143,7 @@ describe("media URL entry", () => {
   it("keeps malformed URL feedback local to the input", async () => {
     const hooks = createHookHarness();
     const onUrlImport = vi.fn();
-    const render = () =>
-      hooks.render(() => MediaUrlEntry({ layout: "landing", hidden: false, onUrlImport }));
+    const render = () => hooks.render(() => MediaUrlEntry({ layout: "landing", onUrlImport }));
 
     let tree = render();
     changeInputValue(tree, "not a url");
@@ -168,8 +167,7 @@ describe("media URL entry", () => {
     const onUrlImport = vi.fn(async () => {
       throw failure;
     });
-    const render = () =>
-      hooks.render(() => MediaUrlEntry({ layout: "editor", hidden: false, onUrlImport }));
+    const render = () => hooks.render(() => MediaUrlEntry({ layout: "editor", onUrlImport }));
 
     let tree = render();
     changeInputValue(tree, "https://youtube.com/watch?v=abc");
@@ -191,8 +189,7 @@ describe("media URL entry", () => {
     const onUrlImport = vi.fn(async () => {
       throw new Error("soundcloud set request failed (404)");
     });
-    const render = () =>
-      hooks.render(() => MediaUrlEntry({ layout: "landing", hidden: false, onUrlImport }));
+    const render = () => hooks.render(() => MediaUrlEntry({ layout: "landing", onUrlImport }));
 
     let tree = render();
     changeInputValue(tree, "https://soundcloud.com/user/sets/missing");

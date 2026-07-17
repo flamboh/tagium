@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CoverArt from "@/features/editor/coverArt";
+import AudioImportDropzone from "@/features/import/AudioImportDropzone";
 import { isValidFilenameBase, sanitizeFilenameBase } from "@/features/library/filename";
 import { getAudioFormatInfo } from "@/features/audio/audioFormat";
 import { getSampleTrack, type SampleTrackMetadata } from "@/features/editor/sampleMetadata";
@@ -67,6 +68,7 @@ interface TrackMetadataEditorProps {
     field: "filename" | "title" | "artist",
     event: ChangeEvent<HTMLInputElement>,
   ) => void;
+  onAudioUpload: (files: File[]) => void | Promise<void>;
 }
 
 interface LoadedTrackMetadataEditorProps extends Omit<TrackMetadataEditorProps, "selectedFile"> {
@@ -855,13 +857,11 @@ export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
         data-editor-state="empty-selection"
         aria-hidden={trackIsSelected}
         inert={trackIsSelected}
-        className={`absolute inset-0 flex items-center justify-center bg-muted/5 transition-opacity duration-200 motion-reduce:transition-none ${
+        className={`absolute inset-0 flex items-center justify-center bg-muted/5 px-4 pb-28 transition-opacity duration-200 motion-reduce:transition-none ${
           trackIsSelected ? "pointer-events-none opacity-0" : "opacity-100"
         }`}
       >
-        <div className="text-center">
-          <p className="text-muted-foreground">select a track to edit its tags</p>
-        </div>
+        <AudioImportDropzone onAudioUpload={props.onAudioUpload} />
       </div>
       <div
         data-editor-state="loaded-track"

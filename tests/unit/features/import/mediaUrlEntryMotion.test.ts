@@ -3,30 +3,15 @@ import { getMediaUrlEntryMotionKeyframes } from "@/features/import/mediaUrlEntry
 import { getMediaUrlEntryPresentation } from "@/features/import/mediaUrlEntryPresentation";
 
 describe("media URL entry presentation", () => {
-  it("docks the persistent entry in empty-library settings", () => {
-    expect(getMediaUrlEntryPresentation(true, false)).toEqual({
-      layout: "landing",
-      hidden: false,
-      docked: false,
-    });
-    expect(getMediaUrlEntryPresentation(true, true)).toEqual({
-      layout: "editor",
-      hidden: false,
-      docked: true,
-    });
+  it("fully removes the entry in settings", () => {
+    expect(getMediaUrlEntryPresentation(true, false)).toEqual({ layout: "landing" });
+    expect(getMediaUrlEntryPresentation(true, true)).toBeNull();
+    expect(getMediaUrlEntryPresentation(false, true, true)).toBeNull();
   });
 
-  it("preserves non-empty-library visibility behavior", () => {
-    expect(getMediaUrlEntryPresentation(false, false)).toEqual({
-      layout: "editor",
-      hidden: false,
-      docked: false,
-    });
-    expect(getMediaUrlEntryPresentation(false, true)).toEqual({
-      layout: "editor",
-      hidden: true,
-      docked: false,
-    });
+  it("moves between empty and loaded editor positions", () => {
+    expect(getMediaUrlEntryPresentation(false, false)).toEqual({ layout: "empty-editor" });
+    expect(getMediaUrlEntryPresentation(false, false, true)).toEqual({ layout: "editor" });
   });
 
   it("animates position and real width without a transform", () => {
