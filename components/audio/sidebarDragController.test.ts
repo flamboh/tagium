@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 import { resolveSidebarDragCommand, type SidebarDropPosition } from "./sidebarDragController";
-import { LOOSE_APPEND_CONTAINER_ID, LOOSE_CONTAINER_ID } from "./sidebarDnd";
+import {
+  emptyLooseDropCollision,
+  LOOSE_APPEND_CONTAINER_ID,
+  LOOSE_CONTAINER_ID,
+} from "./sidebarDnd";
 
 const albums = [
   { id: "album-a", trackIds: ["a-1", "a-2"] },
@@ -28,6 +32,35 @@ const resolve = (overrides: Partial<Parameters<typeof resolveSidebarDragCommand>
   });
 
 describe("sidebar drag controller", () => {
+  it("keeps an empty loose drop target available at the first album without reserving space", () => {
+    const looseContainer = {
+      id: LOOSE_CONTAINER_ID,
+      data: { current: { type: "container", container: "loose" } },
+    };
+    const firstAlbum = {
+      id: "album:album-a",
+      data: { current: { type: "album", albumId: "album-a" } },
+    };
+
+    const collisionArgs = (y: number) =>
+      ({
+        active: {
+          data: {
+            current: { type: "track", trackId: "a-1", container: "album", albumId: "album-a" },
+          },
+        },
+        droppableContainers: [looseContainer, firstAlbum],
+        droppableRects: new Map([
+          [LOOSE_CONTAINER_ID, { top: 100 }],
+          ["album:album-a", { top: 100 }],
+        ]),
+        pointerCoordinates: { x: 10, y },
+      }) as never;
+
+    expect(emptyLooseDropCollision(collisionArgs(112))).toEqual([{ id: LOOSE_CONTAINER_ID }]);
+    expect(emptyLooseDropCollision(collisionArgs(125))).toBeNull();
+  });
+
   it("reorders albums by the album containing the drop target", () => {
     expect(
       resolve({

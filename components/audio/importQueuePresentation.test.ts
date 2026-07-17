@@ -55,4 +55,10 @@ describe("import queue presentation", () => {
   it("keeps single-track controller state out of the playlist panel", () => {
     expect(getImportQueuePresentation(snapshot({ total: 1 }), [])).toBeNull();
   });
+
+  it("marks a successfully settled queue complete", () => {
+    expect(
+      getImportQueuePresentation(snapshot({ completed: 2, pending: 0, done: true }), []),
+    ).toMatchObject({ id: 1, status: "complete", downloadedCount: 2, progress: 100 });
+  });
 });

@@ -1,9 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export type PlaylistDownloadQueueStatus = "downloading" | "waiting" | "error" | "canceled";
+export type PlaylistDownloadQueueStatus =
+  | "downloading"
+  | "waiting"
+  | "complete"
+  | "error"
+  | "canceled";
 
 export interface PlaylistDownloadQueueTrack {
   id: string;
@@ -11,6 +17,7 @@ export interface PlaylistDownloadQueueTrack {
 }
 
 export interface PlaylistDownloadQueuePanelState {
+  id: number;
   status: PlaylistDownloadQueueStatus;
   downloadedCount: number;
   totalCount: number;
@@ -34,7 +41,16 @@ export default function PlaylistDownloadQueuePanel({
   onCancel,
   onRetry,
 }: PlaylistDownloadQueuePanelProps) {
-  if (!queue) return null;
+  const [dismissedQueueId, setDismissedQueueId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!queue || queue.status !== "complete") return;
+
+    const timeout = window.setTimeout(() => setDismissedQueueId(queue.id), 10_000);
+    return () => window.clearTimeout(timeout);
+  }, [queue]);
+
+  if (!queue || dismissedQueueId === queue.id) return null;
 
   const progress = Math.min(100, Math.max(0, queue.progress));
   const shownTracks = queue.currentTracks.slice(0, 2);
@@ -47,6 +63,9 @@ export default function PlaylistDownloadQueuePanel({
   }
   if (queue.status === "canceled") {
     label = `canceled ${queue.canceledCount}/${queue.totalCount}`;
+  }
+  if (queue.status === "complete") {
+    label = `downloaded ${queue.downloadedCount}/${queue.totalCount}`;
   }
 
   return (
@@ -71,7 +90,7 @@ export default function PlaylistDownloadQueuePanel({
           )}
         </div>
 
-        {(showCancel || showRetry) && (
+        {(showCancel || showRetry || queue.status !== "downloading") && (
           <div className="flex shrink-0 items-center gap-1">
             {showRetry && (
               <Button
@@ -93,6 +112,18 @@ export default function PlaylistDownloadQueuePanel({
                 className="size-7"
                 onClick={onCancel}
                 aria-label="cancel playlist downloads"
+              >
+                <X className="size-3.5" />
+              </Button>
+            )}
+            {!showCancel && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={() => setDismissedQueueId(queue.id)}
+                aria-label="dismiss playlist download progress"
               >
                 <X className="size-3.5" />
               </Button>

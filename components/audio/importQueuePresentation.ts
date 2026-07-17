@@ -23,11 +23,13 @@ export const getImportQueuePresentation = (
   ).length;
   let status: PlaylistDownloadQueuePanelState["status"] = "downloading";
   if (snapshot.waitingForTunnelBudget) status = "waiting";
+  if (snapshot.done && snapshot.failed === 0 && !snapshot.canceled) status = "complete";
   if (snapshot.done && snapshot.failed > 0) status = "error";
   if (snapshot.canceled && snapshot.failed === 0) status = "canceled";
   const settled = snapshot.completed + snapshot.failed + snapshot.canceledCount;
   const eta = formatEta(snapshot.etaMs);
   return {
+    id: snapshot.id,
     status,
     downloadedCount: snapshot.completed,
     totalCount: snapshot.total,
