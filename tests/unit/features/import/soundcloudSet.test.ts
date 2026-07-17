@@ -8,6 +8,7 @@ import { resolveSoundCloudSet } from "@/features/import/soundcloudSet";
 import { startSoundCloudSetImport } from "@/features/import/soundcloudSetImport";
 import type { SoundCloudSet } from "@/features/import/soundcloudSet";
 import type { AlbumGroup, AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
+import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -41,6 +42,7 @@ const cover: AudioMetadata["picture"] = [
 ];
 
 const defaultSettings: AppSettings = {
+  ...DEFAULT_APP_SETTINGS,
   audioBitrate: "320",
   syncFilenames: false,
   syncTrackNumbers: false,
@@ -255,6 +257,7 @@ describe("download track plans", () => {
       {
         title: "First Track",
         artist: "Set Artist",
+        albumArtist: "Set Artist",
         album: "Imported Set",
         genre: "Electronic",
         year: 2024,
@@ -263,6 +266,7 @@ describe("download track plans", () => {
       {
         title: "Second Track",
         artist: "Set Artist",
+        albumArtist: "Set Artist",
         album: "Imported Set",
         genre: "Electronic",
         year: 2024,
@@ -330,6 +334,7 @@ describe("soundcloud set import", () => {
       {
         title: "First Track",
         artist: "Set Artist",
+        albumArtist: "Set Artist",
         album: "Imported Set",
         genre: "Electronic",
         year: 2024,
@@ -338,6 +343,7 @@ describe("soundcloud set import", () => {
       {
         title: "Second Track",
         artist: "Set Artist",
+        albumArtist: "Set Artist",
         album: "Imported Set",
         genre: "Electronic",
         year: 2024,

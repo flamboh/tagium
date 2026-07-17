@@ -27,6 +27,7 @@ const metadataSnapshotSchema = Schema.Struct({
   filename: Schema.mutableKey(Schema.String),
   title: Schema.mutableKey(Schema.String),
   artist: Schema.mutableKey(Schema.String),
+  albumArtist: Schema.mutableKey(Schema.String),
   album: Schema.mutableKey(Schema.String),
   year: Schema.mutableKey(Schema.NullOr(Schema.Number)),
   genre: Schema.mutableKey(metadataGenreSchema),
@@ -35,17 +36,26 @@ const metadataSnapshotSchema = Schema.Struct({
   sampleRate: Schema.mutableKey(Schema.Number),
   picture: Schema.mutableKey(metadataPictureArraySchema),
   trackNumber: Schema.mutableKey(Schema.NullOr(Schema.Number)),
+  discNumber: Schema.mutableKey(Schema.NullOr(Schema.Number)),
+  composer: Schema.mutableKey(Schema.String),
+  bpm: Schema.mutableKey(Schema.NullOr(Schema.Number)),
+  comment: Schema.mutableKey(Schema.String),
 });
 
 const metadataPatchSchema = Schema.Struct({
   filename: optionalMutableKey(Schema.String),
   title: optionalMutableKey(Schema.String),
   artist: optionalMutableKey(Schema.String),
+  albumArtist: optionalMutableKey(Schema.String),
   album: optionalMutableKey(Schema.String),
   year: optionalMutableKey(Schema.NullOr(Schema.Number)),
   genre: optionalMutableKey(metadataGenreSchema),
   picture: optionalMutableKey(metadataPictureArraySchema),
   trackNumber: optionalMutableKey(Schema.NullOr(Schema.Number)),
+  discNumber: optionalMutableKey(Schema.NullOr(Schema.Number)),
+  composer: optionalMutableKey(Schema.String),
+  bpm: optionalMutableKey(Schema.NullOr(Schema.Number)),
+  comment: optionalMutableKey(Schema.String),
 });
 
 export const audioMetadataSchema = metadataSnapshotSchema;

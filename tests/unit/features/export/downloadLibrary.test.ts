@@ -12,6 +12,7 @@ const metadata = (filename: string): AudioMetadata => ({
   filename: filename.replace(/\.mp3$/i, ""),
   title: filename,
   artist: "",
+  albumArtist: "",
   album: "",
   year: null,
   genre: "",
@@ -20,6 +21,10 @@ const metadata = (filename: string): AudioMetadata => ({
   sampleRate: 0,
   picture: [],
   trackNumber: null,
+  discNumber: null,
+  composer: "",
+  bpm: null,
+  comment: "",
 });
 
 const file = (id: string, filename: string, contents = id): TagiumFile => ({

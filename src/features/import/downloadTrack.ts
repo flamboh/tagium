@@ -143,6 +143,7 @@ export const createDownloadMetadata = ({
   filename: withoutAudioExtension(filenameFromTitle(title), "mp3"),
   title,
   artist,
+  albumArtist: artist,
   album,
   genre,
   duration: duration ?? 0,
@@ -151,6 +152,10 @@ export const createDownloadMetadata = ({
   picture: [],
   year: year ?? null,
   trackNumber: trackNumber ?? null,
+  discNumber: null,
+  composer: "",
+  bpm: null,
+  comment: "",
 });
 
 export const createPendingDownloadTrack = (
@@ -243,6 +248,7 @@ const createPlaylistPendingMetadataPatch = (
 ): MetadataPatch => ({
   title: track.title,
   artist: playlist.artist,
+  albumArtist: playlist.artist,
   album: playlist.title,
   genre: playlist.genre,
   ...(playlist.year !== undefined ? { year: playlist.year } : {}),

@@ -25,9 +25,15 @@ interface MP3TagPicture {
   data: number[];
 }
 
+interface MP3TagComment {
+  language: string;
+  descriptor: string;
+  text: string;
+}
+
 interface MP3TagReader {
-  read: () => void;
-  save?: () => void;
+  read: (options?: { unsupported?: boolean }) => void;
+  save?: (options?: { id3v2?: { unsupported?: boolean } }) => void;
   error?: string;
   buffer?: ArrayBuffer;
   tags: {
@@ -37,8 +43,30 @@ interface MP3TagReader {
     year?: string;
     genre?: string;
     track?: string;
+    comment?: string;
+    v1?: { comment?: string; [field: string]: unknown };
     v2?: {
       APIC?: MP3TagPicture[];
+      TPE2?: string;
+      TP2?: string;
+      TCOM?: string;
+      TCM?: string;
+      TBPM?: string;
+      TBP?: string;
+      TPOS?: string;
+      TPA?: string;
+      COMM?: MP3TagComment[];
+      COM?: MP3TagComment[];
+      [frame: string]: unknown;
+    };
+    v2Details?: {
+      version: number[];
+      size?: number;
+      flags?: {
+        unsynchronisation: boolean;
+        extendedHeader: boolean;
+        experimentalIndicator: boolean;
+      };
     };
   };
 }
@@ -55,6 +83,53 @@ const parseTagNumber = (value: string | undefined) => {
   const [head] = value.split("/");
   const parsed = Number.parseInt(head ?? "", 10);
   return Number.isNaN(parsed) ? undefined : parsed;
+};
+
+const toTagNumber = (value: number | null) =>
+  value !== null && !Number.isNaN(value) ? value.toString() : "";
+
+const setVersionedTextFrame = (
+  tags: NonNullable<MP3TagReader["tags"]["v2"]>,
+  version: number | undefined,
+  frame: "TPE2" | "TCOM" | "TBPM" | "TPOS",
+  legacyFrame: "TP2" | "TCM" | "TBP" | "TPA",
+  value: string,
+) => {
+  if (version === 2) {
+    tags[legacyFrame] = value;
+    delete tags[frame];
+    return;
+  }
+  tags[frame] = value;
+  delete tags[legacyFrame];
+};
+
+const ensureId3v2 = (tags: MP3TagReader["tags"]) => {
+  tags.v2 ??= {};
+  tags.v2Details ??= {
+    version: [4, 0],
+    size: 0,
+    flags: {
+      unsynchronisation: false,
+      extendedHeader: false,
+      experimentalIndicator: false,
+    },
+  };
+  return { frames: tags.v2, version: tags.v2Details.version[0] };
+};
+
+const setComment = (tags: MP3TagReader["tags"], value: string) => {
+  const { frames, version } = ensureId3v2(tags);
+  const frame = version === 2 ? "COM" : "COMM";
+  const legacyFrame = version === 2 ? "COMM" : "COM";
+  const comments = (frames[frame] as MP3TagComment[] | undefined) ?? [];
+  const primaryIndex = comments.findIndex(
+    (comment) => comment.language === "eng" && comment.descriptor === "",
+  );
+  const primary = { language: "eng", descriptor: "", text: value };
+  frames[frame] = [primary, ...comments.filter((_, index) => index !== primaryIndex)];
+  delete frames[legacyFrame];
+  if (tags.v1) tags.v1.comment = value;
 };
 
 const getDuration = (file: File) =>
@@ -123,7 +198,7 @@ const readMp3Tags = (MP3Tag: MP3TagConstructor, arrayBuffer: ArrayBuffer, verbos
   Effect.try({
     try: () => {
       const mp3tag = new MP3Tag(arrayBuffer, verbose);
-      mp3tag.read();
+      mp3tag.read({ unsupported: true });
       if (mp3tag.error) throw new Error(mp3tag.error);
       return mp3tag;
     },
@@ -137,7 +212,7 @@ const readMp3Tags = (MP3Tag: MP3TagConstructor, arrayBuffer: ArrayBuffer, verbos
 const saveMp3Tags = (mp3tag: MP3TagReader) =>
   Effect.try({
     try: () => {
-      mp3tag.save?.();
+      mp3tag.save?.({ id3v2: { unsupported: true } });
       if (mp3tag.error || !mp3tag.buffer) {
         throw new Error(mp3tag.error || "unable to save metadata");
       }
@@ -178,6 +253,7 @@ const parseUploadedTrack = (file: File) =>
         filename: withoutAudioExtension(normalizeMp3Filename(file.name), "mp3"),
         title: mp3tag.tags.title || "",
         artist: mp3tag.tags.artist || "",
+        albumArtist: mp3tag.tags.v2?.TPE2 || mp3tag.tags.v2?.TP2 || mp3tag.tags.artist || "",
         album: mp3tag.tags.album || "",
         year: parseTagNumber(mp3tag.tags.year) ?? null,
         genre: mp3tag.tags.genre || "",
@@ -186,6 +262,10 @@ const parseUploadedTrack = (file: File) =>
         sampleRate: 0,
         picture: pictureData,
         trackNumber: parseTrackTagNumber(mp3tag.tags.track) ?? null,
+        discNumber: parseTagNumber(mp3tag.tags.v2?.TPOS || mp3tag.tags.v2?.TPA) ?? null,
+        composer: mp3tag.tags.v2?.TCOM || mp3tag.tags.v2?.TCM || "",
+        bpm: parseTagNumber(mp3tag.tags.v2?.TBPM || mp3tag.tags.v2?.TBP) ?? null,
+        comment: mp3tag.tags.comment || "",
       });
 
       return {
@@ -273,6 +353,7 @@ const writeMetadata = (fileToUpdate: TagiumFile, newTags: AudioMetadata) =>
       ),
     );
 
+    const { frames: v2Frames, version: v2Version } = ensureId3v2(mp3tag.tags);
     mp3tag.tags.title = metadataToWrite.title || "";
     mp3tag.tags.artist = metadataToWrite.artist || "";
     mp3tag.tags.album = metadataToWrite.album || "";
@@ -289,9 +370,23 @@ const writeMetadata = (fileToUpdate: TagiumFile, newTags: AudioMetadata) =>
       !Number.isNaN(metadataToWrite.trackNumber)
         ? metadataToWrite.trackNumber.toString()
         : "";
+    setComment(mp3tag.tags, metadataToWrite.comment);
 
-    if (metadataToWrite.picture && metadataToWrite.picture.length > 0 && mp3tag.tags.v2) {
-      mp3tag.tags.v2.APIC = metadataToWrite.picture.map((picture) => ({
+    {
+      setVersionedTextFrame(v2Frames, v2Version, "TPE2", "TP2", metadataToWrite.albumArtist);
+      setVersionedTextFrame(v2Frames, v2Version, "TCOM", "TCM", metadataToWrite.composer);
+      setVersionedTextFrame(v2Frames, v2Version, "TBPM", "TBP", toTagNumber(metadataToWrite.bpm));
+      setVersionedTextFrame(
+        v2Frames,
+        v2Version,
+        "TPOS",
+        "TPA",
+        toTagNumber(metadataToWrite.discNumber),
+      );
+    }
+
+    if (metadataToWrite.picture && metadataToWrite.picture.length > 0) {
+      v2Frames.APIC = metadataToWrite.picture.map((picture) => ({
         format: picture.format || "image/jpeg",
         type: typeof picture.type === "number" ? picture.type : 3,
         description: picture.description || "",

@@ -2,6 +2,7 @@ import { act } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type { AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
+import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 
 const exportMocks = vi.hoisted(() => ({
   createZipBlob: vi.fn(),
@@ -30,6 +31,7 @@ const metadata: AudioMetadata = {
   filename: "track",
   title: "Track",
   artist: "Artist",
+  albumArtist: "Custom Album Artist",
   album: "Album",
   year: null,
   genre: "",
@@ -38,12 +40,19 @@ const metadata: AudioMetadata = {
   sampleRate: 44_100,
   picture: [],
   trackNumber: null,
+  discNumber: null,
+  composer: "",
+  bpm: null,
+  comment: "",
 };
 const settings: AppSettings = {
+  ...DEFAULT_APP_SETTINGS,
   syncTrackNumbers: false,
   syncFilenames: false,
   audioBitrate: "320",
   applySoundCloudAlbumCoverToTracks: false,
+  advancedMetadata: true,
+  metadataLinks: { ...DEFAULT_APP_SETTINGS.metadataLinks, albumArtist: false },
 };
 
 afterEach(() => vi.clearAllMocks());
@@ -63,7 +72,15 @@ describe("export session", () => {
     let snapshot = libraryReducer(createLibraryState(), {
       type: "content-replaced",
       files: [file],
-      looseTrackIds: [file.id],
+      albums: [
+        {
+          id: "album-1",
+          title: "Album",
+          artist: "Album Artist",
+          genre: "",
+          trackIds: [file.id],
+        },
+      ],
     });
     const library: LibraryStore = {
       get state() {
@@ -101,7 +118,10 @@ describe("export session", () => {
     rejectZip?.(new Error("zip failed"));
     await act(async () => exporting);
 
-    expect(updateTags).toHaveBeenCalledWith(file, metadata);
+    expect(updateTags).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ albumArtist: "Custom Album Artist" }),
+    );
     expect(exportMocks.reportFailure).toHaveBeenCalledWith(expect.any(Error), "export");
     expect(hook.result.exporting).toBe(false);
     hook.unmount();
