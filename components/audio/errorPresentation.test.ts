@@ -37,8 +37,9 @@ describe("local error presentation", () => {
   });
 
   it("keeps cover validation state separate from tooltip visibility", () => {
-    expect(coverArtSource).toContain("onOpenChange={setCoverErrorOpen}");
+    expect(coverArtSource).toContain(
+      'onOpenChange={(open) => dispatch({ type: "errorOpenChanged", open })}',
+    );
     expect(coverArtSource).toContain("aria-describedby={coverError ? coverErrorId : undefined}");
-    expect(coverArtSource).not.toContain("if (!open) setCoverError(null)");
   });
 });

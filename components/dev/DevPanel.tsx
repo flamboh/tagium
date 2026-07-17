@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, BellRing, RotateCcw, SlidersHorizontal, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,8 +47,8 @@ const tunnelFaults: Array<{ value: TunnelFault; label: string }> = [
   { value: "empty-body", label: "empty" },
 ];
 
-const readDevConfig = async () => {
-  const response = await fetch("/api/dev/config");
+const readDevConfig = async (signal: AbortSignal) => {
+  const response = await fetch("/api/dev/config", { signal });
   if (!response.ok) return null;
   return (await response.json()) as DevConfig;
 };
@@ -65,19 +65,36 @@ export function DevPanel() {
   const [windowMs, setWindowMs] = useState("60000");
   const [maxRequests, setMaxRequests] = useState("60");
   const [busy, setBusy] = useState(false);
+  const activeConfigRequest = useRef<AbortController | null>(null);
 
-  const refresh = async () => {
-    const nextConfig = await readDevConfig();
-    setConfig(nextConfig);
-    if (nextConfig) {
-      setWindowMs(String(nextConfig.rateLimit.windowMs));
-      setMaxRequests(String(nextConfig.rateLimit.maxRequests));
+  const refresh = useCallback(async () => {
+    activeConfigRequest.current?.abort();
+    const request = new AbortController();
+    activeConfigRequest.current = request;
+
+    try {
+      const nextConfig = await readDevConfig(request.signal);
+      if (request.signal.aborted || activeConfigRequest.current !== request) return;
+
+      setConfig(nextConfig);
+      if (nextConfig) {
+        setWindowMs(String(nextConfig.rateLimit.windowMs));
+        setMaxRequests(String(nextConfig.rateLimit.maxRequests));
+      }
+    } catch {
+      // This panel is optional; retain the last config if its dev-only endpoint is unavailable.
+    } finally {
+      if (activeConfigRequest.current === request) activeConfigRequest.current = null;
     }
-  };
+  }, []);
 
   useEffect(() => {
     void refresh();
-  }, []);
+    return () => {
+      activeConfigRequest.current?.abort();
+      activeConfigRequest.current = null;
+    };
+  }, [refresh]);
 
   if (!config?.enabled) return null;
 
