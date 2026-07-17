@@ -18,6 +18,7 @@ const metadata = (title: string): AudioMetadata => ({
 
 const readyFile = (id: string): TagiumFile => ({
   id,
+  format: "mp3",
   file: new File([id], `${id}.mp3`, { type: "audio/mpeg" }),
   filename: `${id}.mp3`,
   status: "pending",

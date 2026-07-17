@@ -1,5 +1,6 @@
 import { sanitizeFilenameBase } from "@/features/library/filename";
 import type { AlbumGroup, MetadataPatch, TagiumFile } from "@/features/library/types";
+import { withAudioExtension } from "@/features/audio/audioFormat";
 
 const removableLabels = [
   "official audio",
@@ -160,7 +161,7 @@ export function findMetadataCleanupSuggestions(
         beforeTitle: file.metadata.title,
         afterTitle: cleanup.afterTitle,
         beforeFilename: file.filename,
-        afterFilename: `${sanitizeFilenameBase(cleanup.afterTitle)}.mp3`,
+        afterFilename: withAudioExtension(sanitizeFilenameBase(cleanup.afterTitle), file.format),
         reasons: cleanup.reasons,
       },
     ];

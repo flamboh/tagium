@@ -31,6 +31,7 @@ describe("audioTagger metadata patches", () => {
     const accepted = {
       file: {
         id: "accepted",
+        format: "mp3",
         filename: "accepted.mp3",
         status: "pending",
         downloadStatus: "ready",
@@ -40,6 +41,7 @@ describe("audioTagger metadata patches", () => {
     const rejected = {
       file: {
         id: "rejected",
+        format: "mp3",
         filename: "rejected.mp3",
         status: "error",
         downloadStatus: "ready",
@@ -60,6 +62,7 @@ describe("audioTagger metadata patches", () => {
         ({
           file: {
             id: `rejected-${index}`,
+            format: "mp3",
             filename: index === 0 ? "empty.mp3" : "song.wav",
             status: "error",
             downloadStatus: "ready",
@@ -82,6 +85,7 @@ describe("audioTagger metadata patches", () => {
     expect(
       getTagiumFileImportKey({
         id: "track",
+        format: "mp3",
         filename: edited.name,
         file: edited,
         originalFile: edited,
@@ -182,9 +186,16 @@ describe("audioTagger metadata patches", () => {
   it("summarizes removed track sources without exposing their URLs", () => {
     expect(
       getTrackSourceMix([
-        { id: "local", filename: "local.mp3", status: "saved", downloadStatus: "ready" },
+        {
+          id: "local",
+          format: "mp3",
+          filename: "local.mp3",
+          status: "saved",
+          downloadStatus: "ready",
+        },
         {
           id: "imported",
+          format: "mp3",
           filename: "imported.mp3",
           status: "saved",
           downloadStatus: "ready",

@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CoverArt from "@/features/editor/coverArt";
 import { isValidFilenameBase, sanitizeFilenameBase } from "@/features/library/filename";
+import { getAudioFormatInfo } from "@/features/audio/audioFormat";
 import { getSampleTrack, type SampleTrackMetadata } from "@/features/editor/sampleMetadata";
 import { getTrackFailureDisplay } from "@/features/workspace/systemFailure";
 import type { AlbumGroup, AudioMetadata, TagiumFile } from "@/features/library/types";
@@ -90,6 +91,7 @@ function TrackFilenameHeader({
   filenamePlaceholder,
   filenameInvalid,
   filenameRegistration,
+  extension,
   failure,
 }: {
   syncFilenames: boolean;
@@ -98,6 +100,7 @@ function TrackFilenameHeader({
   filenamePlaceholder: string;
   filenameInvalid: boolean;
   filenameRegistration: UseFormRegisterReturn<"filename">;
+  extension: string;
   failure: TrackFailure | null;
 }) {
   return (
@@ -113,7 +116,7 @@ function TrackFilenameHeader({
               </TooltipTrigger>
               <TooltipContent>filename follows the title</TooltipContent>
             </Tooltip>
-            <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
+            <span className="shrink-0 select-none text-muted-foreground/70">{extension}</span>
           </h2>
         ) : (
           <label className="inline-flex min-w-0 max-w-full items-center text-base font-semibold max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
@@ -131,7 +134,7 @@ function TrackFilenameHeader({
                 placeholder={filenamePlaceholder}
               />
             </span>
-            <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
+            <span className="shrink-0 select-none text-muted-foreground/70">{extension}</span>
           </label>
         )}
       </div>
@@ -414,6 +417,7 @@ function LoadedTrackMetadataEditor({
           filenamePlaceholder={placeholder.filename}
           filenameInvalid={filenameInvalid}
           filenameRegistration={filenameRegistration}
+          extension={getAudioFormatInfo(selectedFile.format).extension}
           failure={failure}
         />
         <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 max-lg:[@media(max-height:700px)]:p-2 lg:p-6 lg:pb-28">

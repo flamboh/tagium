@@ -48,6 +48,7 @@ const createLibrary = (): LibraryStore => {
 const parsedUpload = (file: File) => ({
   file: {
     id: "track-1",
+    format: "mp3" as const,
     filename: file.name,
     file,
     originalFile: file,

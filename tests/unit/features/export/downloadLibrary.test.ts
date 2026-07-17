@@ -24,6 +24,7 @@ const metadata = (filename: string): AudioMetadata => ({
 
 const file = (id: string, filename: string, contents = id): TagiumFile => ({
   id,
+  format: "mp3",
   filename,
   file: new File([contents], filename, { type: "audio/mpeg" }),
   originalFile: new File([contents], filename, { type: "audio/mpeg" }),
@@ -35,6 +36,7 @@ const file = (id: string, filename: string, contents = id): TagiumFile => ({
 
 const missingFile = (id: string, filename: string): TagiumFile => ({
   id,
+  format: "mp3",
   filename,
   status: "pending",
   downloadStatus: "downloading",
@@ -43,6 +45,7 @@ const missingFile = (id: string, filename: string): TagiumFile => ({
 
 const missingMetadata = (id: string, filename: string): TagiumFile => ({
   id,
+  format: "mp3",
   filename,
   file: new File([id], filename, { type: "audio/mpeg" }),
   originalFile: new File([id], filename, { type: "audio/mpeg" }),

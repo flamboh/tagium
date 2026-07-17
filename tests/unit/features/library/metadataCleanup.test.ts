@@ -23,6 +23,7 @@ const metadata = (title: string, artist = "Burial"): AudioMetadata => ({
 
 const file = (title: string): TagiumFile => ({
   id: "track-1",
+  format: "mp3",
   status: "saved",
   downloadStatus: "ready",
   filename: `${title}.mp3`,

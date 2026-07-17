@@ -22,6 +22,7 @@ const snapshot = (
 });
 const retryableFile = (id: string): TagiumFile => ({
   id,
+  format: "mp3",
   filename: `${id}.mp3`,
   status: "error",
   downloadStatus: "error",

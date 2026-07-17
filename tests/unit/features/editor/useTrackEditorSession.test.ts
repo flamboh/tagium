@@ -30,6 +30,7 @@ const readyFile = (id: string, title: string): TagiumFile => {
   const file = new File([id], `${id}.mp3`);
   return {
     id,
+    format: "mp3",
     filename: file.name,
     file,
     originalFile: file,
@@ -93,6 +94,7 @@ describe("track editor session", () => {
     }, undefined);
     const pending: TagiumFile = {
       id: "remote",
+      format: "mp3",
       filename: "edited.mp3",
       status: "pending",
       downloadStatus: "downloading",
@@ -111,6 +113,7 @@ describe("track editor session", () => {
     const downloaded = new File(["download"], "downloaded.mp3");
     const parsedFile: TagiumFile = {
       id: "parsed",
+      format: "mp3",
       filename: downloaded.name,
       file: downloaded,
       originalFile: downloaded,

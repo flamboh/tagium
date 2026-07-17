@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useId, useRef } from "react";
 import { Upload } from "lucide-react";
+import { getAudioUploadAccept } from "@/features/audio/audioFormat";
 
 interface AudioUploadProps {
   onAudioUpload: (audio: File[]) => void;
@@ -34,7 +35,7 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
         type="file"
         id={inputId}
         className="hidden"
-        accept=".mp3,audio/mpeg"
+        accept={getAudioUploadAccept()}
         onChange={handleAudioUpload}
         multiple
         ref={fileInputRef}

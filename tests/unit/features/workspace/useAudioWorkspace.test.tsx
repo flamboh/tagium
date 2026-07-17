@@ -38,6 +38,7 @@ const readyFile = (id: string, title: string): TagiumFile => {
   const file = new File([id], `${id}.mp3`);
   return {
     id,
+    format: "mp3",
     filename: file.name,
     file,
     originalFile: file,
