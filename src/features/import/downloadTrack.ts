@@ -229,9 +229,7 @@ export const fetchImportedCover = async (
 export const createQueuedDownloadTrack = (file: PendingDownloadTrack): QueuedDownloadTrack => ({
   fileId: file.id,
   title:
-    file.metadata.title ||
-    withoutAudioExtension(file.filename, file.format) ||
-    "downloading audio",
+    file.metadata.title || withoutAudioExtension(file.filename, file.format) || "downloading audio",
   downloadRequest: file.downloadRequest,
 });
 

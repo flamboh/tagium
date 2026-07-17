@@ -200,8 +200,7 @@ describe("AudioMetadataIO", () => {
       format: "mp3",
       filename: "extension-lied.wav",
       status: "error",
-      downloadError:
-        "extension-lied.wav is not an mp3. tagium currently supports mp3 files only.",
+      downloadError: "extension-lied.wav is not an mp3. tagium currently supports mp3 files only.",
     });
   });
 

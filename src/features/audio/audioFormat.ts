@@ -14,8 +14,7 @@ const audioFormatInfo = {
   },
 } as const satisfies Record<AudioFormat, AudioFormatInfo>;
 
-export const getAudioFormatInfo = (format: AudioFormat): AudioFormatInfo =>
-  audioFormatInfo[format];
+export const getAudioFormatInfo = (format: AudioFormat): AudioFormatInfo => audioFormatInfo[format];
 
 export const getAudioUploadAccept = () =>
   Object.values(audioFormatInfo)
