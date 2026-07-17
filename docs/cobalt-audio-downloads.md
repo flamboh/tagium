@@ -100,7 +100,7 @@ These are not per browser user. Cobalt keys `POST /` by API key/session when pre
 
 ## Proxy concurrency gate
 
-`cobalt-machine-proxy.mjs` caps how many requests it will forward to upstream Cobalt at once, separately for `POST /` (resolve) and `GET /tunnel`, since a real download issues one resolve call plus one or two tunnel fetches (audio, and usually cover art) run concurrently - see `components/audio/localAudioProcessor.ts`. Requests over the cap queue briefly; once the queue is also full (or a queued request waits too long), the proxy returns a fast `503` (Cobalt-shaped error JSON, status `error.api.capacity_exceeded`) instead of letting requests pile up on a single shared vCPU until everything times out.
+`cobalt-machine-proxy.mjs` caps how many requests it will forward to upstream Cobalt at once, separately for `POST /` (resolve) and `GET /tunnel`, since a real download issues one resolve call plus one or two tunnel fetches (audio, and usually cover art) run concurrently - see `src/features/import/localAudioProcessor.ts`. Requests over the cap queue briefly; once the queue is also full (or a queued request waits too long), the proxy returns a fast `503` (Cobalt-shaped error JSON, status `error.api.capacity_exceeded`) instead of letting requests pile up on a single shared vCPU until everything times out.
 
 Defaults, all overridable via env vars on the Fly app:
 
