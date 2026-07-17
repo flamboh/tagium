@@ -71,7 +71,7 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   fmt: {
-    ignorePatterns: [".repos/*"],
+    ignorePatterns: [".repos/*", ".agents/**", ".claude/**"],
   },
   lint: {
     plugins: ["oxc", "typescript", "unicorn", "react"],
