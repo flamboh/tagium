@@ -9,12 +9,14 @@ describe("library store", () => {
     const store = hook.result;
     const first = {
       id: "first",
+      format: "mp3" as const,
       filename: "first.mp3",
       status: "saved" as const,
       downloadStatus: "ready" as const,
     };
     const second = {
       id: "second",
+      format: "mp3" as const,
       filename: "second.mp3",
       status: "saved" as const,
       downloadStatus: "ready" as const,

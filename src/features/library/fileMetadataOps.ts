@@ -7,6 +7,7 @@ import type {
   MetadataPatch,
   TagiumFile,
 } from "@/features/library/types";
+import { withAudioExtension } from "@/features/audio/audioFormat";
 
 export interface DownloadedTrackHydration {
   hydratedFile: TagiumFile;
@@ -240,14 +241,15 @@ export function applySyncedFilenamesToFiles(files: TagiumFile[], trackIds?: stri
 
     const syncedFilename = filenamify(file.metadata.title, { replacement: "-" });
     if (!syncedFilename) return file;
-    if (file.filename === `${syncedFilename}.mp3` && file.metadata.filename === syncedFilename) {
+    const filename = withAudioExtension(syncedFilename, file.format);
+    if (file.filename === filename && file.metadata.filename === syncedFilename) {
       return file;
     }
 
     return markPendingMetadataPatch(
       {
         ...file,
-        filename: `${syncedFilename}.mp3`,
+        filename,
         status: file.status === "saved" ? "pending" : file.status,
         metadata: {
           ...file.metadata,
@@ -436,7 +438,10 @@ export function prepareDownloadedTrackHydration(
     ...currentFile,
     file: parsedFile.file,
     originalFile: parsedFile.originalFile,
-    filename: nextMetadata?.filename ? `${nextMetadata.filename}.mp3` : parsedFile.filename,
+    format: parsedFile.format,
+    filename: nextMetadata?.filename
+      ? withAudioExtension(nextMetadata.filename, parsedFile.format)
+      : parsedFile.filename,
     metadata: nextMetadata,
     downloadStatus: "ready",
     downloadError: parsedFile.downloadError,
@@ -466,7 +471,7 @@ export function resolveDownloadedTrackHydrationWrite(
     const nextFile = latestFormMetadata
       ? {
           ...latestFile,
-          filename: `${latestFormMetadata.filename}.mp3`,
+          filename: withAudioExtension(latestFormMetadata.filename, latestFile.format),
           metadata: latestFormMetadata,
         }
       : latestFile;

@@ -21,6 +21,7 @@ const metadata: AudioMetadata = {
 
 const loadedTrack: TagiumFile = {
   id: "track-1",
+  format: "mp3",
   filename: "track-1.mp3",
   status: "saved",
   downloadStatus: "ready",

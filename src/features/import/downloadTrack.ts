@@ -15,6 +15,7 @@ import type {
   MetadataPatch,
   TagiumFile,
 } from "@/features/library/types";
+import { withAudioExtension, withoutAudioExtension } from "@/features/audio/audioFormat";
 
 export type DownloadRequest = NonNullable<TagiumFile["downloadRequest"]>;
 
@@ -107,8 +108,8 @@ export type SoundCloudSetDownloadWorkflowDeps = PlaylistDownloadWorkflowDeps;
 
 const filenameFromTitle = (title: string) => {
   const filename = filenamify(title.trim(), { replacement: "-" });
-  if (filename) return `${filename}.mp3`;
-  return "downloading-track.mp3";
+  if (filename) return withAudioExtension(filename, "mp3");
+  return withAudioExtension("downloading-track", "mp3");
 };
 
 export const titleFromSourceUrl = (sourceUrl: string) => {
@@ -139,7 +140,7 @@ export const createDownloadMetadata = ({
   duration?: number;
   trackNumber?: number;
 }): AudioMetadata => ({
-  filename: filenameFromTitle(title).replace(/\.mp3$/i, ""),
+  filename: withoutAudioExtension(filenameFromTitle(title), "mp3"),
   title,
   artist,
   album,
@@ -160,7 +161,8 @@ export const createPendingDownloadTrack = (
   pendingMetadataPatch?: MetadataPatch,
 ): PendingDownloadTrack => ({
   id,
-  filename: `${metadata.filename}.mp3`,
+  format: "mp3",
+  filename: withAudioExtension(metadata.filename, "mp3"),
   status: "pending",
   downloadStatus: "downloading",
   downloadRequest,
@@ -226,7 +228,10 @@ export const fetchImportedCover = async (
 
 export const createQueuedDownloadTrack = (file: PendingDownloadTrack): QueuedDownloadTrack => ({
   fileId: file.id,
-  title: file.metadata.title || file.filename.replace(/\.mp3$/i, "") || "downloading audio",
+  title:
+    file.metadata.title ||
+    withoutAudioExtension(file.filename, file.format) ||
+    "downloading audio",
   downloadRequest: file.downloadRequest,
 });
 

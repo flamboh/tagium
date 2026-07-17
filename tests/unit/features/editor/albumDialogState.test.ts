@@ -40,6 +40,7 @@ const file = (id: string, overrides: Partial<TagiumFile> = {}): TagiumFile => ({
   downloadStatus: "ready",
   metadata: metadata(),
   ...overrides,
+  format: overrides.format ?? "mp3",
 });
 
 const album = (overrides: Partial<AlbumGroup> = {}): AlbumGroup => ({

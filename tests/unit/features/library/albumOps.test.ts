@@ -28,6 +28,7 @@ const upload = (
 ): UploadedTrack => ({
   file: {
     id,
+    format: "mp3",
     file: new File(["a"], `${id}.mp3`, { type: "audio/mpeg" }),
     originalFile: new File(["a"], `${id}.mp3`, { type: "audio/mpeg" }),
     filename: `${id}.mp3`,

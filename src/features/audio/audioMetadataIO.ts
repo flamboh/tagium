@@ -8,8 +8,12 @@ import { audioMetadataSchema } from "@/features/audio/metadata";
 import { parseTrackTagNumber, toGenreString, type UploadedTrack } from "@/features/audio/mp3Utils";
 import type { AudioMetadata, TagiumFile } from "@/features/library/types";
 import {
+  getAudioFormatInfo,
+  withAudioExtension,
+  withoutAudioExtension,
+} from "@/features/audio/audioFormat";
+import {
   getMp3AdmissionError,
-  MP3_MIME_TYPE,
   normalizeMp3File,
   normalizeMp3Filename,
 } from "@/features/audio/mp3Compatibility";
@@ -171,7 +175,7 @@ const parseUploadedTrack = (file: File) =>
         })) ?? [];
 
       const metadata = yield* decodeReadMetadata({
-        filename: normalizeMp3Filename(file.name).replace(/\.mp3$/i, ""),
+        filename: withoutAudioExtension(normalizeMp3Filename(file.name), "mp3"),
         title: mp3tag.tags.title || "",
         artist: mp3tag.tags.artist || "",
         album: mp3tag.tags.album || "",
@@ -187,6 +191,7 @@ const parseUploadedTrack = (file: File) =>
       return {
         file: {
           id,
+          format: "mp3",
           file: normalizedFile,
           originalFile: file,
           filename: normalizedFile.name,
@@ -209,6 +214,7 @@ const parseUploadedTrack = (file: File) =>
         return Effect.succeed({
           file: {
             id,
+            format: "mp3",
             file,
             originalFile: file,
             filename: file.name,
@@ -297,9 +303,11 @@ const writeMetadata = (fileToUpdate: TagiumFile, newTags: AudioMetadata) =>
 
     return new File(
       [new Uint8Array(buffer)],
-      metadataToWrite.filename ? `${metadataToWrite.filename}.mp3` : fileToUpdate.filename,
+      metadataToWrite.filename
+        ? withAudioExtension(metadataToWrite.filename, fileToUpdate.format)
+        : fileToUpdate.filename,
       {
-        type: MP3_MIME_TYPE,
+        type: getAudioFormatInfo(fileToUpdate.format).mimeType,
       },
     );
   });

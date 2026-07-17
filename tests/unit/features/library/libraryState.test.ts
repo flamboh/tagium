@@ -9,6 +9,7 @@ import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 
 const file = (id: string): TagiumFile => ({
   id,
+  format: "mp3",
   filename: `${id}.mp3`,
   status: "saved",
   downloadStatus: "ready",

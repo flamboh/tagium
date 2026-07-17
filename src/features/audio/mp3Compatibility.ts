@@ -1,4 +1,10 @@
-export const MP3_MIME_TYPE = "audio/mpeg";
+import {
+  getAudioFormatInfo,
+  hasAudioExtension,
+  normalizeAudioFilename,
+} from "@/features/audio/audioFormat";
+
+export const MP3_MIME_TYPE = getAudioFormatInfo("mp3").mimeType;
 
 const bitrateKbps = {
   mpeg1Layer1: [0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448],
@@ -120,7 +126,7 @@ const startsWithAscii = (bytes: Uint8Array, value: string, offset = 0) =>
 
 export const getMp3AdmissionError = (file: File, bytes: Uint8Array) => {
   if (bytes.length === 0) return `${file.name} is empty. Choose a valid mp3 file.`;
-  if (!/\.mp3$/i.test(file.name)) {
+  if (!hasAudioExtension(file.name, "mp3")) {
     return `${file.name} is not an mp3. tagium currently supports mp3 files only.`;
   }
   const knownUnsupported =
@@ -135,13 +141,10 @@ export const getMp3AdmissionError = (file: File, bytes: Uint8Array) => {
   return `${file.name} is not a valid mp3. The file may be corrupt or renamed.`;
 };
 
-export const normalizeMp3Filename = (filename: string) => {
-  const basename = filename.replace(/\.[^.]+$/, "") || "track";
-  return `${basename}.mp3`;
-};
+export const normalizeMp3Filename = (filename: string) => normalizeAudioFilename(filename, "mp3");
 
 export const normalizeMp3File = (file: File) =>
-  file.type === MP3_MIME_TYPE && /\.mp3$/i.test(file.name)
+  file.type === MP3_MIME_TYPE && hasAudioExtension(file.name, "mp3")
     ? file
     : new File([file], normalizeMp3Filename(file.name), {
         type: MP3_MIME_TYPE,

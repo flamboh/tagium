@@ -88,6 +88,7 @@ const tagiumFile = (overrides: Partial<TagiumFile> = {}): TagiumFile => ({
   hasBufferedChanges: false,
   metadata: metadata(),
   ...overrides,
+  format: overrides.format ?? "mp3",
 });
 
 const audioMetadataRuntime = makeAudioRuntime(AudioMetadataIOLive);
@@ -144,6 +145,7 @@ describe("AudioMetadataIO", () => {
     ]);
 
     expect(upload.file.status).toBe("pending");
+    expect(upload.file.format).toBe("mp3");
     expect(upload.file.metadata).toMatchObject({
       filename: "artist.track",
       title: "Track Title",
@@ -179,6 +181,28 @@ describe("AudioMetadataIO", () => {
       "corrupt.mp3 is not a valid mp3. The file may be corrupt or renamed.",
       "unsupported.flac is not an mp3. tagium currently supports mp3 files only.",
     ]);
+  });
+
+  it("uses content and extension for admission while treating browser MIME as advisory", async () => {
+    const bytes = validMp3Bytes();
+    const uploads = await parseUploadedTracks([
+      new File([bytes], "mime-lied.mp3", { type: "audio/wav" }),
+      new File([bytes], "extension-lied.wav", { type: "audio/mpeg" }),
+    ]);
+
+    expect(uploads[0]?.file).toMatchObject({
+      format: "mp3",
+      filename: "mime-lied.mp3",
+      status: "pending",
+    });
+    expect(uploads[0]?.file.file?.type).toBe("audio/mpeg");
+    expect(uploads[1]?.file).toMatchObject({
+      format: "mp3",
+      filename: "extension-lied.wav",
+      status: "error",
+      downloadError:
+        "extension-lied.wav is not an mp3. tagium currently supports mp3 files only.",
+    });
   });
 
   it("normalizes missing numeric tags to null in parsed metadata snapshots", async () => {
@@ -269,5 +293,16 @@ describe("AudioMetadataIO", () => {
     await expect(writeMetadataToFile(tagiumFile({ file: undefined }), metadata())).rejects.toThrow(
       "audio file is still downloading.",
     );
+  });
+
+  it("preserves the current filename when a write does not request a rename", async () => {
+    const current = new File([validMp3Bytes()], "Archive.MP3", { type: "audio/mpeg" });
+    const updatedFile = await writeMetadataToFile(
+      tagiumFile({ file: current, filename: current.name }),
+      metadata({ filename: "" }),
+    );
+
+    expect(updatedFile.name).toBe("Archive.MP3");
+    expect(updatedFile.type).toBe("audio/mpeg");
   });
 });

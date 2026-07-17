@@ -37,6 +37,7 @@ const readyFile = (overrides: Partial<TagiumFile> = {}): TagiumFile => ({
   hasBufferedChanges: false,
   metadata: metadata({ filename: "track-1", title: "Track 1" }),
   ...overrides,
+  format: overrides.format ?? "mp3",
 });
 
 describe("fileMetadataOps", () => {
@@ -44,6 +45,7 @@ describe("fileMetadataOps", () => {
     const files = [
       {
         id: "track-1",
+        format: "mp3" as const,
         file: new File(["a"], "track-1.mp3", { type: "audio/mpeg" }),
         originalFile: new File(["a"], "track-1.mp3", { type: "audio/mpeg" }),
         filename: "track-1.mp3",
@@ -66,6 +68,7 @@ describe("fileMetadataOps", () => {
       },
       {
         id: "track-2",
+        format: "mp3" as const,
         file: new File(["b"], "track-2.mp3", { type: "audio/mpeg" }),
         originalFile: new File(["b"], "track-2.mp3", { type: "audio/mpeg" }),
         filename: "track-2.mp3",
@@ -121,6 +124,7 @@ describe("fileMetadataOps", () => {
     const files = [
       {
         id: "track-1",
+        format: "mp3" as const,
         file: new File(["a"], "track-1.mp3", { type: "audio/mpeg" }),
         originalFile: new File(["a"], "track-1.mp3", { type: "audio/mpeg" }),
         filename: "track-1.mp3",

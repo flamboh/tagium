@@ -3,6 +3,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Music4, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getAudioUploadAccept } from "@/features/audio/audioFormat";
 
 interface LandingScreenProps {
   active: boolean;
@@ -62,7 +63,7 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
         <input
           ref={fileInputRef}
           type="file"
-          accept=".mp3,audio/mpeg"
+          accept={getAudioUploadAccept()}
           multiple
           className="hidden"
           onChange={handleFileChange}
