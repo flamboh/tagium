@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { Buffer } from "node:buffer";
 
 const uploadTrack = async (page: Page) => {
@@ -14,6 +14,87 @@ const uploadTrack = async (page: Page) => {
   });
   await expect(page.getByRole("button", { name: "remove track" })).toBeAttached();
 };
+
+const getPopulatedTrackList = (page: Page) => {
+  const libraryHeader = page.getByText("library (1)", { exact: true });
+  return libraryHeader.locator("..").locator("xpath=following-sibling::div[1]");
+};
+
+const clickBlankTrackList = async (page: Page) => {
+  const trackList = getPopulatedTrackList(page);
+  await expect(trackList).toBeVisible();
+
+  const bounds = await trackList.boundingBox();
+  if (!bounds) throw new Error("populated track list bounds were not found");
+
+  await trackList.click({
+    position: { x: bounds.width / 2, y: bounds.height - 8 },
+  });
+};
+
+const sampleEditorCrossfade = async (activationTarget?: unknown) => {
+  interface BrowserElement {
+    click: () => void;
+    parentElement: BrowserElement | null;
+  }
+  const browser = globalThis as unknown as {
+    document: { querySelector: (selector: string) => BrowserElement | null };
+    getComputedStyle: (element: BrowserElement) => { opacity: string };
+    performance: { now: () => number };
+    requestAnimationFrame: (callback: () => void) => number;
+  };
+  const effectiveOpacity = (element: BrowserElement) => {
+    let opacity = 1;
+    let current: BrowserElement | null = element;
+    while (current) {
+      opacity *= Number.parseFloat(browser.getComputedStyle(current).opacity);
+      current = current.parentElement;
+    }
+    return opacity;
+  };
+  const samples: Array<{
+    emptySelectionOpacity: number | null;
+    trackEditorOpacity: number | null;
+  }> = [];
+  const target = activationTarget as BrowserElement | undefined;
+  const startedAt = browser.performance.now();
+  target?.click();
+
+  await new Promise<void>((resolve) => {
+    const sample = () => {
+      const emptySelection = browser.document.querySelector(
+        '[data-editor-state="empty-selection"]',
+      );
+      const trackEditor = browser.document.querySelector('[data-editor-state="loaded-track"]');
+      samples.push({
+        emptySelectionOpacity: emptySelection ? effectiveOpacity(emptySelection) : null,
+        trackEditorOpacity: trackEditor ? effectiveOpacity(trackEditor) : null,
+      });
+      if (browser.performance.now() - startedAt >= 180) {
+        resolve();
+        return;
+      }
+      browser.requestAnimationFrame(sample);
+    };
+    browser.requestAnimationFrame(sample);
+  });
+
+  return samples;
+};
+
+const captureEditorCrossfade = (activationTarget: Locator) =>
+  activationTarget.evaluate(sampleEditorCrossfade);
+
+const includesCrossfadeMidpoint = (samples: Awaited<ReturnType<typeof captureEditorCrossfade>>) =>
+  samples.some(
+    ({ emptySelectionOpacity, trackEditorOpacity }) =>
+      emptySelectionOpacity !== null &&
+      emptySelectionOpacity > 0 &&
+      emptySelectionOpacity < 1 &&
+      trackEditorOpacity !== null &&
+      trackEditorOpacity > 0 &&
+      trackEditorOpacity < 1,
+  );
 
 test("keeps the media entry within its return transition endpoints", async ({ page }) => {
   await page.goto("/");
@@ -102,4 +183,83 @@ test("crossfades the metadata editor and settings without unmounting either pane
 
   await expect(editor).toHaveCSS("opacity", "0");
   await expect(settings).toHaveCSS("opacity", "1");
+});
+
+test("clicking blank space in the empty library closes settings", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "settings" }).click();
+  await expect(page.getByRole("button", { name: "back to editor" })).toBeVisible();
+
+  await page.getByRole("button", { name: "clear track selection and return to editor" }).click();
+
+  await expect(page.getByRole("button", { name: "back to editor" })).not.toBeAttached();
+  await expect(page.getByRole("button", { name: /drop your mp3s here/ })).toBeVisible();
+});
+
+test("clicking blank space in a populated track list closes settings and clears the track", async ({
+  page,
+}) => {
+  await uploadTrack(page);
+
+  const editor = page.locator('[data-view="metadata-editor"]');
+  const settings = page.locator('[data-view="settings"]');
+  await page.getByRole("button", { name: "settings" }).click();
+  await expect(settings).toHaveAttribute("aria-hidden", "false");
+
+  await clickBlankTrackList(page);
+
+  await expect(settings).toHaveAttribute("aria-hidden", "true");
+  await expect(editor).toHaveAttribute("aria-hidden", "false");
+  await expect(page.getByText("select a track to edit its tags", { exact: true })).toBeVisible();
+});
+
+test("crossfades between the empty selection and track editor in both directions", async ({
+  page,
+}) => {
+  await uploadTrack(page);
+  await page.getByRole("button", { name: "settings" }).focus();
+  await page.keyboard.press("Escape");
+  await expect(page.getByText("select a track to edit its tags", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-editor-state="empty-selection"]')).toHaveCSS("opacity", "1");
+
+  const selectingTrack = await captureEditorCrossfade(
+    getPopulatedTrackList(page).getByRole("button").first(),
+  );
+  expect.soft(includesCrossfadeMidpoint(selectingTrack)).toBe(true);
+  await expect(page.getByRole("button", { name: "download track" })).toBeVisible();
+  await expect(page.locator('[data-editor-state="loaded-track"]')).toHaveCSS("opacity", "1");
+
+  const clearingTrack = await captureEditorCrossfade(
+    page.getByRole("button", { name: "clear track selection and return to editor" }),
+  );
+  expect.soft(includesCrossfadeMidpoint(clearingTrack)).toBe(true);
+  await expect(page.getByText("select a track to edit its tags", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "download track" })).not.toBeAttached();
+});
+
+test("keeps the loaded editor when a track is reselected during its exit", async ({ page }) => {
+  await uploadTrack(page);
+
+  await page.getByRole("button", { name: "clear track selection and return to editor" }).click();
+  await page.waitForTimeout(50);
+  await getPopulatedTrackList(page).getByRole("button").first().click();
+  await page.waitForTimeout(300);
+
+  await expect(page.locator('[data-editor-state="loaded-track"]')).toHaveAttribute(
+    "aria-hidden",
+    "false",
+  );
+  await expect(page.getByRole("button", { name: "download track" })).toBeVisible();
+});
+
+test("releases the loaded editor immediately when reduced motion is preferred", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await uploadTrack(page);
+
+  await page.getByRole("button", { name: "clear track selection and return to editor" }).click();
+
+  await expect(page.locator('[data-editor-state="empty-selection"]')).toHaveCSS("opacity", "1");
+  await expect(page.getByRole("button", { name: "download track" })).not.toBeAttached();
 });
