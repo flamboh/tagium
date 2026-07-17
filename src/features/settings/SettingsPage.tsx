@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AUDIO_BITRATE_OPTIONS } from "@/features/settings/settings";
 import {
-  METADATA_LINK_DESCRIPTORS,
+  METADATA_LINK_SETTINGS_DESCRIPTORS,
   isMetadataLinkEnabled,
   isMetadataLinkVisible,
   withMetadataLinkEnabled,
@@ -49,8 +49,24 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
             <div className="space-y-1">
               <h3 className="text-base font-semibold">general</h3>
               <p className="text-sm leading-5 text-muted-foreground">
-                choose how files are named while you edit.
+                choose how tracks are numbered and files are named while you edit.
               </p>
+            </div>
+            <div className={checkboxRowClassName}>
+              <Checkbox
+                id="sync-track-numbers"
+                checked={settings.syncTrackNumbers}
+                onCheckedChange={(checked) =>
+                  onChange({
+                    ...settings,
+                    syncTrackNumbers: checked === true,
+                  })
+                }
+                className="mt-0.5"
+              />
+              <Label htmlFor="sync-track-numbers" className="cursor-pointer leading-5">
+                use album sidebar order as track number
+              </Label>
             </div>
             <div className={checkboxRowClassName}>
               <Checkbox
@@ -109,7 +125,7 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
                 the rest of the album.
               </p>
               <div className="mt-3 flex flex-col gap-2">
-                {METADATA_LINK_DESCRIPTORS.filter((descriptor) =>
+                {METADATA_LINK_SETTINGS_DESCRIPTORS.filter((descriptor) =>
                   isMetadataLinkVisible(descriptor, settings),
                 ).map((descriptor) => (
                   <label key={descriptor.id} className={checkboxRowClassName}>

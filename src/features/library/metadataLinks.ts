@@ -74,6 +74,10 @@ const descriptorById = {
 export const METADATA_LINK_DESCRIPTORS: readonly MetadataLinkDescriptor[] =
   Object.values(descriptorById);
 
+export const METADATA_LINK_SETTINGS_DESCRIPTORS = METADATA_LINK_DESCRIPTORS.filter(
+  (descriptor) => descriptor.id !== "trackNumber",
+);
+
 export const getMetadataLinkDescriptor = (id: MetadataLinkId) => descriptorById[id];
 
 export const isMetadataLinkVisible = (

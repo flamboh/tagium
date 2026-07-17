@@ -2,7 +2,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vite-plus/test";
 import SettingsPage from "@/features/settings/SettingsPage";
 import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
-import { METADATA_LINK_DESCRIPTORS, isMetadataLinkVisible } from "@/features/library/metadataLinks";
+import {
+  METADATA_LINK_DESCRIPTORS,
+  METADATA_LINK_SETTINGS_DESCRIPTORS,
+  isMetadataLinkVisible,
+} from "@/features/library/metadataLinks";
 
 const renderSettings = (advancedMetadata = false) =>
   renderToStaticMarkup(
@@ -34,13 +38,21 @@ describe("settings page", () => {
   it("always exposes all normal metadata link controls", () => {
     const markup = renderSettings();
 
-    for (const descriptor of METADATA_LINK_DESCRIPTORS.filter((candidate) =>
+    for (const descriptor of METADATA_LINK_SETTINGS_DESCRIPTORS.filter((candidate) =>
       isMetadataLinkVisible(candidate, DEFAULT_APP_SETTINGS),
     )) {
       expect(markup).toContain(descriptor.label);
       expect(markup).toContain(descriptor.relation);
     }
     expect(markup).toContain("album title always follows the album and cannot be unlinked");
+  });
+
+  it("shows track-number syncing once in General, not in advanced linking", () => {
+    const markup = renderSettings();
+
+    expect(markup.match(/use album sidebar order as track number/g)).toHaveLength(1);
+    expect(markup).not.toContain("link track number to album order");
+    expect(METADATA_LINK_SETTINGS_DESCRIPTORS.map(({ id }) => id)).not.toContain("trackNumber");
   });
 
   it("defines relation, reason, and private boolean analytics for every link", () => {
