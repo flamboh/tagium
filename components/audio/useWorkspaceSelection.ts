@@ -47,7 +47,10 @@ export const useWorkspaceSelection = ({
   removalDialogProps: DestructiveActionDialogProps;
   sidebarProps: SelectionSidebarProps;
 } => {
-  const [pendingRemoval, setPendingRemoval] = useState<string[] | null>(null);
+  const [removalDialog, setRemovalDialog] = useState<{
+    open: boolean;
+    trackIds: string[];
+  }>({ open: false, trackIds: [] });
   const editorRef = useRef(editor);
   const settingsRef = useRef(settings);
   const removeDownloadsRef = useRef(removeDownloads);
@@ -104,7 +107,7 @@ export const useWorkspaceSelection = ({
   const requestRemoveSelected = useCallback(() => {
     const snapshot = library.getSnapshot();
     if (editorRef.current.isCoverProcessing || snapshot.selectedFileIds.size === 0) return;
-    setPendingRemoval(Array.from(snapshot.selectedFileIds));
+    setRemovalDialog({ open: true, trackIds: Array.from(snapshot.selectedFileIds) });
   }, [library]);
 
   const selectAll = useCallback(() => {
@@ -204,13 +207,13 @@ export const useWorkspaceSelection = ({
 
   return {
     removalDialogProps: {
-      open: pendingRemoval !== null,
-      itemCount: pendingRemoval?.length ?? 0,
-      onCancel: () => setPendingRemoval(null),
+      open: removalDialog.open,
+      itemCount: removalDialog.trackIds.length,
+      onCancel: () => setRemovalDialog((current) => ({ ...current, open: false })),
       onConfirm: () => {
-        const trackIds = pendingRemoval;
-        setPendingRemoval(null);
-        if (trackIds) removeFiles(trackIds);
+        const trackIds = removalDialog.trackIds;
+        setRemovalDialog((current) => ({ ...current, open: false }));
+        removeFiles(trackIds);
       },
     },
     sidebarProps: {
@@ -228,7 +231,9 @@ export const useWorkspaceSelection = ({
       onSelectFile: (albumId, fileId, event) => selectTrack(albumId, fileId, event),
       onSelectLooseTrack: (fileId, event) => selectTrack(null, fileId, event),
       onRemoveFile: (fileId) => {
-        if (!editorRef.current.isCoverProcessing) setPendingRemoval([fileId]);
+        if (!editorRef.current.isCoverProcessing) {
+          setRemovalDialog({ open: true, trackIds: [fileId] });
+        }
       },
       onMoveTrackToAlbum: (trackId, albumId, placement, referenceTrackId) =>
         moveTrack(trackId, { type: "album", albumId }, placement, referenceTrackId),

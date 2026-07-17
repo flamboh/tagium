@@ -146,11 +146,11 @@ describe("albumDialogReducer", () => {
   });
 
   for (const finishType of ["closed", "saved", "deleted"] as const) {
-    it(`resets every dialog field when the dialog is ${finishType}`, () => {
-      const state = reduce([{ type: "edit-opened", album: album() }, { type: finishType }]);
+    it(`keeps edit content stable while the ${finishType} dialog exits`, () => {
+      const openState = reduce([{ type: "edit-opened", album: album() }]);
+      const state = albumDialogReducer(openState, { type: finishType });
 
-      expect(state).toEqual(createAlbumDialogState());
-      expect(state.draft).not.toBe(createAlbumDialogState().draft);
+      expect(state).toEqual({ ...openState, open: false });
     });
   }
 });
