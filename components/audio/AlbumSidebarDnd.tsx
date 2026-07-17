@@ -283,7 +283,7 @@ export function DroppableTrackContainer({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex flex-col min-h-8 transition-shadow",
+        "flex flex-col transition-shadow",
         isOver ? "shadow-[inset_0_0_0_2px_var(--primary)]" : "",
         className,
       )}
