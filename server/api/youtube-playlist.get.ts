@@ -1,5 +1,5 @@
+import { Option, Schema } from "effect";
 import { defineHandler } from "nitro";
-import { z } from "zod";
 import {
   extractYouTubeJsonObject,
   fetchYouTubeWithRetry,
@@ -8,59 +8,51 @@ import {
   YOUTUBE_ORIGIN,
   YOUTUBE_USER_AGENT,
 } from "../utils/youtube";
+import { urlStringSchema } from "../utils/schema";
 
 const MAX_CONTINUATION_REQUESTS = 100;
 
-const textSchema = z
-  .object({
-    simpleText: z.string().optional(),
-    content: z.string().optional(),
-    runs: z.array(z.object({ text: z.string() }).passthrough()).optional(),
-  })
-  .passthrough();
+const textSchema = Schema.Struct({
+  simpleText: Schema.optionalKey(Schema.String),
+  content: Schema.optionalKey(Schema.String),
+  runs: Schema.optionalKey(Schema.Array(Schema.Struct({ text: Schema.String }))),
+});
 
-const legacyVideoSchema = z
-  .object({
-    videoId: z.string().min(1),
-    title: textSchema,
-    lengthSeconds: z.string().optional(),
-    lengthText: textSchema.optional(),
-  })
-  .passthrough();
+const nonEmptyStringSchema = Schema.String.check(Schema.isNonEmpty());
 
-const lockupVideoSchema = z
-  .object({
-    contentId: z.string().min(1),
-    contentType: z.string().optional(),
-    metadata: z
-      .object({
-        lockupMetadataViewModel: z
-          .object({
-            title: textSchema,
-          })
-          .passthrough(),
-      })
-      .passthrough(),
-  })
-  .passthrough();
+const legacyVideoSchema = Schema.Struct({
+  videoId: nonEmptyStringSchema,
+  title: textSchema,
+  lengthSeconds: Schema.optionalKey(Schema.String),
+  lengthText: Schema.optionalKey(textSchema),
+});
 
-const thumbnailSchema = z
-  .object({
-    thumbnail: z
-      .object({
-        thumbnails: z.array(
-          z
-            .object({
-              url: z.string().url(),
-              width: z.number().optional(),
-              height: z.number().optional(),
-            })
-            .passthrough(),
-        ),
-      })
-      .passthrough(),
-  })
-  .passthrough();
+const lockupVideoSchema = Schema.Struct({
+  contentId: nonEmptyStringSchema,
+  contentType: Schema.optionalKey(Schema.String),
+  metadata: Schema.Struct({
+    lockupMetadataViewModel: Schema.Struct({
+      title: textSchema,
+    }),
+  }),
+});
+
+const thumbnailSchema = Schema.Struct({
+  thumbnail: Schema.Struct({
+    thumbnails: Schema.Array(
+      Schema.Struct({
+        url: urlStringSchema,
+        width: Schema.optionalKey(Schema.Finite),
+        height: Schema.optionalKey(Schema.Finite),
+      }),
+    ),
+  }),
+});
+
+const decodeTextOption = Schema.decodeUnknownOption(textSchema);
+const decodeLegacyVideoOption = Schema.decodeUnknownOption(legacyVideoSchema);
+const decodeLockupVideoOption = Schema.decodeUnknownOption(lockupVideoSchema);
+const decodeThumbnailOption = Schema.decodeUnknownOption(thumbnailSchema);
 
 type JsonRecord = Record<string, unknown>;
 
@@ -75,11 +67,11 @@ const isRecord = (value: unknown): value is JsonRecord =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 const getText = (value: unknown) => {
-  const parsed = textSchema.safeParse(value);
-  if (!parsed.success) return undefined;
-  if (parsed.data.simpleText) return parsed.data.simpleText;
-  if (parsed.data.content) return parsed.data.content;
-  const runs = parsed.data.runs?.map((run) => run.text).join("");
+  const parsed = decodeTextOption(value);
+  if (Option.isNone(parsed)) return undefined;
+  if (parsed.value.simpleText) return parsed.value.simpleText;
+  if (parsed.value.content) return parsed.value.content;
+  const runs = parsed.value.runs?.map((run) => run.text).join("");
   return runs || undefined;
 };
 
@@ -136,37 +128,37 @@ const collectTracks = (value: unknown, seenVideoIds: Set<string>, tracks: YouTub
   }
   if (!isRecord(value)) return;
 
-  const legacyVideo = legacyVideoSchema.safeParse(value.playlistVideoRenderer);
-  if (legacyVideo.success && !seenVideoIds.has(legacyVideo.data.videoId)) {
-    const title = getText(legacyVideo.data.title)?.trim();
+  const legacyVideo = decodeLegacyVideoOption(value.playlistVideoRenderer);
+  if (Option.isSome(legacyVideo) && !seenVideoIds.has(legacyVideo.value.videoId)) {
+    const title = getText(legacyVideo.value.title)?.trim();
     if (title) {
-      const durationFromSeconds = Number(legacyVideo.data.lengthSeconds);
-      seenVideoIds.add(legacyVideo.data.videoId);
+      const durationFromSeconds = Number(legacyVideo.value.lengthSeconds);
+      seenVideoIds.add(legacyVideo.value.videoId);
       tracks.push({
         title,
-        url: `${YOUTUBE_ORIGIN}/watch?v=${encodeURIComponent(legacyVideo.data.videoId)}`,
+        url: `${YOUTUBE_ORIGIN}/watch?v=${encodeURIComponent(legacyVideo.value.videoId)}`,
         duration: Number.isFinite(durationFromSeconds)
           ? durationFromSeconds
-          : parseDuration(getText(legacyVideo.data.lengthText)),
+          : parseDuration(getText(legacyVideo.value.lengthText)),
         trackNumber: tracks.length + 1,
       });
     }
   }
 
-  const lockupVideo = lockupVideoSchema.safeParse(value.lockupViewModel);
+  const lockupVideo = decodeLockupVideoOption(value.lockupViewModel);
   if (
-    lockupVideo.success &&
-    (!lockupVideo.data.contentType ||
-      lockupVideo.data.contentType === "LOCKUP_CONTENT_TYPE_VIDEO") &&
-    !seenVideoIds.has(lockupVideo.data.contentId)
+    Option.isSome(lockupVideo) &&
+    (!lockupVideo.value.contentType ||
+      lockupVideo.value.contentType === "LOCKUP_CONTENT_TYPE_VIDEO") &&
+    !seenVideoIds.has(lockupVideo.value.contentId)
   ) {
-    const title = getText(lockupVideo.data.metadata.lockupMetadataViewModel.title)?.trim();
+    const title = getText(lockupVideo.value.metadata.lockupMetadataViewModel.title)?.trim();
     if (title) {
-      seenVideoIds.add(lockupVideo.data.contentId);
+      seenVideoIds.add(lockupVideo.value.contentId);
       tracks.push({
         title,
-        url: `${YOUTUBE_ORIGIN}/watch?v=${encodeURIComponent(lockupVideo.data.contentId)}`,
-        duration: findDuration(lockupVideo.data),
+        url: `${YOUTUBE_ORIGIN}/watch?v=${encodeURIComponent(lockupVideo.value.contentId)}`,
+        duration: findDuration(value.lockupViewModel),
         trackNumber: tracks.length + 1,
       });
     }
@@ -201,11 +193,11 @@ const getPlaylistArtist = (initialData: unknown) => {
 };
 
 const getPlaylistCover = (initialData: unknown) => {
-  const parsed = thumbnailSchema.safeParse(
+  const parsed = decodeThumbnailOption(
     findFirstValue(initialData, "playlistVideoThumbnailRenderer"),
   );
-  if (!parsed.success || parsed.data.thumbnail.thumbnails.length === 0) return undefined;
-  const coverUrl = parsed.data.thumbnail.thumbnails.reduce((largest, thumbnail) => {
+  if (Option.isNone(parsed) || parsed.value.thumbnail.thumbnails.length === 0) return undefined;
+  const coverUrl = parsed.value.thumbnail.thumbnails.reduce((largest, thumbnail) => {
     const largestArea = (largest.width ?? 0) * (largest.height ?? 0);
     const thumbnailArea = (thumbnail.width ?? 0) * (thumbnail.height ?? 0);
     return thumbnailArea >= largestArea ? thumbnail : largest;

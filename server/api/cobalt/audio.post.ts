@@ -6,9 +6,9 @@
  * Changes: runs server-side in Tagium, uses server env for Cobalt URL/auth,
  * and returns a browser-executable download plan without exposing auth.
  */
-import { defineHandler } from "nitro";
+import { Effect, Schema } from "effect";
+import { defineHandler, HTTPError } from "nitro";
 import { env as processEnv } from "node:process";
-import { z } from "zod";
 import { parseCobaltMachineId, signCobaltMachine } from "../../utils/cobalt-machine-affinity";
 import {
   createCloudflareCobaltRequestAdmission,
@@ -22,6 +22,7 @@ import {
   getDeployEnv,
   type CobaltRuntimeEnv as DevControlRuntimeEnv,
 } from "../../utils/dev-controls";
+import { decodeRequestBody, urlStringSchema } from "../../utils/schema";
 import { getYouTubeVideoId, resolveYouTubeUploadYear } from "../../utils/youtube";
 
 enum CobaltResponseType {
@@ -32,59 +33,61 @@ enum CobaltResponseType {
   LocalProcessing = "local-processing",
 }
 
-const audioRequestSchema = z.object({
-  url: z.string().url(),
-  audioBitrate: z.enum(["320", "256", "128", "96", "64"]),
-  year: z.number().int().min(1000).max(9999).optional(),
+const audioRequestSchema = Schema.Struct({
+  url: urlStringSchema,
+  audioBitrate: Schema.Literals(["320", "256", "128", "96", "64"]),
+  year: Schema.optionalKey(
+    Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1_000, maximum: 9_999 })),
+  ),
 });
 
-const cobaltResponseSchema = z.discriminatedUnion("status", [
-  z.object({
-    status: z.literal(CobaltResponseType.Error),
-    error: z.object({
-      code: z.string(),
+const cobaltResponseSchema = Schema.Union([
+  Schema.Struct({
+    status: Schema.Literal(CobaltResponseType.Error),
+    error: Schema.Struct({
+      code: Schema.String,
     }),
   }),
-  z.object({
-    status: z.literal(CobaltResponseType.Picker),
-    audio: z.string().url().optional(),
-    audioFilename: z.string().optional(),
+  Schema.Struct({
+    status: Schema.Literal(CobaltResponseType.Picker),
+    audio: Schema.optionalKey(urlStringSchema),
+    audioFilename: Schema.optionalKey(Schema.String),
   }),
-  z.object({
-    status: z.literal(CobaltResponseType.Redirect),
-    url: z.string().url(),
-    filename: z.string(),
+  Schema.Struct({
+    status: Schema.Literal(CobaltResponseType.Redirect),
+    url: urlStringSchema,
+    filename: Schema.String,
   }),
-  z.object({
-    status: z.literal(CobaltResponseType.Tunnel),
-    url: z.string().url(),
-    filename: z.string(),
+  Schema.Struct({
+    status: Schema.Literal(CobaltResponseType.Tunnel),
+    url: urlStringSchema,
+    filename: Schema.String,
   }),
-  z.object({
-    status: z.literal(CobaltResponseType.LocalProcessing),
-    type: z.enum(["merge", "mute", "audio", "gif", "remux", "proxy"]),
-    service: z.string(),
-    tunnel: z.array(z.string().url()),
-    output: z.object({
-      type: z.string(),
-      filename: z.string(),
-      metadata: z.record(z.string(), z.string().optional()).optional(),
-      subtitles: z.boolean().optional(),
+  Schema.Struct({
+    status: Schema.Literal(CobaltResponseType.LocalProcessing),
+    type: Schema.Literals(["merge", "mute", "audio", "gif", "remux", "proxy"]),
+    service: Schema.String,
+    tunnel: Schema.Array(urlStringSchema),
+    output: Schema.Struct({
+      type: Schema.String,
+      filename: Schema.String,
+      metadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.UndefinedOr(Schema.String))),
+      subtitles: Schema.optionalKey(Schema.Boolean),
     }),
-    audio: z
-      .object({
-        copy: z.boolean(),
-        format: z.string(),
-        bitrate: z.string(),
-        cover: z.boolean().optional(),
-        cropCover: z.boolean().optional(),
-      })
-      .optional(),
-    isHLS: z.boolean().optional(),
+    audio: Schema.optionalKey(
+      Schema.Struct({
+        copy: Schema.Boolean,
+        format: Schema.String,
+        bitrate: Schema.String,
+        cover: Schema.optionalKey(Schema.Boolean),
+        cropCover: Schema.optionalKey(Schema.Boolean),
+      }),
+    ),
+    isHLS: Schema.optionalKey(Schema.Boolean),
   }),
 ]);
 
-type CobaltResponse = z.infer<typeof cobaltResponseSchema>;
+type CobaltResponse = Schema.Schema.Type<typeof cobaltResponseSchema>;
 type CobaltAudioResult = {
   response: CobaltResponse;
   machineId: string | undefined;
@@ -177,7 +180,7 @@ const parseCobaltJson = async (response: Response) => {
     throw new Error(`Cobalt API returned non-JSON (${response.status}).`);
   }
 
-  return cobaltResponseSchema.parse(await response.json());
+  return Effect.runPromise(Schema.decodeUnknownEffect(cobaltResponseSchema)(await response.json()));
 };
 
 const isCobaltCapacityError = (response: CobaltResponse) =>
@@ -359,14 +362,6 @@ const withYearMetadata = (
   };
 };
 
-const parseAudioRequest = async (request: Request) => {
-  try {
-    return audioRequestSchema.parse(await request.json());
-  } catch {
-    return undefined;
-  }
-};
-
 const getCobaltRequestAdmission = (
   request: Request,
   runtimeEnv: CobaltRuntimeEnv,
@@ -416,10 +411,7 @@ export default defineHandler(async (event) => {
       return devFaultResponse;
     }
 
-    const body = await parseAudioRequest(event.req);
-    if (!body) {
-      return new Response("Invalid audio download request.", { status: 400 });
-    }
+    const body = await decodeRequestBody(event.req, audioRequestSchema);
 
     const admission = getCobaltRequestAdmission(event.req, runtimeEnv);
     if (!admission) return admissionUnavailableResponse();
@@ -488,6 +480,8 @@ export default defineHandler(async (event) => {
       proxiedTunnelResponse(event.req, runtimeEnv, cobaltResponse, cobaltResult.machineId),
     );
   } catch (error) {
+    if (HTTPError.isError(error)) throw error;
+
     if (error instanceof Error) {
       return cobaltErrorResponse(error.message);
     }

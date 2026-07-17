@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { HTTPError } from "nitro";
 import handler from "../../server/api/cobalt/audio.post";
 
 type RuntimeRequest = Request & {
@@ -69,6 +70,26 @@ describe("cobalt audio endpoint", () => {
     vi.unstubAllGlobals();
   });
 
+  it("maps invalid request bodies to HTTP 400 errors", async () => {
+    const request = makeAudioRequest();
+    const invalidRequest = new Request(request.url, {
+      method: "POST",
+      headers: request.headers,
+      body: JSON.stringify({
+        url: "not a URL",
+        audioBitrate: "lossless",
+        year: 99,
+      }),
+    }) as RuntimeRequest;
+    invalidRequest.runtime = request.runtime;
+
+    const error = await handler(makeEvent(invalidRequest)).catch((cause) => cause);
+
+    expect(HTTPError.isError(error)).toBe(true);
+    expect(error).toMatchObject({ status: 400 });
+    expect(error.message).toContain('["url"]');
+  });
+
   it("requests non-HLS Cobalt audio", async () => {
     const cobaltBodies: unknown[] = [];
     const audioTunnel =
@@ -95,7 +116,9 @@ describe("cobalt audio endpoint", () => {
           format: "mp3",
           bitrate: "128",
           cover: true,
+          futureAudioField: "ignored",
         },
+        futureResponseField: { nested: true },
       });
     });
 
@@ -119,6 +142,18 @@ describe("cobalt audio endpoint", () => {
         },
       },
     });
+  });
+
+  it("classifies malformed upstream payloads as gateway failures", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ status: "a-future-cobalt-status" })),
+    );
+
+    const response = await handler(makeEvent(makeAudioRequest()));
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toContain("a-future-cobalt-status");
   });
 
   it("infers direct YouTube track year from its upload date", async () => {

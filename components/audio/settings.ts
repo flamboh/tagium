@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { Effect, Option, Schema } from "effect";
 import type { AudioDownloadBitrate } from "./cobaltAudio";
 import type { AppSettings } from "./types";
 
@@ -19,16 +19,25 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 
 export const APP_SETTINGS_STORAGE_KEY = "tagium:app-settings";
 
-const storedAppSettingsSchema = z
-  .object({
-    syncTrackNumbers: z.boolean().catch(DEFAULT_APP_SETTINGS.syncTrackNumbers),
-    syncFilenames: z.boolean().catch(DEFAULT_APP_SETTINGS.syncFilenames),
-    audioBitrate: z.enum(AUDIO_BITRATE_OPTIONS).catch(DEFAULT_APP_SETTINGS.audioBitrate),
-    applySoundCloudAlbumCoverToTracks: z
-      .boolean()
-      .catch(DEFAULT_APP_SETTINGS.applySoundCloudAlbumCoverToTracks),
-  })
-  .catch(DEFAULT_APP_SETTINGS);
+const booleanWithDefault = (value: boolean) =>
+  Schema.Boolean.pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(value))),
+    Schema.withDecodingDefaultKey(Effect.succeed(value)),
+  );
+
+const storedAppSettingsSchema = Schema.Struct({
+  syncTrackNumbers: booleanWithDefault(DEFAULT_APP_SETTINGS.syncTrackNumbers),
+  syncFilenames: booleanWithDefault(DEFAULT_APP_SETTINGS.syncFilenames),
+  audioBitrate: Schema.Literals(AUDIO_BITRATE_OPTIONS).pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_APP_SETTINGS.audioBitrate))),
+    Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_APP_SETTINGS.audioBitrate)),
+  ),
+  applySoundCloudAlbumCoverToTracks: booleanWithDefault(
+    DEFAULT_APP_SETTINGS.applySoundCloudAlbumCoverToTracks,
+  ),
+});
+
+const decodeStoredAppSettings = Schema.decodeUnknownSync(storedAppSettingsSchema);
 
 export const loadAppSettings = (storage?: Pick<Storage, "getItem">): AppSettings => {
   try {
@@ -38,7 +47,7 @@ export const loadAppSettings = (storage?: Pick<Storage, "getItem">): AppSettings
 
     return {
       ...DEFAULT_APP_SETTINGS,
-      ...storedAppSettingsSchema.parse(JSON.parse(storedSettings)),
+      ...decodeStoredAppSettings(JSON.parse(storedSettings)),
     };
   } catch {
     return DEFAULT_APP_SETTINGS;
