@@ -131,6 +131,9 @@ describe("audio workspace", () => {
 
     act(() => hook.result.workspace.sidebarProps.onRemoveFile(second.id));
     expect(hook.result.workspace.removalDialogProps).toMatchObject({ open: true, itemCount: 1 });
+    act(() => hook.result.workspace.removalDialogProps.onCancel());
+    expect(hook.result.workspace.removalDialogProps).toMatchObject({ open: false, itemCount: 1 });
+    act(() => hook.result.workspace.sidebarProps.onRemoveFile(second.id));
     act(() => hook.result.workspace.removalDialogProps.onConfirm());
     expect(removeDownloads).toHaveBeenCalledWith([second.id]);
     expect(hook.result.library.getSnapshot().files.map((file) => file.id)).toEqual([first.id]);
