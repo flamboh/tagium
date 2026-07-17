@@ -165,4 +165,86 @@ describe("album metadata validation layout", () => {
       cover,
     });
   });
+
+  it("renders create placeholders and submits a valid create draft", () => {
+    const hooks = createHookHarness();
+    const onSave = vi.fn();
+    const onClose = vi.fn();
+    const tree = hooks.render(() =>
+      AlbumMetadataDialog({
+        open: true,
+        mode: "create",
+        draft: { title: "New Album", artist: "Artist", genre: "" },
+        trackCount: 0,
+        onChange: vi.fn(),
+        onClose,
+        onSave,
+        placeholder: {
+          title: "Placeholder Album",
+          artist: "Placeholder Artist",
+          genre: "Placeholder Genre",
+          year: "2026",
+        },
+      }),
+    );
+
+    expect(
+      findElement(tree, (element) => element.props.id === "album-title").props.placeholder,
+    ).toBe("Placeholder Album");
+    expect(
+      findElement(tree, (element) => element.props.id === "album-artist").props.placeholder,
+    ).toBe("Placeholder Artist");
+    expect(textContent(tree)).toContain("create album");
+
+    const form = findElement(tree, (element) => element.type === "form");
+    (form.props.onSubmit as (event: { preventDefault: () => void }) => void)({
+      preventDefault: vi.fn(),
+    });
+    expect(onSave).toHaveBeenCalledOnce();
+
+    const cancel = findElement(
+      tree,
+      (element) => textContent(element) === "cancel" && typeof element.props.onClick === "function",
+    );
+    (cancel.props.onClick as () => void)();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("confirms deletion only in edit mode", () => {
+    const hooks = createHookHarness();
+    const onDelete = vi.fn();
+    const render = () =>
+      hooks.render(() =>
+        AlbumMetadataDialog({
+          open: true,
+          mode: "edit",
+          draft: { title: "Existing Album", artist: "Artist", genre: "Rock" },
+          trackCount: 2,
+          onChange: vi.fn(),
+          onClose: vi.fn(),
+          onSave: vi.fn(),
+          onDelete,
+          placeholder: { title: "Album", artist: "Artist", genre: "Genre", year: "2026" },
+        }),
+      );
+
+    let tree = render();
+    expect(textContent(tree)).toContain("edit album");
+    const requestDelete = findElement(
+      tree,
+      (element) =>
+        textContent(element) === "delete album" && typeof element.props.onClick === "function",
+    );
+    (requestDelete.props.onClick as () => void)();
+
+    tree = render();
+    expect(textContent(tree)).toContain("delete album and all 2 tracks?");
+    const confirmDelete = findElement(
+      tree,
+      (element) => textContent(element) === "delete" && typeof element.props.onClick === "function",
+    );
+    (confirmDelete.props.onClick as () => void)();
+
+    expect(onDelete).toHaveBeenCalledOnce();
+  });
 });
