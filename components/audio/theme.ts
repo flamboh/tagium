@@ -10,6 +10,11 @@ const foregrounds = {
 };
 const fallbackRgb: Rgb = [17, 76, 191];
 
+export const cssColorToHex = (color: string) =>
+  `#${resolveCssColor(color)
+    .map((channel) => Math.round(channel).toString(16).padStart(2, "0"))
+    .join("")}`;
+
 const parseHexColor = (color: string): Rgb | undefined => {
   const match = /^#([\da-f]{3}|[\da-f]{6})$/i.exec(color);
   if (!match) return undefined;

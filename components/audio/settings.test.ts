@@ -91,6 +91,26 @@ describe("settings", () => {
     });
   });
 
+  it("preserves RGB and OKLCH accent colors", () => {
+    const appearance = {
+      accentA: "rgb(17 76 191)",
+      accentB: "oklch(0.62 0.21 30)",
+    };
+
+    expect(loadAppSettings(storageWith(JSON.stringify(appearance)))).toEqual({
+      ...DEFAULT_APP_SETTINGS,
+      ...appearance,
+    });
+  });
+
+  it("rejects malformed functional accent colors", () => {
+    expect(
+      loadAppSettings(
+        storageWith(JSON.stringify({ accentA: "rgb(nope)", accentB: "oklch(blue)" })),
+      ),
+    ).toEqual(DEFAULT_APP_SETTINGS);
+  });
+
   it("saves app settings", () => {
     const storage = storageWith(null);
     const settings: AppSettings = {

@@ -49,9 +49,26 @@ const booleanWithDefault = (value: boolean) =>
     Schema.withDecodingDefaultKey(Effect.succeed(value)),
   );
 
-const hexColorWithDefault = (value: string) =>
+const number = String.raw`[-+]?(?:\d*\.)?\d+`;
+const alpha = String.raw`${number}%?`;
+const rgbChannel = String.raw`${number}%?`;
+const rgbColor = new RegExp(
+  String.raw`^rgba?\(\s*${rgbChannel}(?:\s*,\s*|\s+)${rgbChannel}(?:\s*,\s*|\s+)${rgbChannel}(?:\s*(?:,|\/)\s*${alpha})?\s*\)$`,
+  "i",
+);
+const oklchColor = new RegExp(
+  String.raw`^oklch\(\s*${number}%?\s+${number}\s+${number}(?:deg|grad|rad|turn)?(?:\s*\/\s*${alpha})?\s*\)$`,
+  "i",
+);
+
+export const isSupportedAccentColor = (color: string) => {
+  const value = color.trim();
+  return /^#[\da-f]{6}$/i.test(value) || rgbColor.test(value) || oklchColor.test(value);
+};
+
+const accentColorWithDefault = (value: string) =>
   Schema.String.pipe(
-    Schema.refine((color): color is string => /^#[\da-f]{6}$/i.test(color)),
+    Schema.refine((color): color is string => isSupportedAccentColor(color)),
     Schema.catchDecoding(() => Effect.succeed(Option.some(value))),
     Schema.withDecodingDefaultKey(Effect.succeed(value)),
   );
@@ -61,8 +78,8 @@ const storedAppSettingsSchema = Schema.Struct({
     Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_APP_SETTINGS.mode))),
     Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_APP_SETTINGS.mode)),
   ),
-  accentA: hexColorWithDefault(DEFAULT_APP_SETTINGS.accentA),
-  accentB: hexColorWithDefault(DEFAULT_APP_SETTINGS.accentB),
+  accentA: accentColorWithDefault(DEFAULT_APP_SETTINGS.accentA),
+  accentB: accentColorWithDefault(DEFAULT_APP_SETTINGS.accentB),
   wordmarkFont: Schema.Literals(WORDMARK_FONT_OPTIONS).pipe(
     Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_APP_SETTINGS.wordmarkFont))),
     Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_APP_SETTINGS.wordmarkFont)),

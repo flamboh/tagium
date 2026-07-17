@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,7 +11,9 @@ import {
   AUDIO_BITRATE_OPTIONS,
   MODE_OPTIONS,
   WORDMARK_FONT_OPTIONS,
+  isSupportedAccentColor,
 } from "./settings";
+import { cssColorToHex } from "./theme";
 import type { AppSettings } from "./types";
 
 const modeDescriptions: Record<AppSettings["mode"], string> = {
@@ -23,6 +25,69 @@ export interface SettingsPageProps {
   settings: AppSettings;
   onChange: (settings: AppSettings) => void;
   onBack: () => void;
+}
+
+interface AccentColorInputProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function AccentColorInput({ label, value, onChange }: AccentColorInputProps) {
+  const [draft, setDraft] = useState(value);
+  const [invalid, setInvalid] = useState(false);
+
+  useEffect(() => {
+    setDraft(value);
+    setInvalid(false);
+  }, [value]);
+
+  const commit = (nextValue: string) => {
+    const color = nextValue.trim();
+    const valid = isSupportedAccentColor(color) && CSS.supports("color", color);
+    setInvalid(!valid);
+    if (valid) onChange(color);
+  };
+
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5 rounded-sm border border-input px-3 py-2">
+      <div className="flex items-center justify-between gap-3">
+        <label htmlFor={`${label}-color-value`} className="text-sm font-medium">
+          {label}
+        </label>
+        <input
+          type="color"
+          value={cssColorToHex(value)}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-7 w-10 shrink-0 cursor-pointer border-0 bg-transparent p-0"
+          aria-label={`choose ${label}`}
+        />
+      </div>
+      <input
+        id={`${label}-color-value`}
+        type="text"
+        value={draft}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          commit(event.target.value);
+        }}
+        onBlur={() => commit(draft)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") commit(draft);
+        }}
+        aria-invalid={invalid}
+        aria-describedby={invalid ? `${label}-color-error` : undefined}
+        spellCheck={false}
+        placeholder="oklch(0.6 0.2 260) or rgb(20 80 190)"
+        className="h-8 min-w-0 rounded-sm border border-input bg-background px-2 font-mono text-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20"
+      />
+      {invalid && (
+        <span id={`${label}-color-error`} className="text-xs text-destructive">
+          enter a valid OKLCH, RGB, or hex color
+        </span>
+      )}
+    </div>
+  );
 }
 
 export default function SettingsPage({ settings, onChange, onBack }: SettingsPageProps) {
@@ -118,21 +183,14 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
                     );
                   })}
                 </div>
-                <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">
                   {(["accentA", "accentB"] as const).map((key, index) => (
-                    <label
+                    <AccentColorInput
                       key={key}
-                      className="flex cursor-pointer items-center justify-between gap-3 rounded-sm border border-input px-3 py-2"
-                    >
-                      <span className="text-sm font-medium">accent {index === 0 ? "a" : "b"}</span>
-                      <input
-                        type="color"
-                        value={settings[key]}
-                        onChange={(event) => onChange({ ...settings, [key]: event.target.value })}
-                        className="h-7 w-10 cursor-pointer border-0 bg-transparent p-0"
-                        aria-label={`accent ${index === 0 ? "a" : "b"}`}
-                      />
-                    </label>
+                      label={`accent ${index === 0 ? "a" : "b"}`}
+                      value={settings[key]}
+                      onChange={(value) => onChange({ ...settings, [key]: value })}
+                    />
                   ))}
                 </div>
               </div>
