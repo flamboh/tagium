@@ -156,6 +156,7 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
             className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center text-primary/80 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             onClick={onBack}
             aria-label="back to editor"
+            data-mobile-workspace-destination="settings"
           >
             <ArrowLeft className="size-5" />
           </button>

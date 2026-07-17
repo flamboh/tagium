@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { ArrowLeft, ListMusic } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import AlbumMetadataDialog from "@/features/editor/AlbumMetadataDialog";
 import DestructiveActionDialog from "@/features/workspace/DestructiveActionDialog";
 import LandingScreen from "@/features/import/LandingScreen";
@@ -23,6 +25,7 @@ import ExportConfirmationDialog from "@/features/export/ExportConfirmationDialog
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { AppSettings } from "@/features/library/types";
+import { useMobileWorkspaceNavigation } from "@/features/workspace/useMobileWorkspaceNavigation";
 
 export default function AudioTagger() {
   const library = useLibraryStore();
@@ -51,6 +54,11 @@ export default function AudioTagger() {
   const { files, albums, looseTrackIds, selectedFileId, selectedAlbumId, selectedFileIds } =
     library.state;
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
+  const mobileNavigation = useMobileWorkspaceNavigation({
+    selectedFileId,
+    settingsOpen: activeView === "settings",
+    libraryEmpty: libraryIsEmpty,
+  });
   const landingIsActive = libraryIsEmpty && activeView === "editor";
   const mediaUrlEntryPresentation = getMediaUrlEntryPresentation(
     libraryIsEmpty,
@@ -64,6 +72,30 @@ export default function AudioTagger() {
       importing: busy,
     }),
   );
+  const mobilePresentation = !mobileNavigation.isMobile
+    ? "library"
+    : mobileNavigation.page === "library"
+      ? "library"
+      : mobileNavigation.sheetOpen
+        ? "sheet"
+        : "hidden";
+  const sidebarProps = {
+    ...workspace.sidebarProps,
+    onSelectFile: (...args: Parameters<typeof workspace.sidebarProps.onSelectFile>) => {
+      workspace.sidebarProps.onSelectFile(...args);
+      const trigger = args[2]?.currentTarget;
+      mobileNavigation.openEditor("editor", trigger instanceof HTMLElement ? trigger : null);
+    },
+    onSelectLooseTrack: (...args: Parameters<typeof workspace.sidebarProps.onSelectLooseTrack>) => {
+      workspace.sidebarProps.onSelectLooseTrack(...args);
+      const trigger = args[1]?.currentTarget;
+      mobileNavigation.openEditor("editor", trigger instanceof HTMLElement ? trigger : null);
+    },
+    onOpenSettings: () => {
+      workspace.sidebarProps.onOpenSettings();
+      mobileNavigation.openEditor("settings");
+    },
+  };
 
   return (
     <>
@@ -78,7 +110,10 @@ export default function AudioTagger() {
         onConfirm={() => void exporting.confirmDownload()}
         onRestoreFocus={exporting.restoreConfirmationFocus}
       />
-      <div className="min-h-svh flex flex-col bg-background md:h-svh md:flex-row md:overflow-hidden">
+      <div
+        className="relative h-svh min-h-svh overflow-hidden bg-background md:flex md:flex-row"
+        data-mobile-page={mobileNavigation.page}
+      >
         <TagSidebarPanel
           loading={busy}
           files={files}
@@ -87,7 +122,9 @@ export default function AudioTagger() {
           selectedAlbumId={selectedAlbumId}
           selectedFileId={selectedFileId}
           selectedFileIds={selectedFileIds}
-          {...workspace.sidebarProps}
+          {...sidebarProps}
+          mobilePresentation={mobilePresentation}
+          onCloseMobileSheet={mobileNavigation.closeSheet}
           onAudioUpload={importing.commands.upload}
           onRetryDownload={importing.commands.retryTrack}
           onDownloadAlbum={exporting.downloadAlbum}
@@ -99,7 +136,44 @@ export default function AudioTagger() {
           onCancelPlaylistDownloadQueue={importing.commands.cancelQueue}
           onRetryPlaylistDownloadQueue={importing.commands.retryQueue}
         />
-        <div className="relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1">
+        {mobileNavigation.isMobile && mobileNavigation.sheetOpen && (
+          <button
+            type="button"
+            className="fixed inset-0 z-30 bg-black/45 motion-reduce:transition-none md:hidden"
+            onClick={mobileNavigation.closeSheet}
+            aria-label="close library"
+            tabIndex={-1}
+          />
+        )}
+        <div
+          className="relative flex h-svh min-w-0 flex-1 flex-col md:min-h-0"
+          aria-hidden={
+            mobileNavigation.isMobile &&
+            (mobileNavigation.page === "library" || mobileNavigation.sheetOpen)
+              ? true
+              : undefined
+          }
+          inert={
+            mobileNavigation.isMobile &&
+            (mobileNavigation.page === "library" || mobileNavigation.sheetOpen)
+              ? true
+              : undefined
+          }
+        >
+          {mobileNavigation.isMobile && landingIsActive && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="absolute left-3 top-3 z-20 size-10 bg-background"
+              onClick={mobileNavigation.openSheet}
+              aria-label="open library"
+              aria-expanded={mobileNavigation.sheetOpen}
+              data-mobile-workspace-destination="editor"
+            >
+              <ListMusic className="size-5" />
+            </Button>
+          )}
           <div
             className={
               landingIsActive
@@ -119,6 +193,30 @@ export default function AudioTagger() {
                       : "pointer-events-none z-0 opacity-0"
                   }`}
                 >
+                  <div className="flex h-12 shrink-0 items-center justify-between border-b px-2 md:hidden">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 px-2"
+                      onClick={mobileNavigation.backToLibrary}
+                      data-mobile-workspace-destination="editor"
+                    >
+                      <ArrowLeft className="size-4" />
+                      library
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-9"
+                      onClick={mobileNavigation.openSheet}
+                      aria-label="open library"
+                      aria-expanded={mobileNavigation.sheetOpen}
+                    >
+                      <ListMusic className="size-5" />
+                    </Button>
+                  </div>
                   <TrackMetadataEditor
                     selectedFile={editor.selectedFile}
                     selectedFileId={selectedFileId}
@@ -152,11 +250,31 @@ export default function AudioTagger() {
                       : "pointer-events-none z-0 opacity-0"
                   }`}
                 >
-                  <SettingsPage {...workspace.settingsPageProps} />
+                  <SettingsPage
+                    {...workspace.settingsPageProps}
+                    onBack={
+                      mobileNavigation.isMobile
+                        ? () => {
+                            workspace.settingsPageProps.onBack();
+                            mobileNavigation.backToLibrary();
+                          }
+                        : workspace.settingsPageProps.onBack
+                    }
+                  />
                 </div>
               </div>
             ) : activeView === "settings" ? (
-              <SettingsPage {...workspace.settingsPageProps} />
+              <SettingsPage
+                {...workspace.settingsPageProps}
+                onBack={
+                  mobileNavigation.isMobile
+                    ? () => {
+                        workspace.settingsPageProps.onBack();
+                        mobileNavigation.backToLibrary();
+                      }
+                    : workspace.settingsPageProps.onBack
+                }
+              />
             ) : null}
           </div>
           <LandingScreen active={landingIsActive} onAudioUpload={importing.commands.upload}>

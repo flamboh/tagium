@@ -127,7 +127,8 @@ export function SortableTrackRow({
         ref={setActivatorNodeRef}
         variant="ghost"
         className={cn(
-          "justify-start h-auto py-2.5 px-4 pr-8 w-full text-left font-normal rounded-none hover:bg-accent/30",
+          "justify-start h-auto py-2.5 px-4 pr-8 w-full text-left font-normal rounded-none hover:bg-accent/30 [@media(pointer:coarse)]:pr-12",
+          retryable && "[@media(pointer:coarse)]:pr-20",
           container === "loose" ? "py-3" : "",
           muted ? "opacity-65" : "",
           selectedTone === "primary" ? "bg-accent text-accent-foreground" : "",
@@ -181,7 +182,7 @@ export function SortableTrackRow({
             event.stopPropagation();
             onRetry();
           }}
-          className="absolute right-7 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-full cursor-pointer"
+          className="absolute right-7 top-2.5 cursor-pointer rounded-full p-1 opacity-0 transition-opacity hover:bg-accent focus-visible:opacity-100 group-hover:opacity-100 [@media(pointer:coarse)]:right-10 [@media(pointer:coarse)]:top-1/2 [@media(pointer:coarse)]:flex [@media(pointer:coarse)]:size-10 [@media(pointer:coarse)]:-translate-y-1/2 [@media(pointer:coarse)]:items-center [@media(pointer:coarse)]:justify-center [@media(pointer:coarse)]:opacity-100"
           title="retry download"
           aria-label={`retry download for ${track.filename}`}
         >
@@ -195,7 +196,7 @@ export function SortableTrackRow({
           event.stopPropagation();
           onRemove();
         }}
-        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
+        className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer rounded-full p-1 opacity-0 transition-opacity hover:bg-destructive/10 focus-visible:opacity-100 group-hover:opacity-100 [@media(pointer:coarse)]:right-0 [@media(pointer:coarse)]:flex [@media(pointer:coarse)]:size-10 [@media(pointer:coarse)]:items-center [@media(pointer:coarse)]:justify-center [@media(pointer:coarse)]:opacity-100"
         title="remove track"
       >
         <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
