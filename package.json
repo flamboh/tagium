@@ -18,6 +18,8 @@
     "deploy:preview": "bun run scripts/deploy-preview.ts",
     "deploy:production": "bun run scripts/deploy-production.ts",
     "load-test:cobalt": "bun run scripts/load-test-cobalt.ts",
+    "evidence:flac": "bun run scripts/flac-writer-bakeoff.ts",
+    "evidence:flac-alternative": "bun run scripts/flac-alternative-browser-smoke.ts",
     "doctor": "bunx react-doctor@latest",
     "shadcn": "shadcn"
   },
@@ -45,6 +47,7 @@
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
+    "@akabeko/music-metadata-editor": "1.0.1",
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
@@ -55,9 +58,11 @@
     "@vitejs/plugin-react": "^6.0.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
+    "music-metadata": "11.8.3",
     "nitro": "^3.0.260311-beta",
     "react-test-renderer": "19.1.0",
     "shadcn": "^3.0.0",
+    "taglib-wasm": "1.5.2",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.7",
     "typescript": "^5",
