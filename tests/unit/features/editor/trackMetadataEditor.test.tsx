@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
-import type { ReactElement, ReactNode } from "react";
+import { useEffect, type ReactElement, type ReactNode } from "react";
 import { useForm, type UseFormReturn, type UseFormSetFocus } from "react-hook-form";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -157,7 +157,9 @@ function MountedEditorHarness({
   setFocus?: UseFormSetFocus<AudioMetadata>;
 }) {
   const form = useForm<AudioMetadata>({ defaultValues: validMetadata });
-  exposeForm?.(form);
+  useEffect(() => {
+    exposeForm?.(form);
+  }, [exposeForm, form]);
   return (
     <TrackMetadataEditor
       selectedFile={readyTrack}
