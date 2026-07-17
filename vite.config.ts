@@ -89,6 +89,8 @@ export default defineConfig({
       "playwright-report",
       "test-results",
       ".repos/*",
+      ".agents/**",
+      ".claude/**",
     ],
     overrides: [
       {
