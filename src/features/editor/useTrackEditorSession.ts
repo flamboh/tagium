@@ -9,6 +9,8 @@ import {
 } from "@/features/library/fileMetadataOps";
 import {
   createDirtyMetadataPatch,
+  getAdvancedMetadataValidationErrors,
+  getProjectableAudioMetadata,
   getNullableNumericMetadataValue,
   getNullableNumericPatchValue,
   getSubmittedAudioMetadata,
@@ -90,8 +92,74 @@ const withPendingMetadataPatch = (
   hasBufferedChanges: Boolean(pendingMetadataPatch),
 });
 
+const sanitizePendingMetadataPatch = (patch: MetadataPatch | undefined) => {
+  if (!patch) return undefined;
+  const sanitizedPatch = { ...patch };
+  const validationErrors = getAdvancedMetadataValidationErrors({
+    discNumber: hasOwn(patch, "discNumber") ? patch.discNumber : null,
+    bpm: hasOwn(patch, "bpm") ? patch.bpm : null,
+  });
+  if (validationErrors.discNumber) delete sanitizedPatch.discNumber;
+  if (validationErrors.bpm) delete sanitizedPatch.bpm;
+  return Object.keys(sanitizedPatch).length > 0 ? sanitizedPatch : undefined;
+};
+
 const withMergedPendingMetadataPatch = (file: TagiumFile, patch: MetadataPatch | undefined) =>
-  patch ? withPendingMetadataPatch(file, { ...file.pendingMetadataPatch, ...patch }) : file;
+  patch
+    ? withPendingMetadataPatch(
+        file,
+        sanitizePendingMetadataPatch({ ...file.pendingMetadataPatch, ...patch }),
+      )
+    : file;
+
+const withSanitizedAdvancedMetadata = (file: TagiumFile) => {
+  const metadataErrors = file.metadata
+    ? getAdvancedMetadataValidationErrors(file.metadata)
+    : undefined;
+  const pendingErrors = file.pendingMetadataPatch
+    ? getAdvancedMetadataValidationErrors({
+        discNumber: hasOwn(file.pendingMetadataPatch, "discNumber")
+          ? file.pendingMetadataPatch.discNumber
+          : null,
+        bpm: hasOwn(file.pendingMetadataPatch, "bpm") ? file.pendingMetadataPatch.bpm : null,
+      })
+    : undefined;
+  if (
+    !metadataErrors?.discNumber &&
+    !metadataErrors?.bpm &&
+    !pendingErrors?.discNumber &&
+    !pendingErrors?.bpm
+  ) {
+    return file;
+  }
+  return withPendingMetadataPatch(
+    {
+      ...file,
+      metadata: file.metadata ? getProjectableAudioMetadata(file.metadata) : file.metadata,
+    },
+    sanitizePendingMetadataPatch(file.pendingMetadataPatch),
+  );
+};
+
+const withProjectedMetadataPatch = (
+  file: TagiumFile,
+  submittedData: AudioMetadata,
+  metadataPatch: MetadataPatch | undefined,
+) => {
+  const sanitizedFile = withSanitizedAdvancedMetadata(file);
+  if (!metadataPatch) return sanitizedFile;
+  return withMergedPendingMetadataPatch(
+    {
+      ...sanitizedFile,
+      filename: getFilenameFromPatch(sanitizedFile, metadataPatch),
+      metadata: sanitizedFile.metadata
+        ? applyMetadataPatch(sanitizedFile.metadata, metadataPatch)
+        : submittedData,
+      status: sanitizedFile.status === "saved" ? "pending" : sanitizedFile.status,
+    },
+    metadataPatch,
+  );
+};
 
 const clearPendingMetadataPatch = (file: TagiumFile) => withPendingMetadataPatch(file, undefined);
 
@@ -185,6 +253,12 @@ export const useTrackEditorSession = ({
     [],
   );
 
+  const getProjectedSubmittedMetadata = useCallback(
+    (data: AudioMetadata, fallback?: AudioMetadata) =>
+      getProjectableAudioMetadata(getSubmittedMetadata(data), fallback, data),
+    [getSubmittedMetadata],
+  );
+
   const createCurrentMetadataPatch = useCallback(
     (
       metadata: AudioMetadata,
@@ -208,32 +282,46 @@ export const useTrackEditorSession = ({
     [],
   );
 
+  const createCurrentFormProjection = useCallback(
+    (
+      data: AudioMetadata,
+      fallback: AudioMetadata | undefined,
+      extraFields: Iterable<keyof MetadataPatch> = [],
+    ) => {
+      const submittedData = getProjectableAudioMetadata(getSubmittedMetadata(data), fallback, data);
+      const projectableDirtyFields = { ...dirtyFieldsRef.current };
+      const validationErrors = getAdvancedMetadataValidationErrors(data);
+      if (validationErrors.discNumber) delete projectableDirtyFields.discNumber;
+      if (validationErrors.bpm) delete projectableDirtyFields.bpm;
+      return {
+        submittedData,
+        metadataPatch: createCurrentMetadataPatch(
+          submittedData,
+          projectableDirtyFields,
+          extraFields,
+        ),
+      };
+    },
+    [createCurrentMetadataPatch, getSubmittedMetadata],
+  );
+
   const applyCurrentFormMetadataToFiles = useCallback(
     (files: TagiumFile[], trackIds?: string[]) => {
       const selectedId = selectedFileIdRef.current;
       if (!selectedId || !formDirtyRef.current) return files;
       if (trackIds && !trackIds.includes(selectedId)) return files;
 
-      const submittedData = getSubmittedMetadata(getValues());
-      const metadataPatch = createCurrentMetadataPatch(submittedData, dirtyFieldsRef.current);
-      if (!metadataPatch) return files;
-      return files.map((file) =>
-        file.id === selectedId
-          ? withMergedPendingMetadataPatch(
-              {
-                ...file,
-                filename: getFilenameFromPatch(file, metadataPatch),
-                metadata: file.metadata
-                  ? applyMetadataPatch(file.metadata, metadataPatch)
-                  : submittedData,
-                status: file.status === "saved" ? "pending" : file.status,
-              },
-              metadataPatch,
-            )
-          : file,
+      const currentFile = files.find((file) => file.id === selectedId);
+      if (!currentFile) return files;
+      const { submittedData, metadataPatch } = createCurrentFormProjection(
+        getValues(),
+        currentFile.metadata,
       );
+      const projectedFile = withProjectedMetadataPatch(currentFile, submittedData, metadataPatch);
+      if (projectedFile === currentFile) return files;
+      return files.map((file) => (file.id === selectedId ? projectedFile : file));
     },
-    [createCurrentMetadataPatch, getSubmittedMetadata, getValues],
+    [createCurrentFormProjection, getValues],
   );
 
   const flush = useCallback(
@@ -254,29 +342,19 @@ export const useTrackEditorSession = ({
       if (!selectedId) return;
 
       formDirtyRef.current = true;
-      const submittedData = getSubmittedMetadata({ ...getValues(), [field]: value });
-      const metadataPatch = createCurrentMetadataPatch(submittedData, dirtyFieldsRef.current, [
-        field,
-      ]);
-      if (!metadataPatch) return;
-      const nextFiles = library.getSnapshot().files.map((file) =>
-        file.id === selectedId
-          ? withMergedPendingMetadataPatch(
-              {
-                ...file,
-                filename: getFilenameFromPatch(file, metadataPatch),
-                metadata: file.metadata
-                  ? applyMetadataPatch(file.metadata, metadataPatch)
-                  : submittedData,
-                status: file.status === "saved" ? "pending" : file.status,
-              },
-              metadataPatch,
-            )
-          : file,
+      const currentFiles = library.getSnapshot().files;
+      const currentFile = currentFiles.find((file) => file.id === selectedId);
+      if (!currentFile) return;
+      const { submittedData, metadataPatch } = createCurrentFormProjection(
+        { ...getValues(), [field]: value },
+        currentFile.metadata,
+        [field],
       );
+      const projectedFile = withProjectedMetadataPatch(currentFile, submittedData, metadataPatch);
+      const nextFiles = currentFiles.map((file) => (file.id === selectedId ? projectedFile : file));
       library.dispatch({ type: "content-replaced", files: nextFiles });
     },
-    [createCurrentMetadataPatch, getSubmittedMetadata, getValues, library],
+    [createCurrentFormProjection, getValues, library],
   );
 
   const updateTags = useCallback(
@@ -284,7 +362,7 @@ export const useTrackEditorSession = ({
       const snapshot = library.getSnapshot();
       const latestFileToUpdate =
         snapshot.files.find((file) => file.id === fileToUpdate.id) ?? fileToUpdate;
-      const submittedMetadata = getSubmittedMetadata(newTags);
+      const submittedMetadata = getProjectedSubmittedMetadata(newTags, latestFileToUpdate.metadata);
       const metadata = {
         ...submittedMetadata,
         duration: latestFileToUpdate.metadata?.duration || 0,
@@ -359,7 +437,7 @@ export const useTrackEditorSession = ({
         throw error;
       }
     },
-    [getSubmittedMetadata, library, reset],
+    [getProjectedSubmittedMetadata, library, reset],
   );
 
   const hydrateDownloadedTrack = useCallback(
@@ -375,20 +453,22 @@ export const useTrackEditorSession = ({
           }
 
           const hydrationState = yield* Effect.sync(() => {
-            const currentFile = library.getSnapshot().files.find((file) => file.id === fileId);
-            if (!currentFile) return null;
+            const storedFile = library.getSnapshot().files.find((file) => file.id === fileId);
+            if (!storedFile) return null;
+            const currentFile = withSanitizedAdvancedMetadata(storedFile);
             const parsedFile = parsedUpload.file;
             const formMetadata =
               selectedFileIdRef.current === fileId && formDirtyRef.current && currentFile.metadata
-                ? getSubmittedMetadata(getValues())
+                ? getProjectedSubmittedMetadata(getValues(), currentFile.metadata)
                 : undefined;
             const currentPendingPatch = formMetadata
-              ? createCurrentMetadataPatch(formMetadata, dirtyFieldsRef.current)
+              ? sanitizePendingMetadataPatch(
+                  createCurrentMetadataPatch(formMetadata, dirtyFieldsRef.current),
+                )
               : getPendingMetadataPatch(currentFile);
-            const currentFileWithPendingPatch =
-              currentPendingPatch && currentPendingPatch !== currentFile.pendingMetadataPatch
-                ? withPendingMetadataPatch(currentFile, currentPendingPatch)
-                : currentFile;
+            const currentFileWithPendingPatch = formMetadata
+              ? withPendingMetadataPatch(currentFile, currentPendingPatch)
+              : currentFile;
             return {
               ...prepareDownloadedTrackHydration(
                 currentFileWithPendingPatch,
@@ -404,7 +484,7 @@ export const useTrackEditorSession = ({
           let { hydratedFile } = hydrationState;
           const { currentFileWithPendingPatch, metadataToWrite, parsedFile } = hydrationState;
           const normalizedMetadataToWrite = metadataToWrite
-            ? getSubmittedMetadata(metadataToWrite)
+            ? getProjectedSubmittedMetadata(metadataToWrite, hydratedFile.metadata)
             : undefined;
           if (normalizedMetadataToWrite) {
             const writeResult = yield* writeTags(hydratedFile, normalizedMetadataToWrite).pipe(
@@ -412,12 +492,15 @@ export const useTrackEditorSession = ({
             );
             yield* Effect.sync(() => signal.throwIfAborted());
             const nextHydratedFile = yield* Effect.sync(() => {
-              const latestFile = library.getSnapshot().files.find((file) => file.id === fileId);
-              if (!latestFile) return null;
+              const storedLatestFile = library
+                .getSnapshot()
+                .files.find((file) => file.id === fileId);
+              if (!storedLatestFile) return null;
+              const latestFile = withSanitizedAdvancedMetadata(storedLatestFile);
               if (Exit.isSuccess(writeResult)) {
                 const latestFormMetadata =
                   selectedFileIdRef.current === fileId && formDirtyRef.current
-                    ? getSubmittedMetadata(getValues())
+                    ? getProjectedSubmittedMetadata(getValues(), latestFile.metadata)
                     : undefined;
                 const latestFormPatch = latestFormMetadata
                   ? createCurrentMetadataPatch(latestFormMetadata, dirtyFieldsRef.current)
@@ -464,7 +547,12 @@ export const useTrackEditorSession = ({
                     ? createSubmittedMetadataPatch(hydratedFile.metadata)
                     : normalizedMetadataToWrite))
                 : undefined;
-            const nextFile = withPendingMetadataPatch(hydratedFile, hydratedPendingPatch);
+            const nextFile = withSanitizedAdvancedMetadata(
+              withPendingMetadataPatch(
+                hydratedFile,
+                sanitizePendingMetadataPatch(hydratedPendingPatch),
+              ),
+            );
             const nextFiles = library
               .getSnapshot()
               .files.map((file) => (file.id === fileId ? nextFile : file));
@@ -472,7 +560,7 @@ export const useTrackEditorSession = ({
           });
         }),
       ),
-    [createCurrentMetadataPatch, getSubmittedMetadata, getValues, library],
+    [createCurrentMetadataPatch, getProjectedSubmittedMetadata, getValues, library],
   );
 
   return {

@@ -23,6 +23,11 @@ import CoverArt from "@/features/editor/coverArt";
 import { isValidFilenameBase, sanitizeFilenameBase } from "@/features/library/filename";
 import { getAudioFormatInfo } from "@/features/audio/audioFormat";
 import { getSampleTrack, type SampleTrackMetadata } from "@/features/editor/sampleMetadata";
+import {
+  getAdvancedMetadataValidationErrors,
+  validateBpm,
+  validateDiscNumber,
+} from "@/features/editor/audioTaggerUtils";
 import { getTrackFailureDisplay } from "@/features/workspace/systemFailure";
 import {
   useMetadataEditorMode,
@@ -347,26 +352,7 @@ const nullableNumberRegistration = {
   setValueAs: (value: string) => (value === "" ? null : Number(value)),
 };
 
-export const validateDiscNumber = (value: number | null) =>
-  value === null ||
-  (Number.isFinite(value) && Number.isInteger(value) && value >= 1 && value <= 999) ||
-  "disc number must be a whole number from 1 to 999";
-
-export const validateBpm = (value: number | null) =>
-  value === null ||
-  (Number.isFinite(value) && value >= 1 && value <= 999) ||
-  "BPM must be from 1 to 999";
-
-export const getAdvancedMetadataValidationErrors = (
-  metadata: Pick<AudioMetadata, "discNumber" | "bpm">,
-) => {
-  const discNumber = validateDiscNumber(metadata.discNumber);
-  const bpm = validateBpm(metadata.bpm);
-  return {
-    ...(discNumber === true ? {} : { discNumber }),
-    ...(bpm === true ? {} : { bpm }),
-  };
-};
+export { getAdvancedMetadataValidationErrors, validateBpm, validateDiscNumber };
 
 export const useLinkedAlbumArtistDisplay = (control: Control<AudioMetadata>) =>
   useWatch({ control, name: "artist", defaultValue: "" });
