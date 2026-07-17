@@ -144,14 +144,14 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
               <h3 className="text-base font-semibold">ethics</h3>
               <p className="text-sm leading-6 text-muted-foreground">
                 tagium is not a piracy tool and cannot be used as one. it only works with free,
-                publicly accessible audio — the same content anyone can already save with the
-                developer tools built into any modern web browser. it never bypasses paywalls, DRM,
-                or private content.
+                publicly accessible audio — the same content anyone can already save with the dev
+                tools in any modern browser. it cannot be used to bypass paywalls or access private
+                content.
               </p>
               <p className="text-sm leading-6 text-muted-foreground">
-                you are responsible for the content you download and how you use it. be mindful when
-                using others' work, credit original creators, and make sure you don't violate any
-                terms or licenses.
+                you are responsible for the content you download and how you use it. credit original
+                creators, support artists, don't violate any terms or licenses, and share the
+                love.{" "}
               </p>
             </div>
 
