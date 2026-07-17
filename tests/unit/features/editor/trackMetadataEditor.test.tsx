@@ -53,6 +53,7 @@ const metadata: AudioMetadata = {
 const loadedTrack: TagiumFile = {
   id: "track-1",
   format: "mp3",
+  file: new File(["audio"], "track-1.mp3", { type: "audio/mpeg" }),
   filename: "track-1.mp3",
   status: "saved",
   downloadStatus: "ready",
@@ -249,6 +250,16 @@ describe("track metadata editor form seam", () => {
       expect(markup).toContain(`for="${id}"`);
       expect(markup).toContain(`id="${id}"`);
     }
+  });
+
+  it("exposes an accessible selected-track preview without native audio controls", () => {
+    const markup = renderToStaticMarkup(<EditorHarness />);
+
+    expect(markup).toContain('aria-label="preview track-1.mp3"');
+    expect(markup).toContain('aria-label="play preview"');
+    expect(markup).toContain('role="slider"');
+    expect(markup).toContain('aria-label="track position"');
+    expect(markup).not.toContain(" controls=");
   });
 
   it("describes a synced filename error from the title field", () => {

@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CoverArt from "@/features/editor/coverArt";
 import AudioImportDropzone from "@/features/import/AudioImportDropzone";
+import TrackWaveformPreview from "@/features/editor/TrackWaveformPreview";
 import { isValidFilenameBase, sanitizeFilenameBase } from "@/features/library/filename";
 import { getAudioFormatInfo } from "@/features/audio/audioFormat";
 import { getSampleTrack, type SampleTrackMetadata } from "@/features/editor/sampleMetadata";
@@ -76,6 +77,7 @@ interface LoadedTrackMetadataEditorProps extends Omit<TrackMetadataEditorProps, 
   focusedTitleFileIdRef: RefObject<string | null>;
   editorMode: MetadataEditorMode;
   onEditorModeChange: (mode: MetadataEditorMode) => void;
+  previewActive: boolean;
 }
 
 interface PendingTrackMetadataEditorProps extends Pick<
@@ -647,6 +649,7 @@ function LoadedTrackMetadataEditor({
   selectedFile,
   selectedFileId,
   focusedTitleFileIdRef,
+  previewActive,
   register,
   control,
   getValues,
@@ -797,6 +800,13 @@ function LoadedTrackMetadataEditor({
                 )}
               </div>
               <TrackFileSummary selectedFile={selectedFile} />
+              <TrackWaveformPreview
+                active={previewActive}
+                file={selectedFile.file}
+                fileId={selectedFile.id}
+                fallbackDuration={selectedFile.metadata.duration}
+                title={watchedTitle}
+              />
               <DownloadTrackButton
                 onClick={submitDownload}
                 disabled={!canDownloadTrack}
@@ -882,6 +892,7 @@ export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
               focusedTitleFileIdRef={focusedTitleFileIdRef}
               editorMode={editorMode}
               onEditorModeChange={setEditorMode}
+              previewActive={trackIsSelected}
             />
           ) : (
             <PendingTrackMetadataEditor

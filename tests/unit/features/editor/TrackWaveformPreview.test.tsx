@@ -1,0 +1,362 @@
+import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import TrackWaveformPreview from "@/features/editor/TrackWaveformPreview";
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+describe("track waveform transport", () => {
+  it("plays, seeks by pointer and keyboard, and cleans up without autoplaying a replacement", async () => {
+    const createdUrls: string[] = [];
+    const revokedUrls: string[] = [];
+    vi.spyOn(URL, "createObjectURL").mockImplementation(() => {
+      const url = `blob:preview-${createdUrls.length + 1}`;
+      createdUrls.push(url);
+      return url;
+    });
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation((url) => revokedUrls.push(url));
+    class TestAudioContext {
+      async decodeAudioData() {
+        return {
+          duration: 120,
+          length: 4,
+          numberOfChannels: 1,
+          getChannelData: () => new Float32Array([0, 0.5, 1, 0.5]),
+        };
+      }
+
+      async close() {}
+    }
+    vi.stubGlobal("AudioContext", TestAudioContext);
+
+    const audio = {
+      currentTime: 0,
+      duration: 120,
+      paused: true,
+      src: "",
+      load: vi.fn(),
+      pause: vi.fn(() => {
+        audio.paused = true;
+      }),
+      play: vi.fn(async () => {
+        audio.paused = false;
+      }),
+      removeAttribute: vi.fn(() => {
+        audio.src = "";
+      }),
+    };
+    const firstFile = new File(["first"], "first.mp3", { type: "audio/mpeg" });
+    const secondFile = new File(["second"], "second.mp3", { type: "audio/mpeg" });
+    let renderer: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <TrackWaveformPreview
+          active
+          file={firstFile}
+          fileId="first"
+          fallbackDuration={120}
+          title="first"
+        />,
+        { createNodeMock: (element) => (element.type === "audio" ? audio : null) },
+      );
+    });
+
+    const getAudioElement = () => renderer!.root.findByType("audio");
+    const getSlider = () => renderer!.root.findByProps({ role: "slider" });
+    const getPlayButton = () => renderer!.root.findByProps({ "aria-label": "play preview" });
+
+    await act(async () => {
+      await getPlayButton().props.onClick();
+      getAudioElement().props.onPlay();
+    });
+    expect(audio.play).toHaveBeenCalledOnce();
+    expect(renderer!.root.findByProps({ "aria-label": "pause preview" })).toBeDefined();
+
+    act(() => {
+      getSlider().props.onPointerDown({
+        clientX: 150,
+        pointerId: 1,
+        pointerType: "mouse",
+        currentTarget: {
+          getBoundingClientRect: () => ({ left: 100, width: 200 }),
+          setPointerCapture: vi.fn(),
+        },
+      });
+    });
+    expect(audio.currentTime).toBe(30);
+
+    act(() => {
+      getSlider().props.onKeyDown({ key: "ArrowRight", preventDefault: vi.fn() });
+    });
+    expect(audio.currentTime).toBe(35);
+
+    act(() => {
+      getSlider().props.onPointerDown({
+        clientX: 100,
+        pointerId: 2,
+        pointerType: "touch",
+        currentTarget: { getBoundingClientRect: () => ({ left: 100, width: 200 }) },
+      });
+      getSlider().props.onPointerUp({
+        clientX: 200,
+        pointerType: "touch",
+        currentTarget: { getBoundingClientRect: () => ({ left: 100, width: 200 }) },
+      });
+    });
+    expect(audio.currentTime).toBe(60);
+
+    await act(async () => {
+      renderer!.root.findByProps({ "aria-label": "pause preview" }).props.onClick();
+      getAudioElement().props.onPause();
+    });
+    expect(audio.pause).toHaveBeenCalled();
+
+    await act(async () => {
+      renderer!.update(
+        <TrackWaveformPreview
+          active
+          file={secondFile}
+          fileId="second"
+          fallbackDuration={90}
+          title="second"
+        />,
+      );
+    });
+    expect(audio.play).toHaveBeenCalledOnce();
+    expect(audio.currentTime).toBe(0);
+    expect(revokedUrls).toContain("blob:preview-1");
+    expect(renderer!.root.findByProps({ "aria-label": "play preview" })).toBeDefined();
+
+    act(() => renderer!.unmount());
+    expect(revokedUrls).toEqual(["blob:preview-1", "blob:preview-2"]);
+  });
+
+  it("blocks every seek path while the preview is inactive", async () => {
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:inactive");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const audio = {
+      currentTime: 12,
+      paused: true,
+      src: "",
+      load: vi.fn(),
+      pause: vi.fn(),
+      play: vi.fn(),
+      removeAttribute: vi.fn(),
+    };
+    let renderer: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <TrackWaveformPreview
+          active={false}
+          file={new File(["audio"], "inactive.mp3")}
+          fileId="inactive"
+          fallbackDuration={120}
+          title="inactive"
+        />,
+        { createNodeMock: (element) => (element.type === "audio" ? audio : null) },
+      );
+    });
+    const slider = renderer!.root.findByProps({ role: "slider" });
+    expect(slider.props["aria-disabled"]).toBe(true);
+    expect(slider.props.className).toContain("cursor-not-allowed");
+    audio.currentTime = 12;
+
+    act(() => {
+      slider.props.onPointerDown({ clientX: 150, pointerType: "mouse" });
+      slider.props.onKeyDown({ key: "ArrowRight", preventDefault: vi.fn() });
+    });
+    expect(audio.currentTime).toBe(12);
+    expect(audio.play).not.toHaveBeenCalled();
+    act(() => renderer!.unmount());
+  });
+
+  it("pauses and resets its play state as soon as an active preview becomes inactive", async () => {
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:deactivated");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    class TestAudioContext {
+      async decodeAudioData() {
+        return {
+          duration: 120,
+          length: 1,
+          numberOfChannels: 1,
+          getChannelData: () => new Float32Array([1]),
+        };
+      }
+
+      async close() {}
+    }
+    vi.stubGlobal("AudioContext", TestAudioContext);
+    const audio = {
+      currentTime: 0,
+      paused: true,
+      src: "",
+      load: vi.fn(),
+      pause: vi.fn(() => {
+        audio.paused = true;
+      }),
+      play: vi.fn(async () => {
+        audio.paused = false;
+      }),
+      removeAttribute: vi.fn(),
+    };
+    const file = new File(["audio"], "deactivated.mp3");
+    let renderer: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <TrackWaveformPreview
+          active
+          file={file}
+          fileId="deactivated"
+          fallbackDuration={120}
+          title="deactivated"
+        />,
+        { createNodeMock: (element) => (element.type === "audio" ? audio : null) },
+      );
+    });
+    await act(async () => {
+      await renderer!.root.findByProps({ "aria-label": "play preview" }).props.onClick();
+      renderer!.root.findByType("audio").props.onPlay();
+    });
+    expect(renderer!.root.findByProps({ "aria-label": "pause preview" })).toBeDefined();
+
+    await act(async () => {
+      renderer!.update(
+        <TrackWaveformPreview
+          active={false}
+          file={file}
+          fileId="deactivated"
+          fallbackDuration={120}
+          title="deactivated"
+        />,
+      );
+    });
+    expect(audio.pause).toHaveBeenCalled();
+    expect(renderer!.root.findByProps({ "aria-label": "play preview" })).toBeDefined();
+    expect(renderer!.root.findByProps({ role: "slider" }).props["aria-disabled"]).toBe(true);
+    act(() => renderer!.unmount());
+  });
+
+  it("marks missing media duration unavailable without constructing a decoder", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:unknown-duration");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const construct = vi.fn();
+    class TestAudioContext {
+      constructor() {
+        construct();
+      }
+    }
+    vi.stubGlobal("AudioContext", TestAudioContext);
+    const audio = {
+      currentTime: 0,
+      paused: true,
+      src: "",
+      load: vi.fn(),
+      pause: vi.fn(),
+      play: vi.fn(),
+      removeAttribute: vi.fn(),
+    };
+    let renderer: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <TrackWaveformPreview
+          active
+          file={new File(["audio"], "unknown-duration.mp3")}
+          fileId="unknown-duration"
+          fallbackDuration={0}
+          title="unknown duration"
+        />,
+        { createNodeMock: (element) => (element.type === "audio" ? audio : null) },
+      );
+    });
+    expect(renderer!.root.findByType("section").props["data-waveform-status"]).toBe("loading");
+    expect(construct).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(5_000);
+    });
+    expect(renderer!.root.findByType("section").props["data-waveform-status"]).toBe("unavailable");
+    expect(construct).not.toHaveBeenCalled();
+    act(() => renderer!.unmount());
+  });
+
+  it("never carries a known duration into a new unknown-duration file", async () => {
+    vi.spyOn(URL, "createObjectURL").mockImplementation((file) => `blob:${(file as File).name}`);
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const construct = vi.fn();
+    class TestAudioContext {
+      constructor() {
+        construct();
+      }
+
+      async decodeAudioData() {
+        return {
+          duration: 60,
+          length: 1,
+          numberOfChannels: 1,
+          getChannelData: () => new Float32Array([1]),
+        };
+      }
+
+      async close() {}
+    }
+    vi.stubGlobal("AudioContext", TestAudioContext);
+    const audio = {
+      currentTime: 0,
+      paused: true,
+      src: "",
+      load: vi.fn(),
+      pause: vi.fn(),
+      play: vi.fn(),
+      removeAttribute: vi.fn(),
+    };
+    const knownFile = new File(["known"], "known.mp3");
+    const unknownFile = new File(["unknown"], "unknown.mp3");
+    let renderer: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <TrackWaveformPreview
+          active
+          file={knownFile}
+          fileId="known"
+          fallbackDuration={60}
+          title="known"
+        />,
+        { createNodeMock: (element) => (element.type === "audio" ? audio : null) },
+      );
+    });
+    expect(construct).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      renderer!.root.findByType("audio").props.onLoadedMetadata({
+        currentTarget: { duration: 60 },
+      });
+    });
+    expect(construct).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      renderer!.update(
+        <TrackWaveformPreview
+          active
+          file={unknownFile}
+          fileId="unknown"
+          fallbackDuration={0}
+          title="unknown"
+        />,
+      );
+    });
+    expect(construct).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      renderer!.root.findByType("audio").props.onLoadedMetadata({
+        currentTarget: { duration: 60 },
+      });
+    });
+    expect(construct).toHaveBeenCalledTimes(2);
+    act(() => renderer!.unmount());
+  });
+});
