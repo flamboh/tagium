@@ -142,7 +142,9 @@ export default function AlbumSidebar({
               className={
                 looseTracks.length === 0 && activeDrag?.type === "track"
                   ? "min-h-12 shrink-0"
-                  : "shrink-0"
+                  : looseTracks.length === 0
+                    ? "min-h-0 shrink-0"
+                    : "shrink-0"
               }
             >
               {looseTracks.map((track) => (
