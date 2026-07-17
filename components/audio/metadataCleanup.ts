@@ -16,7 +16,7 @@ export interface MetadataCleanupSuggestion {
   afterTitle: string;
   beforeFilename: string;
   afterFilename: string;
-  reasons: ("artist" | "label" | "spacing")[];
+  reasons: ("artist" | "album" | "label" | "spacing")[];
 }
 
 export interface MetadataCleanupUndoEntry {
@@ -62,23 +62,60 @@ const removeMatchingArtistPrefix = (title: string, artists: string[]) => {
   return normalizedTitle.slice(normalizedPrefix.length).trim();
 };
 
-const removeTrailingLabels = (title: string) => {
+const removeTrailingNoise = (title: string, albumTitle?: string) => {
   let nextTitle = title.trim();
-  let removed = false;
+  let removedAlbum = false;
+  let removedLabel = false;
+  const comparableAlbum = albumTitle ? normalizeComparable(albumTitle) : "";
 
   while (true) {
-    const match = nextTitle.match(/\s*[([]([^\])]+)[\])]\s*$/);
-    if (!match || !removableLabels.includes(normalizeComparable(match[1]) as never)) break;
-    nextTitle = nextTitle.slice(0, match.index).trim();
-    removed = true;
+    const annotation = nextTitle.match(/\(([^()]*)\)\s*$/) ?? nextTitle.match(/\[([^\]]*)\]\s*$/);
+    const annotationValue = annotation?.[1];
+    const annotationRemainder = annotation ? nextTitle.slice(0, annotation.index).trim() : "";
+
+    if (
+      annotationValue !== undefined &&
+      annotationRemainder &&
+      comparableAlbum &&
+      normalizeComparable(annotationValue) === comparableAlbum
+    ) {
+      nextTitle = annotationRemainder;
+      removedAlbum = true;
+      continue;
+    }
+    if (
+      annotation &&
+      annotationValue !== undefined &&
+      annotationRemainder &&
+      removableLabels.includes(normalizeComparable(annotationValue) as never)
+    ) {
+      nextTitle = annotationRemainder;
+      removedLabel = true;
+      continue;
+    }
+
+    let albumRemainder = "";
+    if (comparableAlbum) {
+      for (const separator of nextTitle.matchAll(/\s+[-–—]\s+/g)) {
+        const suffix = nextTitle.slice(separator.index + separator[0].length);
+        if (normalizeComparable(suffix) === comparableAlbum) {
+          albumRemainder = nextTitle.slice(0, separator.index).trim();
+          break;
+        }
+      }
+    }
+    if (!albumRemainder) break;
+    nextTitle = albumRemainder;
+    removedAlbum = true;
   }
 
-  return { title: nextTitle, removed };
+  return { title: nextTitle, removedAlbum, removedLabel };
 };
 
 export function suggestTitleCleanup(
   title: string,
   artists: string[],
+  albumTitle?: string,
 ): Pick<MetadataCleanupSuggestion, "afterTitle" | "reasons"> | null {
   const trimmedTitle = title.trim();
   if (!trimmedTitle) return null;
@@ -87,9 +124,10 @@ export function suggestTitleCleanup(
   let nextTitle = removeMatchingArtistPrefix(trimmedTitle, artists);
   if (nextTitle !== trimmedTitle) reasons.push("artist");
 
-  const withoutLabels = removeTrailingLabels(nextTitle);
-  if (withoutLabels.removed) reasons.push("label");
-  nextTitle = withoutLabels.title;
+  const withoutNoise = removeTrailingNoise(nextTitle, albumTitle);
+  if (withoutNoise.removedAlbum) reasons.push("album");
+  if (withoutNoise.removedLabel) reasons.push("label");
+  nextTitle = withoutNoise.title;
 
   const normalizedSpacing = nextTitle.replace(/\s+/g, " ").trim();
   if (normalizedSpacing !== nextTitle) reasons.push("spacing");
@@ -108,8 +146,12 @@ export function findMetadataCleanupSuggestions(
     if (candidateTrackIds && !candidateTrackIds.has(file.id)) return [];
     if (!file.metadata) return [];
 
-    const albumArtist = albums.find((album) => album.trackIds.includes(file.id))?.artist ?? "";
-    const cleanup = suggestTitleCleanup(file.metadata.title, [file.metadata.artist, albumArtist]);
+    const album = albums.find((candidate) => candidate.trackIds.includes(file.id));
+    const cleanup = suggestTitleCleanup(
+      file.metadata.title,
+      [file.metadata.artist, album?.artist ?? ""],
+      album?.title,
+    );
     if (!cleanup) return [];
 
     return [
