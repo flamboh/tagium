@@ -1,6 +1,21 @@
 {
   "$schema": "https://react.doctor/schema/config.json",
   "ignore": {
-    "files": [".repos/**"]
+    "files": [".repos/**"],
+    "overrides": [
+      {
+        "files": [
+          "server/api/dev/config.get.ts",
+          "server/api/dev/config.post.ts",
+          "server/api/dev/fault.post.ts",
+          "server/middleware/01-canonical-origin.ts"
+        ],
+        "rules": ["deslop/unused-file"]
+      },
+      {
+        "files": ["server/api/track-metadata.get.ts"],
+        "rules": ["deslop/unused-export"]
+      }
+    ]
   }
 }

@@ -1,7 +1,6 @@
 import { Effect, Schema } from "effect";
 import { AudioDecodeError, toPublicAudioError } from "./audioErrors";
 import { runAudioEffectWithoutServices } from "./audioRuntime";
-import type { ImportedAlbumMetadata } from "./types";
 
 const urlStringSchema = Schema.String.pipe(
   Schema.refine((value): value is string => {
@@ -52,11 +51,3 @@ export const decodePlaylist = async (input: unknown, providerName: string) => {
     throw toPublicAudioError(error);
   }
 };
-
-export const toImportedAlbumMetadata = (playlist: Playlist): ImportedAlbumMetadata => ({
-  title: playlist.title,
-  artist: playlist.artist,
-  genre: playlist.genre,
-  year: playlist.year,
-  coverUrl: playlist.coverUrl,
-});

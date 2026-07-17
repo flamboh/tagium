@@ -1,5 +1,3 @@
-export const CANONICAL_ORIGIN = "https://tagium.app";
-
 const redirectHostnames = new Set(["tagium.oli.boo", "www.tagium.app"]);
 
 export const getCanonicalRedirectUrl = (requestUrl: string) => {
