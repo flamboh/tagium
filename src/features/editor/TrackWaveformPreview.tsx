@@ -1,7 +1,7 @@
 "use client";
 
 import { Pause, Play } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +34,8 @@ export default function TrackWaveformPreview({
   title,
 }: TrackWaveformPreviewProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const sourceGenerationRef = useRef(0);
+  const mediaGenerationRef = useRef<number | null>(null);
   const dragRef = useRef({ active: false, startX: 0, moved: false });
   const [waveform, setWaveform] = useState<WaveformPreviewData | null>(null);
   const [waveformStatus, setWaveformStatus] = useState<WaveformStatus>("idle");
@@ -56,31 +58,43 @@ export default function TrackWaveformPreview({
   const decodeDuration =
     normalizePreviewDuration(fallbackDuration) || normalizePreviewDuration(currentMediaDuration);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (active) return;
     const audio = audioRef.current;
     audio?.pause();
+    if (audio) audio.currentTime = 0;
     setPlaying(false);
+    setCurrentTime(0);
   }, [active]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    sourceGenerationRef.current += 1;
     const audio = audioRef.current;
+    audio?.pause();
+    if (audio) audio.currentTime = 0;
     setPlaying(false);
     setCurrentTime(0);
     setMediaDuration(null);
     setPlaybackUnavailable(false);
     setWaveform(null);
     setWaveformStatus(file ? "loading" : "idle");
+  }, [file, fileId]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
 
     if (!file || !audio) {
       return;
     }
 
     const objectUrl = URL.createObjectURL(file);
+    const generation = sourceGenerationRef.current;
+    mediaGenerationRef.current = generation;
     audio.currentTime = 0;
     audio.src = objectUrl;
     audio.load();
     return () => {
+      if (mediaGenerationRef.current === generation) mediaGenerationRef.current = null;
       audio.pause();
       audio.removeAttribute("src");
       audio.load();
@@ -90,11 +104,11 @@ export default function TrackWaveformPreview({
 
   useEffect(() => {
     if (!file) return;
+    const generation = sourceGenerationRef.current;
     if (decodeDuration === 0) {
-      const timeoutId = globalThis.setTimeout(
-        () => setWaveformStatus("unavailable"),
-        METADATA_WAIT_TIMEOUT_MS,
-      );
+      const timeoutId = globalThis.setTimeout(() => {
+        if (sourceGenerationRef.current === generation) setWaveformStatus("unavailable");
+      }, METADATA_WAIT_TIMEOUT_MS);
       return () => globalThis.clearTimeout(timeoutId);
     }
 
@@ -102,12 +116,13 @@ export default function TrackWaveformPreview({
     setWaveformStatus("loading");
     void loadWaveformPreview(file, controller.signal, decodeDuration).then(
       (preview) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || sourceGenerationRef.current !== generation) return;
         setWaveform(preview);
         setWaveformStatus("ready");
       },
       (error: unknown) => {
         if (
+          sourceGenerationRef.current !== generation ||
           controller.signal.aborted ||
           (error instanceof DOMException && error.name === "AbortError")
         ) {
@@ -190,28 +205,37 @@ export default function TrackWaveformPreview({
         ref={audioRef}
         preload="metadata"
         onLoadedMetadata={(event) =>
+          mediaGenerationRef.current === sourceGenerationRef.current &&
           setMediaDuration({
             fileId,
             duration: normalizePreviewDuration(event.currentTarget.duration),
           })
         }
         onDurationChange={(event) =>
+          mediaGenerationRef.current === sourceGenerationRef.current &&
           setMediaDuration({
             fileId,
             duration: normalizePreviewDuration(event.currentTarget.duration),
           })
         }
-        onTimeUpdate={(event) =>
-          setCurrentTime(normalizePreviewDuration(event.currentTarget.currentTime))
-        }
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
+        onTimeUpdate={(event) => {
+          if (mediaGenerationRef.current !== sourceGenerationRef.current) return;
+          setCurrentTime(normalizePreviewDuration(event.currentTarget.currentTime));
+        }}
+        onPlay={() => {
+          if (mediaGenerationRef.current === sourceGenerationRef.current) setPlaying(true);
+        }}
+        onPause={() => {
+          if (mediaGenerationRef.current === sourceGenerationRef.current) setPlaying(false);
+        }}
         onEnded={(event) => {
+          if (mediaGenerationRef.current !== sourceGenerationRef.current) return;
           event.currentTarget.currentTime = 0;
           setPlaying(false);
           setCurrentTime(0);
         }}
         onError={() => {
+          if (mediaGenerationRef.current !== sourceGenerationRef.current) return;
           setPlaybackUnavailable(true);
           if (decodeDuration === 0) setWaveformStatus("unavailable");
         }}

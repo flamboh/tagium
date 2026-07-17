@@ -46,6 +46,7 @@ import { METADATA_EDITOR_FORM_LAYOUT } from "@/features/editor/trackMetadataEdit
 type LoadedTrack = TagiumFile & { metadata: AudioMetadata };
 
 interface TrackMetadataEditorProps {
+  previewActive: boolean;
   selectedFile: TagiumFile | null;
   selectedFileId: string | null;
   register: UseFormRegister<AudioMetadata>;
@@ -892,7 +893,7 @@ export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
               focusedTitleFileIdRef={focusedTitleFileIdRef}
               editorMode={editorMode}
               onEditorModeChange={setEditorMode}
-              previewActive={trackIsSelected}
+              previewActive={trackIsSelected && props.previewActive}
             />
           ) : (
             <PendingTrackMetadataEditor

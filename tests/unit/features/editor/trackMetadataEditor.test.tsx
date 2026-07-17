@@ -81,12 +81,14 @@ function EditorHarness({
   advancedMetadata = false,
   albumArtistLinked = true,
   inAlbum = false,
+  previewActive = true,
 }: {
   selectedFile?: TagiumFile | null;
   syncFilenames?: boolean;
   advancedMetadata?: boolean;
   albumArtistLinked?: boolean;
   inAlbum?: boolean;
+  previewActive?: boolean;
 }) {
   const { register, control, getValues, setError, clearErrors, setFocus } = useForm<AudioMetadata>({
     defaultValues: metadata,
@@ -95,6 +97,7 @@ function EditorHarness({
   return (
     <TooltipProvider>
       <TrackMetadataEditor
+        previewActive={previewActive}
         selectedFile={selectedFile}
         selectedFileId={selectedFile?.id ?? null}
         register={register}
@@ -260,6 +263,15 @@ describe("track metadata editor form seam", () => {
     expect(markup).toContain('role="slider"');
     expect(markup).toContain('aria-label="track position"');
     expect(markup).not.toContain(" controls=");
+  });
+
+  it("keeps selection rendered but disables playback when its editor is inaccessible", () => {
+    const markup = renderToStaticMarkup(<EditorHarness previewActive={false} />);
+
+    expect(markup).toContain('aria-label="preview track-1.mp3"');
+    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*aria-label="play preview"/);
+    expect(markup).toContain('aria-label="track position"');
+    expect(markup).toContain('aria-disabled="true"');
   });
 
   it("describes a synced filename error from the title field", () => {

@@ -223,6 +223,7 @@ describe("track waveform transport", () => {
       renderer!.root.findByType("audio").props.onPlay();
     });
     expect(renderer!.root.findByProps({ "aria-label": "pause preview" })).toBeDefined();
+    audio.currentTime = 42;
 
     await act(async () => {
       renderer!.update(
@@ -236,8 +237,185 @@ describe("track waveform transport", () => {
       );
     });
     expect(audio.pause).toHaveBeenCalled();
+    expect(audio.currentTime).toBe(0);
     expect(renderer!.root.findByProps({ "aria-label": "play preview" })).toBeDefined();
     expect(renderer!.root.findByProps({ role: "slider" }).props["aria-disabled"]).toBe(true);
+    act(() => renderer!.unmount());
+  });
+
+  it("resets an active A to B switch in layout phase before passive source cleanup", async () => {
+    const phases: string[] = [];
+    vi.spyOn(URL, "createObjectURL").mockImplementation((file) => `blob:${(file as File).name}`);
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => phases.push("revoke"));
+    let decodeCount = 0;
+    let resolveSecondDecode!: () => void;
+    class TestAudioContext {
+      decodeAudioData() {
+        decodeCount += 1;
+        const decoded = {
+          duration: 60,
+          length: 1,
+          numberOfChannels: 1,
+          getChannelData: () => new Float32Array([1]),
+        };
+        if (decodeCount === 1) return Promise.resolve(decoded);
+        return new Promise<typeof decoded>((resolve) => {
+          resolveSecondDecode = () => resolve(decoded);
+        });
+      }
+
+      async close() {}
+    }
+    vi.stubGlobal("AudioContext", TestAudioContext);
+    const audio = {
+      currentTime: 0,
+      paused: false,
+      src: "",
+      load: vi.fn(),
+      pause: vi.fn(() => {
+        phases.push("pause");
+        audio.paused = true;
+      }),
+      play: vi.fn(),
+      removeAttribute: vi.fn(),
+    };
+    const firstFile = new File(["first"], "phase-first.mp3");
+    const secondFile = new File(["second"], "phase-second.mp3");
+    let renderer: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <TrackWaveformPreview
+          active
+          file={firstFile}
+          fileId="phase-first"
+          fallbackDuration={60}
+          title="first"
+        />,
+        { createNodeMock: (element) => (element.type === "audio" ? audio : null) },
+      );
+    });
+    act(() => {
+      const audioElement = renderer!.root.findByType("audio");
+      audioElement.props.onPlay();
+      audioElement.props.onTimeUpdate({ currentTarget: { currentTime: 37 } });
+    });
+    expect(renderer!.root.findByProps({ role: "slider" }).props["aria-valuenow"]).toBe(37);
+    phases.length = 0;
+
+    await act(async () => {
+      renderer!.update(
+        <TrackWaveformPreview
+          active
+          file={secondFile}
+          fileId="phase-second"
+          fallbackDuration={60}
+          title="second"
+        />,
+      );
+    });
+
+    expect(phases[0]).toBe("pause");
+    expect(phases.indexOf("pause")).toBeLessThan(phases.indexOf("revoke"));
+    expect(audio.currentTime).toBe(0);
+    expect(renderer!.root.findByProps({ "aria-label": "play preview" })).toBeDefined();
+    expect(renderer!.root.findByProps({ role: "slider" }).props["aria-valuenow"]).toBe(0);
+    expect(renderer!.root.findByType("section").props["data-waveform-status"]).toBe("loading");
+    expect(
+      renderer!.root.findAll(
+        (node) => node.type === "svg" && node.props.preserveAspectRatio === "none",
+      ),
+    ).toHaveLength(0);
+
+    await act(async () => {
+      resolveSecondDecode();
+    });
+    act(() => renderer!.unmount());
+  });
+
+  it("discards a deferred decode when the File changes under the same track id", async () => {
+    vi.spyOn(URL, "createObjectURL").mockImplementation((file) => `blob:${(file as File).name}`);
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const decodeResolvers: Array<() => void> = [];
+    class TestAudioContext {
+      async decodeAudioData() {
+        await new Promise<void>((resolve) => {
+          decodeResolvers.push(resolve);
+        });
+        return {
+          duration: 60,
+          length: 1,
+          numberOfChannels: 1,
+          getChannelData: () => new Float32Array([1]),
+        };
+      }
+
+      async close() {}
+    }
+    vi.stubGlobal("AudioContext", TestAudioContext);
+    const audio = {
+      currentTime: 0,
+      paused: true,
+      src: "",
+      load: vi.fn(),
+      pause: vi.fn(),
+      play: vi.fn(),
+      removeAttribute: vi.fn(),
+    };
+    const firstFile = new File(["first"], "same-id-first.mp3");
+    const secondFile = new File(["second"], "same-id-second.mp3");
+    let renderer: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <TrackWaveformPreview
+          active
+          file={firstFile}
+          fileId="stable-id"
+          fallbackDuration={60}
+          title="first"
+        />,
+        { createNodeMock: (element) => (element.type === "audio" ? audio : null) },
+      );
+    });
+    await vi.waitFor(() => expect(decodeResolvers).toHaveLength(1));
+
+    await act(async () => {
+      renderer!.update(
+        <TrackWaveformPreview
+          active
+          file={secondFile}
+          fileId="stable-id"
+          fallbackDuration={60}
+          title="second"
+        />,
+      );
+    });
+    expect(renderer!.root.findByType("section").props["data-waveform-status"]).toBe("loading");
+    expect(
+      renderer!.root.findAll(
+        (node) => node.type === "svg" && node.props.preserveAspectRatio === "none",
+      ),
+    ).toHaveLength(0);
+
+    await act(async () => {
+      decodeResolvers.shift()?.();
+    });
+    await vi.waitFor(() => expect(decodeResolvers).toHaveLength(1));
+    expect(renderer!.root.findByType("section").props["data-waveform-status"]).toBe("loading");
+    expect(
+      renderer!.root.findAll(
+        (node) => node.type === "svg" && node.props.preserveAspectRatio === "none",
+      ),
+    ).toHaveLength(0);
+
+    await act(async () => {
+      decodeResolvers.shift()?.();
+    });
+    expect(renderer!.root.findByType("section").props["data-waveform-status"]).toBe("ready");
+    expect(
+      renderer!.root.findAll(
+        (node) => node.type === "svg" && node.props.preserveAspectRatio === "none",
+      ),
+    ).toHaveLength(2);
     act(() => renderer!.unmount());
   });
 
