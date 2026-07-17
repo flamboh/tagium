@@ -1,24 +1,8 @@
 "use client";
 
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { useRef, useState } from "react";
-import {
-  DndContext,
-  DragOverlay,
-  type DragEndEvent,
-  type DragOverEvent,
-  type DragStartEvent,
-  KeyboardSensor,
-  MouseSensor,
-  useSensor,
-  useSensors,
-  TouchSensor,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { DndContext, DragOverlay } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AlbumSidebarEmptyState } from "./AlbumSidebarEmptyState";
@@ -29,21 +13,15 @@ import {
   SortableTrackRow,
 } from "./AlbumSidebarDnd";
 import {
-  albumIdFromDrop,
   albumContainerId,
   albumItemId,
-  dragStartY,
-  isCenteredLooseDrop,
   LOOSE_APPEND_CONTAINER_ID,
   LOOSE_CONTAINER_ID,
-  rowPlacement,
-  sidebarCollisionDetection,
   trackItemId,
-  type SidebarDragData,
-  type SidebarDropData,
 } from "./sidebarDnd";
 import type { AlbumGroup, TagiumFile } from "./types";
 import { isTrackReadyForDownload } from "./downloadLibrary";
+import { useAlbumSidebarDragController } from "./useAlbumSidebarDragController";
 
 interface AlbumSidebarProps {
   albums: AlbumGroup[];
@@ -77,22 +55,11 @@ interface AlbumSidebarProps {
   onAudioUpload: (files: File[]) => void;
 }
 
-const isFileDrag = (event: React.DragEvent) => event.dataTransfer.types.includes("Files");
-
 const isRetryableError = (track: TagiumFile) =>
   Boolean(track.downloadRequest) &&
   (track.downloadStatus === "error" ||
     track.downloadStatus === "canceled" ||
     track.status === "error");
-
-const handleFileDrop = (event: React.DragEvent, onUpload: (files: File[]) => void) => {
-  const droppedFiles = Array.from(event.dataTransfer.files);
-  if (droppedFiles.length === 0) return;
-
-  event.preventDefault();
-  event.stopPropagation();
-  onUpload(droppedFiles);
-};
 
 export default function AlbumSidebar({
   albums,
@@ -116,134 +83,31 @@ export default function AlbumSidebar({
   onReorderAlbums,
   onAudioUpload,
 }: AlbumSidebarProps) {
-  const [activeDrag, setActiveDrag] = useState<SidebarDragData | null>(null);
-  const dragStartYRef = useRef<number | null>(null);
-  const recentLooseTargetRef = useRef<{ trackId: string; expiresAt: number } | null>(null);
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
   const filesById = new Map(files.map((file) => [file.id, file]));
+  const looseTracks = looseTrackIds
+    .map((trackId) => filesById.get(trackId))
+    .filter((track): track is TagiumFile => Boolean(track));
+  const { activeDrag, dndContextProps, libraryFileDropProps, albumFileDropProps } =
+    useAlbumSidebarDragController({
+      albums,
+      looseTrackIds,
+      onMoveTrackToAlbum,
+      onMoveTrackToLoose,
+      onPromptCreateAlbumFromLooseTracks,
+      onReorderAlbums,
+      onAudioUpload,
+      onUploadToAlbum,
+    });
   const activeTrack = activeDrag?.type === "track" ? filesById.get(activeDrag.trackId) : undefined;
   const activeAlbum =
     activeDrag?.type === "album"
       ? albums.find((album) => album.id === activeDrag.albumId)
       : undefined;
-  const looseTracks = looseTrackIds
-    .map((trackId) => filesById.get(trackId))
-    .filter((track): track is TagiumFile => Boolean(track));
 
   const selectedTone = (trackId: string) => {
     if (selectedFileIds.has(trackId)) return "primary";
     if (selectedFileId === trackId) return "secondary";
     return null;
-  };
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveDrag((event.active.data.current as SidebarDragData | undefined) ?? null);
-    recentLooseTargetRef.current = null;
-    dragStartYRef.current = dragStartY(event.activatorEvent);
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const active = event.active.data.current as SidebarDragData | undefined;
-    const over = event.over?.data.current as SidebarDropData | undefined;
-    if (active?.type !== "track") return;
-    if (active.container !== "loose") return;
-    if (over?.type !== "track") return;
-    if (over.container !== "loose") return;
-    if (over.trackId === active.trackId) return;
-    recentLooseTargetRef.current = { trackId: over.trackId, expiresAt: Date.now() + 700 };
-  };
-
-  const trackIdsForDrop = (drop: Extract<SidebarDropData, { type: "track" }>) => {
-    if (drop.container === "loose") return looseTrackIds;
-
-    const album = albums.find((entry) => entry.id === drop.albumId);
-    if (album) return album.trackIds;
-    return [];
-  };
-
-  const handleAlbumDragEnd = (active: SidebarDragData, over: SidebarDropData) => {
-    if (active.type !== "album") return;
-
-    const targetAlbumId = albumIdFromDrop(over);
-
-    if (targetAlbumId && targetAlbumId !== active.albumId) {
-      const sourceIndex = albums.findIndex((album) => album.id === active.albumId);
-      const targetIndex = albums.findIndex((album) => album.id === targetAlbumId);
-      if (sourceIndex < 0 || targetIndex < 0) return;
-      onReorderAlbums(active.albumId, targetIndex);
-    }
-  };
-
-  const handleTrackDragEnd = (
-    event: DragEndEvent,
-    active: SidebarDragData,
-    over: SidebarDropData,
-  ) => {
-    if (active.type !== "track") return;
-
-    if (over.type === "track") {
-      if (over.trackId === active.trackId) return;
-
-      const placement = rowPlacement(
-        event,
-        active.trackId,
-        over.trackId,
-        trackIdsForDrop(over),
-        dragStartYRef.current,
-      );
-      if (over.container === "loose") {
-        if (active.container === "loose" && isCenteredLooseDrop(event, dragStartYRef.current)) {
-          onPromptCreateAlbumFromLooseTracks(active.trackId, over.trackId);
-          return;
-        }
-        onMoveTrackToLoose(active.trackId, placement, over.trackId);
-        return;
-      }
-
-      onMoveTrackToAlbum(active.trackId, over.albumId, placement, over.trackId);
-      return;
-    }
-
-    if (over.type === "album") {
-      onMoveTrackToAlbum(active.trackId, over.albumId, "append");
-      return;
-    }
-
-    if (over.type === "container" && over.container === "album") {
-      onMoveTrackToAlbum(active.trackId, over.albumId, "append");
-      return;
-    }
-
-    if (over.type === "container" && over.container === "loose") {
-      const recentLooseTarget = recentLooseTargetRef.current;
-      if (
-        active.container === "loose" &&
-        event.over?.id !== LOOSE_APPEND_CONTAINER_ID &&
-        recentLooseTarget &&
-        recentLooseTarget.expiresAt > Date.now()
-      ) {
-        onPromptCreateAlbumFromLooseTracks(active.trackId, recentLooseTarget.trackId);
-        return;
-      }
-      onMoveTrackToLoose(active.trackId, "append");
-    }
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const active = event.active.data.current as SidebarDragData | undefined;
-    const over = event.over?.data.current as SidebarDropData | undefined;
-
-    if (active && over) {
-      handleAlbumDragEnd(active, over);
-      handleTrackDragEnd(event, active, over);
-    }
-    dragStartYRef.current = null;
-    recentLooseTargetRef.current = null;
-    setActiveDrag(null);
   };
 
   if (albums.length === 0 && looseTracks.length === 0) {
@@ -261,26 +125,10 @@ export default function AlbumSidebar({
         </Button>
       </div>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={sidebarCollisionDetection}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragCancel={() => {
-          dragStartYRef.current = null;
-          recentLooseTargetRef.current = null;
-          setActiveDrag(null);
-        }}
-        onDragEnd={handleDragEnd}
-      >
+      <DndContext {...dndContextProps}>
         <div
           className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col"
-          onDragOver={(event) => {
-            if (!isFileDrag(event)) return;
-            event.preventDefault();
-            event.dataTransfer.dropEffect = "copy";
-          }}
-          onDrop={(event) => handleFileDrop(event, onAudioUpload)}
+          {...libraryFileDropProps}
         >
           <SortableContext
             items={looseTracks.map((track) => trackItemId(track.id))}
@@ -322,6 +170,7 @@ export default function AlbumSidebar({
                   const file = filesById.get(trackId);
                   return file ? isTrackReadyForDownload(file) : false;
                 });
+              const fileDropProps = albumFileDropProps(album.id);
               return (
                 <SortableAlbumCard
                   key={album.id}
@@ -331,15 +180,7 @@ export default function AlbumSidebar({
                   onSelect={(event) => onSelectAlbum(album.id, event)}
                   onEdit={() => onEditAlbum(album.id)}
                   onDownload={() => onDownloadAlbum(album.id)}
-                  onFileDragOver={(event) => {
-                    if (!isFileDrag(event)) return;
-                    event.preventDefault();
-                    event.stopPropagation();
-                    event.dataTransfer.dropEffect = "copy";
-                  }}
-                  onFileDrop={(event) =>
-                    handleFileDrop(event, (audioFiles) => onUploadToAlbum(album.id, audioFiles))
-                  }
+                  {...fileDropProps}
                 >
                   <SortableContext
                     items={album.trackIds.map((trackId) => trackItemId(trackId))}

@@ -1,7 +1,6 @@
 import {
   closestCorners,
   type CollisionDetection,
-  type DragEndEvent,
   pointerWithin,
   rectIntersection,
 } from "@dnd-kit/core";
@@ -33,51 +32,9 @@ export const sidebarCollisionDetection: CollisionDetection = (args) => {
   return closestCorners(args);
 };
 
-export const dragStartY = (event: Event) => {
-  const sourceEvent = event as Event & {
-    changedTouches?: TouchList;
-    clientY?: number;
-    touches?: TouchList;
-  };
-  if (sourceEvent.clientY !== undefined) return sourceEvent.clientY;
-  if (sourceEvent.touches?.[0]) return sourceEvent.touches[0].clientY;
-  if (sourceEvent.changedTouches?.[0]) return sourceEvent.changedTouches[0].clientY;
-  return null;
-};
-
 export const albumIdFromDrop = (drop: SidebarDropData) => {
   if (drop.type === "album") return drop.albumId;
   if (drop.type === "track" && drop.container === "album") return drop.albumId;
   if (drop.type === "container" && drop.container === "album") return drop.albumId;
   return null;
-};
-
-export const rowPlacement = (
-  event: DragEndEvent,
-  sourceTrackId: string,
-  targetTrackId: string,
-  trackIds: string[],
-  initialY: number | null,
-) => {
-  const rect = event.over?.rect;
-  if (!rect) return "after";
-  if (initialY === null) {
-    const sourceIndex = trackIds.indexOf(sourceTrackId);
-    const targetIndex = trackIds.indexOf(targetTrackId);
-    if (sourceIndex >= 0 && targetIndex >= 0 && sourceIndex > targetIndex) return "before";
-    if (sourceIndex < 0) return "before";
-    return "after";
-  }
-
-  const y = initialY + event.delta.y;
-  return y > rect.top + rect.height / 2 ? "after" : "before";
-};
-
-export const isCenteredLooseDrop = (event: DragEndEvent, initialY: number | null) => {
-  const rect = event.over?.rect;
-  if (!rect) return false;
-  if (initialY === null) return false;
-  const y = initialY + event.delta.y;
-  const position = (y - rect.top) / rect.height;
-  return position > 0.3 && position < 0.7;
 };
