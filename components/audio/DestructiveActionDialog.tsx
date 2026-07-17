@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-interface DestructiveActionDialogProps {
+export interface DestructiveActionDialogProps {
   open: boolean;
   itemCount: number;
   onCancel: () => void;

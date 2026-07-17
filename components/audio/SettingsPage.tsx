@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { AUDIO_BITRATE_OPTIONS } from "./settings";
 import type { AppSettings } from "./types";
 
-interface SettingsPageProps {
+export interface SettingsPageProps {
   settings: AppSettings;
   onChange: (settings: AppSettings) => void;
   onBack: () => void;
