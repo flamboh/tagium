@@ -75,6 +75,10 @@
   --secondary: color-mix(in oklab, var(--accent-a) 14%, var(--background));
 }
 
+[data-theme="dark"][data-darken-accents="false"] {
+  --sidebar: var(--accent-a);
+}
+
 [data-slot="sidebar-panel"] {
   --background: var(--sidebar);
   --foreground: var(--sidebar-foreground);

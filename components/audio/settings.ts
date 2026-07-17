@@ -34,6 +34,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   mode: "light",
   accentA: ACCENT_PRESETS[0].accentA,
   accentB: ACCENT_PRESETS[0].accentB,
+  darkenAccentsInDarkMode: true,
   wordmarkFont: "archivo-black",
   syncTrackNumbers: true,
   syncFilenames: true,
@@ -80,6 +81,7 @@ const storedAppSettingsSchema = Schema.Struct({
   ),
   accentA: accentColorWithDefault(DEFAULT_APP_SETTINGS.accentA),
   accentB: accentColorWithDefault(DEFAULT_APP_SETTINGS.accentB),
+  darkenAccentsInDarkMode: booleanWithDefault(DEFAULT_APP_SETTINGS.darkenAccentsInDarkMode),
   wordmarkFont: Schema.Literals(WORDMARK_FONT_OPTIONS).pipe(
     Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_APP_SETTINGS.wordmarkFont))),
     Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_APP_SETTINGS.wordmarkFont)),

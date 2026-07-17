@@ -28,6 +28,7 @@ export default function AudioTagger() {
     const root = document.documentElement;
     const wordmark = WORDMARK_FONT_STYLES[settings.wordmarkFont];
     root.dataset.theme = settings.mode;
+    root.dataset.darkenAccents = String(settings.darkenAccentsInDarkMode);
     root.classList.toggle("dark", settings.mode === "dark");
     root.style.setProperty("--accent-a", settings.accentA);
     root.style.setProperty("--accent-b", settings.accentB);
@@ -36,7 +37,13 @@ export default function AudioTagger() {
     root.style.setProperty("--font-wordmark", wordmark.family);
     root.style.setProperty("--wordmark-tracking", wordmark.tracking);
     root.style.setProperty("--wordmark-scale", wordmark.scale);
-  }, [settings.mode, settings.accentA, settings.accentB, settings.wordmarkFont]);
+  }, [
+    settings.mode,
+    settings.accentA,
+    settings.accentB,
+    settings.darkenAccentsInDarkMode,
+    settings.wordmarkFont,
+  ]);
   const activateEditor = useCallback(() => setActiveView("editor"), []);
   const editor = useTrackEditorSession({ library, settings });
   const exporting = useExportSession({ library, editor: editor.commands, settings });

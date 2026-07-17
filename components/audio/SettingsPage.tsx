@@ -193,6 +193,25 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
                     />
                   ))}
                 </div>
+                <div className="flex items-start gap-3 py-1">
+                  <Checkbox
+                    id="darken-accents-in-dark-mode"
+                    checked={settings.darkenAccentsInDarkMode}
+                    onCheckedChange={(checked) =>
+                      onChange({
+                        ...settings,
+                        darkenAccentsInDarkMode: checked === true,
+                      })
+                    }
+                    className="mt-0.5"
+                  />
+                  <Label htmlFor="darken-accents-in-dark-mode" className="flex flex-col gap-0.5">
+                    <span>darken accents in dark mode</span>
+                    <span className="text-xs font-normal leading-4 text-muted-foreground">
+                      blends the sidebar accent into the dark background
+                    </span>
+                  </Label>
+                </div>
               </div>
 
               <div className="flex flex-col gap-2">

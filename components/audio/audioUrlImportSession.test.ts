@@ -23,6 +23,7 @@ const settings = (audioBitrate: AppSettings["audioBitrate"]): AppSettings => ({
   mode: "light",
   accentA: "#114cbf",
   accentB: "#e93f2d",
+  darkenAccentsInDarkMode: true,
   wordmarkFont: "archivo-black",
   syncTrackNumbers: false,
   syncFilenames: false,

@@ -103,6 +103,15 @@ describe("settings", () => {
     });
   });
 
+  it("loads the dark mode accent adjustment preference", () => {
+    expect(
+      loadAppSettings(storageWith(JSON.stringify({ darkenAccentsInDarkMode: false }))),
+    ).toEqual({
+      ...DEFAULT_APP_SETTINGS,
+      darkenAccentsInDarkMode: false,
+    });
+  });
+
   it("rejects malformed functional accent colors", () => {
     expect(
       loadAppSettings(
