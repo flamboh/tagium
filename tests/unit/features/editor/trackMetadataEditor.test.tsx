@@ -189,6 +189,7 @@ function MountedEditorHarness({
       advancedMetadata
       metadataLinks={getMetadataLinkState(DEFAULT_APP_SETTINGS)}
       onPreviewMetadataChange={vi.fn()}
+      onAudioUpload={vi.fn()}
     />
   );
 }
