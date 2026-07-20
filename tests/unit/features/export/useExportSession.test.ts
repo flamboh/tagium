@@ -65,6 +65,7 @@ describe("export session", () => {
   const createHarness = (initialSettings = settings) => {
     const file: TagiumFile = {
       id: "track-1",
+      format: "mp3",
       filename: "track.mp3",
       file: new File(["audio"], "track.mp3"),
       originalFile: new File(["audio"], "track.mp3"),

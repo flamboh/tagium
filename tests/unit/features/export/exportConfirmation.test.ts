@@ -4,9 +4,11 @@ import {
   formatByteSize,
 } from "@/features/export/exportConfirmation";
 import { createLibraryState } from "@/features/library/libraryState";
-import type { AlbumGroup, AudioMetadata, TagiumFile } from "@/features/library/types";
+import type { AlbumGroup, AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
+import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 
-const settings = {
+const settings: AppSettings = {
+  ...DEFAULT_APP_SETTINGS,
   syncTrackNumbers: false,
   syncFilenames: false,
   audioBitrate: "320" as const,
@@ -17,6 +19,7 @@ const metadata = (title: string): AudioMetadata => ({
   filename: title,
   title,
   artist: "",
+  albumArtist: "",
   album: "",
   year: null,
   genre: "",
@@ -25,10 +28,15 @@ const metadata = (title: string): AudioMetadata => ({
   sampleRate: 0,
   picture: [],
   trackNumber: null,
+  discNumber: null,
+  composer: "",
+  bpm: null,
+  comment: "",
 });
 
 const track = (id: string, title: string, bytes: number): TagiumFile => ({
   id,
+  format: "mp3",
   filename: `${title}.mp3`,
   file: new File([new Uint8Array(bytes)], `${title}.mp3`),
   originalFile: new File([new Uint8Array(bytes)], `${title}.mp3`),
