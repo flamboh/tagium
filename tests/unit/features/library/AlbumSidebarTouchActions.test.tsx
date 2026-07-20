@@ -27,6 +27,7 @@ describe("track row touch actions", () => {
         <SortableTrackRow
           track={{
             id: "track",
+            format: "mp3",
             filename: "touch-track.mp3",
             status: "error",
             downloadStatus: "error",
