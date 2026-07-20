@@ -176,6 +176,7 @@ function MountedEditorHarness({
   }, [exposeForm, form]);
   return (
     <TrackMetadataEditor
+      previewActive
       selectedFile={readyTrack}
       selectedFileId={readyTrack.id}
       register={form.register}
@@ -216,6 +217,18 @@ const createFormNodeMocks = () => {
     nodes,
     createNodeMock: (element: ReactElement) => {
       if (typeof element.type !== "string") return {};
+      if (element.type === "audio") {
+        return {
+          currentTime: 0,
+          duration: 0,
+          paused: true,
+          src: "",
+          load: vi.fn(),
+          pause: vi.fn(),
+          play: vi.fn(async () => undefined),
+          removeAttribute: vi.fn(),
+        };
+      }
       const props = element.props as Record<string, unknown>;
       const node = {
         focus: vi.fn(),
