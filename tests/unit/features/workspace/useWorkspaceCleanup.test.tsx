@@ -1,6 +1,7 @@
 import { act } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { AlbumGroup, AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
+import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 
 const toastMocks = vi.hoisted(() => {
   const toast = vi.fn();
@@ -14,6 +15,7 @@ import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useWorkspaceCleanup } from "@/features/workspace/useWorkspaceCleanup";
 
 const settings: AppSettings = {
+  ...DEFAULT_APP_SETTINGS,
   syncTrackNumbers: false,
   syncFilenames: true,
   audioBitrate: "320",
@@ -24,6 +26,7 @@ const metadata = (title: string): AudioMetadata => ({
   filename: title,
   title,
   artist: "Burial",
+  albumArtist: "Burial",
   album: "Untrue",
   year: 2007,
   genre: "Electronic",
@@ -32,10 +35,15 @@ const metadata = (title: string): AudioMetadata => ({
   sampleRate: 44_100,
   picture: [],
   trackNumber: 1,
+  discNumber: null,
+  composer: "",
+  bpm: null,
+  comment: "",
 });
 
 const file = (id: string, title: string): TagiumFile => ({
   id,
+  format: "mp3",
   status: "saved",
   downloadStatus: "ready",
   filename: `${title}.mp3`,
