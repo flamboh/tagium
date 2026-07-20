@@ -22,6 +22,7 @@ import type {
   MetadataPatch,
   TagiumFile,
 } from "@/features/library/types";
+import { audioFilename, getAudioFormat } from "@/features/audio/audioFormat";
 
 type PreviewField = "filename" | "title" | "artist";
 
@@ -64,7 +65,9 @@ const applyMetadataPatch = (metadata: AudioMetadata, patch: MetadataPatch): Audi
 });
 
 const getFilenameFromPatch = (file: TagiumFile, patch: MetadataPatch) =>
-  hasOwn(patch, "filename") && patch.filename ? `${patch.filename}.mp3` : file.filename;
+  hasOwn(patch, "filename") && patch.filename
+    ? audioFilename(patch.filename, getAudioFormat(file))
+    : file.filename;
 
 const withPendingMetadataPatch = (
   file: TagiumFile,
@@ -261,7 +264,9 @@ export const useTrackEditorSession = ({
             ? withPendingMetadataPatch(
                 {
                   ...file,
-                  filename: newTags.filename ? `${newTags.filename}.mp3` : file.filename,
+                  filename: newTags.filename
+                    ? audioFilename(newTags.filename, getAudioFormat(file))
+                    : file.filename,
                   metadata,
                   status: "pending" as const,
                 },
@@ -306,7 +311,9 @@ export const useTrackEditorSession = ({
                     bitrate: file.metadata?.bitrate || 0,
                     sampleRate: file.metadata?.sampleRate || 0,
                   },
-                  filename: newTags.filename ? `${newTags.filename}.mp3` : file.filename,
+                  filename: newTags.filename
+                    ? audioFilename(newTags.filename, getAudioFormat(file))
+                    : file.filename,
                   downloadError: message,
                 },
                 createSubmittedMetadataPatch(newTags),

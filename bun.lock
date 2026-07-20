@@ -17,7 +17,6 @@
         "fflate": "^0.8.2",
         "filenamify": "^7.0.1",
         "lucide-react": "^0.542.0",
-        "mp3tag.js": "^3.14.1",
         "posthog-js": "^1.399.1",
         "radix-ui": "^1.4.3",
         "react": "19.1.0",
@@ -998,8 +997,6 @@
     "minizlib": ["minizlib@3.0.2", "", { "dependencies": { "minipass": "7.1.2" } }, "sha512-oG62iEk+CYt5Xj2YqI5Xi9xWUeZhDI8jjQmC5oThVH5JGCTgIjr7ciJDzC7MBzYd//WvR1OTmP5Q38Q8ShQtVA=="],
 
     "mkdirp": ["mkdirp@3.0.1", "", { "bin": { "mkdirp": "dist/cjs/src/bin.js" } }, "sha512-+NsyUUAZDmo6YVHzL/stxSu3t9YS1iljliy3BSDrXJ/dkn1KYdmtZODGGjLcc9XLgVVpH4KshHB8XmZgMhaBXg=="],
-
-    "mp3tag.js": ["mp3tag.js@3.14.1", "", {}, "sha512-3yTDNlIagK76KXhwiHQwFCeKUzOWEmGNzo1KRKV5xk6+l4tsCl5/PO8K4mn/xh8qg8QnR9MjkYmZYaPEea5/2g=="],
 
     "mrmime": ["mrmime@2.0.1", "", {}, "sha512-Y3wQdFg2Va6etvQ5I82yUhGdsKrcYox6p7FfL1LbK2J4V01F9TGlepTIhnK24t7koZibmg82KGglhA1XK5IsLQ=="],
 

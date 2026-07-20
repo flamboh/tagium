@@ -191,6 +191,9 @@ export default function AlbumMetadataDialog({
                     <Input
                       id="album-year"
                       type="number"
+                      min={0}
+                      max={9999}
+                      step={1}
                       value={draft.year ?? ""}
                       onChange={(event) =>
                         onChange({

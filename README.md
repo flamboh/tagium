@@ -1,6 +1,6 @@
 # Tagium
 
-mp3tag editing for music fans who want to save their favorite tracks locally.
+Local, lossless metadata editing for MP3, FLAC, and M4A music files.
 
 [Open Tagium](https://tagium.app)
 

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { Effect } from "effect";
 import { downloadFromCobalt, runAudioBackendEffect } from "@/features/audio/audioBackend";
 import { runAudioEffectWithoutServices } from "@/features/audio/audioRuntime";
 import type { CobaltAudioDownloadRequest } from "@/features/import/cobaltAudio";
@@ -8,6 +9,8 @@ import {
   applyCobaltAudioMetadata,
   validateLocalAudioPlan,
 } from "@/features/import/localAudioProcessor";
+import { inspectAudioFile } from "@/features/audio/metadataEngine/engine";
+import { validMp3Bytes } from "../../support/mp3TestFixtures";
 
 const runCobaltDownload = (request: CobaltAudioDownloadRequest) =>
   runAudioBackendEffect(downloadFromCobalt(request));
@@ -408,7 +411,7 @@ describe("CobaltAudio download", () => {
     ).rejects.toThrow("malformed cobalt local processing message.");
   });
 
-  it("processes local audio with cover art through the worker and mp3tag", async () => {
+  it("processes local audio with cover art through the bounded metadata engine", async () => {
     const fetchedUrls: string[] = [];
     const workerMessages: unknown[] = [];
 
@@ -456,7 +459,7 @@ describe("CobaltAudio download", () => {
             this.onmessage?.({
               data: {
                 cobaltLocalProcessing: {
-                  blob: new Blob(["processed-audio"], { type: "audio/mpeg" }),
+                  blob: new Blob([validMp3Bytes()], { type: "audio/mpeg" }),
                 },
               },
             } as MessageEvent);
@@ -501,24 +504,18 @@ describe("CobaltAudio download", () => {
       name: "input-0",
       type: "audio/mpeg",
     });
-    expect(mp3tagMock.instances[0]?.tags).toMatchObject({
-      title: "Track",
-      v2: {
-        APIC: [
-          {
-            format: "image/jpeg",
-            type: 3,
-            description: "cover",
-            data: Array.from(new TextEncoder().encode("audio-bytes")),
-          },
-        ],
-      },
-    });
     expect(file).toMatchObject({
       name: "Track.MP3",
       type: "audio/mpeg",
     });
-    expect(new TextDecoder().decode(await file.arrayBuffer())).toBe("saved-audio");
+    const inspected = await Effect.runPromise(inspectAudioFile(file));
+    expect(inspected.metadata.title).toBe("Track");
+    expect(inspected.metadata.picture[0]).toMatchObject({
+      format: "image/jpeg",
+      type: 3,
+      description: "cover",
+    });
+    expect(inspected.metadata.picture[0]?.data).toEqual(new TextEncoder().encode("audio-bytes"));
   });
 
   it("returns non-mp3 local audio without fetching cover or using mp3tag", async () => {

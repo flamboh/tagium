@@ -14,6 +14,13 @@ const metadataPictureSchema = Schema.Struct({
   type: Schema.mutableKey(Schema.Number),
   description: Schema.mutableKey(Schema.String),
   data: Schema.mutableKey(metadataPictureDataSchema),
+  width: optionalMutableKey(Schema.Number),
+  height: optionalMutableKey(Schema.Number),
+  depth: optionalMutableKey(Schema.Number),
+  colors: optionalMutableKey(Schema.Number),
+  dataType: optionalMutableKey(Schema.Number),
+  dataLocale: optionalMutableKey(Schema.Number),
+  opaqueData: optionalMutableKey(metadataPictureDataSchema),
 });
 
 const metadataGenreSchema = Schema.Union([
@@ -35,6 +42,7 @@ const metadataSnapshotSchema = Schema.Struct({
   sampleRate: Schema.mutableKey(Schema.Number),
   picture: Schema.mutableKey(metadataPictureArraySchema),
   trackNumber: Schema.mutableKey(Schema.NullOr(Schema.Number)),
+  trackTotal: optionalMutableKey(Schema.NullOr(Schema.Number)),
 });
 
 const metadataPatchSchema = Schema.Struct({
