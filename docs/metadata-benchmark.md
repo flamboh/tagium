@@ -59,12 +59,14 @@ The report in [`generated/metadata-benchmark.json`](generated/metadata-benchmark
 
 At the checked-in run:
 
-- large median scan throughput improved **11.23x**;
+- large median scan throughput improved **15.12x**;
 - deterministic peak retained allocation fell **99.85%**;
-- small median wall-clock throughput improved **4.31%** (reported regression `-0.0431`);
+- the best-effort small median wall-clock measurement regressed **39.10%** (reported regression
+  `0.3910`), illustrating the documented instability of the roughly one-millisecond samples;
 - small deterministic copied work improved **96.86%**;
-- scheduling delay p95 was **0.79 ms**;
+- scheduling delay p95 was **0.65 ms**;
 - the largest candidate read was **32,768 bytes**; and
-- all asserted gates passed.
+- all primary asserted gates passed; the explicitly non-gating best-effort wall-clock indicator did
+  not pass in this run.
 
 Wall-clock values on memory-backed synthetic `Blob`s can vary substantially across runtimes and machines. Regenerate the JSON on the same machine and corpus when comparing another implementation, inspect all five samples, and use the deterministic counters as the primary allocation and small-file evidence.
