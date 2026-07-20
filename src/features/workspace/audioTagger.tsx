@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { ArrowLeft, ListMusic } from "lucide-react";
+import { ListMusic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AlbumMetadataDialog from "@/features/editor/AlbumMetadataDialog";
 import DestructiveActionDialog from "@/features/workspace/DestructiveActionDialog";
@@ -55,8 +55,6 @@ export default function AudioTagger() {
     library.state;
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
   const mobileNavigation = useMobileWorkspaceNavigation({
-    selectedFileId,
-    settingsOpen: activeView === "settings",
     libraryEmpty: libraryIsEmpty,
   });
   const landingIsActive = libraryIsEmpty && activeView === "editor";
@@ -74,26 +72,22 @@ export default function AudioTagger() {
   );
   const mobilePresentation = !mobileNavigation.isMobile
     ? "library"
-    : mobileNavigation.page === "library"
-      ? "library"
-      : mobileNavigation.sheetOpen
-        ? "sheet"
-        : "hidden";
+    : mobileNavigation.drawerOpen
+      ? "drawer"
+      : "hidden";
   const sidebarProps = {
     ...workspace.sidebarProps,
     onSelectFile: (...args: Parameters<typeof workspace.sidebarProps.onSelectFile>) => {
       workspace.sidebarProps.onSelectFile(...args);
-      const trigger = args[2]?.currentTarget;
-      mobileNavigation.openEditor("editor", trigger instanceof HTMLElement ? trigger : null);
+      mobileNavigation.closeDrawer();
     },
     onSelectLooseTrack: (...args: Parameters<typeof workspace.sidebarProps.onSelectLooseTrack>) => {
       workspace.sidebarProps.onSelectLooseTrack(...args);
-      const trigger = args[1]?.currentTarget;
-      mobileNavigation.openEditor("editor", trigger instanceof HTMLElement ? trigger : null);
+      mobileNavigation.closeDrawer();
     },
     onOpenSettings: () => {
       workspace.sidebarProps.onOpenSettings();
-      mobileNavigation.openEditor("settings");
+      mobileNavigation.closeDrawer();
     },
   };
 
@@ -111,8 +105,8 @@ export default function AudioTagger() {
         onRestoreFocus={exporting.restoreConfirmationFocus}
       />
       <div
-        className="relative h-svh min-h-svh overflow-hidden bg-background md:flex md:flex-row"
-        data-mobile-page={mobileNavigation.page}
+        className="relative h-svh min-h-svh overflow-hidden bg-background [--mobile-drawer-width:min(20rem,88vw)] md:flex md:flex-row"
+        data-mobile-drawer={mobileNavigation.drawerOpen ? "open" : "closed"}
       >
         <TagSidebarPanel
           loading={busy}
@@ -124,7 +118,7 @@ export default function AudioTagger() {
           selectedFileIds={selectedFileIds}
           {...sidebarProps}
           mobilePresentation={mobilePresentation}
-          onCloseMobileSheet={mobileNavigation.closeSheet}
+          onCloseMobileDrawer={mobileNavigation.closeDrawer}
           onAudioUpload={importing.commands.upload}
           onRetryDownload={importing.commands.retryTrack}
           onDownloadAlbum={exporting.downloadAlbum}
@@ -136,43 +130,37 @@ export default function AudioTagger() {
           onCancelPlaylistDownloadQueue={importing.commands.cancelQueue}
           onRetryPlaylistDownloadQueue={importing.commands.retryQueue}
         />
-        {mobileNavigation.isMobile && mobileNavigation.sheetOpen && (
-          <button
-            type="button"
-            className="fixed inset-0 z-30 bg-black/45 motion-reduce:transition-none md:hidden"
-            onClick={mobileNavigation.closeSheet}
-            aria-label="close library"
-            tabIndex={-1}
-          />
-        )}
         <div
-          className="relative flex h-svh min-w-0 flex-1 flex-col md:min-h-0"
-          aria-hidden={
-            mobileNavigation.isMobile &&
-            (mobileNavigation.page === "library" || mobileNavigation.sheetOpen)
-              ? true
-              : undefined
-          }
-          inert={
-            mobileNavigation.isMobile &&
-            (mobileNavigation.page === "library" || mobileNavigation.sheetOpen)
-              ? true
-              : undefined
-          }
+          className={`relative flex h-svh w-full shrink-0 flex-col transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:min-h-0 md:min-w-0 md:flex-1 md:shrink md:translate-x-0 md:transition-none ${
+            mobileNavigation.drawerOpen
+              ? "translate-x-[var(--mobile-drawer-width)]"
+              : "translate-x-0"
+          }`}
+          data-mobile-main-surface=""
+          aria-hidden={mobileNavigation.isMobile && mobileNavigation.drawerOpen ? true : undefined}
+          inert={mobileNavigation.isMobile && mobileNavigation.drawerOpen ? true : undefined}
         >
-          {mobileNavigation.isMobile && landingIsActive && (
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="absolute left-3 top-3 z-20 size-10 bg-background"
-              onClick={mobileNavigation.openSheet}
-              aria-label="open library"
-              aria-expanded={mobileNavigation.sheetOpen}
-              data-mobile-workspace-destination="editor"
+          {mobileNavigation.isMobile && (
+            <div
+              className={
+                landingIsActive
+                  ? "absolute inset-x-0 top-0 z-20 h-14 border-b bg-background md:hidden"
+                  : "contents"
+              }
             >
-              <ListMusic className="size-5" />
-            </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute left-2 top-2 z-20 size-11 md:hidden"
+                onClick={mobileNavigation.openDrawer}
+                aria-label="open library"
+                aria-expanded={mobileNavigation.drawerOpen}
+                aria-controls="tagium-library"
+              >
+                <ListMusic className="size-5" />
+              </Button>
+            </div>
           )}
           <div
             className={
@@ -193,30 +181,6 @@ export default function AudioTagger() {
                       : "pointer-events-none z-0 opacity-0"
                   }`}
                 >
-                  <div className="flex h-12 shrink-0 items-center justify-between border-b px-2 md:hidden">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1.5 px-2"
-                      onClick={mobileNavigation.backToLibrary}
-                      data-mobile-workspace-destination="editor"
-                    >
-                      <ArrowLeft className="size-4" />
-                      library
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-9"
-                      onClick={mobileNavigation.openSheet}
-                      aria-label="open library"
-                      aria-expanded={mobileNavigation.sheetOpen}
-                    >
-                      <ListMusic className="size-5" />
-                    </Button>
-                  </div>
                   <TrackMetadataEditor
                     selectedFile={editor.selectedFile}
                     selectedFileId={selectedFileId}
@@ -252,28 +216,14 @@ export default function AudioTagger() {
                 >
                   <SettingsPage
                     {...workspace.settingsPageProps}
-                    onBack={
-                      mobileNavigation.isMobile
-                        ? () => {
-                            workspace.settingsPageProps.onBack();
-                            mobileNavigation.backToLibrary();
-                          }
-                        : workspace.settingsPageProps.onBack
-                    }
+                    onBack={workspace.settingsPageProps.onBack}
                   />
                 </div>
               </div>
             ) : activeView === "settings" ? (
               <SettingsPage
                 {...workspace.settingsPageProps}
-                onBack={
-                  mobileNavigation.isMobile
-                    ? () => {
-                        workspace.settingsPageProps.onBack();
-                        mobileNavigation.backToLibrary();
-                      }
-                    : workspace.settingsPageProps.onBack
-                }
+                onBack={workspace.settingsPageProps.onBack}
               />
             ) : null}
           </div>

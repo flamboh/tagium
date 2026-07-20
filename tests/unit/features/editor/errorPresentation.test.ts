@@ -29,11 +29,12 @@ describe("local error presentation", () => {
     );
   });
 
-  it("centers the filename independently from the fixed error margin", () => {
+  it("centers the filename while reserving and then resetting mobile navigation space", () => {
     expect(trackMetadataEditorSource).toContain('className="flex h-full min-w-0 items-center"');
     expect(trackMetadataEditorSource).toContain(
-      'className="absolute inset-x-4 bottom-1 h-4 min-w-0 overflow-hidden',
+      'className="absolute bottom-1 left-16 right-4 h-4 min-w-0 overflow-hidden',
     );
+    expect(trackMetadataEditorSource).toContain("md:inset-x-4 lg:inset-x-6");
   });
 
   it("keeps cover validation state separate from tooltip visibility", () => {

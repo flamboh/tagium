@@ -1,51 +1,16 @@
 import { act } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { renderHook } from "../../support/hookTestHarness";
-import {
-  addMobileWorkspaceHistoryEntry,
-  ownsMobileWorkspaceHistoryEntry,
-  removeMobileWorkspaceHistoryEntry,
-  useMobileWorkspaceNavigation,
-} from "@/features/workspace/useMobileWorkspaceNavigation";
+import { useMobileWorkspaceNavigation } from "@/features/workspace/useMobileWorkspaceNavigation";
 
-class FakeMobileWindow extends EventTarget {
-  private states: unknown[] = [{ hostRouter: "preserved" }];
-  private index = 0;
-
+class FakeMobileWindow {
   private media = new EventTarget() as EventTarget & { matches: boolean };
 
-  matchMedia = () => this.media;
-
-  history = {
-    get state() {
-      return undefined as unknown;
-    },
-    pushState: (_state: unknown, _title: string) => {},
-    replaceState: (_state: unknown, _title: string) => {},
-    back: () => {},
-  };
-
   constructor() {
-    super();
     this.media.matches = true;
-    Object.defineProperty(this.history, "state", {
-      get: () => this.states[this.index],
-    });
-    this.history.pushState = (state) => {
-      this.states.splice(this.index + 1, Infinity, state);
-      this.index++;
-    };
-    this.history.replaceState = (state) => {
-      this.states[this.index] = state;
-    };
-    this.history.back = () => {
-      if (this.index === 0) return;
-      this.index--;
-      const event = new Event("popstate") as Event & { state: unknown };
-      Object.defineProperty(event, "state", { value: this.states[this.index] });
-      this.dispatchEvent(event);
-    };
   }
+
+  matchMedia = () => this.media;
 
   resize(matches: boolean) {
     this.media.matches = matches;
@@ -56,221 +21,81 @@ class FakeMobileWindow extends EventTarget {
 class FakeHTMLElement {
   isConnected = true;
   focused = false;
-  constructor(
-    private readonly onFocus: () => void = () => {},
-    private readonly inLibrary = false,
-  ) {}
+
   focus() {
     this.focused = true;
-    this.onFocus();
-  }
-  closest(selector: string) {
-    return selector === "[data-mobile-library]" && this.inLibrary ? this : null;
   }
 }
 
 const installBrowserGlobals = (fakeWindow: FakeMobileWindow) => {
-  const fakeDocument = {
-    activeElement: null as FakeHTMLElement | null,
-    querySelector: (_selector: string): FakeHTMLElement | null => null,
-  };
-  const editor = new FakeHTMLElement(() => {
-    fakeDocument.activeElement = editor;
-  });
-  const settings = new FakeHTMLElement(() => {
-    fakeDocument.activeElement = settings;
-  });
-  const library = new FakeHTMLElement(() => {
-    fakeDocument.activeElement = library;
-  }, true);
-  fakeDocument.activeElement = library;
-  fakeDocument.querySelector = (selector: string) => {
-    if (selector.includes('="editor"')) return editor;
-    if (selector.includes('="settings"')) return settings;
-    if (selector.includes("data-mobile-library")) return library;
-    return null;
-  };
+  const trigger = new FakeHTMLElement();
+  const desktopSidebarControl = new FakeHTMLElement();
   vi.stubGlobal("window", fakeWindow);
-  vi.stubGlobal("document", fakeDocument);
+  vi.stubGlobal("document", {
+    activeElement: trigger,
+    querySelector: (selector: string) =>
+      selector.includes('data-mobile-library="library"') ? desktopSidebarControl : null,
+  });
   vi.stubGlobal("HTMLElement", FakeHTMLElement);
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
     callback(0);
     return 1;
   });
-  return { editor, settings, library, fakeDocument };
+  return { desktopSidebarControl, trigger };
 };
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("mobile workspace history", () => {
-  it("preserves unrelated history state while adding an owned editor entry", () => {
-    const state = addMobileWorkspaceHistoryEntry({ analytics: "keep" }, "session-a");
-
-    expect(state).toMatchObject({ analytics: "keep" });
-    expect(ownsMobileWorkspaceHistoryEntry(state, "session-a")).toBe(true);
-    expect(ownsMobileWorkspaceHistoryEntry(state, "session-b")).toBe(false);
-  });
-
-  it("removes only Tagium's marker from a stale reload entry", () => {
-    const state = addMobileWorkspaceHistoryEntry({ router: { index: 3 } }, "old-session");
-
-    expect(removeMobileWorkspaceHistoryEntry(state)).toEqual({ router: { index: 3 } });
-  });
-
-  it("does not claim malformed or foreign history state", () => {
-    expect(ownsMobileWorkspaceHistoryEntry(null, "session-a")).toBe(false);
-    expect(ownsMobileWorkspaceHistoryEntry({ __tagiumMobileWorkspace: true }, "session-a")).toBe(
-      false,
-    );
-  });
-
-  it("pushes one owned editor entry and consumes it when returning to the library", () => {
+describe("mobile workspace drawer", () => {
+  it("starts on the main surface and restores opener focus when the drawer closes", () => {
     const fakeWindow = new FakeMobileWindow();
-    installBrowserGlobals(fakeWindow);
-    const hook = renderHook(
-      (props: { selectedFileId: string | null }) =>
-        useMobileWorkspaceNavigation({
-          selectedFileId: props.selectedFileId,
-          settingsOpen: false,
-          libraryEmpty: false,
-        }),
-      { selectedFileId: "track-a" } as { selectedFileId: string | null },
-    );
+    const { trigger } = installBrowserGlobals(fakeWindow);
+    const hook = renderHook(() => useMobileWorkspaceNavigation({ libraryEmpty: false }), undefined);
 
-    expect(hook.result.page).toBe("library");
-    act(() => hook.result.openEditor());
-    expect(hook.result.page).toBe("editor");
-    expect(fakeWindow.history.state).toMatchObject({ hostRouter: "preserved" });
-
-    act(() => hook.result.backToLibrary());
-    expect(hook.result.page).toBe("library");
-    expect(fakeWindow.history.state).toEqual({ hostRouter: "preserved" });
+    expect(hook.result.isMobile).toBe(true);
+    expect(hook.result.drawerOpen).toBe(false);
+    act(() => hook.result.openDrawer());
+    expect(hook.result.drawerOpen).toBe(true);
+    act(() => hook.result.closeDrawer());
+    expect(hook.result.drawerOpen).toBe(false);
+    expect(trigger.focused).toBe(true);
     hook.unmount();
   });
 
-  it("restores the drill-in trigger when native browser Back resolves to the library", () => {
+  it("closes when removing the final track reveals the empty download page", () => {
     const fakeWindow = new FakeMobileWindow();
-    const browser = installBrowserGlobals(fakeWindow);
+    const { trigger } = installBrowserGlobals(fakeWindow);
     const hook = renderHook(
-      () =>
-        useMobileWorkspaceNavigation({
-          selectedFileId: "track-a",
-          settingsOpen: false,
-          libraryEmpty: false,
-        }),
-      undefined,
+      (props: { libraryEmpty: boolean }) =>
+        useMobileWorkspaceNavigation({ libraryEmpty: props.libraryEmpty }),
+      { libraryEmpty: false },
     );
 
-    act(() => hook.result.openEditor());
-    expect(browser.fakeDocument.activeElement).toBe(browser.editor);
-    act(() => fakeWindow.history.back());
-    expect(hook.result.page).toBe("library");
-    expect(browser.fakeDocument.activeElement).toBe(browser.library);
+    act(() => hook.result.openDrawer());
+    expect(hook.result.drawerOpen).toBe(true);
+    hook.rerender({ libraryEmpty: true });
+    expect(hook.result.drawerOpen).toBe(false);
+    expect(trigger.focused).toBe(true);
     hook.unmount();
   });
 
-  it("restores the tapped track when pointer activation leaves focus on body", () => {
+  it("closes across breakpoints and cannot open on desktop", () => {
     const fakeWindow = new FakeMobileWindow();
-    const browser = installBrowserGlobals(fakeWindow);
-    const body = new FakeHTMLElement();
-    Object.assign(browser.fakeDocument, { activeElement: body, body });
-    const hook = renderHook(
-      () =>
-        useMobileWorkspaceNavigation({
-          selectedFileId: "track-a",
-          settingsOpen: false,
-          libraryEmpty: false,
-        }),
-      undefined,
-    );
+    const { desktopSidebarControl, trigger } = installBrowserGlobals(fakeWindow);
+    const hook = renderHook(() => useMobileWorkspaceNavigation({ libraryEmpty: false }), undefined);
 
-    act(() => hook.result.openEditor("editor", browser.library as unknown as HTMLElement));
-    expect(browser.fakeDocument.activeElement).toBe(browser.editor);
-    act(() => fakeWindow.history.back());
-    expect(hook.result.page).toBe("library");
-    expect(browser.fakeDocument.activeElement).toBe(browser.library);
-    hook.unmount();
-  });
-
-  it("consumes its marker across desktop resize before a later mobile drill-in", () => {
-    const fakeWindow = new FakeMobileWindow();
-    installBrowserGlobals(fakeWindow);
-    const hook = renderHook(
-      () =>
-        useMobileWorkspaceNavigation({
-          selectedFileId: "track-a",
-          settingsOpen: false,
-          libraryEmpty: false,
-        }),
-      undefined,
-    );
-
-    act(() => hook.result.openEditor());
+    act(() => hook.result.openDrawer());
     act(() => fakeWindow.resize(false));
     expect(hook.result.isMobile).toBe(false);
-    expect(hook.result.page).toBe("editor");
-    expect(fakeWindow.history.state).toEqual({ hostRouter: "preserved" });
+    expect(hook.result.drawerOpen).toBe(false);
+    expect(desktopSidebarControl.focused).toBe(true);
+    expect(trigger.focused).toBe(false);
+    act(() => hook.result.openDrawer());
+    expect(hook.result.drawerOpen).toBe(false);
 
     act(() => fakeWindow.resize(true));
-    expect(hook.result.page).toBe("library");
-    act(() => hook.result.openEditor());
-    act(() => hook.result.backToLibrary());
-    expect(hook.result.page).toBe("library");
-    expect(fakeWindow.history.state).toEqual({ hostRouter: "preserved" });
-    hook.unmount();
-  });
-
-  it("consumes its marker when selection disappears before reentering", () => {
-    const fakeWindow = new FakeMobileWindow();
-    installBrowserGlobals(fakeWindow);
-    const hook = renderHook(
-      (props: { selectedFileId: string | null }) =>
-        useMobileWorkspaceNavigation({
-          selectedFileId: props.selectedFileId,
-          settingsOpen: false,
-          libraryEmpty: false,
-        }),
-      { selectedFileId: "track-a" } as { selectedFileId: string | null },
-    );
-
-    act(() => hook.result.openEditor());
-    hook.rerender({ selectedFileId: null });
-    expect(hook.result.page).toBe("library");
-    expect(fakeWindow.history.state).toEqual({ hostRouter: "preserved" });
-
-    hook.rerender({ selectedFileId: "track-a" });
-    act(() => hook.result.openEditor());
-    act(() => hook.result.backToLibrary());
-    expect(hook.result.page).toBe("library");
-    hook.unmount();
-  });
-
-  it("moves focus out of the inert library and restores it on Back and sheet close", () => {
-    const fakeWindow = new FakeMobileWindow();
-    const browser = installBrowserGlobals(fakeWindow);
-    const hook = renderHook(
-      () =>
-        useMobileWorkspaceNavigation({
-          selectedFileId: "track-a",
-          settingsOpen: false,
-          libraryEmpty: false,
-        }),
-      undefined,
-    );
-
-    act(() => hook.result.openEditor());
-    expect(browser.editor.focused).toBe(true);
-    expect(browser.fakeDocument.activeElement).toBe(browser.editor);
-    act(() => hook.result.backToLibrary());
-    expect(browser.library.focused).toBe(true);
-    expect(browser.fakeDocument.activeElement).toBe(browser.library);
-
-    browser.fakeDocument.activeElement = browser.editor;
-    act(() => hook.result.openEditor());
-    act(() => hook.result.openSheet());
-    act(() => hook.result.closeSheet());
-    expect(browser.editor.focused).toBe(true);
-    expect(browser.fakeDocument.activeElement).toBe(browser.editor);
+    expect(hook.result.isMobile).toBe(true);
+    expect(hook.result.drawerOpen).toBe(false);
     hook.unmount();
   });
 });

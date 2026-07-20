@@ -8,130 +8,100 @@ const mp3Upload = (name: string) => {
   return { name, mimeType: "audio/mpeg", buffer: Buffer.from(bytes) };
 };
 
-const openMobileLibrary = async (page: Page, filenames = ["mobile-track.mp3"]) => {
+const openMobileApp = async (page: Page) => {
   await page.setViewportSize({ width: 390, height: 700 });
   await page.goto("/");
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles(filenames.map((filename) => mp3Upload(filename)));
-  await expect(page.getByText(`library (${filenames.length})`, { exact: true })).toBeVisible();
 };
 
-test("drills into a track and restores the list and focus with app or browser Back", async ({
+test("lands on the download surface with one push-drawer opener", async ({ page }) => {
+  await openMobileApp(page);
+
+  await expect(page.getByRole("button", { name: /drop your mp3s here/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "open library" })).toHaveCount(1);
+  await expect(page.locator("[data-mobile-drawer]")).toHaveAttribute(
+    "data-mobile-drawer",
+    "closed",
+  );
+
+  await page.getByRole("button", { name: "open library" }).click();
+  const drawer = page.getByRole("dialog", { name: "library" });
+  const main = page.locator("[data-mobile-main-surface]");
+
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByRole("button", { name: "close library" })).toBeFocused();
+  const shell = page.locator("[data-mobile-drawer]");
+  await expect(shell.locator(":scope > *")).toHaveCount(2);
+  await expect(
+    shell.locator(":scope > :not([data-mobile-library]):not([data-mobile-main-surface])"),
+  ).toHaveCount(0);
+  await expect(drawer).toHaveCSS("transition-duration", "0.2s");
+  await expect(drawer).toHaveCSS("transition-property", /transform/);
+  await expect(main).toHaveCSS("transition-duration", "0.2s");
+  await expect(main).toHaveCSS("transition-property", /transform/);
+  const drawerWidth = await drawer.evaluate((element) => element.getBoundingClientRect().width);
+  await expect
+    .poll(async () =>
+      Math.round(await main.evaluate((element) => element.getBoundingClientRect().left)),
+    )
+    .toBe(Math.round(drawerWidth));
+});
+
+test("keeps the editor primary and closes the drawer when a track is selected", async ({
   page,
 }) => {
-  await openMobileLibrary(page);
-  const track = page.getByRole("button", { name: /mobile-track\.mp3/ }).first();
+  await openMobileApp(page);
+  await page.locator('input[type="file"]').setInputFiles(mp3Upload("mobile-track.mp3"));
 
-  await track.click();
-  await expect(page.getByRole("button", { name: "library" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "library" })).toBeFocused();
-  await page.getByRole("button", { name: "library" }).click();
-  await expect(track).toBeVisible();
-  await expect(track).toBeFocused();
-
-  await track.click();
-  await page.goBack();
-  await expect(track).toBeVisible();
-  await expect(track).toBeFocused();
-});
-
-test("reconciles mobile history across resize before another drill-in", async ({ page }) => {
-  await openMobileLibrary(page);
-  const track = page.getByRole("button", { name: /mobile-track\.mp3/ }).first();
-  await track.click();
-
-  await page.setViewportSize({ width: 1024, height: 768 });
   await expect(page.getByRole("button", { name: "download track" })).toBeVisible();
-  await page.setViewportSize({ width: 390, height: 700 });
-  await expect(track).toBeVisible();
-
-  await track.click();
-  await expect(page.getByRole("button", { name: "library" })).toBeFocused();
-  await page.getByRole("button", { name: "library" }).click();
-  await expect(track).toBeVisible();
-});
-
-test("reconciles mobile history when selection is cleared before reentering", async ({ page }) => {
-  await openMobileLibrary(page);
-  const track = page.getByRole("button", { name: /mobile-track\.mp3/ }).first();
-  await track.click();
-  await page.keyboard.press("Escape");
-  await expect(track).toBeVisible();
-
-  await track.click();
-  await page.getByRole("button", { name: "library" }).click();
-  await expect(track).toBeVisible();
-});
-
-test("selects another track from the accessible library sheet", async ({ page }) => {
-  await openMobileLibrary(page, ["first-track.mp3", "second-track.mp3"]);
-  await page
-    .getByRole("button", { name: /first-track\.mp3/ })
-    .first()
-    .click();
+  await expect(page.getByRole("button", { name: "open library" })).toHaveCount(1);
   await page.getByRole("button", { name: "open library" }).click();
-
-  const sheet = page.getByRole("dialog", { name: "library" });
-  await expect(sheet).toBeVisible();
-  await expect(sheet.getByRole("button", { name: "close library" })).toBeFocused();
-  await sheet
-    .getByRole("button", { name: /second-track\.mp3/ })
+  const drawer = page.getByRole("dialog", { name: "library" });
+  await drawer
+    .getByRole("button", { name: /\.mp3$/ })
     .first()
     .click();
 
-  await expect(sheet).not.toBeVisible();
-  await expect(page.getByText("second-track.mp3", { exact: true })).toBeVisible();
-
-  const openLibrary = page.getByRole("button", { name: "open library" });
-  await openLibrary.click();
-  await sheet.getByRole("button", { name: "close library" }).click();
-  await expect(openLibrary).toBeFocused();
+  await expect(drawer).not.toBeVisible();
+  await expect(page.locator("[data-mobile-drawer]")).toHaveAttribute(
+    "data-mobile-drawer",
+    "closed",
+  );
+  await expect(page.getByRole("button", { name: "download track" })).toBeVisible();
 });
 
-test("opens settings as a mobile page and returns to the preserved library", async ({ page }) => {
-  await openMobileLibrary(page);
-  await page.getByRole("button", { name: "settings" }).click();
-  await expect(page.getByRole("heading", { name: "settings" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "back to editor" })).toBeFocused();
-
-  await page.getByRole("button", { name: "back to editor" }).click();
-  await expect(page.getByText("library (1)", { exact: true })).toBeVisible();
-});
-
-test("preserves the exact library scroll position across track editing", async ({ page }) => {
-  const filenames = Array.from({ length: 16 }, (_, index) => `scroll-track-${index + 1}.mp3`);
-  await openMobileLibrary(page, filenames);
-  const libraryScroller = page
-    .getByText("library (16)", { exact: true })
-    .locator("..")
-    .locator("xpath=following-sibling::div[1]");
-  await libraryScroller.evaluate((element) => {
-    element.scrollTop = 260;
-  });
-  const scrollTop = await libraryScroller.evaluate((element) => element.scrollTop);
-
-  await page
-    .getByRole("button", { name: /scroll-track-12\.mp3/ })
-    .first()
-    .click();
-  await page.getByRole("button", { name: "library" }).click();
-
-  expect(await libraryScroller.evaluate((element) => element.scrollTop)).toBe(scrollTop);
-});
-
-test("returns to the library if the edited track is deleted from the sheet", async ({ page }) => {
-  await openMobileLibrary(page);
-  await page
-    .getByRole("button", { name: /mobile-track\.mp3/ })
-    .first()
-    .click();
+test("reaches settings from the empty drawer and returns to download", async ({ page }) => {
+  await openMobileApp(page);
   await page.getByRole("button", { name: "open library" }).click();
   await page
     .getByRole("dialog", { name: "library" })
-    .getByRole("button", {
-      name: "remove track",
-    })
+    .getByRole("button", { name: "settings" })
+    .click();
+
+  await expect(page.getByRole("heading", { name: "settings" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "open library" })).toHaveCount(1);
+  await expect(page.getByRole("dialog", { name: "library" })).not.toBeVisible();
+  await page.getByRole("button", { name: "back to editor" }).click();
+  await expect(page.getByRole("button", { name: /drop your mp3s here/ })).toBeVisible();
+});
+
+test("closes on Escape and restores focus to the single opener", async ({ page }) => {
+  await openMobileApp(page);
+  const opener = page.getByRole("button", { name: "open library" });
+  await opener.click();
+  await page.keyboard.press("Escape");
+
+  await expect(page.getByRole("dialog", { name: "library" })).not.toBeVisible();
+  await expect(opener).toBeFocused();
+});
+
+test("restores focus when removing the final track closes the drawer", async ({ page }) => {
+  await openMobileApp(page);
+  await page.locator('input[type="file"]').setInputFiles(mp3Upload("last-track.mp3"));
+  const opener = page.getByRole("button", { name: "open library" });
+  await opener.click();
+  await page
+    .getByRole("dialog", { name: "library" })
+    .getByRole("button", { name: "remove track" })
     .click();
   await page
     .getByRole("dialog", { name: "remove track?" })
@@ -140,57 +110,35 @@ test("returns to the library if the edited track is deleted from the sheet", asy
 
   await expect(page.getByRole("button", { name: /drop your mp3s here/ })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "library" })).not.toBeVisible();
+  await expect(opener).toBeFocused();
 });
 
-test("discards a stale mobile history marker on reload", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 700 });
-  await page.goto("/");
-  await page.evaluate(() => {
-    const browserHistory = (
-      globalThis as unknown as {
-        history: { replaceState: (state: unknown, title: string) => void };
-      }
-    ).history;
-    browserHistory.replaceState(
-      { __tagiumMobileWorkspace: { token: "stale-session", page: "editor" } },
-      "",
-    );
-  });
-  await page.reload();
-
-  await expect(page.getByRole("button", { name: /drop your mp3s here/ })).toBeVisible();
-  expect(
-    await page.evaluate(() => {
-      const browserHistory = (
-        globalThis as unknown as { history: { state: Record<string, unknown> | null } }
-      ).history;
-      return Boolean(browserHistory.state?.__tagiumMobileWorkspace);
-    }),
-  ).toBe(false);
-});
-
-test("keeps settings reachable from the empty mobile landing screen", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 700 });
-  await page.goto("/");
+test("keeps the tablet split layout and reconciles drawer focus across resize", async ({
+  page,
+}) => {
+  await openMobileApp(page);
+  await page.locator('input[type="file"]').setInputFiles(mp3Upload("tablet-track.mp3"));
   await page.getByRole("button", { name: "open library" }).click();
-  await page
-    .getByRole("dialog", { name: "library" })
-    .getByRole("button", {
-      name: "settings",
-    })
-    .click();
+  await page.setViewportSize({ width: 800, height: 768 });
 
-  await expect(page.getByRole("heading", { name: "settings" })).toBeVisible();
-  await page.getByRole("button", { name: "back to editor" }).click();
-  await expect(page.getByRole("button", { name: /drop your mp3s here/ })).toBeVisible();
-});
-
-test("keeps the desktop split workspace and controls unchanged", async ({ page }) => {
-  await page.setViewportSize({ width: 1024, height: 768 });
-  await page.goto("/");
-  await page.locator('input[type="file"]').setInputFiles(mp3Upload("desktop-track.mp3"));
-
-  await expect(page.getByText("library (1)", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "download track" })).toBeVisible();
+  await expect(page.locator('[data-mobile-library="library"]')).toBeVisible();
   await expect(page.getByRole("button", { name: "open library" })).not.toBeVisible();
+  await expect(page.locator("[data-mobile-main-surface]")).toHaveCSS("transform", "none");
+  await expect(page.locator('[data-mobile-library="library"] button:focus')).toHaveCount(1);
+  await expect
+    .poll(async () =>
+      Math.round(
+        await page
+          .locator('[data-view="metadata-editor"] h2')
+          .evaluate((element) => element.getBoundingClientRect().left),
+      ),
+    )
+    .toBe(304);
+
+  await page.setViewportSize({ width: 390, height: 700 });
+  await expect(page.locator("[data-mobile-drawer]")).toHaveAttribute(
+    "data-mobile-drawer",
+    "closed",
+  );
+  await expect(page.getByRole("dialog", { name: "library" })).not.toBeVisible();
 });

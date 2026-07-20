@@ -54,8 +54,8 @@ export interface TagSidebarPanelProps {
   onOpenSettings: () => void;
   onCancelPlaylistDownloadQueue?: () => void;
   onRetryPlaylistDownloadQueue?: () => void;
-  mobilePresentation?: "library" | "hidden" | "sheet";
-  onCloseMobileSheet?: () => void;
+  mobilePresentation?: "library" | "hidden" | "drawer";
+  onCloseMobileDrawer?: () => void;
 }
 
 const isFileDrag = (event: React.DragEvent<HTMLDivElement>) =>
@@ -93,7 +93,7 @@ export default function TagSidebarPanel({
   onCancelPlaylistDownloadQueue,
   onRetryPlaylistDownloadQueue,
   mobilePresentation = "library",
-  onCloseMobileSheet,
+  onCloseMobileDrawer,
 }: TagSidebarPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeSheetButtonRef = useRef<HTMLButtonElement>(null);
@@ -112,14 +112,14 @@ export default function TagSidebarPanel({
         : "tracks need files and metadata";
 
   useEffect(() => {
-    if (mobilePresentation === "sheet") closeSheetButtonRef.current?.focus();
+    if (mobilePresentation === "drawer") closeSheetButtonRef.current?.focus();
   }, [mobilePresentation]);
 
-  const trapSheetFocus = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (mobilePresentation !== "sheet") return;
+  const trapDrawerFocus = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (mobilePresentation !== "drawer") return;
     if (event.key === "Escape") {
       event.preventDefault();
-      onCloseMobileSheet?.();
+      onCloseMobileDrawer?.();
       return;
     }
     if (event.key !== "Tab") return;
@@ -172,19 +172,20 @@ export default function TagSidebarPanel({
   return (
     <div
       ref={panelRef}
+      id="tagium-library"
       data-mobile-library={mobilePresentation}
-      role={mobilePresentation === "sheet" ? "dialog" : undefined}
-      aria-modal={mobilePresentation === "sheet" ? true : undefined}
-      aria-label={mobilePresentation === "sheet" ? "library" : undefined}
+      role={mobilePresentation === "drawer" ? "dialog" : undefined}
+      aria-modal={mobilePresentation === "drawer" ? true : undefined}
+      aria-label={mobilePresentation === "drawer" ? "library" : undefined}
       aria-hidden={mobilePresentation === "hidden" ? true : undefined}
       inert={mobilePresentation === "hidden" ? true : undefined}
       className={cn(
-        "fixed inset-y-0 left-0 z-40 flex h-svh w-full flex-shrink-0 flex-col overflow-hidden border-t bg-card transition-[transform,background-color] duration-200 ease-out motion-reduce:transition-none md:static md:z-auto md:order-none md:h-auto md:min-h-0 md:w-72 md:translate-x-0 md:border-t-0 md:border-r",
-        mobilePresentation === "hidden" && "w-[min(20rem,88vw)] -translate-x-full",
-        mobilePresentation === "sheet" && "w-[min(20rem,88vw)] translate-x-0 shadow-lg",
+        "fixed inset-y-0 left-0 z-40 flex h-svh w-(--mobile-drawer-width) flex-shrink-0 flex-col overflow-hidden border-r bg-card transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:static md:z-auto md:order-none md:h-auto md:min-h-0 md:w-72 md:translate-x-0 md:border-t-0 md:border-r md:transition-none",
+        mobilePresentation === "hidden" && "-translate-x-full",
+        mobilePresentation === "drawer" && "translate-x-0",
         isDraggingFile && "bg-primary/5 shadow-[inset_0_0_0_2px_var(--primary)]",
       )}
-      onKeyDown={trapSheetFocus}
+      onKeyDown={trapDrawerFocus}
       onDragEnter={handleSidebarDragEnter}
       onDragLeave={handleSidebarDragLeave}
       onDropCapture={(event) => {
@@ -203,14 +204,14 @@ export default function TagSidebarPanel({
     >
       <div className="h-14 flex items-center justify-between px-5 border-b flex-shrink-0">
         <span className="font-bold text-xl tracking-tight select-none">tagium</span>
-        {mobilePresentation === "sheet" && (
+        {mobilePresentation === "drawer" && (
           <Button
             ref={closeSheetButtonRef}
             type="button"
             variant="ghost"
             size="icon"
             className="size-9 md:hidden"
-            onClick={onCloseMobileSheet}
+            onClick={onCloseMobileDrawer}
             aria-label="close library"
           >
             <X className="size-5" />
