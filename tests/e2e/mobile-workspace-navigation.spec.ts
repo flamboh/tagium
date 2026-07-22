@@ -38,6 +38,8 @@ test("lands on the download surface with one push-drawer opener", async ({ page 
   await expect(drawer).toHaveCSS("transition-property", /transform/);
   await expect(main).toHaveCSS("transition-duration", "0.2s");
   await expect(main).toHaveCSS("transition-property", /transform/);
+  await expect(main).not.toHaveAttribute("inert");
+  await expect(main.locator("[data-mobile-main-content]")).toHaveAttribute("inert", "");
   const drawerWidth = await drawer.evaluate((element) => element.getBoundingClientRect().width);
   await expect
     .poll(async () =>
@@ -89,6 +91,30 @@ test("closes on Escape and restores focus to the single opener", async ({ page }
   const opener = page.getByRole("button", { name: "open library" });
   await opener.click();
   await page.keyboard.press("Escape");
+
+  await expect(page.getByRole("dialog", { name: "library" })).not.toBeVisible();
+  await expect(opener).toBeFocused();
+});
+
+test("closes when the exposed main canvas is pressed and restores opener focus", async ({
+  page,
+}) => {
+  await openMobileApp(page);
+  const opener = page.getByRole("button", { name: "open library" });
+  await opener.click();
+
+  const main = page.locator("[data-mobile-main-surface]");
+  await main.click({ position: { x: 20, y: 350 } });
+
+  await expect(page.getByRole("dialog", { name: "library" })).not.toBeVisible();
+  await expect(opener).toBeFocused();
+});
+
+test("closes with the close button and restores focus to the single opener", async ({ page }) => {
+  await openMobileApp(page);
+  const opener = page.getByRole("button", { name: "open library" });
+  await opener.click();
+  await page.getByRole("button", { name: "close library" }).click();
 
   await expect(page.getByRole("dialog", { name: "library" })).not.toBeVisible();
   await expect(opener).toBeFocused();

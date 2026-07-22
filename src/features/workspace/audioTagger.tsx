@@ -137,104 +137,116 @@ export default function AudioTagger() {
               : "translate-x-0"
           }`}
           data-mobile-main-surface=""
-          aria-hidden={mobileNavigation.isMobile && mobileNavigation.drawerOpen ? true : undefined}
-          inert={mobileNavigation.isMobile && mobileNavigation.drawerOpen ? true : undefined}
+          onClick={() => {
+            if (mobileNavigation.drawerOpen) mobileNavigation.closeDrawer();
+          }}
         >
-          {mobileNavigation.isMobile && (
+          <div
+            className={`flex h-full w-full flex-col ${
+              mobileNavigation.drawerOpen ? "pointer-events-none" : ""
+            }`}
+            data-mobile-main-content=""
+            aria-hidden={
+              mobileNavigation.isMobile && mobileNavigation.drawerOpen ? true : undefined
+            }
+            inert={mobileNavigation.isMobile && mobileNavigation.drawerOpen ? true : undefined}
+          >
+            {mobileNavigation.isMobile && (
+              <div
+                className={
+                  landingIsActive
+                    ? "absolute inset-x-0 top-0 z-20 h-14 border-b bg-background md:hidden"
+                    : "contents"
+                }
+              >
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute left-2 top-2 z-20 size-11 md:hidden"
+                  onClick={mobileNavigation.openDrawer}
+                  aria-label="open library"
+                  aria-expanded={mobileNavigation.drawerOpen}
+                  aria-controls="tagium-library"
+                >
+                  <ListMusic className="size-5" />
+                </Button>
+              </div>
+            )}
             <div
               className={
                 landingIsActive
-                  ? "absolute inset-x-0 top-0 z-20 h-14 border-b bg-background md:hidden"
-                  : "contents"
+                  ? "contents"
+                  : "h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1"
               }
             >
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute left-2 top-2 z-20 size-11 md:hidden"
-                onClick={mobileNavigation.openDrawer}
-                aria-label="open library"
-                aria-expanded={mobileNavigation.drawerOpen}
-                aria-controls="tagium-library"
-              >
-                <ListMusic className="size-5" />
-              </Button>
+              {!libraryIsEmpty ? (
+                <div className="relative min-h-0 flex-1">
+                  <div
+                    data-view="metadata-editor"
+                    aria-hidden={activeView !== "editor"}
+                    inert={activeView !== "editor"}
+                    className={`absolute inset-0 flex min-h-0 flex-col bg-background transition-opacity duration-200 motion-reduce:transition-none ${
+                      activeView === "editor"
+                        ? "z-10 opacity-100"
+                        : "pointer-events-none z-0 opacity-0"
+                    }`}
+                  >
+                    <TrackMetadataEditor
+                      selectedFile={editor.selectedFile}
+                      selectedFileId={selectedFileId}
+                      register={editor.form.register}
+                      control={editor.form.control}
+                      getValues={editor.form.getValues}
+                      setError={editor.form.setError}
+                      clearErrors={editor.form.clearErrors}
+                      setFocus={editor.form.setFocus}
+                      onTrackCoverUpload={editor.commands.uploadCover}
+                      onTrackCoverProcessingChange={editor.commands.setCoverProcessing}
+                      isTrackCoverProcessing={editor.isCoverProcessing}
+                      onDownloadUpdatedFile={exporting.downloadTrack}
+                      selectedFileAlbum={editor.selectedFileAlbum}
+                      syncFilenames={settings.syncFilenames}
+                      advancedMetadata={settings.advancedMetadata}
+                      metadataLinks={getMetadataLinkState(settings)}
+                      onPreviewMetadataChange={(field, event) =>
+                        editor.commands.preview(field, event.target.value)
+                      }
+                      onAudioUpload={importing.commands.upload}
+                    />
+                  </div>
+                  <div
+                    data-view="settings"
+                    aria-hidden={activeView !== "settings"}
+                    inert={activeView !== "settings"}
+                    className={`absolute inset-0 flex min-h-0 flex-col bg-background transition-opacity duration-200 motion-reduce:transition-none ${
+                      activeView === "settings"
+                        ? "z-10 opacity-100"
+                        : "pointer-events-none z-0 opacity-0"
+                    }`}
+                  >
+                    <SettingsPage
+                      {...workspace.settingsPageProps}
+                      onBack={workspace.settingsPageProps.onBack}
+                    />
+                  </div>
+                </div>
+              ) : activeView === "settings" ? (
+                <SettingsPage
+                  {...workspace.settingsPageProps}
+                  onBack={workspace.settingsPageProps.onBack}
+                />
+              ) : null}
             </div>
-          )}
-          <div
-            className={
-              landingIsActive
-                ? "contents"
-                : "h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1"
-            }
-          >
-            {!libraryIsEmpty ? (
-              <div className="relative min-h-0 flex-1">
-                <div
-                  data-view="metadata-editor"
-                  aria-hidden={activeView !== "editor"}
-                  inert={activeView !== "editor"}
-                  className={`absolute inset-0 flex min-h-0 flex-col bg-background transition-opacity duration-200 motion-reduce:transition-none ${
-                    activeView === "editor"
-                      ? "z-10 opacity-100"
-                      : "pointer-events-none z-0 opacity-0"
-                  }`}
-                >
-                  <TrackMetadataEditor
-                    selectedFile={editor.selectedFile}
-                    selectedFileId={selectedFileId}
-                    register={editor.form.register}
-                    control={editor.form.control}
-                    getValues={editor.form.getValues}
-                    setError={editor.form.setError}
-                    clearErrors={editor.form.clearErrors}
-                    setFocus={editor.form.setFocus}
-                    onTrackCoverUpload={editor.commands.uploadCover}
-                    onTrackCoverProcessingChange={editor.commands.setCoverProcessing}
-                    isTrackCoverProcessing={editor.isCoverProcessing}
-                    onDownloadUpdatedFile={exporting.downloadTrack}
-                    selectedFileAlbum={editor.selectedFileAlbum}
-                    syncFilenames={settings.syncFilenames}
-                    advancedMetadata={settings.advancedMetadata}
-                    metadataLinks={getMetadataLinkState(settings)}
-                    onPreviewMetadataChange={(field, event) =>
-                      editor.commands.preview(field, event.target.value)
-                    }
-                    onAudioUpload={importing.commands.upload}
-                  />
-                </div>
-                <div
-                  data-view="settings"
-                  aria-hidden={activeView !== "settings"}
-                  inert={activeView !== "settings"}
-                  className={`absolute inset-0 flex min-h-0 flex-col bg-background transition-opacity duration-200 motion-reduce:transition-none ${
-                    activeView === "settings"
-                      ? "z-10 opacity-100"
-                      : "pointer-events-none z-0 opacity-0"
-                  }`}
-                >
-                  <SettingsPage
-                    {...workspace.settingsPageProps}
-                    onBack={workspace.settingsPageProps.onBack}
-                  />
-                </div>
-              </div>
-            ) : activeView === "settings" ? (
-              <SettingsPage
-                {...workspace.settingsPageProps}
-                onBack={workspace.settingsPageProps.onBack}
-              />
-            ) : null}
+            <LandingScreen active={landingIsActive} onAudioUpload={importing.commands.upload}>
+              {mediaUrlEntryPresentation && (
+                <MediaUrlEntry
+                  layout={mediaUrlEntryPresentation.layout}
+                  onUrlImport={importing.commands.importUrl}
+                />
+              )}
+            </LandingScreen>
           </div>
-          <LandingScreen active={landingIsActive} onAudioUpload={importing.commands.upload}>
-            {mediaUrlEntryPresentation && (
-              <MediaUrlEntry
-                layout={mediaUrlEntryPresentation.layout}
-                onUrlImport={importing.commands.importUrl}
-              />
-            )}
-          </LandingScreen>
         </div>
       </div>
     </>
