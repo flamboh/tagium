@@ -1,10 +1,12 @@
 {
-  "Rules": [
+  "rules": [
     {
-      "ID": "tagium-share-artwork-expiry",
-      "Status": "Enabled",
-      "Filter": { "Prefix": "shares/" },
-      "Expiration": { "Days": 90 }
+      "id": "tagium-share-artwork-expiry",
+      "enabled": true,
+      "conditions": { "prefix": "shares/" },
+      "deleteObjectsTransition": {
+        "condition": { "maxAge": 7776000, "type": "Age" }
+      }
     }
   ]
 }

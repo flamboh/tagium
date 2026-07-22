@@ -36,7 +36,7 @@ if (result.status !== 0) exit(result.status ?? 1);
 
 const verification = spawnSync(
   "npx",
-  ["wrangler@4.110.0", "r2", "bucket", "lifecycle", "get", bucket],
+  ["wrangler@4.110.0", "r2", "bucket", "lifecycle", "list", bucket],
   { encoding: "utf8" },
 );
 const output = `${verification.stdout ?? ""}\n${verification.stderr ?? ""}`;
