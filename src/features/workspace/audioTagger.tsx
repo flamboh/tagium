@@ -26,6 +26,7 @@ import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { AppSettings } from "@/features/library/types";
 import { useMobileWorkspaceNavigation } from "@/features/workspace/useMobileWorkspaceNavigation";
+import { useDrawerSwipe } from "@/features/workspace/drawerSwipe";
 
 export default function AudioTagger() {
   const library = useLibraryStore();
@@ -56,6 +57,23 @@ export default function AudioTagger() {
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
   const mobileNavigation = useMobileWorkspaceNavigation({
     libraryEmpty: libraryIsEmpty,
+  });
+  const startsInSwipeZone = useCallback(
+    (touch: Touch, surface: HTMLElement) => {
+      const bounds = surface.getBoundingClientRect();
+      return mobileNavigation.drawerOpen
+        ? touch.clientX >= bounds.left && touch.clientX <= bounds.left + 28
+        : touch.clientX >= 20 && touch.clientX <= 48 && touch.clientY >= bounds.top + 64;
+    },
+    [mobileNavigation.drawerOpen],
+  );
+  const swipeSurfaceRef = useDrawerSwipe({
+    enabled: mobileNavigation.isMobile,
+    direction: mobileNavigation.drawerOpen ? "close" : "open",
+    onCommit: mobileNavigation.drawerOpen
+      ? mobileNavigation.closeDrawer
+      : mobileNavigation.openDrawer,
+    startsInZone: startsInSwipeZone,
   });
   const landingIsActive = libraryIsEmpty && activeView === "editor";
   const mediaUrlEntryPresentation = getMediaUrlEntryPresentation(
@@ -131,12 +149,13 @@ export default function AudioTagger() {
           onRetryPlaylistDownloadQueue={importing.commands.retryQueue}
         />
         <div
+          data-mobile-main-surface=""
+          ref={swipeSurfaceRef}
           className={`relative flex h-svh w-full shrink-0 flex-col transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:min-h-0 md:min-w-0 md:flex-1 md:shrink md:translate-x-0 md:transition-none ${
             mobileNavigation.drawerOpen
               ? "translate-x-[var(--mobile-drawer-width)]"
               : "translate-x-0"
           }`}
-          data-mobile-main-surface=""
           onClick={() => {
             if (mobileNavigation.drawerOpen) mobileNavigation.closeDrawer();
           }}

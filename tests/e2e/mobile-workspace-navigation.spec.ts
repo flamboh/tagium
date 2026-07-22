@@ -13,6 +13,23 @@ const openMobileApp = async (page: Page) => {
   await page.goto("/");
 };
 
+const dispatchTouchSwipe = async (
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+) => {
+  const client = await page.context().newCDPSession(page);
+  await client.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ ...from, id: 1 }],
+  });
+  await client.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [{ ...to, id: 1 }],
+  });
+  await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+};
+
 test("lands on the download surface with one push-drawer opener", async ({ page }) => {
   await openMobileApp(page);
 
@@ -46,6 +63,42 @@ test("lands on the download surface with one push-drawer opener", async ({ page 
       Math.round(await main.evaluate((element) => element.getBoundingClientRect().left)),
     )
     .toBe(Math.round(drawerWidth));
+});
+
+test("opens and closes from coordinate-bounded touch start zones", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== "chromium", "CDP touch injection is Chromium-only");
+  await openMobileApp(page);
+  const main = page.locator("[data-mobile-main-surface]");
+  await expect(main).toHaveCSS("touch-action", "auto");
+
+  await dispatchTouchSwipe(page, { x: 24, y: 200 }, { x: 96, y: 204 });
+  await expect(page.getByRole("dialog", { name: "library" })).toBeVisible();
+
+  await expect.poll(async () => Math.round((await main.boundingBox())?.x ?? 0)).toBe(320);
+  await dispatchTouchSwipe(page, { x: 325, y: 200 }, { x: 325, y: 280 });
+  await expect(page.getByRole("dialog", { name: "library" })).toBeVisible();
+  await dispatchTouchSwipe(page, { x: 325, y: 200 }, { x: 350, y: 200 });
+  await expect(page.getByRole("dialog", { name: "library" })).toBeVisible();
+  await dispatchTouchSwipe(page, { x: 325, y: 200 }, { x: 250, y: 204 });
+  await expect(page.getByRole("dialog", { name: "library" })).not.toBeVisible();
+});
+
+test("ignores mouse drags and keeps the desktop surface native", async ({ page }) => {
+  await openMobileApp(page);
+  await page.mouse.move(24, 200);
+  await page.mouse.down();
+  await page.mouse.move(96, 204);
+  await page.mouse.up();
+  await expect(page.getByRole("dialog", { name: "library" })).not.toBeVisible();
+  await page.setViewportSize({ width: 800, height: 768 });
+  await expect(page.locator("[data-mobile-main-surface]")).toHaveCSS("touch-action", "auto");
+  await expect(page.locator("[data-mobile-drawer]")).toHaveAttribute(
+    "data-mobile-drawer",
+    "closed",
+  );
 });
 
 test("keeps the editor primary and closes the drawer when a track is selected", async ({
