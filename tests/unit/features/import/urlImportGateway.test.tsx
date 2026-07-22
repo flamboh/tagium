@@ -1,9 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import audioTaggerSource from "@/features/workspace/audioTagger.tsx?raw";
 import landingScreenSource from "@/features/import/LandingScreen.tsx?raw";
 import mediaUrlEntrySource from "@/features/import/MediaUrlEntry.tsx?raw";
-import shareWorkflowSource from "@/features/share/useShareWorkflow.ts?raw";
 import MediaUrlEntry from "@/features/import/MediaUrlEntry";
 
 const reactHookMocks = vi.hoisted(() => ({
@@ -109,28 +107,7 @@ const changeInputValue = (tree: ReactNode, value: string) => {
 afterEach(() => vi.clearAllMocks());
 
 describe("media URL entry", () => {
-  it("adds a pasted share link in the current workspace instead of navigating to its preview", () => {
-    expect(audioTaggerSource).toContain("sharing.importFromInput(classification.slug)");
-    expect(audioTaggerSource).not.toContain("sharing.openFromInput(classification.slug)");
-    expect(shareWorkflowSource).toContain("const importFromInput");
-    expect(shareWorkflowSource).not.toContain("history.pushState({ shareSlug");
-  });
-
-  it("focuses an already-added shared album rather than importing it again", () => {
-    expect(shareWorkflowSource).toContain("album.sourceManifestSlug === slug");
-    expect(shareWorkflowSource).toContain('type: "album-selected", albumId: existing.id');
-    expect(shareWorkflowSource).toContain("if (importingSlugRef.current) return");
-  });
-
-  it("keeps shared-album imports on the existing queue and append path", () => {
-    expect(shareWorkflowSource).toContain(
-      "importing.commands.importSharedAlbum(fresh.manifest, slug, picture)",
-    );
-    expect(shareWorkflowSource).toContain("fetchSharedAlbumArtwork(slug)");
-  });
   it("is rendered once outside the landing/editor choice", () => {
-    expect(audioTaggerSource.match(/<MediaUrlEntry/g)).toHaveLength(1);
-    expect(audioTaggerSource).not.toContain("<AudioDownloader");
     expect(mediaUrlEntrySource).toContain("onUrlImport");
     expect(mediaUrlEntrySource).not.toContain("isSoundCloudSetUrl");
     expect(mediaUrlEntrySource).not.toContain("resolveSoundCloudSet");

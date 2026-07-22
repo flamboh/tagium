@@ -21,6 +21,7 @@ import {
 import { detectAnotherTagiumTab, listenForTagiumPresence } from "@/features/share/sharePresence";
 import { shareSlugFromPathname } from "@/features/share/shareLink";
 import { shareEligibility } from "@/features/share/shareEligibility";
+import { sharePublicationErrorMessage } from "@/features/share/sharePublicationError";
 import type { ShareDialogState } from "@/features/share/ShareAlbumDialog";
 import type { SharedAlbumPageState } from "@/features/share/SharedAlbumPage";
 
@@ -130,6 +131,8 @@ export const useShareWorkflow = ({
         .getSnapshot()
         .albums.find((album) => album.sourceManifestSlug === slug);
       if (existing) {
+        // Mirror normal workspace selection: commit any buffered metadata before changing album.
+        editor.commands.flush();
         library.dispatch({ type: "album-selected", albumId: existing.id, mode: "replace" });
         return;
       }
@@ -163,7 +166,7 @@ export const useShareWorkflow = ({
         importingSlugRef.current = null;
       }
     },
-    [enabled, importing.commands, library],
+    [editor.commands, enabled, importing.commands, library],
   );
 
   const closePage = useCallback((replace = false) => {
@@ -246,7 +249,7 @@ export const useShareWorkflow = ({
         albumTitle: currentDialog.albumTitle,
         trackCount: currentDialog.trackCount,
         hasCover: currentDialog.hasCover,
-        message: error instanceof Error ? error.message : "the share link could not be created",
+        message: sharePublicationErrorMessage(error),
       });
     }
   }, [creatorAlbumId, dialog, editor.commands, library]);

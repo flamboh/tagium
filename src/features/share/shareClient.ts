@@ -1,6 +1,7 @@
 import { decodeManifest, MANIFEST_VERSION, type Manifest } from "@/features/share/shareManifest";
 
 const UNAVAILABLE_MESSAGE = "this shared album is no longer available";
+const SHARE_METADATA_TOO_LARGE_MESSAGE = "This album contains too much metadata to share.";
 
 export class SharedAlbumUnavailableError extends Error {
   constructor() {
@@ -109,7 +110,12 @@ export const publishSharedAlbum = async (
     body,
     headers: { Accept: "application/json" },
   });
-  if (!response.ok) throw new Error("the share link could not be created");
+  if (!response.ok) {
+    if (response.status === 400 || response.status === 413)
+      throw new Error(SHARE_METADATA_TOO_LARGE_MESSAGE);
+    if (response.status === 429) throw new Error("too many share requests; try again shortly");
+    throw new Error("the share link could not be created");
+  }
   const receipt = await readJson(response);
   if (
     typeof receipt !== "object" ||
