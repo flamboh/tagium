@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
+  Check,
+  Copy,
   Download,
   ExternalLink,
   ImageOff,
@@ -22,6 +24,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { sharedArtworkUrl } from "@/features/share/shareClient";
 import type { Manifest } from "@/features/share/shareManifest";
+import { shareLinkForSlug } from "@/features/share/shareLink";
 
 export type SharedAlbumPageState =
   | { status: "loading"; slug: string }
@@ -125,6 +128,8 @@ export default function SharedAlbumPage({
   const [showStopConfirmation, setShowStopConfirmation] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<"copied" | "failed" | null>(null);
+  const shareLinkRef = useRef<HTMLInputElement>(null);
 
   if (state.status === "loading") return <SharedAlbumSkeleton />;
 
@@ -178,6 +183,16 @@ export default function SharedAlbumPage({
       setStopError("Sharing could not be stopped. Check your connection and try again.");
     } finally {
       setStopping(false);
+    }
+  };
+
+  const copyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareLinkForSlug(slug));
+      setCopyFeedback("copied");
+    } catch {
+      shareLinkRef.current?.select();
+      setCopyFeedback("failed");
     }
   };
 
@@ -255,8 +270,7 @@ export default function SharedAlbumPage({
             {new Intl.DateTimeFormat(undefined, { dateStyle: "long" }).format(new Date(expiresAt))}.
           </p>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground">
-            This shared album includes tags and cover art chosen by its creator. Audio downloads
-            from the original sources on this device.
+            Downloads use the original sources with the shared tags and cover.
           </p>
         </section>
 
@@ -269,13 +283,44 @@ export default function SharedAlbumPage({
               </p>
             )}
             {anotherTabOpen && (
-              <p className="flex gap-2 text-muted-foreground">
-                <AlertTriangle className="mt-1 size-4 shrink-0" aria-hidden="true" />
-                <span>
-                  Tagium is already open in another tab. Continuing here starts a separate
-                  workspace.
+              <div className="flex flex-wrap items-center gap-2">
+                <AlertTriangle
+                  className="size-4 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <span className="text-muted-foreground">Tagium is open in another tab.</span>
+                <Button type="button" size="sm" onClick={() => void copyShareLink()}>
+                  {copyFeedback === "copied" ? (
+                    <Check aria-hidden="true" />
+                  ) : (
+                    <Copy aria-hidden="true" />
+                  )}
+                  {copyFeedback === "copied" ? "copied" : "copy link"}
+                </Button>
+                <input
+                  ref={shareLinkRef}
+                  readOnly
+                  aria-label="share link"
+                  value={shareLinkForSlug(slug)}
+                  className={
+                    copyFeedback === "failed"
+                      ? "w-full min-w-0 rounded-md border bg-background px-2 py-1 font-mono text-xs"
+                      : "sr-only"
+                  }
+                />
+                <span role="status" className="sr-only" aria-live="polite">
+                  {copyFeedback === "copied"
+                    ? "Share link copied."
+                    : copyFeedback === "failed"
+                      ? "Copy failed. The share link is selected; copy it and paste it in the other tab."
+                      : ""}
                 </span>
-              </p>
+                {copyFeedback === "failed" && (
+                  <p className="w-full text-xs text-destructive">
+                    Copy failed. Copy the selected link and paste it in the other tab.
+                  </p>
+                )}
+              </div>
             )}
           </aside>
         )}
@@ -361,7 +406,7 @@ export default function SharedAlbumPage({
               ) : (
                 <Download aria-hidden="true" />
               )}
-              {adding ? "adding album…" : primaryLabel}
+              {adding ? "adding shared album…" : primaryLabel}
             </Button>
           </div>
         </div>

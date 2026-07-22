@@ -35,6 +35,11 @@ export const shareSlugFromPathname = (pathname: string) => {
   return match?.[1] ?? null;
 };
 
+export const shareLinkForSlug = (
+  slug: string,
+  origin = typeof location === "undefined" ? "https://tagium.app" : location.origin,
+) => new URL(`/share/${slug}`, origin).toString();
+
 export class InvalidShareLinkError extends Error {
   constructor() {
     super("that isn’t a Tagium share link");

@@ -71,6 +71,7 @@ export const useShareWorkflow = ({
   const [anotherTabOpen, setAnotherTabOpen] = useState(false);
   const artworkFileRef = useRef<File | null>(null);
   const loadingSlugRef = useRef<string | null>(null);
+  const importingSlugRef = useRef<string | null>(null);
 
   const loadSlug = useCallback(async (slug: string) => {
     loadingSlugRef.current = slug;
@@ -120,18 +121,49 @@ export const useShareWorkflow = ({
     return () => window.removeEventListener("popstate", handlePopState);
   }, [enabled, loadSlug]);
 
-  const openFromInput = useCallback(
+  const importFromInput = useCallback(
     async (slug: string) => {
       if (!enabled) throw new SharedAlbumUnavailableError();
-      history.pushState({ shareSlug: slug }, "", `/share/${slug}`);
+      if (importingSlugRef.current) return;
+
+      const existing = library
+        .getSnapshot()
+        .albums.find((album) => album.sourceManifestSlug === slug);
+      if (existing) {
+        library.dispatch({ type: "album-selected", albumId: existing.id, mode: "replace" });
+        return;
+      }
+
+      importingSlugRef.current = slug;
       try {
-        await loadSlug(slug);
+        const fresh = await fetchSharedAlbum(slug);
+        const artworkFile = fresh.manifest.album.artwork
+          ? await fetchSharedAlbumArtwork(slug)
+          : null;
+        const convertedPicture = artworkFile
+          ? await coverArtFileToPicture(artworkFile, "shared album cover")
+          : undefined;
+        const artwork = fresh.manifest.album.artwork;
+        const picture = convertedPicture?.map((entry, index) =>
+          index === 0 && artwork
+            ? {
+                ...entry,
+                format: artwork.format,
+                type: artwork.type,
+                description: artwork.description,
+              }
+            : entry,
+        );
+        await importing.commands.importSharedAlbum(fresh.manifest, slug, picture);
+        toast.success("shared album added · downloading 3 at a time");
       } catch (error) {
         if (error instanceof SharedAlbumVersionError) throw error;
         throw new SharedAlbumUnavailableError();
+      } finally {
+        importingSlugRef.current = null;
       }
     },
-    [enabled, loadSlug],
+    [enabled, importing.commands, library],
   );
 
   const closePage = useCallback((replace = false) => {
@@ -265,7 +297,7 @@ export const useShareWorkflow = ({
         await importing.commands.importSharedAlbum(fresh.manifest, page.slug, picture);
         history.replaceState({}, "", "/");
         setPage(null);
-        toast.success("album added · downloading 3 at a time");
+        toast.success("shared album added · downloading 3 at a time");
       } catch (error) {
         if (error instanceof SharedAlbumUnavailableError) {
           setPage({ status: "unavailable", slug: page.slug, reason: "unavailable" });
@@ -308,7 +340,7 @@ export const useShareWorkflow = ({
     anotherTabOpen,
     alreadyAddedAlbumId,
     canStopSharing,
-    openFromInput,
+    importFromInput,
     openCreator,
     publish: () => void publish(),
     closeDialog: () => setDialog({ status: "closed" }),

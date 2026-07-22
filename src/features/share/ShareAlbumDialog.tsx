@@ -77,12 +77,14 @@ export default function ShareAlbumDialog({
                 <Share2 className="size-4" aria-hidden="true" />
               </div>
               <DialogTitle>
-                {state.status === "published" ? "album shared" : `share ${state.albumTitle}`}
+                {state.status === "published"
+                  ? "share link ready"
+                  : `share album: ${state.albumTitle}`}
               </DialogTitle>
               <DialogDescription>
                 {state.status === "published"
-                  ? "Anyone with this link can review and download the album."
-                  : `${state.trackCount} track${state.trackCount === 1 ? "" : "s"} will be shared from their original sources.`}
+                  ? "Download from the original sources with the shared tags and cover."
+                  : `${state.trackCount} track${state.trackCount === 1 ? "" : "s"}.`}
               </DialogDescription>
             </DialogHeader>
 
@@ -103,31 +105,19 @@ export default function ShareAlbumDialog({
                   </Button>
                 </div>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  This shared album expires in 90 days. Its cover art is retained until then. You
-                  can stop sharing later from this browser.
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Available until{" "}
-                  {new Intl.DateTimeFormat(undefined, { dateStyle: "long" }).format(
-                    new Date(state.receipt.expiresAt),
-                  )}
-                  .
+                  This share link expires in 90 days. Stop sharing to revoke it immediately.
                 </p>
               </div>
             ) : (
               <div className="space-y-4 p-5">
                 <p className="text-sm leading-6 text-foreground">
-                  The shared album keeps the tags you chose. Audio is not uploaded; each recipient
-                  downloads it from the original sources on their device.
+                  Recipients download from the original sources with your tags and cover.
                 </p>
                 <p className="text-sm leading-6 text-foreground">
-                  Only share sources you have permission to access and redistribute.
+                  Confirm you have permission to share these sources.
                 </p>
                 <div className="rounded-lg bg-muted p-4 text-sm leading-6 text-muted-foreground">
-                  The shared album expires after 90 days.
-                  {state.hasCover
-                    ? " Its cover art will be retained until then."
-                    : " No cover art will be stored."}
+                  This share link expires in 90 days.
                 </div>
                 {state.status === "error" && (
                   <p role="alert" className="text-sm text-destructive">

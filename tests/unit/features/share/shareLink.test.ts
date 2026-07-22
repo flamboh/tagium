@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vite-plus/test";
-import { classifyShareLink, shareSlugFromPathname } from "@/features/share/shareLink";
+import {
+  classifyShareLink,
+  shareLinkForSlug,
+  shareSlugFromPathname,
+} from "@/features/share/shareLink";
 
 const slug = "AbcdEFGHijklmno_123-45";
 
 describe("share link classification", () => {
+  it("builds the canonical link used for copying into another workspace", () => {
+    expect(shareLinkForSlug(slug, "https://tagium.app")).toBe(`https://tagium.app/share/${slug}`);
+  });
   it("recognizes production and current-origin links before media import", () => {
     expect(classifyShareLink(`https://tagium.app/share/${slug}`, "http://localhost:5173")).toEqual({
       kind: "share",

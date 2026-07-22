@@ -77,7 +77,7 @@ export default function AudioTagger() {
     if (classification.kind === "invalid-share") throw new InvalidShareLinkError();
     if (classification.kind === "share" && !shareLinksEnabled) throw new ShareLinksDisabledError();
     if (classification.kind === "share") {
-      await sharing.openFromInput(classification.slug);
+      await sharing.importFromInput(classification.slug);
       return;
     }
     await importing.commands.importUrl(sourceUrl);
@@ -197,7 +197,7 @@ export default function AudioTagger() {
               onUrlImport={handleUrlImport}
               getSubmissionLabel={(sourceUrl) =>
                 classifyShareLink(sourceUrl).kind === "share"
-                  ? "opening shared album…"
+                  ? "adding shared album…"
                   : "importing media…"
               }
             />
