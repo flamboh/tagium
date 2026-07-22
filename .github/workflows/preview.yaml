@@ -36,7 +36,7 @@ jobs:
           VITE_PUBLIC_SHARE_LINKS_ENABLED: ${{ vars.VITE_PUBLIC_SHARE_LINKS_ENABLED }}
 
       - name: Deploy preview Worker
-        run: bun run deploy:preview -- --message "PR #${{ github.event.pull_request.number }} ${{ github.sha }}"
+        run: "bun run deploy:preview -- --message 'PR #${{ github.event.pull_request.number }} ${{ github.sha }}'"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
