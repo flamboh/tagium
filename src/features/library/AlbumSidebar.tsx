@@ -39,6 +39,7 @@ interface AlbumSidebarProps {
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
   onDownloadAlbum: (albumId: string) => void;
+  onShareAlbum?: (albumId: string) => void;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
     trackId: string,
@@ -78,6 +79,7 @@ export default function AlbumSidebar({
   onAddAlbum,
   onEditAlbum,
   onDownloadAlbum,
+  onShareAlbum,
   onUploadToAlbum,
   onMoveTrackToAlbum,
   onMoveTrackToLoose,
@@ -168,6 +170,14 @@ export default function AlbumSidebar({
                   const file = filesById.get(trackId);
                   return file ? isTrackReadyForDownload(file) : false;
                 });
+              const shareableTracks = album.trackIds.map((trackId) => filesById.get(trackId));
+              const canShareAlbum =
+                shareableTracks.length > 0 &&
+                shareableTracks.every((file) => Boolean(file?.downloadRequest && file.metadata));
+              const shareDisabledReason =
+                album.trackIds.length === 0
+                  ? "add imported tracks first"
+                  : "albums with local tracks cannot be shared";
               const fileDropProps = albumFileDropProps(album.id);
               return (
                 <SortableAlbumCard
@@ -175,9 +185,12 @@ export default function AlbumSidebar({
                   album={album}
                   selected={selectedAlbumId === album.id}
                   canDownload={canDownloadAlbum}
+                  canShare={canShareAlbum}
+                  shareDisabledReason={shareDisabledReason}
                   onSelect={(event) => onSelectAlbum(album.id, event)}
                   onEdit={() => onEditAlbum(album.id)}
                   onDownload={() => onDownloadAlbum(album.id)}
+                  onShare={() => onShareAlbum?.(album.id)}
                   {...fileDropProps}
                 >
                   <SortableContext

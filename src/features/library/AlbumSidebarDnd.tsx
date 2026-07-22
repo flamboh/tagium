@@ -12,6 +12,7 @@ import {
   Loader2,
   Pencil,
   RefreshCw,
+  Share2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -168,10 +169,13 @@ type AlbumCardProps = {
   album: AlbumGroup;
   selected: boolean;
   canDownload: boolean;
+  canShare: boolean;
+  shareDisabledReason: string;
   children: ReactNode;
   onSelect: (event: ReactMouseEvent) => void;
   onEdit: () => void;
   onDownload: () => void;
+  onShare: () => void;
   onFileDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
   onFileDrop: (event: React.DragEvent<HTMLDivElement>) => void;
 };
@@ -180,10 +184,13 @@ export function SortableAlbumCard({
   album,
   selected,
   canDownload,
+  canShare,
+  shareDisabledReason,
   children,
   onSelect,
   onEdit,
   onDownload,
+  onShare,
   onFileDragOver,
   onFileDrop,
 }: AlbumCardProps) {
@@ -249,6 +256,24 @@ export function SortableAlbumCard({
           <TooltipContent>
             {canDownload ? "download album" : "album tracks need files, metadata, and filenames"}
           </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={onShare}
+                disabled={!canShare}
+                aria-label={`share ${album.title}`}
+              >
+                <Share2 className="h-3.5 w-3.5" />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{canShare ? "share album" : shareDisabledReason}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>

@@ -91,7 +91,7 @@ export type AnalyticsEvent =
     }
   | {
       type: "import_retry_started";
-      sourceUrls: string[];
+      provider: "youtube" | "soundcloud" | "other";
       retryCount: number;
       previousFailedCount: number;
       previousCanceledCount: number;
@@ -309,12 +309,6 @@ const sizeBucket = (sizeBytes: number) => {
   return "500_mb_or_more";
 };
 
-const providerFromUrls = (sourceUrls: string[]) => {
-  const providers = new Set(sourceUrls.map(providerFromUrl));
-  if (providers.size === 1) return providers.values().next().value ?? "other";
-  return "other" as const;
-};
-
 const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
   const commonProperties = {
     event_version: 1,
@@ -449,7 +443,7 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
         name: event.type,
         properties: {
           ...commonProperties,
-          provider: providerFromUrls(event.sourceUrls),
+          provider: event.provider,
           retry_count: event.retryCount,
           previous_failed_count: event.previousFailedCount,
           previous_canceled_count: event.previousCanceledCount,

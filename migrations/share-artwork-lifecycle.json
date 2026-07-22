@@ -1,0 +1,10 @@
+{
+  "Rules": [
+    {
+      "ID": "tagium-share-artwork-expiry",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "shares/" },
+      "Expiration": { "Days": 90 }
+    }
+  ]
+}

@@ -6,7 +6,8 @@ import { createAudioUrlImportSession } from "@/features/import/audioUrlImportSes
 import { getImportQueuePresentation } from "@/features/import/importQueuePresentation";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
-import type { AppSettings, ImportedAlbumMetadata } from "@/features/library/types";
+import type { AppSettings, AudioMetadata, ImportedAlbumMetadata } from "@/features/library/types";
+import type { Manifest } from "@/features/share/shareManifest";
 
 type AudioImportEditor = {
   commands: Pick<TrackEditorSession["commands"], "flush" | "hydrateDownloadedTrack" | "updateTags">;
@@ -27,6 +28,11 @@ export interface AudioImportSession {
     cancelQueue: () => void;
     retryQueue: () => void;
     removeTracks: (trackIds: string[]) => void;
+    importSharedAlbum: (
+      manifest: Manifest,
+      sourceManifestSlug: string,
+      cover?: AudioMetadata["picture"],
+    ) => Promise<void>;
   };
 }
 
@@ -92,6 +98,7 @@ export const useAudioImportSession = ({
       cancelQueue: urlSession.cancelQueue,
       retryQueue: urlSession.retryQueue,
       removeTracks: urlSession.removeTracks,
+      importSharedAlbum: urlSession.importSharedAlbum,
     },
   };
 };

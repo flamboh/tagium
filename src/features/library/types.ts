@@ -32,6 +32,8 @@ export interface AlbumGroup {
   cover?: AudioMetadata["picture"];
   trackIds: string[];
   year?: number;
+  /** In-memory provenance used to prevent accidental duplicate share-link imports. */
+  sourceManifestSlug?: string;
 }
 
 export interface AppSettings {

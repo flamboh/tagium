@@ -33,6 +33,7 @@ export interface TagSidebarPanelProps {
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
   onDownloadAlbum: (albumId: string) => void;
+  onShareAlbum?: (albumId: string) => void;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
     trackId: string,
@@ -76,6 +77,7 @@ export default function TagSidebarPanel({
   onAddAlbum,
   onEditAlbum,
   onDownloadAlbum,
+  onShareAlbum,
   onUploadToAlbum,
   onMoveTrackToAlbum,
   onMoveTrackToLoose,
@@ -171,6 +173,7 @@ export default function TagSidebarPanel({
         onAddAlbum={onAddAlbum}
         onEditAlbum={onEditAlbum}
         onDownloadAlbum={onDownloadAlbum}
+        onShareAlbum={onShareAlbum}
         onUploadToAlbum={onUploadToAlbum}
         onMoveTrackToAlbum={onMoveTrackToAlbum}
         onMoveTrackToLoose={onMoveTrackToLoose}

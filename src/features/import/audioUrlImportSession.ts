@@ -19,10 +19,31 @@ import { reportSystemFailure } from "@/features/workspace/systemFailure";
 import { resolveTrackMetadata, type TrackMetadata } from "@/features/import/trackMetadata";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
-import type { AppSettings, TagiumFile } from "@/features/library/types";
+import type { AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
 import { isYouTubePlaylistUrl, resolveYouTubePlaylist } from "@/features/import/youtubePlaylist";
+import type { Manifest } from "@/features/share/shareManifest";
+import { createSharedAlbumDownloadPlan } from "@/features/share/sharedAlbumDownload";
 
 type ManagedDownloadTrack = QueuedDownloadTrack & { importOperationId?: string };
+const retryProvider = (
+  tracks: readonly ManagedDownloadTrack[],
+): "youtube" | "soundcloud" | "other" => {
+  const providers = new Set(
+    tracks.map((track) => {
+      try {
+        const host = new URL(track.downloadRequest.sourceUrl).hostname.toLowerCase();
+        return host === "youtu.be" || host.includes("youtube")
+          ? "youtube"
+          : host.includes("soundcloud")
+            ? "soundcloud"
+            : "other";
+      } catch {
+        return "other";
+      }
+    }),
+  );
+  return providers.size === 1 ? providers.values().next().value! : "other";
+};
 type UrlImportEditor = Pick<
   TrackEditorSession["commands"],
   "flush" | "hydrateDownloadedTrack" | "updateTags"
@@ -49,6 +70,11 @@ export interface AudioUrlImportSession {
   cancelQueue: () => void;
   retryQueue: () => void;
   removeTracks: (trackIds: string[]) => void;
+  importSharedAlbum: (
+    manifest: Manifest,
+    sourceManifestSlug: string,
+    cover?: AudioMetadata["picture"],
+  ) => Promise<void>;
 }
 
 export const createAudioUrlImportSession = ({
@@ -153,7 +179,7 @@ export const createAudioUrlImportSession = ({
         }
         analytics.capture({
           type: "import_retry_started",
-          sourceUrls: event.tracks.map((track) => track.downloadRequest.sourceUrl),
+          provider: retryProvider(event.tracks),
           retryCount: event.tracks.length,
           previousFailedCount: event.previousSnapshot.failed,
           previousCanceledCount: event.previousSnapshot.canceledCount,
@@ -276,6 +302,29 @@ export const createAudioUrlImportSession = ({
   };
 
   return {
+    importSharedAlbum: async (manifest, sourceManifestSlug, cover) => {
+      getEditor().flush();
+      activateEditor();
+      const snapshot = library.getSnapshot();
+      const plan = createSharedAlbumDownloadPlan(
+        manifest,
+        sourceManifestSlug,
+        () => crypto.randomUUID(),
+        cover,
+      );
+      library.dispatch({
+        type: "content-replaced",
+        files: [...snapshot.files, ...plan.pendingFiles],
+        albums: [...snapshot.albums, plan.album],
+        selection: {
+          selectedAlbumId: plan.selection.selectedAlbumId,
+          selectedFileId: plan.selection.selectedFileId,
+          selectedFileIds: plan.selection.selectedFileIds,
+          rangeAnchorFileId: plan.selection.lastSelectedFileId,
+        },
+      });
+      queueDownloadTracks(plan.queuedTracks);
+    },
     importUrl: async (sourceUrl) => {
       const trimmedUrl = sourceUrl.trim();
       if (!trimmedUrl) return;

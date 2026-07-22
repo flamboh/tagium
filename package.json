@@ -17,6 +17,10 @@
     "prepare": "vp config",
     "deploy:preview": "bun run scripts/deploy-preview.ts",
     "deploy:production": "bun run scripts/deploy-production.ts",
+    "migrate:share:preview": "TAGIUM_DEPLOY_ENV=preview bun run scripts/apply-share-migrations.ts",
+    "migrate:share:production": "TAGIUM_DEPLOY_ENV=production bun run scripts/apply-share-migrations.ts",
+    "configure:share-artwork-lifecycle": "bun run scripts/configure-share-artwork-lifecycle.ts",
+    "disable:share-manifest": "bun run scripts/disable-share-manifest.ts",
     "load-test:cobalt": "bun run scripts/load-test-cobalt.ts",
     "doctor": "bunx react-doctor@latest",
     "shadcn": "shadcn"
