@@ -16,7 +16,16 @@ const uploadTrack = async (page: Page) => {
 };
 
 const enableAdvancedMetadata = async (page: Page) => {
-  await page.getByRole("button", { name: "settings" }).click();
+  const viewport = page.viewportSize();
+  if (viewport && viewport.width < 768) {
+    await page.getByRole("button", { name: "open library" }).click();
+    await page
+      .getByRole("dialog", { name: "library" })
+      .getByRole("button", { name: "settings" })
+      .click();
+  } else {
+    await page.getByRole("button", { name: "settings" }).click();
+  }
   await page.getByRole("checkbox", { name: "enable advanced metadata" }).click();
   await page.getByRole("button", { name: "back to editor" }).click();
   await expect(page.getByRole("button", { name: "advanced" })).toBeVisible();
