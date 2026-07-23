@@ -144,9 +144,7 @@ function TrackFilenameHeader({
   return (
     <div
       className={`relative h-16 shrink-0 border-b pl-16 max-lg:[@media(max-height:700px)]:h-14 md:pl-4 lg:h-[104px] lg:pl-6 ${
-        hasModeToggle
-          ? "pr-40 max-lg:[@media(max-height:700px)]:pr-36 lg:pr-44"
-          : "pr-4 lg:pr-6"
+        hasModeToggle ? "pr-40 max-lg:[@media(max-height:700px)]:pr-36 lg:pr-44" : "pr-4 lg:pr-6"
       }`}
     >
       <div className="flex h-full min-w-0 items-center">
