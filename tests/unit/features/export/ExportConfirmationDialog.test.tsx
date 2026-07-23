@@ -102,8 +102,9 @@ describe("ExportConfirmationDialog", () => {
       onConfirm: vi.fn(),
       onRestoreFocus: vi.fn(),
     });
-    const status = findAll(tree, (element) => element.props.role === "status")[0];
-    expect(textContent(status)).toContain("no longer ready");
+    const alert = findAll(tree, (element) => element.props.role === "alert")[0];
+    expect(textContent(alert)).toContain("no longer ready");
+    expect(alert?.props["aria-live"]).toBeUndefined();
     const download = findAll(tree, (element) => element.type === Button).find((button) =>
       textContent(button).includes("download"),
     );

@@ -57,7 +57,7 @@ export default function ExportConfirmationDialog({
           </DialogDescription>
           {status !== "ready" && (
             <p
-              role="status"
+              role="alert"
               className="rounded-md bg-accent px-3 py-2 text-sm text-accent-foreground"
             >
               {status === "changed"
