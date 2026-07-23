@@ -17,6 +17,7 @@ export type ShareRuntimeEnv = {
   SHARE_CREATE_RATE_LIMITER?: ShareRateLimitBinding;
   SHARE_READ_RATE_LIMITER?: ShareRateLimitBinding;
   SHARE_REVOKE_RATE_LIMITER?: ShareRateLimitBinding;
+  SHARE_UPDATE_RATE_LIMITER?: ShareRateLimitBinding;
 };
 
 type CloudflareRequest = Request & { runtime?: { cloudflare?: { env?: ShareRuntimeEnv } } };
@@ -43,6 +44,9 @@ export const admitShareRead = (request: Request) =>
 
 export const admitShareRevoke = (request: Request) =>
   admitShareRequest(request, getShareRuntimeEnv(request).SHARE_REVOKE_RATE_LIMITER);
+
+export const admitShareUpdate = (request: Request) =>
+  admitShareRequest(request, getShareRuntimeEnv(request).SHARE_UPDATE_RATE_LIMITER);
 
 /** The shared transport contract is the sole source/SSRF validation policy. */
 export const decodePublishedManifest = (value: unknown): ShareManifest => {

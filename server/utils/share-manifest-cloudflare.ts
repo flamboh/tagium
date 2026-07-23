@@ -107,6 +107,34 @@ export const createCloudflareShareManifestPersistence = ({
       .first<D1Row>();
     return row ? fromRow(row) : undefined;
   },
+  update: async ({ previous, replacement, revocationTokenHash, now }) => {
+    const result = await database
+      .prepare(
+        `UPDATE share_manifests SET
+          version = ?, payload_json = ?, artwork_key = ?, artwork_type = ?, artwork_bytes = ?,
+          artwork_sha256 = ?, track_count = ?, payload_bytes = ?
+        WHERE slug = ? AND revocation_token_hash = ? AND status = 'active' AND expires_at = ?
+          AND expires_at > ? AND payload_json = ? AND artwork_key IS ?`,
+      )
+      .bind(
+        replacement.version,
+        replacement.payloadJson,
+        replacement.artworkKey ?? null,
+        replacement.artworkType ?? null,
+        replacement.artworkBytes ?? null,
+        replacement.artworkSha256 ?? null,
+        replacement.trackCount,
+        replacement.payloadBytes,
+        previous.slug,
+        revocationTokenHash,
+        previous.expiresAt,
+        now,
+        previous.payloadJson,
+        previous.artworkKey ?? null,
+      )
+      .run();
+    return result.meta.changes === 1 ? "updated" : "conflict";
+  },
   disable: async (slug, tokenHash, now) => {
     const row = await database
       .prepare(

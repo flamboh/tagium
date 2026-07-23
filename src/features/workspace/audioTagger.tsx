@@ -126,6 +126,7 @@ export default function AudioTagger() {
           onRetryDownload={importing.commands.retryTrack}
           onDownloadAlbum={exporting.downloadAlbum}
           onShareAlbum={shareLinksEnabled ? sharing.openCreator : undefined}
+          shareAlbumActions={shareLinksEnabled ? sharing.shareActions : undefined}
           onUploadToAlbum={(albumId, filesToUpload) =>
             importing.commands.upload(filesToUpload, albumId)
           }

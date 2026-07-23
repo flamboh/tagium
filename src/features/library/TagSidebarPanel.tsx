@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { allTracksReadyForDownload } from "@/features/export/downloadLibrary";
 import { isValidFilenameBase } from "@/features/library/filename";
+import type { ShareAlbumActionState } from "@/features/share/sharePublication";
 
 export interface TagSidebarPanelProps {
   loading: boolean;
@@ -34,6 +35,7 @@ export interface TagSidebarPanelProps {
   onEditAlbum: (albumId: string) => void;
   onDownloadAlbum: (albumId: string) => void;
   onShareAlbum?: (albumId: string) => void;
+  shareAlbumActions?: Readonly<Record<string, ShareAlbumActionState>>;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
     trackId: string,
@@ -78,6 +80,7 @@ export default function TagSidebarPanel({
   onEditAlbum,
   onDownloadAlbum,
   onShareAlbum,
+  shareAlbumActions,
   onUploadToAlbum,
   onMoveTrackToAlbum,
   onMoveTrackToLoose,
@@ -174,6 +177,7 @@ export default function TagSidebarPanel({
         onEditAlbum={onEditAlbum}
         onDownloadAlbum={onDownloadAlbum}
         onShareAlbum={onShareAlbum}
+        shareAlbumActions={shareAlbumActions}
         onUploadToAlbum={onUploadToAlbum}
         onMoveTrackToAlbum={onMoveTrackToAlbum}
         onMoveTrackToLoose={onMoveTrackToLoose}

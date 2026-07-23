@@ -3,6 +3,7 @@ import artworkHandler from "../../server/api/manifests/[slug]/artwork.get";
 import revokeHandler from "../../server/api/manifests/[slug].delete";
 import manifestHandler from "../../server/api/manifests/[slug].get";
 import publishHandler from "../../server/api/manifests/index.post";
+import updateHandler from "../../server/api/manifests/[slug].patch";
 import noindexMiddleware from "../../server/middleware/02-share-noindex";
 import type { ShareRuntimeEnv } from "../../server/utils/share-manifest-request";
 import { isShareExpiryIso } from "../../src/features/share/shareManifest";
@@ -61,6 +62,31 @@ const createRuntime = () => {
           return statement;
         },
         run: async () => {
+          if (query.startsWith("UPDATE share_manifests SET\n          version")) {
+            const slug = values[8] as string;
+            const record = records.get(slug);
+            if (
+              !record ||
+              record.revocationTokenHash !== values[9] ||
+              record.status !== "active" ||
+              record.expiresAt !== values[10] ||
+              record.expiresAt <= Number(values[11]) ||
+              record.payloadJson !== values[12] ||
+              record.artworkKey !== values[13]
+            )
+              return { meta: { changes: 0 } };
+            Object.assign(record, {
+              version: values[0],
+              payloadJson: values[1],
+              artworkKey: values[2],
+              artworkType: values[3],
+              artworkBytes: values[4],
+              artworkSha256: values[5],
+              trackCount: values[6],
+              payloadBytes: values[7],
+            });
+            return { meta: { changes: 1 } };
+          }
           const record = Object.fromEntries(
             [
               "slug",
@@ -249,6 +275,24 @@ describe("share manifest endpoints", () => {
           slug,
         ),
       ),
+      updateHandler(
+        event(
+          request(
+            `https://tagium.test/api/manifests/${slug}`,
+            {
+              method: "PATCH",
+              headers: { authorization: "Bearer wrong" },
+              body: (() => {
+                const form = new FormData();
+                form.set("manifest", JSON.stringify(manifest));
+                return form;
+              })(),
+            },
+            runtime.env,
+          ),
+          slug,
+        ),
+      ),
     ])) {
       expect(response.status).toBe(404);
       expect(response.headers.get("cache-control")).toBe("no-store");
@@ -276,6 +320,214 @@ describe("share manifest endpoints", () => {
     expect(read.status).toBe(429);
     expect(create.headers.get("cache-control")).toBe("no-store");
     expect(read.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("updates an existing manifest and artwork in place while preserving its URL and expiry", async () => {
+    const runtime = createRuntime();
+    const createForm = new FormData();
+    createForm.set("manifest", JSON.stringify(manifest));
+    createForm.set("cover", new File([png], "cover.png"));
+    const created = await publishHandler(
+      event(
+        request(
+          "https://tagium.test/api/manifests",
+          { method: "POST", body: createForm },
+          runtime.env,
+        ),
+      ),
+    );
+    const receipt = (await created.json()) as {
+      slug: string;
+      url: string;
+      expiresAt: string;
+      revocationToken: string;
+    };
+    const oldArtworkKey = runtime.records.get(receipt.slug)?.artworkKey;
+    const edited = { ...manifest, album: { ...manifest.album, title: "Edited album" } };
+    const updateForm = new FormData();
+    updateForm.set("manifest", JSON.stringify(edited));
+    updateForm.set("cover", new File([png], "replacement.png"));
+    const updated = await updateHandler(
+      event(
+        request(
+          `https://tagium.test/api/manifests/${receipt.slug}`,
+          {
+            method: "PATCH",
+            headers: { authorization: `Bearer ${receipt.revocationToken}` },
+            body: updateForm,
+          },
+          runtime.env,
+        ),
+        receipt.slug,
+      ),
+    );
+
+    expect(updated.status).toBe(200);
+    expect(await updated.json()).toEqual({
+      slug: receipt.slug,
+      url: receipt.url,
+      expiresAt: receipt.expiresAt,
+    });
+    expect(runtime.records.size).toBe(1);
+    expect(runtime.records.get(receipt.slug)?.artworkKey).not.toBe(oldArtworkKey);
+    expect(oldArtworkKey && runtime.artwork.has(oldArtworkKey)).toBe(false);
+    const loaded = await manifestHandler(
+      event(
+        request(`https://tagium.test/api/manifests/${receipt.slug}`, {}, runtime.env),
+        receipt.slug,
+      ),
+    );
+    await expect(loaded.json()).resolves.toMatchObject({
+      manifest: { album: { title: "Edited album" } },
+    });
+  });
+
+  it("supports metadata-only artwork retention and explicit artwork removal", async () => {
+    const runtime = createRuntime();
+    const createForm = new FormData();
+    createForm.set("manifest", JSON.stringify(manifest));
+    createForm.set("cover", new File([png], "cover.png"));
+    const created = await publishHandler(
+      event(
+        request(
+          "https://tagium.test/api/manifests",
+          { method: "POST", body: createForm },
+          runtime.env,
+        ),
+      ),
+    );
+    const receipt = (await created.json()) as { slug: string; revocationToken: string };
+    const retainedKey = runtime.records.get(receipt.slug)?.artworkKey;
+    const retainForm = new FormData();
+    retainForm.set("manifest", JSON.stringify(manifest));
+    expect(
+      (
+        await updateHandler(
+          event(
+            request(
+              `https://tagium.test/api/manifests/${receipt.slug}`,
+              {
+                method: "PATCH",
+                headers: { authorization: `Bearer ${receipt.revocationToken}` },
+                body: retainForm,
+              },
+              runtime.env,
+            ),
+            receipt.slug,
+          ),
+        )
+      ).status,
+    ).toBe(200);
+    expect(runtime.records.get(receipt.slug)?.artworkKey).toBe(retainedKey);
+
+    const removeForm = new FormData();
+    removeForm.set("manifest", JSON.stringify(manifest));
+    removeForm.set("removeArtwork", "true");
+    expect(
+      (
+        await updateHandler(
+          event(
+            request(
+              `https://tagium.test/api/manifests/${receipt.slug}`,
+              {
+                method: "PATCH",
+                headers: { authorization: `Bearer ${receipt.revocationToken}` },
+                body: removeForm,
+              },
+              runtime.env,
+            ),
+            receipt.slug,
+          ),
+        )
+      ).status,
+    ).toBe(200);
+    expect(runtime.records.get(receipt.slug)?.artworkKey).toBeNull();
+    expect(retainedKey && runtime.artwork.has(retainedKey)).toBe(false);
+  });
+
+  it("rate-limits updates and rejects cross-site or ambiguous update bodies", async () => {
+    const runtime = createRuntime();
+    runtime.env.SHARE_UPDATE_RATE_LIMITER = { limit: async () => ({ success: false }) };
+    const slug = "a".repeat(22);
+    const limitedForm = new FormData();
+    limitedForm.set("manifest", JSON.stringify(manifest));
+    const limited = await updateHandler(
+      event(
+        request(
+          `https://tagium.test/api/manifests/${slug}`,
+          {
+            method: "PATCH",
+            headers: { authorization: "Bearer token" },
+            body: limitedForm,
+          },
+          runtime.env,
+        ),
+        slug,
+      ),
+    );
+    expect(limited.status).toBe(429);
+
+    delete runtime.env.SHARE_UPDATE_RATE_LIMITER;
+    const publishForm = new FormData();
+    publishForm.set("manifest", JSON.stringify(manifest));
+    const publishResponse = await publishHandler(
+      event(
+        request(
+          "https://tagium.test/api/manifests",
+          { method: "POST", body: publishForm, headers: { origin: "https://tagium.test" } },
+          runtime.env,
+        ),
+      ),
+    );
+    const receipt = (await publishResponse.json()) as { slug: string; revocationToken: string };
+    const crossSiteForm = new FormData();
+    crossSiteForm.set(
+      "manifest",
+      JSON.stringify({ ...manifest, album: { ...manifest.album, title: "Cross-site" } }),
+    );
+    const crossSitePatch = await updateHandler(
+      event(
+        request(
+          `https://tagium.test/api/manifests/${receipt.slug}`,
+          {
+            method: "PATCH",
+            headers: {
+              authorization: `Bearer ${receipt.revocationToken}`,
+              origin: "https://evil.test",
+              "sec-fetch-site": "cross-site",
+            },
+            body: crossSiteForm,
+          },
+          runtime.env,
+        ),
+        receipt.slug,
+      ),
+    );
+    expect(crossSitePatch.status).toBe(400);
+    expect(JSON.parse(runtime.records.get(receipt.slug)!.payloadJson).album.title).toBe("Album");
+
+    const invalidForm = new FormData();
+    invalidForm.set("manifest", JSON.stringify(manifest));
+    invalidForm.set("cover", new File([png], "cover.png"));
+    invalidForm.set("removeArtwork", "true");
+    const invalid = await updateHandler(
+      event(
+        request(
+          `https://tagium.test/api/manifests/${slug}`,
+          {
+            method: "PATCH",
+            headers: {
+              authorization: "Bearer token",
+              origin: "https://tagium.test",
+            },
+            body: invalidForm,
+          },
+          runtime.env,
+        ),
+        slug,
+      ),
+    );
+    expect(invalid.status).toBe(400);
   });
 
   it("rejects cross-site, duplicate and unexpected multipart fields before persistence", async () => {

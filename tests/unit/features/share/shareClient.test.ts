@@ -4,6 +4,7 @@ import {
   revokeSharedAlbum,
   SharedAlbumUnavailableError,
   SharedAlbumVersionError,
+  updateSharedAlbum,
 } from "@/features/share/shareClient";
 
 const manifest = {
@@ -73,5 +74,27 @@ describe("shared album client", () => {
     await expect(
       revokeSharedAlbum("AbcdEFGHijklmno_123-45", "private-secret", { fetch }),
     ).rejects.toThrow("sharing could not be stopped");
+  });
+
+  it("updates the same link with a bearer capability and never posts", async () => {
+    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      Response.json({
+        slug: "AbcdEFGHijklmno_123-45",
+        url: "https://tagium.app/share/AbcdEFGHijklmno_123-45",
+        expiresAt: "2026-10-20T12:00:00Z",
+      }),
+    );
+    await expect(
+      updateSharedAlbum("AbcdEFGHijklmno_123-45", "private-secret", manifest as never, null, {
+        fetch,
+      }),
+    ).resolves.toMatchObject({ slug: "AbcdEFGHijklmno_123-45" });
+    const [url, request] = fetch.mock.calls[0]!;
+    expect(url).toBe("/api/manifests/AbcdEFGHijklmno_123-45");
+    expect(request).toMatchObject({
+      method: "PATCH",
+      headers: expect.objectContaining({ Authorization: "Bearer private-secret" }),
+    });
+    expect((request!.body as FormData).get("removeArtwork")).toBe("true");
   });
 });

@@ -36,6 +36,14 @@ export interface AlbumGroup {
   sourceUrl?: string;
   /** In-memory provenance used to prevent accidental duplicate share-link imports. */
   sourceManifestSlug?: string;
+  /** The single creator-owned publication associated with this in-memory album. */
+  sharePublication?: {
+    slug: string;
+    url: string;
+    expiresAt: string;
+    publishedFingerprint: string;
+    status: "active" | "stopped";
+  };
 }
 
 export interface AppSettings {

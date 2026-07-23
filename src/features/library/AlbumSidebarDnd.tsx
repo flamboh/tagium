@@ -171,6 +171,7 @@ type AlbumCardProps = {
   canDownload: boolean;
   canShare: boolean;
   shareDisabledReason: string;
+  shareLabel: "share album" | "update shared album";
   children: ReactNode;
   onSelect: (event: ReactMouseEvent) => void;
   onEdit: () => void;
@@ -186,6 +187,7 @@ export function SortableAlbumCard({
   canDownload,
   canShare,
   shareDisabledReason,
+  shareLabel,
   children,
   onSelect,
   onEdit,
@@ -267,13 +269,13 @@ export function SortableAlbumCard({
                 className="h-7 w-7"
                 onClick={onShare}
                 disabled={!canShare}
-                aria-label={`share ${album.title}`}
+                aria-label={`${shareLabel}: ${album.title}`}
               >
                 <Share2 className="h-3.5 w-3.5" />
               </Button>
             </span>
           </TooltipTrigger>
-          <TooltipContent>{canShare ? "share album" : shareDisabledReason}</TooltipContent>
+          <TooltipContent>{canShare ? shareLabel : shareDisabledReason}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>

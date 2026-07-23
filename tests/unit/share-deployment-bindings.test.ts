@@ -42,6 +42,10 @@ describe("share deployment config contract", () => {
           name: "SHARE_CREATE_RATE_LIMITER",
           namespace_id: target.createRateLimitNamespace,
         }),
+        expect.objectContaining({
+          name: "SHARE_UPDATE_RATE_LIMITER",
+          namespace_id: target.updateRateLimitNamespace,
+        }),
       ]),
     );
     expect(config.routes).toEqual([{ pattern: "tagium.app", custom_domain: true }]);

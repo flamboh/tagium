@@ -22,6 +22,7 @@ import {
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import { isTrackReadyForDownload } from "@/features/export/downloadLibrary";
 import { useAlbumSidebarDragController } from "@/features/library/useAlbumSidebarDragController";
+import type { ShareAlbumActionState } from "@/features/share/sharePublication";
 
 interface AlbumSidebarProps {
   albums: AlbumGroup[];
@@ -40,6 +41,7 @@ interface AlbumSidebarProps {
   onEditAlbum: (albumId: string) => void;
   onDownloadAlbum: (albumId: string) => void;
   onShareAlbum?: (albumId: string) => void;
+  shareAlbumActions?: Readonly<Record<string, ShareAlbumActionState>>;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
     trackId: string,
@@ -80,6 +82,7 @@ export default function AlbumSidebar({
   onEditAlbum,
   onDownloadAlbum,
   onShareAlbum,
+  shareAlbumActions = {},
   onUploadToAlbum,
   onMoveTrackToAlbum,
   onMoveTrackToLoose,
@@ -171,13 +174,17 @@ export default function AlbumSidebar({
                   return file ? isTrackReadyForDownload(file) : false;
                 });
               const shareableTracks = album.trackIds.map((trackId) => filesById.get(trackId));
-              const canShareAlbum =
+              const contentCanShare =
                 shareableTracks.length > 0 &&
                 shareableTracks.every((file) => Boolean(file?.downloadRequest && file.metadata));
-              const shareDisabledReason =
+              const contentDisabledReason =
                 album.trackIds.length === 0
                   ? "add imported tracks first"
                   : "albums with local tracks cannot be shared";
+              const shareAction = shareAlbumActions[album.id];
+              const canShareAlbum =
+                Boolean(onShareAlbum) && contentCanShare && (shareAction?.enabled ?? true);
+              const shareDisabledReason = shareAction?.reason ?? contentDisabledReason;
               const fileDropProps = albumFileDropProps(album.id);
               return (
                 <SortableAlbumCard
@@ -187,6 +194,7 @@ export default function AlbumSidebar({
                   canDownload={canDownloadAlbum}
                   canShare={canShareAlbum}
                   shareDisabledReason={shareDisabledReason}
+                  shareLabel={shareAction?.label ?? "share album"}
                   onSelect={(event) => onSelectAlbum(album.id, event)}
                   onEdit={() => onEditAlbum(album.id)}
                   onDownload={() => onDownloadAlbum(album.id)}

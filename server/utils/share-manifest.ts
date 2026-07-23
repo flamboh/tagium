@@ -6,7 +6,7 @@ import {
 
 /**
  * The share-manifest module is the server seam for publishing, reading, and
- * revoking immutable manifests. Callers do not learn SQL, R2 keys, expiry
+ * revoking manifests. Callers do not learn SQL, R2 keys, expiry
  * arithmetic, token hashing, or compensation rules; tests swap its small
  * persistence adapter for a fake.
  */
@@ -57,6 +57,13 @@ export interface ShareManifestPersistence {
   >;
   create: (record: StoredShareManifest) => Promise<"created" | "conflict">;
   get: (slug: string) => Promise<StoredShareManifest | undefined>;
+  /** Atomically replaces an active record only if it still matches the loaded snapshot. */
+  update: (input: {
+    previous: StoredShareManifest;
+    replacement: StoredShareManifest;
+    revocationTokenHash: string;
+    now: number;
+  }) => Promise<"updated" | "conflict">;
   /** Returns a matching record even when it was already disabled, for retry-safe revoke. */
   disable: (
     slug: string,
@@ -68,6 +75,13 @@ export interface ShareManifestPersistence {
 export type ShareManifestUnavailable = { kind: "unavailable" };
 export type ShareManifestLoaded = { kind: "available"; manifest: ShareManifest; expiresAt: number };
 export type ShareManifestRevokeResult = "revoked" | "unavailable" | "artwork_unavailable";
+export type ShareArtworkUpdate =
+  | { kind: "retain" }
+  | { kind: "remove" }
+  | { kind: "replace"; artwork: ShareArtwork };
+export type ShareManifestUpdateResult =
+  | { kind: "updated"; slug: string; expiresAt: number }
+  | ShareManifestUnavailable;
 const unavailable = (): ShareManifestUnavailable => ({ kind: "unavailable" });
 
 const base64url = (bytes: Uint8Array) =>
@@ -217,6 +231,27 @@ const withArtwork = (manifest: ShareManifest, artwork: ShareArtwork | undefined)
   });
 };
 
+const withoutArtwork = (manifest: ShareManifest): ShareManifest => {
+  const { artwork: _artwork, ...album } = manifest.album;
+  return decodeManifest({ ...manifest, album });
+};
+
+const withRetainedArtwork = (
+  manifest: ShareManifest,
+  record: StoredShareManifest,
+): ShareManifest => {
+  if (!record.artworkKey) return withArtwork(manifest, undefined);
+  const storedManifest = decodeStored(record.payloadJson);
+  const descriptor = manifest.album.artwork ?? storedManifest?.album.artwork;
+  if (!descriptor || !record.artworkType)
+    throw new ShareManifestValidationError("share_artwork_missing");
+  const { artwork: _artwork, ...album } = manifest.album;
+  return decodeManifest({
+    ...manifest,
+    album: { ...album, artwork: { ...descriptor, format: record.artworkType } },
+  });
+};
+
 const decodeStored = (payloadJson: string): ShareManifest | undefined => {
   try {
     return decodeManifest(JSON.parse(payloadJson));
@@ -227,6 +262,20 @@ const decodeStored = (payloadJson: string): ShareManifest | undefined => {
 
 const active = (record: StoredShareManifest | undefined, now: number) =>
   record && record.status === "active" && record.expiresAt > now ? record : undefined;
+
+const equalSecretHashes = (left: string, right: string) => {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index++)
+    difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  return difference === 0;
+};
+
+const samePublishedValue = (left: StoredShareManifest, right: StoredShareManifest) =>
+  left.payloadJson === right.payloadJson &&
+  left.artworkType === right.artworkType &&
+  left.artworkBytes === right.artworkBytes &&
+  left.artworkSha256 === right.artworkSha256;
 
 export const createShareManifestStore = (
   persistence: ShareManifestPersistence,
@@ -251,8 +300,14 @@ export const createShareManifestStore = (
         const artworkKey = artwork
           ? `shares/${slug}/${token(8)}.${artwork.type === "image/png" ? "png" : "jpg"}`
           : undefined;
-        if (artwork && artworkKey)
-          await persistence.putArtwork({ ...artwork, key: artworkKey, expiresAt });
+        if (artwork && artworkKey) {
+          try {
+            await persistence.putArtwork({ ...artwork, key: artworkKey, expiresAt });
+          } catch (error) {
+            await persistence.deleteArtwork(artworkKey).catch(() => undefined);
+            throw error;
+          }
+        }
         const created = await persistence
           .create({
             slug,
@@ -277,6 +332,130 @@ export const createShareManifestStore = (
         if (artworkKey) await persistence.deleteArtwork(artworkKey).catch(() => undefined);
       }
       throw new Error("share_slug_collision");
+    },
+    update: async (
+      slug: string,
+      revocationToken: string,
+      manifest: ShareManifest,
+      artworkUpdate: ShareArtworkUpdate,
+    ): Promise<ShareManifestUpdateResult> => {
+      if (!SHARE_SLUG_PATTERN.test(slug) || !revocationToken) return unavailable();
+      const now = clock();
+      const previous = active(await persistence.get(slug), now);
+      if (!previous) return unavailable();
+      const revocationTokenHash = await hashShareSecret(revocationToken);
+      if (!equalSecretHashes(previous.revocationTokenHash, revocationTokenHash))
+        return unavailable();
+
+      const artwork = artworkUpdate.kind === "replace" ? artworkUpdate.artwork : undefined;
+      const nextManifest =
+        artworkUpdate.kind === "remove"
+          ? withoutArtwork(manifest)
+          : artworkUpdate.kind === "replace"
+            ? withArtwork(manifest, artwork)
+            : withRetainedArtwork(manifest, previous);
+      const payloadJson = JSON.stringify(nextManifest);
+      const payloadBytes = utf8.encode(payloadJson).byteLength;
+      if (payloadBytes > SHARE_MANIFEST_MAX_BYTES)
+        throw new ShareManifestValidationError("share_manifest_too_large");
+
+      let artworkKey = artworkUpdate.kind === "retain" ? previous.artworkKey : undefined;
+      if (artworkUpdate.kind === "replace") {
+        const extension = artwork?.type === "image/png" ? "png" : "jpg";
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const candidate = `shares/${slug}/${token(8)}.${extension}`;
+          if (candidate !== previous.artworkKey) {
+            artworkKey = candidate;
+            break;
+          }
+        }
+        if (!artworkKey) throw new Error("share_artwork_key_collision");
+      }
+      const replacement: StoredShareManifest = {
+        ...previous,
+        version: nextManifest.version,
+        payloadJson,
+        payloadBytes,
+        trackCount: nextManifest.tracks.length,
+        artworkKey,
+        artworkType:
+          artworkUpdate.kind === "replace"
+            ? artwork?.type
+            : artworkUpdate.kind === "retain"
+              ? previous.artworkType
+              : undefined,
+        artworkBytes:
+          artworkUpdate.kind === "replace"
+            ? artwork?.bytes.byteLength
+            : artworkUpdate.kind === "retain"
+              ? previous.artworkBytes
+              : undefined,
+        artworkSha256:
+          artworkUpdate.kind === "replace"
+            ? artwork?.sha256
+            : artworkUpdate.kind === "retain"
+              ? previous.artworkSha256
+              : undefined,
+      };
+
+      if (artwork && artworkKey) {
+        try {
+          await persistence.putArtwork({
+            ...artwork,
+            key: artworkKey,
+            expiresAt: previous.expiresAt,
+          });
+        } catch (error) {
+          // R2 may have stored the object before reporting a failure. The
+          // candidate key is not referenced by D1 yet, so clean it up while
+          // preserving the original failure semantics.
+          await persistence.deleteArtwork(artworkKey).catch(() => undefined);
+          throw error;
+        }
+      }
+      let outcome: "updated" | "conflict";
+      try {
+        outcome = await persistence.update({ previous, replacement, revocationTokenHash, now });
+      } catch (error) {
+        if (artwork && artworkKey) {
+          let current: StoredShareManifest | undefined;
+          try {
+            current = await persistence.get(slug);
+          } catch {
+            // The D1 outcome is ambiguous and verification failed. Preserve
+            // the candidate rather than risking deletion of a live object.
+            throw error;
+          }
+          if (current?.artworkKey === artworkKey) {
+            if (
+              equalSecretHashes(current.revocationTokenHash, revocationTokenHash) &&
+              samePublishedValue(current, replacement)
+            ) {
+              if (previous.artworkKey && previous.artworkKey !== artworkKey)
+                await persistence.deleteArtwork(previous.artworkKey).catch(() => undefined);
+              return { kind: "updated", slug, expiresAt: current.expiresAt };
+            }
+            throw error;
+          }
+          await persistence.deleteArtwork(artworkKey).catch(() => undefined);
+        }
+        throw error;
+      }
+      if (outcome === "conflict") {
+        // Do not delete a candidate until the live row has been checked. If
+        // this read fails, the candidate remains orphaned but recoverable.
+        const current = active(await persistence.get(slug), now);
+        if (artwork && artworkKey && current?.artworkKey !== artworkKey)
+          await persistence.deleteArtwork(artworkKey).catch(() => undefined);
+        return current &&
+          equalSecretHashes(current.revocationTokenHash, revocationTokenHash) &&
+          samePublishedValue(current, replacement)
+          ? { kind: "updated", slug, expiresAt: current.expiresAt }
+          : unavailable();
+      }
+      if (previous.artworkKey && previous.artworkKey !== artworkKey)
+        await persistence.deleteArtwork(previous.artworkKey).catch(() => undefined);
+      return { kind: "updated", slug, expiresAt: previous.expiresAt };
     },
     load: async (slug: string): Promise<ShareManifestLoaded | ShareManifestUnavailable> => {
       if (!SHARE_SLUG_PATTERN.test(slug)) return unavailable();

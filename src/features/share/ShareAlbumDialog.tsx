@@ -14,14 +14,19 @@ import type { ShareAlbumPreview } from "@/features/share/sharePreview";
 
 export type ShareDialogState =
   | { status: "closed" }
-  | { status: "confirm"; preview: ShareAlbumPreview }
-  | { status: "publishing"; preview: ShareAlbumPreview }
+  | { status: "confirm"; preview: ShareAlbumPreview; intent?: "create" | "update" }
+  | { status: "publishing"; preview: ShareAlbumPreview; intent?: "create" | "update" }
   | {
       status: "published";
       preview: ShareAlbumPreview;
       receipt: SharePublicationReceipt;
     }
-  | { status: "error"; preview: ShareAlbumPreview; message: string };
+  | {
+      status: "error";
+      preview: ShareAlbumPreview;
+      intent?: "create" | "update";
+      message: string;
+    };
 
 interface ShareAlbumDialogProps {
   state: ShareDialogState;
@@ -127,7 +132,7 @@ function ShareAlbumDialogSession({
             <DialogTitle className="truncate text-left">
               {state.status === "published"
                 ? "share link ready"
-                : `share album: ${state.preview.albumTitle}`}
+                : `${state.intent === "update" ? "update shared album" : "share album"}: ${state.preview.albumTitle}`}
             </DialogTitle>
           </DialogHeader>
 
@@ -153,16 +158,20 @@ function ShareAlbumDialogSession({
           ) : (
             <div className="space-y-4 p-5">
               <p className="text-sm leading-6 text-foreground">
-                anyone with the link can download these tracks with your tags.
+                {state.intent === "update"
+                  ? "the existing link will use these tags."
+                  : "anyone with the link can download these tracks with your tags."}
               </p>
-              <p className="text-sm text-muted-foreground">expires in 90 days.</p>
+              <p className="text-sm text-muted-foreground">
+                {state.intent === "update"
+                  ? "the link keeps its current expiration."
+                  : "expires in 90 days."}
+              </p>
               <p
                 role={state.status === "error" ? "alert" : undefined}
                 className="min-h-5 text-sm text-destructive"
               >
-                {state.status === "error"
-                  ? `${state.message.replace(/[.!?]+$/, "")}. your album is unchanged.`
-                  : null}
+                {state.status === "error" ? state.message : null}
               </p>
             </div>
           )}
@@ -257,7 +266,13 @@ function ShareAlbumDialogSession({
                       className="animate-spin motion-reduce:animate-none"
                     />
                   )}
-                  {state.status === "publishing" ? "creating link…" : "create share link"}
+                  {state.status === "publishing"
+                    ? state.intent === "update"
+                      ? "updating shared album…"
+                      : "creating link…"
+                    : state.intent === "update"
+                      ? "update shared album"
+                      : "create share link"}
                 </Button>
               </>
             )}

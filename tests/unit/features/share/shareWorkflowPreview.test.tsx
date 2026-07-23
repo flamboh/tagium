@@ -81,10 +81,11 @@ describe("share creator preview state", () => {
       ],
     });
 
-    act(() => {
+    await act(async () => {
       hook.result.publish();
+      await Promise.resolve();
     });
-    expect(publishSharedAlbum).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(publishSharedAlbum).toHaveBeenCalledTimes(1));
     expect(hook.result.dialog.status).toBe("publishing");
     rejectPublish(new Error("offline"));
     await act(async () => {

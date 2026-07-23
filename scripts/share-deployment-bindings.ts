@@ -10,6 +10,7 @@ export const SHARE_DEPLOYMENT_RESOURCES = {
     createRateLimitNamespace: "128100001",
     readRateLimitNamespace: "128100002",
     revokeRateLimitNamespace: "128100003",
+    updateRateLimitNamespace: "128100004",
   },
   production: {
     deployEnv: "production",
@@ -19,6 +20,7 @@ export const SHARE_DEPLOYMENT_RESOURCES = {
     createRateLimitNamespace: "128200001",
     readRateLimitNamespace: "128200002",
     revokeRateLimitNamespace: "128200003",
+    updateRateLimitNamespace: "128200004",
   },
 } as const;
 
@@ -69,6 +71,11 @@ export const configureShareDeploymentBindings = (
     {
       name: "SHARE_REVOKE_RATE_LIMITER",
       namespace_id: resources.revokeRateLimitNamespace,
+      simple: { limit: 20, period: 60 },
+    },
+    {
+      name: "SHARE_UPDATE_RATE_LIMITER",
+      namespace_id: resources.updateRateLimitNamespace,
       simple: { limit: 20, period: 60 },
     },
   ];

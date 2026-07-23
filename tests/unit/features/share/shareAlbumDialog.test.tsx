@@ -210,6 +210,40 @@ describe("share album dialog", () => {
     expect(renderer.root.findAllByProps({ "aria-label": "no album cover" })).toHaveLength(1);
   });
 
+  it("uses concise update copy without changing the dialog structure", () => {
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        createElement(ShareAlbumDialog, {
+          state: { status: "confirm", intent: "update", preview },
+          onClose: vi.fn(),
+          onPublish: vi.fn(),
+          onStopSharing: vi.fn(async () => undefined),
+        }),
+      );
+    });
+    expect(text(renderer)).toContain("update shared album: Night Drive");
+    expect(text(renderer)).toContain("the existing link will use these tags.");
+    expect(text(renderer)).toContain("the link keeps its current expiration.");
+    expect(text(renderer)).not.toContain("expires in 90 days.");
+    const updateButton = renderer.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("update shared album"));
+    expect(updateButton?.props.className).toContain("w-44");
+
+    act(() => {
+      renderer.update(
+        createElement(ShareAlbumDialog, {
+          state: { status: "publishing", intent: "update", preview },
+          onClose: vi.fn(),
+          onPublish: vi.fn(),
+          onStopSharing: vi.fn(async () => undefined),
+        }),
+      );
+    });
+    expect(text(renderer)).toContain("updating shared album…");
+  });
+
   it("keeps published copy and revoke actions available", () => {
     const renderer = render("published");
     expect(text(renderer)).toContain("share link ready");

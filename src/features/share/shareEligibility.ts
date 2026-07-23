@@ -22,6 +22,7 @@ const supportedSource = (value: string) => {
 
 /** Client-side preflight mirrors the publishable parts of the manifest contract. */
 export const shareEligibility = (album: AlbumGroup, files: readonly (TagiumFile | undefined)[]) => {
+  if (album.sourceManifestSlug) return "shared albums cannot be shared again";
   if (album.trackIds.length < 1 || album.trackIds.length > 100)
     return "shared albums need between 1 and 100 tracks.";
   if (files.some((file) => !file)) return "this album has a missing track.";

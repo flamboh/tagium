@@ -11,8 +11,8 @@ import {
   revokeSharedAlbum,
   SharedAlbumUnavailableError,
   SharedAlbumVersionError,
+  updateSharedAlbum,
 } from "@/features/share/shareClient";
-import { projectAlbumManifest } from "@/features/share/shareManifest";
 import {
   getRevocationReceipt,
   removeRevocationReceipt,
@@ -24,21 +24,12 @@ import { shareEligibility } from "@/features/share/shareEligibility";
 import { sharePublicationErrorMessage } from "@/features/share/sharePublicationError";
 import type { ShareDialogState } from "@/features/share/ShareAlbumDialog";
 import { buildShareAlbumPreview } from "@/features/share/sharePreview";
+import {
+  projectShareSnapshot,
+  shareAlbumActionState,
+  type ShareAlbumActionState,
+} from "@/features/share/sharePublication";
 import type { SharedAlbumPageState } from "@/features/share/SharedAlbumPage";
-
-const pictureToFile = (
-  picture: NonNullable<ReturnType<LibraryStore["getSnapshot"]>["albums"][number]["cover"]>,
-) => {
-  const first = picture[0];
-  if (!first || (first.format !== "image/jpeg" && first.format !== "image/png")) return null;
-  return new File(
-    [new Uint8Array(first.data)],
-    first.format === "image/png" ? "cover.png" : "cover.jpg",
-    {
-      type: first.format,
-    },
-  );
-};
 
 const safelyGetRevocationReceipt = (slug: string) => {
   try {
@@ -69,11 +60,99 @@ export const useShareWorkflow = ({
   );
   const [dialog, setDialog] = useState<ShareDialogState>({ status: "closed" });
   const [creatorAlbumId, setCreatorAlbumId] = useState<string | null>(null);
+  const [albumFingerprints, setAlbumFingerprints] = useState<Record<string, string | undefined>>(
+    {},
+  );
   const [adding, setAdding] = useState(false);
   const [anotherTabOpen, setAnotherTabOpen] = useState(false);
+  const [, setExpiryTick] = useState(0);
   const artworkFileRef = useRef<File | null>(null);
   const loadingSlugRef = useRef<string | null>(null);
   const importingSlugRef = useRef<string | null>(null);
+  const publicationReceiptsRef = useRef(
+    new Map<string, { slug: string; expiresAt: string; token: string }>(),
+  );
+  const publicationActionInFlightRef = useRef(false);
+  const getPublicationCapability = useCallback(
+    (slug: string) => publicationReceiptsRef.current.get(slug) ?? safelyGetRevocationReceipt(slug),
+    [],
+  );
+
+  useEffect(() => {
+    const expiries: number[] = [];
+    const now = Date.now();
+    for (const album of library.state.albums) {
+      if (album.sharePublication?.status !== "active") continue;
+      const expiry = Date.parse(album.sharePublication.expiresAt);
+      if (Number.isFinite(expiry) && expiry > now) expiries.push(expiry);
+    }
+    if (!expiries.length) return;
+    const timer = globalThis.setTimeout(
+      () => setExpiryTick((tick) => tick + 1),
+      Math.max(0, Math.min(...expiries) - now + 1),
+    );
+    return () => globalThis.clearTimeout(timer);
+  }, [library.state.albums]);
+
+  useEffect(() => {
+    let canceled = false;
+    const publishedAlbums = library.state.albums.filter(
+      (album) => album.sharePublication?.status === "active",
+    );
+    if (!publishedAlbums.length) {
+      setAlbumFingerprints({});
+      return () => {
+        canceled = true;
+      };
+    }
+    setAlbumFingerprints((current) =>
+      Object.fromEntries(publishedAlbums.map((album) => [album.id, current[album.id]])),
+    );
+    void Promise.all(
+      publishedAlbums.map(async (album) => {
+        const files = (album.trackIds ?? []).map((trackId) =>
+          library.state.files?.find((file) => file.id === trackId),
+        );
+        if (files.some((file) => !file)) return [album.id, undefined] as const;
+        try {
+          const snapshot = await projectShareSnapshot(
+            album,
+            files as NonNullable<(typeof files)[number]>[],
+          );
+          return [album.id, snapshot.fingerprint] as const;
+        } catch {
+          return [album.id, undefined] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (!canceled) setAlbumFingerprints(Object.fromEntries(entries));
+    });
+    return () => {
+      canceled = true;
+    };
+  }, [library.state.albums, library.state.files]);
+
+  const currentLibrary = library.getSnapshot();
+  const shareActions = Object.fromEntries(
+    currentLibrary.albums.map((album): [string, ShareAlbumActionState] => {
+      const files = (album.trackIds ?? []).map((trackId) =>
+        currentLibrary.files?.find((file) => file.id === trackId),
+      );
+      const eligibilityReason = shareEligibility(album, files);
+      if (eligibilityReason) {
+        return [album.id, { enabled: false, label: "share album", reason: eligibilityReason }];
+      }
+      const publication = album.sharePublication;
+      return [
+        album.id,
+        shareAlbumActionState(
+          album,
+          albumFingerprints[album.id],
+          Boolean(publication && getPublicationCapability(publication.slug)),
+        ),
+      ];
+    }),
+  );
 
   const loadSlug = useCallback(async (slug: string) => {
     loadingSlugRef.current = slug;
@@ -197,18 +276,36 @@ export const useShareWorkflow = ({
         });
         return;
       }
+      const publication = album.sharePublication;
+      const action = shareAlbumActionState(
+        album,
+        albumFingerprints[album.id],
+        Boolean(publication && getPublicationCapability(publication.slug)),
+      );
+      if (!action?.enabled) {
+        toast.error(action?.reason ?? "this album cannot be shared");
+        return;
+      }
       setCreatorAlbumId(albumId);
       const preview = buildShareAlbumPreview(album, files);
       setDialog({
         status: "confirm",
         preview,
+        intent: album.sharePublication ? "update" : "create",
       });
     },
-    [library],
+    [albumFingerprints, getPublicationCapability, library],
   );
 
   const publish = useCallback(async () => {
-    if (!creatorAlbumId || dialog.status === "closed" || dialog.status === "published") return;
+    if (
+      publicationActionInFlightRef.current ||
+      !creatorAlbumId ||
+      dialog.status === "closed" ||
+      dialog.status === "published"
+    )
+      return;
+    publicationActionInFlightRef.current = true;
     const currentDialog = dialog;
     setDialog({ ...currentDialog, status: "publishing" });
     try {
@@ -221,31 +318,84 @@ export const useShareWorkflow = ({
         if (!file) throw new Error("the album has a missing track");
         return file;
       });
-      const cover = album.cover ? pictureToFile(album.cover) : null;
-      const firstPicture = album.cover?.[0];
-      const manifest = projectAlbumManifest(
+      const existingPublication = album.sharePublication;
+      const latestAction = shareAlbumActionState(
         album,
-        files,
-        cover && firstPicture
-          ? {
-              kind: "stored",
-              format: cover.type as "image/jpeg" | "image/png",
-              type: firstPicture.type,
-              description: firstPicture.description,
-            }
-          : undefined,
+        albumFingerprints[album.id],
+        Boolean(existingPublication && getPublicationCapability(existingPublication.slug)),
       );
-      const receipt = await publishSharedAlbum(manifest, cover);
-      try {
-        storeRevocationReceipt({
+      if (!latestAction.enabled) throw new Error(latestAction.reason);
+      const shareSnapshot = await projectShareSnapshot(album, files);
+      let receipt;
+      if (existingPublication) {
+        if (!existingPublication) throw new Error("the shared album could not be updated");
+        const capability = getPublicationCapability(existingPublication.slug);
+        if (!capability) throw new Error("this browser cannot update the shared album");
+        await updateSharedAlbum(
+          existingPublication.slug,
+          capability.token,
+          shareSnapshot.manifest,
+          shareSnapshot.cover,
+        );
+        receipt = {
+          slug: existingPublication.slug,
+          url: existingPublication.url,
+          expiresAt: existingPublication.expiresAt,
+          revocationToken: capability.token,
+        };
+      } else {
+        receipt = await publishSharedAlbum(shareSnapshot.manifest, shareSnapshot.cover);
+        const capability = {
           slug: receipt.slug,
           expiresAt: receipt.expiresAt,
           token: receipt.revocationToken,
+        };
+        publicationReceiptsRef.current.set(receipt.slug, capability);
+        library.dispatch({
+          type: "album-share-publication-set",
+          albumId: album.id,
+          publication: {
+            slug: receipt.slug,
+            url: receipt.url,
+            expiresAt: receipt.expiresAt,
+            publishedFingerprint: shareSnapshot.fingerprint,
+            status: "active",
+          },
         });
-      } catch {
-        await revokeSharedAlbum(receipt.slug, receipt.revocationToken);
-        throw new Error("your browser did not allow tagium to save the sharing permission");
+        try {
+          storeRevocationReceipt(capability);
+        } catch {
+          try {
+            await revokeSharedAlbum(receipt.slug, receipt.revocationToken);
+            publicationReceiptsRef.current.delete(receipt.slug);
+            library.dispatch({
+              type: "album-share-publication-set",
+              albumId: album.id,
+              publication: {
+                slug: receipt.slug,
+                url: receipt.url,
+                expiresAt: receipt.expiresAt,
+                publishedFingerprint: shareSnapshot.fingerprint,
+                status: "stopped",
+              },
+            });
+          } catch {
+            throw new Error("your browser did not allow tagium to save the sharing permission");
+          }
+          throw new Error("your browser did not allow tagium to save the sharing permission");
+        }
       }
+      library.dispatch({
+        type: "album-share-publication-set",
+        albumId: album.id,
+        publication: {
+          slug: receipt.slug,
+          url: receipt.url,
+          expiresAt: receipt.expiresAt,
+          publishedFingerprint: shareSnapshot.fingerprint,
+          status: "active",
+        },
+      });
       setDialog({
         status: "published",
         preview: currentDialog.preview,
@@ -255,33 +405,68 @@ export const useShareWorkflow = ({
       setDialog({
         status: "error",
         preview: currentDialog.preview,
-        message: sharePublicationErrorMessage(error),
+        intent: currentDialog.intent,
+        message:
+          currentDialog.intent === "update"
+            ? "the shared album could not be updated. your album is unchanged."
+            : `${sharePublicationErrorMessage(error).replace(/[.!?]+$/, "")}. your album is unchanged.`,
       });
+    } finally {
+      publicationActionInFlightRef.current = false;
     }
-  }, [creatorAlbumId, dialog, editor.commands, library]);
+  }, [
+    albumFingerprints,
+    creatorAlbumId,
+    dialog,
+    editor.commands,
+    getPublicationCapability,
+    library,
+  ]);
 
   const stopDialogShare = useCallback(async () => {
     if (dialog.status !== "published") return;
     const receipt = dialog.receipt;
     await revokeSharedAlbum(receipt.slug, receipt.revocationToken);
+    publicationReceiptsRef.current.delete(receipt.slug);
     removeRevocationReceipt(receipt.slug);
+    if (creatorAlbumId) {
+      const album = library.getSnapshot().albums.find((entry) => entry.id === creatorAlbumId);
+      if (album?.sharePublication?.slug === receipt.slug) {
+        library.dispatch({
+          type: "album-share-publication-set",
+          albumId: creatorAlbumId,
+          publication: { ...album.sharePublication, status: "stopped" },
+        });
+      }
+    }
     setDialog({ status: "closed" });
     toast.success("sharing stopped", {
       description: "the link no longer works.",
     });
-  }, [dialog]);
+  }, [creatorAlbumId, dialog, library]);
 
   const stopPageShare = useCallback(async () => {
     if (page?.status !== "ready") return;
-    const receipt = safelyGetRevocationReceipt(page.slug);
+    const receipt = getPublicationCapability(page.slug);
     if (!receipt) return;
     await revokeSharedAlbum(page.slug, receipt.token);
+    publicationReceiptsRef.current.delete(page.slug);
     removeRevocationReceipt(page.slug);
+    const creatorAlbum = library
+      .getSnapshot()
+      .albums.find((album) => album.sharePublication?.slug === page.slug);
+    if (creatorAlbum?.sharePublication) {
+      library.dispatch({
+        type: "album-share-publication-set",
+        albumId: creatorAlbum.id,
+        publication: { ...creatorAlbum.sharePublication, status: "stopped" },
+      });
+    }
     setPage({ status: "unavailable", slug: page.slug, reason: "unavailable" });
     toast.success("sharing stopped", {
       description: "the link no longer works.",
     });
-  }, [page]);
+  }, [getPublicationCapability, library, page]);
 
   const addSharedAlbum = useCallback(
     async (allowDuplicate = false) => {
@@ -348,7 +533,7 @@ export const useShareWorkflow = ({
     if (!album?.trackIds.length) return;
   }, [alreadyAddedAlbumId, library]);
 
-  const canStopSharing = page?.status === "ready" && Boolean(safelyGetRevocationReceipt(page.slug));
+  const canStopSharing = page?.status === "ready" && Boolean(getPublicationCapability(page.slug));
 
   return {
     page,
@@ -357,6 +542,7 @@ export const useShareWorkflow = ({
     anotherTabOpen,
     alreadyAddedAlbumId,
     canStopSharing,
+    shareActions,
     importFromInput,
     openCreator,
     publish: () => void publish(),

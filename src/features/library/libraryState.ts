@@ -43,7 +43,12 @@ export type LibraryAction =
       mode: TrackSelectionMode;
     }
   | { type: "selection-cleared" }
-  | { type: "all-tracks-selected" };
+  | { type: "all-tracks-selected" }
+  | {
+      type: "album-share-publication-set";
+      albumId: string;
+      publication: NonNullable<AlbumGroup["sharePublication"]>;
+    };
 
 const uniqueExistingTrackIds = (trackIds: Iterable<string>, fileIdSet: ReadonlySet<string>) => {
   const result: string[] = [];
@@ -355,5 +360,12 @@ export const libraryReducer = (state: LibraryState, action: LibraryAction): Libr
         selectionWasManuallyCleared: false,
       };
     }
+    case "album-share-publication-set":
+      return {
+        ...state,
+        albums: state.albums.map((album) =>
+          album.id === action.albumId ? { ...album, sharePublication: action.publication } : album,
+        ),
+      };
   }
 };

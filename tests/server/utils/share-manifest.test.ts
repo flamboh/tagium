@@ -58,6 +58,21 @@ const createFakePersistence = () => {
       return "created";
     },
     get: async (slug) => records.get(slug),
+    update: async ({ previous, replacement, revocationTokenHash, now }) => {
+      const current = records.get(previous.slug);
+      if (
+        !current ||
+        current.status !== "active" ||
+        current.expiresAt <= now ||
+        current.expiresAt !== previous.expiresAt ||
+        current.payloadJson !== previous.payloadJson ||
+        current.artworkKey !== previous.artworkKey ||
+        current.revocationTokenHash !== revocationTokenHash
+      )
+        return "conflict";
+      records.set(previous.slug, replacement);
+      return "updated";
+    },
     disable: async (slug, tokenHash, now) => {
       const record = records.get(slug);
       if (!record || record.expiresAt <= now || record.revocationTokenHash !== tokenHash)
@@ -71,7 +86,7 @@ const createFakePersistence = () => {
 };
 
 describe("share manifest store", () => {
-  it("publishes a single immutable record and makes it unavailable at exactly 90 days", async () => {
+  it("publishes a single record and makes it unavailable at exactly 90 days", async () => {
     const fake = createFakePersistence();
     let now = 1_000;
     const store = createShareManifestStore(fake.persistence, { now: () => now });
@@ -208,5 +223,222 @@ describe("share manifest store", () => {
       "D1 unavailable",
     );
     expect(fake.artwork.size).toBe(0);
+  });
+
+  it("cleans an artwork object when put stores it before rejecting", async () => {
+    const fake = createFakePersistence();
+    const originalPut = fake.persistence.putArtwork;
+    fake.persistence.putArtwork = async (input) => {
+      await originalPut(input);
+      throw new Error("R2 unavailable");
+    };
+    const store = createShareManifestStore(fake.persistence);
+    await expect(
+      store.publish(manifest, await parseShareArtwork(new File([png], "cover.png"))),
+    ).rejects.toThrow("R2 unavailable");
+    expect(fake.artwork.size).toBe(0);
+  });
+
+  it("updates metadata in place without changing the capability or expiration", async () => {
+    const fake = createFakePersistence();
+    const store = createShareManifestStore(fake.persistence, { now: () => 1_000 });
+    const published = await store.publish(manifest, undefined);
+    const result = await store.update(
+      published.slug,
+      published.revocationToken,
+      { ...manifest, album: { ...manifest.album, title: "Edited" } },
+      { kind: "retain" },
+    );
+
+    expect(result).toEqual({
+      kind: "updated",
+      slug: published.slug,
+      expiresAt: published.expiresAt,
+    });
+    expect(await store.load(published.slug)).toMatchObject({
+      kind: "available",
+      manifest: { album: { title: "Edited" } },
+    });
+    await expect(store.revoke(published.slug, published.revocationToken)).resolves.toBe("revoked");
+  });
+
+  it("replaces and removes artwork without leaving superseded objects", async () => {
+    const fake = createFakePersistence();
+    const store = createShareManifestStore(fake.persistence);
+    const artwork = await parseShareArtwork(new File([png], "cover.png"));
+    const published = await store.publish(manifest, artwork);
+    const originalKey = fake.records.get(published.slug)?.artworkKey;
+
+    await expect(
+      store.update(published.slug, published.revocationToken, manifest, {
+        kind: "replace",
+        artwork: artwork!,
+      }),
+    ).resolves.toMatchObject({ kind: "updated", slug: published.slug });
+    const replacementKey = fake.records.get(published.slug)?.artworkKey;
+    expect(replacementKey).not.toBe(originalKey);
+    expect(originalKey && fake.artwork.has(originalKey)).toBe(false);
+    expect(replacementKey && fake.artwork.has(replacementKey)).toBe(true);
+
+    await expect(
+      store.update(published.slug, published.revocationToken, manifest, { kind: "remove" }),
+    ).resolves.toMatchObject({ kind: "updated", slug: published.slug });
+    expect(replacementKey && fake.artwork.has(replacementKey)).toBe(false);
+    expect(fake.records.get(published.slug)?.artworkKey).toBeUndefined();
+    expect(await store.loadArtwork(published.slug)).toEqual({ kind: "unavailable" });
+  });
+
+  it("rejects unauthorized and inactive updates without uploading artwork", async () => {
+    const fake = createFakePersistence();
+    let now = 1_000;
+    const store = createShareManifestStore(fake.persistence, { now: () => now });
+    const published = await store.publish(manifest, undefined);
+    const artwork = (await parseShareArtwork(new File([png], "cover.png")))!;
+
+    await expect(
+      store.update(published.slug, "wrong", manifest, { kind: "replace", artwork }),
+    ).resolves.toEqual({ kind: "unavailable" });
+    expect(fake.artwork.size).toBe(0);
+    now = published.expiresAt;
+    await expect(
+      store.update(published.slug, published.revocationToken, manifest, {
+        kind: "replace",
+        artwork,
+      }),
+    ).resolves.toEqual({ kind: "unavailable" });
+    expect(fake.artwork.size).toBe(0);
+
+    now = 1_000;
+    await expect(store.revoke(published.slug, published.revocationToken)).resolves.toBe("revoked");
+    await expect(
+      store.update(published.slug, published.revocationToken, manifest, {
+        kind: "replace",
+        artwork,
+      }),
+    ).resolves.toEqual({ kind: "unavailable" });
+    expect(fake.artwork.size).toBe(0);
+  });
+
+  it("compensates a losing artwork update and accepts an already-applied retry", async () => {
+    const fake = createFakePersistence();
+    const store = createShareManifestStore(fake.persistence);
+    const published = await store.publish(manifest, undefined);
+    const artwork = (await parseShareArtwork(new File([png], "cover.png")))!;
+    const originalUpdate = fake.persistence.update;
+    let first = true;
+    fake.persistence.update = async (input) => {
+      if (!first) return originalUpdate(input);
+      first = false;
+      fake.records.set(input.previous.slug, {
+        ...input.replacement,
+        artworkKey: "shares/already-applied.png",
+      });
+      fake.artwork.set("shares/already-applied.png", artwork.bytes);
+      return "conflict";
+    };
+
+    await expect(
+      store.update(published.slug, published.revocationToken, manifest, {
+        kind: "replace",
+        artwork,
+      }),
+    ).resolves.toMatchObject({ kind: "updated", slug: published.slug });
+    expect(fake.artwork.size).toBe(1);
+    expect(fake.artwork.has("shares/already-applied.png")).toBe(true);
+  });
+
+  it("compensates failed updates and does not roll back a commit when old artwork cleanup fails", async () => {
+    const failed = createFakePersistence();
+    const failedStore = createShareManifestStore(failed.persistence);
+    const failedPublish = await failedStore.publish(manifest, undefined);
+    const artwork = (await parseShareArtwork(new File([png], "cover.png")))!;
+    failed.persistence.update = async () => {
+      throw new Error("D1 unavailable");
+    };
+    await expect(
+      failedStore.update(failedPublish.slug, failedPublish.revocationToken, manifest, {
+        kind: "replace",
+        artwork,
+      }),
+    ).rejects.toThrow("D1 unavailable");
+    expect(failed.artwork.size).toBe(0);
+
+    const committed = createFakePersistence();
+    const committedStore = createShareManifestStore(committed.persistence);
+    const committedPublish = await committedStore.publish(manifest, artwork);
+    const oldKey = committed.records.get(committedPublish.slug)?.artworkKey;
+    committed.persistence.deleteArtwork = async () => {
+      throw new Error("R2 unavailable");
+    };
+    await expect(
+      committedStore.update(committedPublish.slug, committedPublish.revocationToken, manifest, {
+        kind: "remove",
+      }),
+    ).resolves.toMatchObject({ kind: "updated", slug: committedPublish.slug });
+    expect(committed.records.get(committedPublish.slug)?.artworkKey).toBeUndefined();
+    expect(oldKey && committed.artwork.has(oldKey)).toBe(true);
+  });
+
+  it("reconciles an update that commits before D1 reports a failure", async () => {
+    const fake = createFakePersistence();
+    const store = createShareManifestStore(fake.persistence);
+    const published = await store.publish(manifest, undefined);
+    const artwork = (await parseShareArtwork(new File([png], "cover.png")))!;
+    const originalUpdate = fake.persistence.update;
+    fake.persistence.update = async (input) => {
+      await originalUpdate(input);
+      throw new Error("D1 ambiguous");
+    };
+    await expect(
+      store.update(published.slug, published.revocationToken, manifest, {
+        kind: "replace",
+        artwork,
+      }),
+    ).resolves.toMatchObject({ kind: "updated" });
+    const currentKey = fake.records.get(published.slug)?.artworkKey;
+    expect(currentKey && fake.artwork.has(currentKey)).toBe(true);
+  });
+
+  it("preserves a candidate when ambiguous-update verification fails", async () => {
+    const fake = createFakePersistence();
+    const store = createShareManifestStore(fake.persistence);
+    const published = await store.publish(manifest, undefined);
+    const artwork = (await parseShareArtwork(new File([png], "cover.png")))!;
+    fake.persistence.update = async () => {
+      throw new Error("D1 ambiguous");
+    };
+    const originalGet = fake.persistence.get;
+    let reads = 0;
+    fake.persistence.get = async (slug) => {
+      reads += 1;
+      if (reads > 1) throw new Error("D1 unavailable");
+      return originalGet(slug);
+    };
+    await expect(
+      store.update(published.slug, published.revocationToken, manifest, {
+        kind: "replace",
+        artwork,
+      }),
+    ).rejects.toThrow("D1 ambiguous");
+    expect(fake.artwork.size).toBe(1);
+  });
+
+  it("does not delete a candidate referenced by the live row after a CAS conflict", async () => {
+    const fake = createFakePersistence();
+    const store = createShareManifestStore(fake.persistence);
+    const published = await store.publish(manifest, undefined);
+    const artwork = (await parseShareArtwork(new File([png], "cover.png")))!;
+    fake.persistence.update = async (input) => {
+      fake.records.set(input.previous.slug, input.replacement);
+      return "conflict";
+    };
+    await expect(
+      store.update(published.slug, published.revocationToken, manifest, {
+        kind: "replace",
+        artwork,
+      }),
+    ).resolves.toMatchObject({ kind: "updated" });
+    const currentKey = fake.records.get(published.slug)?.artworkKey;
+    expect(currentKey && fake.artwork.has(currentKey)).toBe(true);
   });
 });

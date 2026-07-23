@@ -24,6 +24,8 @@ export interface SharePublicationReceipt {
   revocationToken: string;
 }
 
+export type ShareUpdateReceipt = Omit<SharePublicationReceipt, "revocationToken">;
+
 const apiPath = (slug: string, suffix = "") =>
   `/api/manifests/${encodeURIComponent(slug)}${suffix}`;
 
@@ -131,6 +133,44 @@ export const publishSharedAlbum = async (
     throw new Error("the share link could not be created");
   }
   return receipt as SharePublicationReceipt;
+};
+
+export const updateSharedAlbum = async (
+  slug: string,
+  revocationToken: string,
+  manifest: Manifest,
+  cover: File | null,
+  dependencies: { fetch?: typeof globalThis.fetch } = {},
+): Promise<ShareUpdateReceipt> => {
+  const body = new FormData();
+  body.set("manifest", JSON.stringify(manifest));
+  if (cover) body.set("cover", cover);
+  else body.set("removeArtwork", "true");
+  const response = await (dependencies.fetch ?? globalThis.fetch)(apiPath(slug), {
+    method: "PATCH",
+    body,
+    headers: {
+      Authorization: `Bearer ${revocationToken}`,
+      Accept: "application/json",
+    },
+  });
+  if (!response.ok) {
+    if (response.status === 400 || response.status === 413)
+      throw new Error(SHARE_METADATA_TOO_LARGE_MESSAGE);
+    if (response.status === 429) throw new Error("too many update requests; try again shortly");
+    throw new Error("the shared album could not be updated");
+  }
+  const receipt = await readJson(response);
+  if (
+    typeof receipt !== "object" ||
+    receipt === null ||
+    typeof receipt.slug !== "string" ||
+    typeof receipt.url !== "string" ||
+    typeof receipt.expiresAt !== "string"
+  ) {
+    throw new Error("the shared album could not be updated");
+  }
+  return receipt as ShareUpdateReceipt;
 };
 
 export const revokeSharedAlbum = async (

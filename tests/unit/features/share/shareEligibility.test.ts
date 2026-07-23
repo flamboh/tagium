@@ -34,6 +34,11 @@ const importedTrack: TagiumFile = {
 };
 
 describe("share eligibility", () => {
+  it("rejects albums imported from a shared album", () => {
+    expect(shareEligibility({ ...album, sourceManifestSlug: "source" }, [importedTrack])).toBe(
+      "shared albums cannot be shared again",
+    );
+  });
   it("accepts a replayable imported album", () => {
     expect(shareEligibility(album, [importedTrack])).toBeNull();
   });
