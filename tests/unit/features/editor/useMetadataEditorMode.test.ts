@@ -27,7 +27,7 @@ const metadata: AudioMetadata = {
 };
 
 describe("metadata editor mode", () => {
-  it("persists advanced mode through rerenders and returns to normal when the gate closes", () => {
+  it("persists advanced mode through rerenders and resets it when the gate closes", () => {
     const hook = renderHook(({ enabled }: { enabled: boolean }) => useMetadataEditorMode(enabled), {
       enabled: true,
     });
@@ -37,6 +37,9 @@ describe("metadata editor mode", () => {
     expect(hook.result.mode).toBe("advanced");
 
     hook.rerender({ enabled: false });
+    expect(hook.result.mode).toBe("normal");
+
+    hook.rerender({ enabled: true });
     expect(hook.result.mode).toBe("normal");
     hook.unmount();
   });
