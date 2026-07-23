@@ -62,8 +62,11 @@ export default function AudioTagger() {
     (touch: Touch, surface: HTMLElement) => {
       const bounds = surface.getBoundingClientRect();
       return mobileNavigation.drawerOpen
-        ? touch.clientX >= bounds.left && touch.clientX <= bounds.left + 28
-        : touch.clientX >= 20 && touch.clientX <= 48 && touch.clientY >= bounds.top + 64;
+        ? touch.clientX >= Math.max(bounds.left, 48) &&
+            touch.clientX <= Math.min(bounds.right, window.innerWidth - 20)
+        : touch.clientX >= bounds.left + 48 &&
+            touch.clientX <= bounds.left + bounds.width / 2 &&
+            touch.clientY >= bounds.top + 64;
     },
     [mobileNavigation.drawerOpen],
   );
@@ -172,17 +175,20 @@ export default function AudioTagger() {
           >
             {mobileNavigation.isMobile && (
               <div
+                data-mobile-opener-layer=""
                 className={
                   landingIsActive
                     ? "absolute inset-x-0 top-0 z-20 h-14 border-b bg-background md:hidden"
-                    : "contents"
+                    : "absolute left-2 top-2 z-20 size-11 transform-gpu md:hidden"
                 }
               >
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute left-2 top-2 z-20 size-11 md:hidden"
+                  className={
+                    landingIsActive ? "absolute left-2 top-2 z-20 size-11 md:hidden" : "size-11"
+                  }
                   onClick={mobileNavigation.openDrawer}
                   aria-label="open library"
                   aria-expanded={mobileNavigation.drawerOpen}

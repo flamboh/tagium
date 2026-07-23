@@ -75,14 +75,23 @@ test("opens and closes from coordinate-bounded touch start zones", async ({
   await expect(main).toHaveCSS("touch-action", "auto");
 
   await dispatchTouchSwipe(page, { x: 24, y: 200 }, { x: 96, y: 204 });
+  await expect(page.getByRole("dialog", { name: "library" })).not.toBeVisible();
+  await dispatchTouchSwipe(page, { x: 96, y: 200 }, { x: 176, y: 204 });
   await expect(page.getByRole("dialog", { name: "library" })).toBeVisible();
 
   await expect.poll(async () => Math.round((await main.boundingBox())?.x ?? 0)).toBe(320);
-  await dispatchTouchSwipe(page, { x: 325, y: 200 }, { x: 325, y: 280 });
+  await dispatchTouchSwipe(page, { x: 330, y: 200 }, { x: 330, y: 280 });
   await expect(page.getByRole("dialog", { name: "library" })).toBeVisible();
-  await dispatchTouchSwipe(page, { x: 325, y: 200 }, { x: 350, y: 200 });
+  await dispatchTouchSwipe(page, { x: 330, y: 200 }, { x: 350, y: 200 });
   await expect(page.getByRole("dialog", { name: "library" })).toBeVisible();
-  await dispatchTouchSwipe(page, { x: 325, y: 200 }, { x: 250, y: 204 });
+  await dispatchTouchSwipe(page, { x: 330, y: 200 }, { x: 250, y: 204 });
+  await expect(page.getByRole("dialog", { name: "library" })).not.toBeVisible();
+
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.getByRole("button", { name: "open library" }).click();
+  await expect(page.getByRole("dialog", { name: "library" })).toBeVisible();
+  await expect.poll(async () => Math.round((await main.boundingBox())?.x ?? 0)).toBe(282);
+  await dispatchTouchSwipe(page, { x: 290, y: 200 }, { x: 210, y: 204 });
   await expect(page.getByRole("dialog", { name: "library" })).not.toBeVisible();
 });
 
@@ -109,6 +118,10 @@ test("keeps the editor primary and closes the drawer when a track is selected", 
 
   await expect(page.getByRole("button", { name: "download track" })).toBeVisible();
   await expect(page.getByRole("button", { name: "open library" })).toHaveCount(1);
+  await expect(page.locator("[data-mobile-opener-layer]")).toHaveCSS("display", "block");
+  await expect(page.locator("[data-mobile-opener-layer]")).toHaveCSS("position", "absolute");
+  await expect(page.locator("[data-mobile-opener-layer]")).toHaveCSS("z-index", "20");
+  await expect(page.locator("[data-mobile-opener-layer]")).not.toHaveCSS("transform", "none");
   await page.getByRole("button", { name: "open library" }).click();
   const drawer = page.getByRole("dialog", { name: "library" });
   await drawer
