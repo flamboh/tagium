@@ -140,7 +140,7 @@ function TrackFilenameHeader({
 }) {
   return (
     <div
-      className={`relative h-16 border-b flex-shrink-0 px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6 ${
+      className={`relative h-16 shrink-0 border-b px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6 ${
         hasModeToggle ? "pr-40 max-lg:[@media(max-height:700px)]:pr-36 lg:pr-44" : ""
       }`}
     >
@@ -581,18 +581,23 @@ function PendingTrackMetadataEditor({
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-      <div className="flex h-16 flex-shrink-0 items-center justify-between gap-3 border-b px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6">
+      <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6">
         <div className="min-w-0">
           <h2 className="truncate text-base font-semibold text-muted-foreground max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
             {selectedFile.filename}
           </h2>
-          <p className="text-xs text-muted-foreground">{trackState}</p>
+          <p role="status" className="text-xs text-muted-foreground">
+            {trackState}
+          </p>
         </div>
         {advancedMetadata && (
           <MetadataEditorModeToggle mode={editorMode} onChange={onEditorModeChange} />
         )}
       </div>
-      <div className="flex flex-1 items-center justify-center bg-muted/5 p-4 text-center text-sm text-muted-foreground">
+      <div
+        aria-hidden="true"
+        className="flex flex-1 items-center justify-center bg-muted/5 p-4 text-center text-sm text-muted-foreground"
+      >
         {trackState}
       </div>
     </div>
@@ -758,7 +763,7 @@ function LoadedTrackMetadataEditor({
             <div className="flex flex-1 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3">
               <div
                 data-editor-form-area
-                className="flex min-h-[17rem] flex-col gap-2 max-lg:[@media(max-height:700px)]:min-h-[14.25rem] max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3"
+                className="flex min-h-[19rem] flex-col gap-2 max-lg:[@media(max-height:700px)]:min-h-[18rem] max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3"
               >
                 {advancedMetadata && editorMode === "advanced" ? (
                   <AdvancedTrackDetailsFields
