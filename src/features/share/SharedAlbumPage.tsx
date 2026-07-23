@@ -45,6 +45,7 @@ const summaryBitrates = (manifest: Manifest) => {
   return rates.length === 1 ? `${rates[0]} kbps` : "mixed bitrates";
 };
 const trackCountLabel = (count: number) => `${count} track${count === 1 ? "" : "s"}`;
+const skeletonRows = ["one", "two", "three", "four", "five", "six"] as const;
 
 function SharedAlbumSkeleton() {
   return (
@@ -66,8 +67,8 @@ function SharedAlbumSkeleton() {
         </div>
       </div>
       <div className="mt-10 space-y-2 border-t pt-4">
-        {Array.from({ length: 6 }, (_, index) => (
-          <div key={`skeleton-${index}`} className="flex h-12 items-center gap-4 border-b">
+        {skeletonRows.map((row) => (
+          <div key={row} className="flex h-12 items-center gap-4 border-b">
             <div className="h-4 w-5 animate-pulse rounded bg-muted motion-reduce:animate-none" />
             <div className="h-4 w-1/2 animate-pulse rounded bg-muted motion-reduce:animate-none" />
           </div>
