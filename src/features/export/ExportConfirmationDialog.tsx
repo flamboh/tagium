@@ -23,11 +23,7 @@ export interface ExportConfirmationDialogProps {
   onRestoreFocus: () => void;
 }
 
-export function ExportConfirmationDisclosure({
-  group,
-}: {
-  group: ExportConfirmationGroup;
-}) {
+export function ExportConfirmationDisclosure({ group }: { group: ExportConfirmationGroup }) {
   const [open, setOpen] = useState(false);
   const contentId = useId();
 
@@ -82,7 +78,9 @@ export default function ExportConfirmationDialog({
   onRestoreFocus,
 }: ExportConfirmationDialogProps) {
   const noun = summary?.trackCount === 1 ? "track" : "tracks";
-  const downloadLabel = summary ? `Download ${formatMegabyteSize(summary.totalSizeBytes)}` : "Download";
+  const downloadLabel = summary
+    ? `Download ${formatMegabyteSize(summary.totalSizeBytes)}`
+    : "Download";
 
   return (
     <Dialog open={Boolean(summary)} onOpenChange={(open) => !open && !busy && onCancel()}>
