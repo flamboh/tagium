@@ -143,7 +143,7 @@ describe("shared album preview", () => {
     expect(status).toContain("share link copied.");
   });
 
-  it("shows the another-tab warning with copy link below the sentence", async () => {
+  it("shows the another-tab warning with a flush-left copy link below the sentence", async () => {
     let renderer!: ReactTestRenderer;
     await act(async () => {
       renderer = create(createElement(SharedAlbumPage, props));
@@ -157,12 +157,13 @@ describe("shared album preview", () => {
         ),
       );
     expect(warning).toBeDefined();
-    const warningRow = warning?.parent;
-    const copyRow = warningRow?.parent?.children.find(
-      (child) =>
-        typeof child !== "string" && child.type === "div" && child.props.className === "pl-6",
-    );
+    const copyRow = notice
+      .findAllByType("div")
+      .find((node) => node.props.className === "flex justify-start");
     expect(copyRow).toBeDefined();
+    expect(copyRow?.props.className).toContain("justify-start");
+    expect(copyRow?.props.className).not.toContain("pl-6");
+    expect(copyRow?.findAllByType("button")).toHaveLength(1);
     expect(
       notice.findAllByType("button").some((button) => button.children.includes("copy link")),
     ).toBe(true);
@@ -254,6 +255,27 @@ describe("shared album preview", () => {
     void act(() => duplicate?.props.onClick());
     expect(onViewAlbum).toHaveBeenCalledOnce();
     expect(onAdd).toHaveBeenCalledWith(true);
+  });
+
+  it("matches every desktop primary state to the cover width while staying full-width on mobile", async () => {
+    const states = [
+      { alreadyAddedAlbumId: null, adding: false, label: "download album" },
+      { alreadyAddedAlbumId: null, adding: true, label: "downloading album…" },
+      { alreadyAddedAlbumId: "album-1", adding: false, label: "open album" },
+    ] as const;
+
+    for (const state of states) {
+      let renderer!: ReactTestRenderer;
+      await act(async () => {
+        renderer = create(createElement(SharedAlbumPage, { ...props, ...state }));
+      });
+      const primary = renderer.root
+        .findAllByType("button")
+        .find((button) => buttonText(button) === state.label);
+      expect(primary?.props.className).toContain("w-40");
+      expect(primary?.props.className).toContain("max-sm:w-full");
+      expect(primary?.props.className).not.toContain("w-52");
+    }
   });
 
   it("shows a recoverable error when the owner cannot stop sharing", async () => {

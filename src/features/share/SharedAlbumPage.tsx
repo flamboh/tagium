@@ -191,7 +191,7 @@ function WorkspaceNotice({
               tagium is open in another tab, copy the link and download in the open instance.
             </span>
           </div>
-          <div className="pl-6">
+          <div className="flex justify-start">
             <Button
               type="button"
               size="sm"
@@ -346,7 +346,7 @@ function ActionBar({
         <Button
           type="button"
           size="lg"
-          className="w-52 justify-center max-sm:w-full"
+          className="w-40 justify-center max-sm:w-full"
           disabled={adding}
           onClick={alreadyAddedAlbumId ? onViewAlbum : () => onAdd()}
         >
