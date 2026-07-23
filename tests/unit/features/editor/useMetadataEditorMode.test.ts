@@ -3,11 +3,8 @@ import { useForm } from "react-hook-form";
 import { describe, expect, it } from "vite-plus/test";
 import { renderHook } from "../../support/hookTestHarness";
 import { useMetadataEditorMode } from "@/features/editor/useMetadataEditorMode";
-import {
-  useLinkedAlbumArtistDisplay,
-  validateBpm,
-  validateDiscNumber,
-} from "@/features/editor/TrackMetadataEditor";
+import { useLinkedAlbumArtistDisplay } from "@/features/editor/useLinkedAlbumArtistDisplay";
+import { validateBpm, validateDiscNumber } from "@/features/editor/audioTaggerUtils";
 import type { AudioMetadata } from "@/features/library/types";
 
 const metadata: AudioMetadata = {

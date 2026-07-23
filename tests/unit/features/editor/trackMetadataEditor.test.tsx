@@ -6,10 +6,9 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import TrackMetadataEditor, {
   AdvancedTrackDetailsFields,
-  getAdvancedMetadataValidationErrors,
   MetadataEditorModeToggle,
-  useAdvancedMetadataFormBoundary,
 } from "@/features/editor/TrackMetadataEditor";
+import { getAdvancedMetadataValidationErrors } from "@/features/editor/audioTaggerUtils";
 import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 import { getMetadataLinkState } from "@/features/library/metadataLinks";
 import type { AudioMetadata, TagiumFile } from "@/features/library/types";
@@ -129,12 +128,17 @@ function EditorHarness({
 }
 
 function AdvancedFieldsHarness({ albumArtistLinked = true }: { albumArtistLinked?: boolean }) {
-  const { register, control } = useForm<AudioMetadata>({ defaultValues: metadata });
-  const advancedFields = useAdvancedMetadataFormBoundary({
-    register,
-    control,
-    enabled: true,
-  });
+  const { register } = useForm<AudioMetadata>({ defaultValues: metadata });
+  const advancedFields = {
+    registrations: {
+      albumArtist: register("albumArtist"),
+      discNumber: register("discNumber"),
+      composer: register("composer"),
+      bpm: register("bpm"),
+      comment: register("comment"),
+    },
+    errors: {},
+  };
   return (
     <TooltipProvider>
       <AdvancedTrackDetailsFields

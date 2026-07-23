@@ -33,6 +33,7 @@ import {
   useMetadataEditorMode,
   type MetadataEditorMode,
 } from "@/features/editor/useMetadataEditorMode";
+import { useLinkedAlbumArtistDisplay } from "@/features/editor/useLinkedAlbumArtistDisplay";
 import type { AlbumGroup, AudioMetadata, TagiumFile } from "@/features/library/types";
 import {
   getMetadataLinkDescriptor,
@@ -352,11 +353,6 @@ const nullableNumberRegistration = {
   setValueAs: (value: string) => (value === "" ? null : Number(value)),
 };
 
-export { getAdvancedMetadataValidationErrors, validateBpm, validateDiscNumber };
-
-export const useLinkedAlbumArtistDisplay = (control: Control<AudioMetadata>) =>
-  useWatch({ control, name: "artist", defaultValue: "" });
-
 interface AdvancedFieldRegistrations {
   albumArtist: UseFormRegisterReturn<"albumArtist">;
   discNumber: UseFormRegisterReturn<"discNumber">;
@@ -557,7 +553,7 @@ export function MetadataEditorModeToggle({
   );
 }
 
-export const useAdvancedMetadataFormBoundary = ({
+const useAdvancedMetadataFormBoundary = ({
   register,
   control,
   enabled,
@@ -617,11 +613,14 @@ function LoadedTrackMetadataEditor({
   const [pendingAdvancedFocus, setPendingAdvancedFocus] = useState<"discNumber" | "bpm" | null>(
     null,
   );
-  useEffect(() => {
-    if (editorMode !== "advanced" || !pendingAdvancedFocus) return;
-    setFocus(pendingAdvancedFocus, { shouldSelect: true });
-    setPendingAdvancedFocus(null);
-  }, [editorMode, pendingAdvancedFocus, setFocus]);
+  const focusPendingAdvancedField = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node || editorMode !== "advanced" || !pendingAdvancedFocus) return;
+      setFocus(pendingAdvancedFocus, { shouldSelect: true });
+      setPendingAdvancedFocus(null);
+    },
+    [editorMode, pendingAdvancedFocus, setFocus],
+  );
   const filenameValue = syncFilenames ? watchedTitle : watchedFilename;
   const filenameInvalid = !isValidFilenameBase(filenameValue);
   const canDownloadTrack =
@@ -702,12 +701,14 @@ function LoadedTrackMetadataEditor({
                 <MetadataEditorModeToggle mode={editorMode} onChange={onEditorModeChange} />
               )}
               {advancedMetadata && editorMode === "advanced" ? (
-                <AdvancedTrackDetailsFields
-                  registrations={advancedFields.registrations}
-                  errors={advancedFields.errors}
-                  albumArtistLinked={metadataLinks.albumArtist}
-                  linkedArtistValue={linkedAlbumArtistDisplay}
-                />
+                <div ref={focusPendingAdvancedField}>
+                  <AdvancedTrackDetailsFields
+                    registrations={advancedFields.registrations}
+                    errors={advancedFields.errors}
+                    albumArtistLinked={metadataLinks.albumArtist}
+                    linkedArtistValue={linkedAlbumArtistDisplay}
+                  />
+                </div>
               ) : (
                 <TrackDetailsFields
                   selectedFileId={selectedFileId}

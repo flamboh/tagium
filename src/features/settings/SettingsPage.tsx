@@ -21,8 +21,75 @@ export interface SettingsPageProps {
   onBack: () => void;
 }
 
+const getVisibleMetadataLinkDescriptors = (settings: AppSettings) => {
+  const visibleDescriptors = [];
+  for (const descriptor of METADATA_LINK_SETTINGS_DESCRIPTORS) {
+    if (isMetadataLinkVisible(descriptor, settings)) visibleDescriptors.push(descriptor);
+  }
+  return visibleDescriptors;
+};
+
+function SettingsAbout() {
+  return (
+    <>
+      <section className="flex flex-col gap-5">
+        <div className="flex flex-col gap-2">
+          <h3 className="text-base font-semibold">about</h3>
+          <p className="text-sm leading-6 text-muted-foreground">
+            tagium exists to make device-local music more accessible to everyone.
+          </p>
+          <p className="text-sm leading-6 text-muted-foreground">
+            listening guide: tagium currently imports, edits, and downloads mp3 audio only.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-base font-semibold">ethics</h3>
+          <p className="text-sm leading-6 text-muted-foreground">
+            tagium is not a piracy tool and cannot be used as one. it only works with free,
+            publicly accessible audio — the same content anyone can already save with the dev tools
+            in any modern browser. it cannot be used to bypass paywalls or access private content.
+          </p>
+          <p className="text-sm leading-6 text-muted-foreground">
+            you are responsible for the content you download and how you use it. credit original
+            creators, support artists, don't violate any terms or licenses, and share the love.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-base font-semibold">acknowledgements</h3>
+          <div className="flex flex-col gap-2 text-sm leading-6 text-muted-foreground">
+            <p>
+              <a href="https://cobalt.tools/" target="_blank" rel="noreferrer" className="cursor-pointer text-primary underline-offset-4 hover:underline">cobalt</a>{" "}
+              and{" "}
+              <a href="https://imput.net/" target="_blank" rel="noreferrer" className="cursor-pointer text-primary underline-offset-4 hover:underline">imput</a>,
+              for their incredible downloading api service. they're a huge inspiration for this tool!
+            </p>
+            <p>
+              <a href="https://mp3tag.js.org/" target="_blank" rel="noreferrer" className="cursor-pointer text-primary underline-offset-4 hover:underline">mp3tag.js</a>,
+              for the fantastic metadata editing library.
+            </p>
+          </div>
+        </div>
+      </section>
+      <nav className="flex items-center gap-3" aria-label="social links">
+        <a href="https://github.com/flamboh/tagium" target="_blank" rel="noreferrer" aria-label="GitHub" className="inline-flex size-12 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-6" aria-hidden="true">
+            <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
+            <path d="M9 18c-4.51 2-5-2-7-2" />
+          </svg>
+        </a>
+        <a href="https://x.com/flambohh" target="_blank" rel="noreferrer" aria-label="Twitter" className="inline-flex size-12 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-6" aria-hidden="true">
+            <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />
+          </svg>
+        </a>
+      </nav>
+    </>
+  );
+}
+
 export default function SettingsPage({ settings, onChange, onBack }: SettingsPageProps) {
   const [bitrateOpen, setBitrateOpen] = useState(false);
+  const visibleMetadataLinkDescriptors = getVisibleMetadataLinkDescriptors(settings);
 
   const checkboxRowClassName = "flex cursor-pointer select-none items-start gap-3 py-1";
 
@@ -125,9 +192,7 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
                 the rest of the album.
               </p>
               <div className="mt-3 flex flex-col gap-2">
-                {METADATA_LINK_SETTINGS_DESCRIPTORS.filter((descriptor) =>
-                  isMetadataLinkVisible(descriptor, settings),
-                ).map((descriptor) => (
+                {visibleMetadataLinkDescriptors.map((descriptor) => (
                   <label key={descriptor.id} className={checkboxRowClassName}>
                     <Checkbox
                       checked={isMetadataLinkEnabled(settings, descriptor)}
@@ -219,116 +284,7 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
             </label>
           </section>
 
-          <section className="flex flex-col gap-5">
-            <div className="flex flex-col gap-2">
-              <h3 className="text-base font-semibold">about</h3>
-              <p className="text-sm leading-6 text-muted-foreground">
-                tagium exists to make device-local music more accessible to everyone.
-              </p>
-              <p className="text-sm leading-6 text-muted-foreground">
-                listening guide: tagium currently imports, edits, and downloads mp3 audio only.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <h3 className="text-base font-semibold">ethics</h3>
-              <p className="text-sm leading-6 text-muted-foreground">
-                tagium is not a piracy tool and cannot be used as one. it only works with free,
-                publicly accessible audio — the same content anyone can already save with the dev
-                tools in any modern browser. it cannot be used to bypass paywalls or access private
-                content.
-              </p>
-              <p className="text-sm leading-6 text-muted-foreground">
-                you are responsible for the content you download and how you use it. credit original
-                creators, support artists, don't violate any terms or licenses, and share the
-                love.{" "}
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <h3 className="text-base font-semibold">acknowledgements</h3>
-              <div className="flex flex-col gap-2 text-sm leading-6 text-muted-foreground">
-                <p>
-                  <a
-                    href="https://cobalt.tools/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="cursor-pointer text-primary underline-offset-4 hover:underline"
-                  >
-                    cobalt
-                  </a>{" "}
-                  and{" "}
-                  <a
-                    href="https://imput.net/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="cursor-pointer text-primary underline-offset-4 hover:underline"
-                  >
-                    imput
-                  </a>
-                  , for their incredible downloading api service. they're a huge inspiration for
-                  this tool!
-                </p>
-                <p>
-                  <a
-                    href="https://mp3tag.js.org/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="cursor-pointer text-primary underline-offset-4 hover:underline"
-                  >
-                    mp3tag.js
-                  </a>
-                  , for the fantastic metadata editing library.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <nav className="flex items-center gap-3" aria-label="social links">
-            <a
-              href="https://github.com/flamboh/tagium"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="GitHub"
-              className="inline-flex size-12 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="size-6"
-                aria-hidden="true"
-              >
-                <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
-                <path d="M9 18c-4.51 2-5-2-7-2" />
-              </svg>
-            </a>
-            <a
-              href="https://x.com/flambohh"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Twitter"
-              className="inline-flex size-12 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="size-6"
-                aria-hidden="true"
-              >
-                <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />
-              </svg>
-            </a>
-          </nav>
+          <SettingsAbout />
         </div>
       </div>
     </div>
