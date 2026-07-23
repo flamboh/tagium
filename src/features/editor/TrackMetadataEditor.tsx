@@ -75,6 +75,14 @@ interface LoadedTrackMetadataEditorProps extends Omit<TrackMetadataEditorProps, 
   onEditorModeChange: (mode: MetadataEditorMode) => void;
 }
 
+interface PendingTrackMetadataEditorProps extends Pick<
+  TrackMetadataEditorProps,
+  "selectedFile" | "advancedMetadata"
+> {
+  editorMode: MetadataEditorMode;
+  onEditorModeChange: (mode: MetadataEditorMode) => void;
+}
+
 const hasMetadata = (selectedFile: TagiumFile | null): selectedFile is LoadedTrack =>
   Boolean(selectedFile?.metadata);
 
@@ -118,6 +126,7 @@ function TrackFilenameHeader({
   filenameRegistration,
   extension,
   failure,
+  hasModeToggle = false,
 }: {
   syncFilenames: boolean;
   watchedFilename: string;
@@ -127,9 +136,14 @@ function TrackFilenameHeader({
   filenameRegistration: UseFormRegisterReturn<"filename">;
   extension: string;
   failure: TrackFailure | null;
+  hasModeToggle?: boolean;
 }) {
   return (
-    <div className="relative h-16 border-b flex-shrink-0 px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6">
+    <div
+      className={`relative h-16 border-b flex-shrink-0 px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6 ${
+        hasModeToggle ? "pr-40 max-lg:[@media(max-height:700px)]:pr-36 lg:pr-44" : ""
+      }`}
+    >
       <div className="flex h-full min-w-0 items-center">
         {syncFilenames ? (
           <h2 className="inline-flex min-w-0 max-w-full items-center text-base font-semibold text-muted-foreground max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
@@ -396,11 +410,6 @@ export function AdvancedTrackDetailsFields({
             className={`${placeholderClassName} ${syncedInputClassName}`}
           />
         </DisabledReason>
-        {albumArtistLinked && (
-          <p className="mt-1 text-xs leading-4 text-muted-foreground">
-            follows track artist while linked in settings
-          </p>
-        )}
       </div>
       <div ref={onFieldsMount} className="grid grid-cols-2 gap-2">
         <div>
@@ -466,9 +475,9 @@ export function AdvancedTrackDetailsFields({
         <textarea
           {...registrations.comment}
           id="track-comment"
-          rows={3}
+          rows={2}
           placeholder="Add a comment"
-          className="border-input placeholder:text-muted-foreground/45 selection:bg-primary selection:text-primary-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 flex min-h-20 w-full resize-y rounded-md border bg-transparent px-3 py-2 text-base shadow-xs outline-none focus-visible:ring-[3px] md:text-sm"
+          className="border-input placeholder:text-muted-foreground/45 selection:bg-primary selection:text-primary-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 flex min-h-16 w-full resize-y rounded-md border bg-transparent px-3 py-2 text-base shadow-xs outline-none focus-visible:ring-[3px] md:text-sm"
         />
       </div>
     </>
@@ -532,7 +541,7 @@ export function MetadataEditorModeToggle({
 }) {
   return (
     <div
-      className="grid min-w-0 grid-cols-2 rounded-md bg-muted p-1"
+      className="inline-grid h-7 w-[8.5rem] shrink-0 grid-cols-2 rounded-md bg-muted p-0.5"
       role="group"
       aria-label="metadata fields"
     >
@@ -542,7 +551,7 @@ export function MetadataEditorModeToggle({
           type="button"
           aria-pressed={mode === option}
           onClick={() => onChange(option)}
-          className={`h-8 min-w-0 cursor-pointer rounded-sm px-3 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-muted ${
+          className={`h-6 min-w-0 cursor-pointer rounded-sm px-1.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-muted ${
             mode === option
               ? "bg-background text-foreground shadow-xs"
               : "text-muted-foreground hover:text-foreground"
@@ -551,6 +560,41 @@ export function MetadataEditorModeToggle({
           {option}
         </button>
       ))}
+    </div>
+  );
+}
+
+function PendingTrackMetadataEditor({
+  selectedFile,
+  advancedMetadata,
+  editorMode,
+  onEditorModeChange,
+}: PendingTrackMetadataEditorProps) {
+  if (!selectedFile) return null;
+
+  const trackState =
+    selectedFile.downloadStatus === "error"
+      ? "download failed"
+      : selectedFile.downloadStatus === "canceled"
+        ? "download canceled"
+        : "loading metadata";
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div className="flex h-16 flex-shrink-0 items-center justify-between gap-3 border-b px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6">
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-semibold text-muted-foreground max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
+            {selectedFile.filename}
+          </h2>
+          <p className="text-xs text-muted-foreground">{trackState}</p>
+        </div>
+        {advancedMetadata && (
+          <MetadataEditorModeToggle mode={editorMode} onChange={onEditorModeChange} />
+        )}
+      </div>
+      <div className="flex flex-1 items-center justify-center bg-muted/5 p-4 text-center text-sm text-muted-foreground">
+        {trackState}
+      </div>
     </div>
   );
 }
@@ -677,16 +721,24 @@ function LoadedTrackMetadataEditor({
         }}
         className="flex min-h-0 flex-col h-full"
       >
-        <TrackFilenameHeader
-          syncFilenames={syncFilenames}
-          watchedFilename={watchedFilename}
-          sanitizedFilename={sanitizeFilenameBase(filenameValue)}
-          filenamePlaceholder={placeholder.filename}
-          filenameInvalid={filenameInvalid}
-          filenameRegistration={filenameRegistration}
-          extension={getAudioFormatInfo(selectedFile.format).extension}
-          failure={failure}
-        />
+        <div className="relative">
+          <TrackFilenameHeader
+            syncFilenames={syncFilenames}
+            watchedFilename={watchedFilename}
+            sanitizedFilename={sanitizeFilenameBase(filenameValue)}
+            filenamePlaceholder={placeholder.filename}
+            filenameInvalid={filenameInvalid}
+            filenameRegistration={filenameRegistration}
+            extension={getAudioFormatInfo(selectedFile.format).extension}
+            failure={failure}
+            hasModeToggle={advancedMetadata}
+          />
+          {advancedMetadata && (
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 max-lg:[@media(max-height:700px)]:right-3 lg:right-6">
+              <MetadataEditorModeToggle mode={editorMode} onChange={onEditorModeChange} />
+            </div>
+          )}
+        </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 max-lg:[@media(max-height:700px)]:p-2 lg:p-6 lg:pb-28">
           <div className="flex min-h-full flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:min-h-0 lg:flex-row lg:gap-4">
             <Controller
@@ -704,30 +756,32 @@ function LoadedTrackMetadataEditor({
               )}
             />
             <div className="flex flex-1 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3">
-              {advancedMetadata && (
-                <MetadataEditorModeToggle mode={editorMode} onChange={onEditorModeChange} />
-              )}
-              {advancedMetadata && editorMode === "advanced" ? (
-                <AdvancedTrackDetailsFields
-                  registrations={advancedFields.registrations}
-                  errors={advancedFields.errors}
-                  albumArtistLinked={metadataLinks.albumArtist}
-                  linkedArtistValue={linkedAlbumArtistDisplay}
-                  onFieldsMount={focusPendingAdvancedField}
-                />
-              ) : (
-                <TrackDetailsFields
-                  selectedFileId={selectedFileId}
-                  focusedTitleFileIdRef={focusedTitleFileIdRef}
-                  register={register}
-                  placeholder={placeholder}
-                  inAlbum={Boolean(selectedFileAlbum)}
-                  syncFilenames={syncFilenames}
-                  metadataLinks={metadataLinks}
-                  filenameInvalid={filenameInvalid}
-                  onPreviewMetadataChange={onPreviewMetadataChange}
-                />
-              )}
+              <div
+                data-editor-form-area
+                className="flex min-h-[17rem] flex-col gap-2 max-lg:[@media(max-height:700px)]:min-h-[14.25rem] max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3"
+              >
+                {advancedMetadata && editorMode === "advanced" ? (
+                  <AdvancedTrackDetailsFields
+                    registrations={advancedFields.registrations}
+                    errors={advancedFields.errors}
+                    albumArtistLinked={metadataLinks.albumArtist}
+                    linkedArtistValue={linkedAlbumArtistDisplay}
+                    onFieldsMount={focusPendingAdvancedField}
+                  />
+                ) : (
+                  <TrackDetailsFields
+                    selectedFileId={selectedFileId}
+                    focusedTitleFileIdRef={focusedTitleFileIdRef}
+                    register={register}
+                    placeholder={placeholder}
+                    inAlbum={Boolean(selectedFileAlbum)}
+                    syncFilenames={syncFilenames}
+                    metadataLinks={metadataLinks}
+                    filenameInvalid={filenameInvalid}
+                    onPreviewMetadataChange={onPreviewMetadataChange}
+                  />
+                )}
+              </div>
               <TrackFileSummary selectedFile={selectedFile} />
               <DownloadTrackButton
                 onClick={submitDownload}
@@ -747,9 +801,8 @@ export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
   const { mode: editorMode, setMode: setEditorMode } = useMetadataEditorMode(
     props.advancedMetadata,
   );
-  const selectedFile = hasMetadata(props.selectedFile) ? props.selectedFile : null;
-  const currentSelection = selectedFile
-    ? { selectedFile, selectedFileAlbum: props.selectedFileAlbum }
+  const currentSelection = props.selectedFile
+    ? { selectedFile: props.selectedFile, selectedFileAlbum: props.selectedFileAlbum }
     : null;
   const [retainedSelection, setRetainedSelection] = useState(currentSelection);
   if (
@@ -807,17 +860,25 @@ export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
           trackIsSelected ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
-        {displayedSelection ? (
-          <LoadedTrackMetadataEditor
-            {...props}
-            selectedFile={displayedSelection.selectedFile}
-            selectedFileId={displayedSelection.selectedFile.id}
-            selectedFileAlbum={displayedSelection.selectedFileAlbum}
-            focusedTitleFileIdRef={focusedTitleFileIdRef}
-            editorMode={editorMode}
-            onEditorModeChange={setEditorMode}
-          />
-        ) : null}
+        {displayedSelection &&
+          (hasMetadata(displayedSelection.selectedFile) ? (
+            <LoadedTrackMetadataEditor
+              {...props}
+              selectedFile={displayedSelection.selectedFile}
+              selectedFileId={displayedSelection.selectedFile.id}
+              selectedFileAlbum={displayedSelection.selectedFileAlbum}
+              focusedTitleFileIdRef={focusedTitleFileIdRef}
+              editorMode={editorMode}
+              onEditorModeChange={setEditorMode}
+            />
+          ) : (
+            <PendingTrackMetadataEditor
+              selectedFile={displayedSelection.selectedFile}
+              advancedMetadata={props.advancedMetadata}
+              editorMode={editorMode}
+              onEditorModeChange={setEditorMode}
+            />
+          ))}
       </div>
     </div>
   );

@@ -271,6 +271,23 @@ describe("track metadata editor form seam", () => {
     expect(enabledMarkup).toContain("advanced</button>");
   });
 
+  it("keeps the settings-gated mode switch available while a selected track is loading", () => {
+    const pendingTrack: TagiumFile = {
+      ...loadedTrack,
+      metadata: undefined,
+      downloadStatus: "downloading",
+    };
+
+    const gatedMarkup = renderToStaticMarkup(
+      <EditorHarness selectedFile={pendingTrack} advancedMetadata />,
+    );
+    const normalMarkup = renderToStaticMarkup(<EditorHarness selectedFile={pendingTrack} />);
+
+    expect(gatedMarkup).toContain("loading metadata");
+    expect(gatedMarkup).toContain("advanced</button>");
+    expect(normalMarkup).not.toContain("advanced</button>");
+  });
+
   it("renders all five advanced fields in the swapped form area", () => {
     const output = renderToStaticMarkup(<AdvancedFieldsHarness />);
     for (const id of [
@@ -284,18 +301,19 @@ describe("track metadata editor form seam", () => {
     }
   });
 
-  it("explains and disables album artist while it is linked", () => {
+  it("explains linked album artist only through the concise tooltip", () => {
     const linkedMarkup = renderToStaticMarkup(<AdvancedFieldsHarness />);
     const unlinkedMarkup = renderToStaticMarkup(
       <AdvancedFieldsHarness albumArtistLinked={false} />,
     );
 
     expect(linkedMarkup).toMatch(/id="track-album-artist"[^>]*disabled/);
-    expect(linkedMarkup).toContain("follows track artist while linked");
+    expect(linkedMarkup).toContain("Album artist is synced with the album.");
+    expect(linkedMarkup).not.toContain("follows track artist while linked");
     expect(unlinkedMarkup).not.toMatch(/id="track-album-artist"[^>]*disabled/);
   });
 
-  it("mounts keyboard-native mode buttons and switches mode", () => {
+  it("mounts keyboard-native equal-size mode buttons and switches mode", () => {
     const onChange = vi.fn();
     let renderer: ReactTestRenderer;
     act(() => {
@@ -306,6 +324,9 @@ describe("track metadata editor form seam", () => {
     expect(buttons).toHaveLength(2);
     expect(buttons.map((button) => button.props.type)).toEqual(["button", "button"]);
     expect(buttons.map((button) => button.props["aria-pressed"])).toEqual([true, false]);
+    expect(buttons.map((button) => button.props.className)).toEqual(
+      expect.arrayContaining([expect.stringContaining("h-6"), expect.stringContaining("h-6")]),
+    );
     act(() => void buttons[1].props.onClick());
     expect(onChange).toHaveBeenCalledWith("advanced");
     act(() => renderer!.unmount());
@@ -317,10 +338,19 @@ describe("track metadata editor form seam", () => {
     );
     const advancedMarkup = renderToStaticMarkup(<AdvancedFieldsHarness />);
 
-    expect(toggleMarkup).toContain("min-w-0 grid-cols-2");
+    expect(toggleMarkup).toContain("h-7 w-[8.5rem] shrink-0 grid-cols-2");
     expect(toggleMarkup).toContain('aria-label="metadata fields"');
     expect(advancedMarkup).toContain("grid grid-cols-2 gap-2");
     expect(advancedMarkup).toContain("w-full resize-y");
+    expect(advancedMarkup).toContain("min-h-16");
+  });
+
+  it("reserves one compact editor form area for either metadata mode", () => {
+    const markup = renderToStaticMarkup(<EditorHarness advancedMetadata />);
+
+    expect(markup).toContain("data-editor-form-area");
+    expect(markup).toContain("min-h-[17rem]");
+    expect(markup).toContain("max-lg:[@media(max-height:700px)]:min-h-[14.25rem]");
   });
 
   it.each([
