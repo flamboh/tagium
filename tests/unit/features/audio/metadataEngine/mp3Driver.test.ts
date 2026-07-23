@@ -43,11 +43,26 @@ const frameV22 = (id: string, value: string) => {
     payload,
   );
 };
+const frameV23 = (id: string, value: string) =>
+  rawFrame(id, concat(Uint8Array.of(0), encoder.encode(value)));
 const tagV22 = (...frames: Uint8Array[]) => {
   const body = concat(...frames);
   return concat(
     encoder.encode("ID3"),
     Uint8Array.of(2, 0, 0),
+    numberToSynchsafe(body.length),
+    body,
+  );
+};
+const tagWithExtendedHeader = (
+  version: 3 | 4,
+  extendedHeader: Uint8Array,
+  ...frames: Uint8Array[]
+) => {
+  const body = concat(extendedHeader, ...frames);
+  return concat(
+    encoder.encode("ID3"),
+    Uint8Array.of(version, 0, 0x40),
     numberToSynchsafe(body.length),
     body,
   );
@@ -134,6 +149,71 @@ describe("mp3Driver", () => {
     const output = new Blob(plan.parts);
     const inspected = await Effect.runPromise(mp3Driver.inspect(makeBlobByteSource(output)));
     expect(inspected.metadata).toMatchObject({ title: "After", artist: "Artist", year: 2032 });
+  });
+
+  it.each([
+    [
+      "ID3v2.3",
+      tagWithExtendedHeader(
+        3,
+        concat(Uint8Array.of(0, 0, 0, 100), new Uint8Array(6)),
+        frame("TIT2", "Title"),
+      ),
+    ],
+    [
+      "ID3v2.4",
+      tagWithExtendedHeader(
+        4,
+        concat(Uint8Array.of(0, 0, 0, 127), Uint8Array.of(1, 0)),
+        frame("TIT2", "Title"),
+      ),
+    ],
+  ])(
+    "rejects malformed declared %s extended-header sizes on inspect and patch",
+    async (_version, tagBytes) => {
+      const input = concat(tagBytes, validMp3Bytes());
+      const source = makeBlobByteSource(new Blob([input]));
+      await expect(Effect.runPromise(mp3Driver.inspect(source))).rejects.toThrow(
+        /extended header/iu,
+      );
+      await expect(
+        Effect.runPromise(mp3Driver.patch(source, { title: "Updated" })),
+      ).rejects.toThrow(/extended header/iu);
+    },
+  );
+
+  it("accepts valid ID3v2.3 and ID3v2.4 extended headers", async () => {
+    const v23 = concat(Uint8Array.of(0, 0, 0, 6), new Uint8Array(6));
+    const v24 = concat(numberToSynchsafe(6), Uint8Array.of(1, 0));
+    const v24Crc = concat(numberToSynchsafe(12), Uint8Array.of(1, 0x20, 5, 0, 0, 0, 0, 0));
+    const v24Restrictions = concat(numberToSynchsafe(8), Uint8Array.of(1, 0x10, 1, 0));
+    for (const input of [
+      concat(tagWithExtendedHeader(3, v23, frameV23("TIT2", "Title")), validMp3Bytes()),
+      concat(tagWithExtendedHeader(4, v24, frame("TIT2", "Title")), validMp3Bytes()),
+      concat(tagWithExtendedHeader(4, v24Crc, frame("TIT2", "Title")), validMp3Bytes()),
+      concat(tagWithExtendedHeader(4, v24Restrictions, frame("TIT2", "Title")), validMp3Bytes()),
+    ]) {
+      const inspected = await Effect.runPromise(
+        mp3Driver.inspect(makeBlobByteSource(new Blob([input]))),
+      );
+      expect(inspected.metadata.title).toBe("Title");
+      await Effect.runPromise(
+        mp3Driver.patch(makeBlobByteSource(new Blob([input])), { title: "Updated" }),
+      );
+    }
+  });
+
+  it("rejects ID3v2.4 extended headers with malformed flag-data lengths", async () => {
+    const malformedCrc = concat(numberToSynchsafe(12), Uint8Array.of(1, 0x20, 4, 0, 0, 0, 0, 0));
+    const input = concat(
+      tagWithExtendedHeader(4, malformedCrc, frame("TIT2", "Title")),
+      validMp3Bytes(),
+    );
+    const source = makeBlobByteSource(new Blob([input]));
+    await expect(Effect.runPromise(mp3Driver.inspect(source))).rejects.toThrow(/CRC length/iu);
+    await expect(Effect.runPromise(mp3Driver.patch(source, { title: "Updated" }))).rejects.toThrow(
+      /CRC length/iu,
+    );
   });
 
   it("rejects headerless mixed-bitrate VBR instead of reporting a false duration", async () => {

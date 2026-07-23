@@ -153,8 +153,59 @@ const parseId3 = (bytes: Uint8Array<ArrayBuffer>): ParsedTag | undefined => {
   }
   let offset = 10;
   if ((bytes[5]! & 0x40) !== 0) {
-    if (version === 3) offset += 4 + readUint32BE(bytes, offset);
-    else if (version === 4) offset += synchsafeToNumber(bytes, offset);
+    const tagEnd = 10 + payloadSize;
+    if (version === 3) {
+      if (offset + 10 > tagEnd) throw readFailure("truncated ID3v2.3 extended header.");
+      const extendedSize = readUint32BE(bytes, offset);
+      const extendedFlags = bytes[offset + 4]! * 0x100 + bytes[offset + 5]!;
+      if (extendedSize !== 6 && extendedSize !== 10)
+        throw readFailure("invalid ID3v2.3 extended header size.");
+      if (
+        (extendedFlags & 0x7fff) !== 0 ||
+        (extendedSize === 10) !== ((extendedFlags & 0x8000) !== 0)
+      )
+        throw readFailure("invalid ID3v2.3 extended header flags.");
+      if (offset + 4 + extendedSize > tagEnd)
+        throw readFailure("truncated ID3v2.3 extended header.");
+      offset += 4 + extendedSize;
+    } else if (version === 4) {
+      if (offset + 6 > tagEnd) throw readFailure("truncated ID3v2.4 extended header.");
+      if (
+        [bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]].some(
+          (value) => (value! & 0x80) !== 0,
+        )
+      )
+        throw readFailure("invalid ID3v2.4 extended header size.");
+      const extendedSize = synchsafeToNumber(bytes, offset);
+      const flagBytes = bytes[offset + 4]!;
+      const extendedFlags = bytes[offset + 5]!;
+      if (extendedSize < 6 || flagBytes !== 1)
+        throw readFailure("invalid ID3v2.4 extended header structure.");
+      if ((extendedFlags & 0x8f) !== 0) throw readFailure("invalid ID3v2.4 extended header flags.");
+      const expectedSize =
+        6 +
+        ((extendedFlags & 0x40) !== 0 ? 1 : 0) +
+        ((extendedFlags & 0x20) !== 0 ? 6 : 0) +
+        ((extendedFlags & 0x10) !== 0 ? 2 : 0);
+      if (extendedSize !== expectedSize || offset + extendedSize > tagEnd)
+        throw readFailure("invalid ID3v2.4 extended header size.");
+      let flagOffset = offset + 6;
+      if ((extendedFlags & 0x40) !== 0) {
+        if (bytes[flagOffset++] !== 0) throw readFailure("invalid ID3v2.4 update flag data.");
+      }
+      if ((extendedFlags & 0x20) !== 0) {
+        if (bytes[flagOffset++] !== 5)
+          throw readFailure("invalid ID3v2.4 extended header CRC length.");
+        if ([0, 1, 2, 3, 4].some((index) => (bytes[flagOffset + index]! & 0x80) !== 0))
+          throw readFailure("invalid ID3v2.4 extended header CRC.");
+        flagOffset += 5;
+      }
+      if ((extendedFlags & 0x10) !== 0) {
+        if (bytes[flagOffset++] !== 1) throw readFailure("invalid ID3v2.4 restrictions length.");
+        flagOffset++;
+      }
+      offset += extendedSize;
+    }
   }
   const headerSize = version === 2 ? 6 : 10;
   const frames: RawFrame[] = [];
