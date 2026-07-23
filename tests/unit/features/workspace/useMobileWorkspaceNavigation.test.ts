@@ -76,6 +76,15 @@ describe("mobile workspace drawer", () => {
     hook.rerender({ libraryEmpty: true });
     expect(hook.result.drawerOpen).toBe(false);
     expect(trigger.focused).toBe(true);
+
+    act(() => hook.result.openDrawer());
+    expect(hook.result.drawerOpen).toBe(true);
+    act(() => hook.result.closeDrawer());
+
+    trigger.focused = false;
+    hook.rerender({ libraryEmpty: false });
+    expect(hook.result.drawerOpen).toBe(false);
+    expect(trigger.focused).toBe(false);
     hook.unmount();
   });
 

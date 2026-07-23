@@ -76,6 +76,7 @@ export default function AudioTagger() {
     onCommit: mobileNavigation.drawerOpen
       ? mobileNavigation.closeDrawer
       : mobileNavigation.openDrawer,
+    onSurfaceClick: mobileNavigation.drawerOpen ? mobileNavigation.closeDrawer : undefined,
     startsInZone: startsInSwipeZone,
   });
   const landingIsActive = libraryIsEmpty && activeView === "editor";
@@ -160,14 +161,6 @@ export default function AudioTagger() {
               : "translate-x-0"
           }`}
         >
-          {mobileNavigation.drawerOpen && (
-            <button
-              type="button"
-              className="absolute inset-0 z-10 cursor-default"
-              aria-label="close library"
-              onClick={mobileNavigation.closeDrawer}
-            />
-          )}
           <div
             className={`flex h-full w-full flex-col ${
               mobileNavigation.drawerOpen ? "pointer-events-none" : ""

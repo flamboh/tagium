@@ -25,28 +25,50 @@ export interface MobileWorkspaceNavigation {
   closeDrawer: () => void;
 }
 
+interface DrawerState {
+  drawerOpen: boolean;
+  libraryEmpty: boolean;
+  restoreFocusAfterEmpty: boolean;
+}
+
 export const useMobileWorkspaceNavigation = ({
   libraryEmpty,
 }: {
   libraryEmpty: boolean;
 }): MobileWorkspaceNavigation => {
   const [isMobile, setIsMobile] = useState(getInitialMobile);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerState, setDrawerState] = useState<DrawerState>({
+    drawerOpen: false,
+    libraryEmpty,
+    restoreFocusAfterEmpty: false,
+  });
   const drawerOpenRef = useRef(false);
   const drawerTriggerRef = useRef<HTMLElement | null>(null);
-  const previousLibraryEmptyRef = useRef(libraryEmpty);
+
+  if (drawerState.libraryEmpty !== libraryEmpty) {
+    setDrawerState({
+      drawerOpen: libraryEmpty ? false : drawerState.drawerOpen,
+      libraryEmpty,
+      restoreFocusAfterEmpty: libraryEmpty && drawerState.drawerOpen,
+    });
+  }
+  const drawerOpen = drawerState.drawerOpen;
 
   const openDrawer = useCallback(() => {
     if (!isMobile) return;
     drawerTriggerRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     drawerOpenRef.current = true;
-    setDrawerOpen(true);
+    setDrawerState((current) => ({
+      ...current,
+      drawerOpen: true,
+      restoreFocusAfterEmpty: false,
+    }));
   }, [isMobile]);
 
   const closeDrawer = useCallback(() => {
     drawerOpenRef.current = false;
-    setDrawerOpen(false);
+    setDrawerState((current) => ({ ...current, drawerOpen: false }));
     restoreFocus(drawerTriggerRef.current);
   }, []);
 
@@ -56,7 +78,7 @@ export const useMobileWorkspaceNavigation = ({
       setIsMobile(media.matches);
       if (!drawerOpenRef.current) return;
       drawerOpenRef.current = false;
-      setDrawerOpen(false);
+      setDrawerState((current) => ({ ...current, drawerOpen: false }));
       if (media.matches) restoreFocus(drawerTriggerRef.current);
       else focusDesktopSidebar();
     };
@@ -65,10 +87,11 @@ export const useMobileWorkspaceNavigation = ({
   }, []);
 
   useEffect(() => {
-    const wasEmpty = previousLibraryEmptyRef.current;
-    previousLibraryEmptyRef.current = libraryEmpty;
-    if (!wasEmpty && libraryEmpty && drawerOpen) restoreFocus(drawerTriggerRef.current);
-  }, [drawerOpen, libraryEmpty]);
+    if (drawerState.restoreFocusAfterEmpty) {
+      drawerOpenRef.current = false;
+      restoreFocus(drawerTriggerRef.current);
+    }
+  }, [drawerState.restoreFocusAfterEmpty]);
 
-  return { isMobile, drawerOpen: drawerOpen && !libraryEmpty, openDrawer, closeDrawer };
+  return { isMobile, drawerOpen, openDrawer, closeDrawer };
 };

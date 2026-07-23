@@ -45,6 +45,7 @@ test("lands on the download surface with one push-drawer opener", async ({ page 
   const main = page.locator("[data-mobile-main-surface]");
 
   await expect(drawer).toBeVisible();
+  await expect(page.getByRole("button", { name: "close library" })).toHaveCount(1);
   await expect(drawer.getByRole("button", { name: "close library" })).toBeFocused();
   const shell = page.locator("[data-mobile-drawer]");
   await expect(shell.locator(":scope > *")).toHaveCount(2);

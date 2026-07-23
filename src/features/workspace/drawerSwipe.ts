@@ -60,11 +60,13 @@ export const useDrawerSwipe = ({
   enabled,
   direction,
   onCommit,
+  onSurfaceClick,
   startsInZone,
 }: {
   enabled: boolean;
   direction: DrawerSwipeDirection;
   onCommit: () => void;
+  onSurfaceClick?: () => void;
   startsInZone: (touch: Touch, surface: HTMLElement) => boolean;
 }) => {
   const surfaceRef = useRef<HTMLDivElement | null>(null);
@@ -145,15 +147,18 @@ export const useDrawerSwipe = ({
     const onVisibilityChange = () => {
       if (document.visibilityState !== "visible") clear();
     };
+    const onClick = () => onSurfaceClick?.();
 
     activeSurface.addEventListener("touchstart", onStart, { passive: true });
+    activeSurface.addEventListener("click", onClick);
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       activeSurface.removeEventListener("touchstart", onStart);
+      activeSurface.removeEventListener("click", onClick);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       clear();
     };
-  }, [direction, enabled, onCommit, startsInZone]);
+  }, [direction, enabled, onCommit, onSurfaceClick, startsInZone]);
 
   return surfaceRef;
 };
