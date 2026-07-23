@@ -226,4 +226,34 @@ describe("cobalt tunnel endpoint", () => {
     expect(response.status).toBe(502);
     expect(await response.text()).toBe("Cobalt tunnel response was empty.");
   });
+
+  it("returns a safe compatibility response when the upstream fetch throws", async () => {
+    const warnMock = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("private upstream detail");
+      }),
+    );
+
+    const response = await handler(makeEvent(makeTunnelRequest()));
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe("private upstream detail");
+    expect(JSON.stringify(warnMock.mock.calls)).not.toContain("private upstream detail");
+  });
+
+  it("preserves the established timeout wording for aborted upstream fetches", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new DOMException("timed out", "TimeoutError");
+      }),
+    );
+
+    const response = await handler(makeEvent(makeTunnelRequest()));
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe("Cobalt tunnel request timed out.");
+  });
 });

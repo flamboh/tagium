@@ -329,7 +329,10 @@ export default defineHandler(async (event) => {
         elapsedMs: Date.now() - startedAt,
         errorName: error.name,
       });
-      return new Response("Cobalt tunnel request failed.", { status: 502 });
+      if (error.name === "TimeoutError" || error.name === "AbortError") {
+        return new Response("Cobalt tunnel request timed out.", { status: 502 });
+      }
+      return new Response(error.message, { status: 502 });
     }
 
     logTunnelFailure("fetch threw non-error", {

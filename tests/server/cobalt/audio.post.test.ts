@@ -187,7 +187,9 @@ describe("cobalt audio endpoint", () => {
         Response.json(
           {
             status: "error",
-            error: { code: "error.api.fetch.soundcloud.resolve_fetch.429" },
+            error: {
+              code: "error.api.fetch.soundcloud.resolve_fetch.429.errorType-TypeError.contentType-application%2Fjson",
+            },
           },
           { status: 200 },
         ),
@@ -199,7 +201,7 @@ describe("cobalt audio endpoint", () => {
     expect(response.status).toBe(502);
     expect(await response.text()).toBe("error.api.fetch.fail");
     expect(JSON.stringify(warn.mock.calls)).toContain(
-      "error.api.fetch.soundcloud.resolve_fetch.429",
+      "error.api.fetch.soundcloud.resolve_fetch.429.errorType-TypeError.contentType-application%2Fjson",
     );
   });
 

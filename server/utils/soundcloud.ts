@@ -73,14 +73,21 @@ export const getSoundCloudClientId = async (
   }
 
   let foundSoundCloudScript = false;
+  let lastScriptError: unknown;
   for (const script of html.matchAll(/<script.+src="(.+)">/g)) {
     const scriptUrl = script[1];
     if (!scriptUrl?.startsWith("https://a-v2.sndcdn.com/")) continue;
     foundSoundCloudScript = true;
-    const scriptText = await fetchText(scriptUrl, fetch, "client_id.script_fetch", {
-      ...context,
-      url: scriptUrl,
-    });
+    let scriptText: string;
+    try {
+      scriptText = await fetchText(scriptUrl, fetch, "client_id.script_fetch", {
+        ...context,
+        url: scriptUrl,
+      });
+    } catch (error) {
+      lastScriptError = error;
+      continue;
+    }
     const scriptClientId = scriptText.match(/,client_id:"([A-Za-z0-9]{32})",/)?.[1];
     if (!scriptClientId) continue;
     cachedClient.version = version ?? "";
@@ -92,5 +99,5 @@ export const getSoundCloudClientId = async (
     foundSoundCloudScript ? "client_id.script_parse" : "client_id.home_parse",
     context,
   );
-  throw new Error("soundcloud.client_id");
+  throw new Error("soundcloud.client_id", lastScriptError ? { cause: lastScriptError } : undefined);
 };

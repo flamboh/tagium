@@ -1,11 +1,19 @@
 import { env } from "../../config.js";
 import { resolveRedirectingURL } from "../url.js";
+import {
+  buildSoundCloudFailureCode,
+  isSoundCloudResolvePayload,
+} from "../../../cobalt-soundcloud-helpers.mjs";
 
 const cachedClient = { version: "", id: "" };
 
 const failure = (stage, details = {}) => {
-  const statusSuffix = details.upstreamStatus ? `.${details.upstreamStatus}` : "";
-  return { error: `fetch.soundcloud.${stage}${statusSuffix}` };
+  return {
+    // Cobalt's adapter normalization discards arbitrary context. Keep these bounded,
+    // allowlisted diagnostics in the internal code; Tagium still maps this prefix to
+    // the public fetch.fail/fetch.empty errors.
+    error: buildSoundCloudFailureCode(stage, details),
+  };
 };
 
 const fetchText = async (url, stage) => {
@@ -146,10 +154,16 @@ export default async function soundcloud(input) {
   if (resolveResult.error) return resolveResult;
   const json = resolveResult.value;
 
+  if (!isSoundCloudResolvePayload(json)) {
+    return failure("resolve_parse", { errorType: "InvalidPayload" });
+  }
+
   if (json.duration > env.durationLimit * 1000) return { error: "content.too_long" };
   if (json.policy === "BLOCK") return { error: "content.region" };
   if (json.policy === "SNIP") return { error: "content.paid" };
-  if (!json.media?.transcodings?.length) return { error: "fetch.empty" };
+  if (!Array.isArray(json.media?.transcodings) || !json.media.transcodings.length) {
+    return { error: "fetch.empty" };
+  }
 
   let bestAudio = "opus";
   let selectedStream = findBestForPreset(json.media.transcodings, "opus");

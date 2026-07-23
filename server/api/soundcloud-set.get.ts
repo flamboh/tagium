@@ -182,6 +182,12 @@ const resolveTracks = async (
   }
 
   if (resolvedTracks.length === 0) {
+    await logSoundCloudCompletion(context, {
+      trackCount,
+      succeeded: 0,
+      failed: failedTracks,
+      failuresByStage,
+    });
     throw new Error("soundcloud.no_resolvable_tracks");
   }
 
