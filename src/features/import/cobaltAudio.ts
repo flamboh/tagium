@@ -23,6 +23,8 @@ export type CobaltAudioDownloadLifecycleCallback = (
 export interface CobaltAudioDownloadRequest {
   sourceUrl: string;
   audioBitrate: AudioDownloadBitrate;
+  importId?: string;
+  trackIndex?: number;
   year?: number;
   onLifecycle?: CobaltAudioDownloadLifecycleCallback;
   signal?: AbortSignal;
@@ -196,12 +198,20 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
   const fetchPlan = (request: CobaltAudioDownloadRequest) =>
     Effect.tryPromise({
       try: async () => {
+        const headers = new Headers({
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        });
+        headers.set("X-Tagium-Request-Id", crypto.randomUUID());
+        if (request.importId) {
+          headers.set("X-Tagium-Import-Id", request.importId);
+        }
+        if (request.trackIndex !== undefined) {
+          headers.set("X-Tagium-Track-Index", String(request.trackIndex));
+        }
         const response = await fetch("/api/cobalt/audio", {
           method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
+          headers,
           signal: request.signal,
           body: JSON.stringify({
             url: request.sourceUrl,

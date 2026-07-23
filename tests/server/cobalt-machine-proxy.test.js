@@ -251,6 +251,66 @@ describe("cobalt machine proxy", () => {
     }
   });
 
+  it("correlates structured Cobalt errors without logging the source URL", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const upstream = createControlledUpstream();
+    const upstreamPort = await listen(upstream.server);
+    const proxy = await createProxy(upstreamPort, {
+      maxConcurrentResolve: 1,
+      maxConcurrentTunnel: 1,
+      maxQueuedResolve: 0,
+      maxQueuedTunnel: 0,
+      maxQueueWaitMs: 1_000,
+    });
+    const sourceUrl = "https://soundcloud.com/artist/private-track";
+    const responsePromise = fetch(`${proxy.origin}/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Tagium-Request-Id": "request-1",
+        "X-Tagium-Parent-Request-Id": "plan-request-1",
+        "X-Tagium-Import-Id": "import-1",
+        "X-Tagium-Source-Fingerprint": `sha256:${"a".repeat(32)}`,
+        "X-Tagium-Track-Index": "7",
+      },
+      body: JSON.stringify({ url: sourceUrl }),
+    });
+
+    try {
+      const request = await upstream.waitForRequest();
+      request.response.writeHead(400, { "content-type": "application/json" });
+      request.response.end(
+        JSON.stringify({
+          status: "error",
+          error: { code: "error.api.fetch.fail", context: { service: "soundcloud" } },
+        }),
+      );
+      await expect(responsePromise.then((response) => response.json())).resolves.toMatchObject({
+        error: { code: "error.api.fetch.fail" },
+      });
+
+      const event = log.mock.calls
+        .map(([entry]) => JSON.parse(entry))
+        .find((entry) => entry.requestId === "request-1");
+      expect(event).toMatchObject({
+        event: "cobalt_proxy_request",
+        requestId: "request-1",
+        parentRequestId: "plan-request-1",
+        importId: "import-1",
+        sourceFingerprint: `sha256:${"a".repeat(32)}`,
+        trackIndex: 7,
+        machineId: "test-machine",
+        status: 400,
+        errorCode: "error.api.fetch.fail",
+        service: "soundcloud",
+      });
+      expect(JSON.stringify(event)).not.toContain(sourceUrl);
+    } finally {
+      await closeServer(proxy.server);
+      await closeServer(upstream.server);
+    }
+  });
+
   it("returns 503 when a queued resolve request waits too long", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const upstream = createControlledUpstream();

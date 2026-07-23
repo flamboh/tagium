@@ -183,6 +183,7 @@ export const createAudioUrlImportSession = ({
       sourceUrl,
       audioBitrate: getSettings().audioBitrate,
       createId: () => crypto.randomUUID(),
+      importId: importOperationId,
       metadata,
     });
     library.dispatch({
@@ -211,6 +212,7 @@ export const createAudioUrlImportSession = ({
       playlist,
       audioBitrate: getSettings().audioBitrate,
       createId: () => crypto.randomUUID(),
+      importId: importOperationId,
     });
     library.dispatch({
       type: "content-replaced",
@@ -294,7 +296,7 @@ export const createAudioUrlImportSession = ({
           try {
             const playlist =
               playlistProvider === "soundcloud"
-                ? await resolveSoundCloudSet(trimmedUrl)
+                ? await resolveSoundCloudSet(trimmedUrl, importOperationId)
                 : await resolveYouTubePlaylist(trimmedUrl);
             handlePlaylistDownload(playlist, importOperationId);
           } catch (error) {

@@ -68,6 +68,7 @@ export interface CreateSingleUrlDownloadPlanInput {
   sourceUrl: string;
   audioBitrate: AppSettings["audioBitrate"];
   createId: () => string;
+  importId?: string;
   metadata?: TrackMetadata;
 }
 
@@ -81,6 +82,7 @@ export interface CreatePlaylistDownloadPlanInput {
   playlist: Playlist;
   audioBitrate: AppSettings["audioBitrate"];
   createId: () => string;
+  importId?: string;
 }
 
 export interface DownloadTrackWorkflowDeps {
@@ -250,6 +252,7 @@ export const createSingleUrlDownloadPlan = ({
   sourceUrl,
   audioBitrate,
   createId,
+  importId,
   metadata,
 }: CreateSingleUrlDownloadPlanInput): SingleUrlDownloadPlan => {
   const id = createId();
@@ -263,7 +266,7 @@ export const createSingleUrlDownloadPlan = ({
       genre: "",
     }),
     false,
-    { sourceUrl, audioBitrate },
+    { sourceUrl, audioBitrate, ...(importId ? { importId } : {}) },
   );
 
   return {
@@ -284,6 +287,7 @@ export const createPlaylistDownloadPlan = ({
   playlist,
   audioBitrate,
   createId,
+  importId,
 }: CreatePlaylistDownloadPlanInput): PlaylistDownloadPlan => {
   const albumId = createId();
   const pendingFiles = playlist.tracks.map((track) =>
@@ -302,6 +306,8 @@ export const createPlaylistDownloadPlan = ({
       {
         sourceUrl: track.url,
         audioBitrate,
+        ...(importId ? { importId } : {}),
+        trackIndex: track.trackNumber,
         ...(playlist.year === undefined ? {} : { year: playlist.year }),
       },
       createPlaylistPendingMetadataPatch(playlist, track),
