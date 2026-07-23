@@ -179,6 +179,8 @@ describe("ExportConfirmationDialog", () => {
       (element) => typeof element.props.onOpenAutoFocus === "function",
     )[0];
     if (!content) throw new Error("dialog content not found");
+    expect("aria-describedby" in content.props).toBe(true);
+    expect(content.props["aria-describedby"]).toBeUndefined();
     const focus = vi.fn();
     const preventOpen = vi.fn();
     (content.props.onOpenAutoFocus as (event: unknown) => void)({

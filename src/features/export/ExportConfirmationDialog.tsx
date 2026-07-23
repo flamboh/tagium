@@ -88,6 +88,7 @@ export default function ExportConfirmationDialog({
     <Dialog open={Boolean(summary)} onOpenChange={(open) => !open && !busy && onCancel()}>
       <DialogContent
         showCloseButton={false}
+        aria-describedby={undefined}
         className="max-h-[calc(100dvh-1rem)] grid-rows-[auto_minmax(0,1fr)_auto] p-4 sm:max-h-[calc(100dvh-2rem)] sm:max-w-lg sm:p-6"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
