@@ -19,17 +19,29 @@ export type ShareDialogState =
   | { status: "published"; preview: ShareAlbumPreview; receipt: SharePublicationReceipt }
   | { status: "error"; preview: ShareAlbumPreview; message: string };
 
-export default function ShareAlbumDialog({
-  state,
-  onClose,
-  onPublish,
-  onStopSharing,
-}: {
+interface ShareAlbumDialogProps {
   state: ShareDialogState;
   onClose: () => void;
   onPublish: () => void;
   onStopSharing: () => Promise<void>;
-}) {
+}
+
+export default function ShareAlbumDialog(props: ShareAlbumDialogProps) {
+  const { state } = props;
+  const sessionKey =
+    state.status === "published"
+      ? `published:${state.receipt.slug}:${state.receipt.expiresAt}`
+      : state.status;
+
+  return <ShareAlbumDialogSession key={sessionKey} {...props} />;
+}
+
+function ShareAlbumDialogSession({
+  state,
+  onClose,
+  onPublish,
+  onStopSharing,
+}: ShareAlbumDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const copyTimerRef = useRef<number | null>(null);
   const [copied, setCopied] = useState(false);
@@ -37,10 +49,8 @@ export default function ShareAlbumDialog({
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const open = state.status !== "closed";
-  const receiptKey =
-    state.status === "published" ? `${state.receipt.slug}:${state.receipt.expiresAt}` : null;
 
-  useEffect(() => {
+  const closeDialog = () => {
     setCopied(false);
     setConfirmStop(false);
     setStopError(null);
@@ -49,7 +59,8 @@ export default function ShareAlbumDialog({
       window.clearTimeout(copyTimerRef.current);
       copyTimerRef.current = null;
     }
-  }, [open, receiptKey]);
+    onClose();
+  };
 
   useEffect(
     () => () => {
@@ -103,7 +114,7 @@ export default function ShareAlbumDialog({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && state.status !== "publishing" && !stopping) onClose();
+        if (!nextOpen && state.status !== "publishing" && !stopping) closeDialog();
       }}
     >
       <DialogContent
@@ -192,7 +203,7 @@ export default function ShareAlbumDialog({
                     >
                       stop sharing
                     </Button>
-                    <Button type="button" onClick={onClose}>
+                    <Button type="button" onClick={closeDialog}>
                       done
                     </Button>
                   </>
@@ -203,7 +214,7 @@ export default function ShareAlbumDialog({
                     type="button"
                     variant="outline"
                     disabled={state.status === "publishing"}
-                    onClick={onClose}
+                    onClick={closeDialog}
                   >
                     cancel
                   </Button>
