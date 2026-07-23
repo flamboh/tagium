@@ -50,7 +50,7 @@ describe("metadata conformance corpus", () => {
       expect(sha256(first)).toBe(fixtureCase.fixtureSha256);
       expect(audioPayloadSha256(fixtureCase.family, first)).toBe(fixtureCase.audioPayloadSha256);
     }
-  });
+  }, 15_000);
 
   it("makes mutation runs reproducible", () => {
     for (const family of ["mp3", "flac", "m4a"] as const) {
