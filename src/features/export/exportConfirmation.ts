@@ -2,8 +2,15 @@ import type { LibraryState } from "@/features/library/libraryState";
 import type { AppSettings, TagiumFile } from "@/features/library/types";
 import { isTrackReadyForDownload } from "@/features/export/downloadLibrary";
 
-const byteFormatter = new Intl.NumberFormat("en-US");
-const compactByteFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+const megabyteFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+const smallMegabyteFormatter = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const largeMegabyteFormatter = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 
 export type ConfirmedExportTarget = { kind: "library" } | { kind: "album"; albumId: string };
 
@@ -203,15 +210,13 @@ export const createExportPlanFingerprint = (
   );
 };
 
-export const formatByteSize = (sizeBytes: number) => {
-  const exact = `${byteFormatter.format(sizeBytes)} ${sizeBytes === 1 ? "byte" : "bytes"}`;
-  if (sizeBytes < 1_000) return exact;
-  const units = ["kB", "MB", "GB", "TB"];
-  let value = sizeBytes / 1_000;
-  let unit = units[0];
-  for (let index = 1; value >= 1_000 && index < units.length; index++) {
-    value /= 1_000;
-    unit = units[index];
-  }
-  return `${compactByteFormatter.format(value)} ${unit} (${exact})`;
+export const formatMegabyteSize = (sizeBytes: number) => {
+  const megabytes = sizeBytes / 1_000_000;
+  const formatted =
+    megabytes < 0.1
+      ? smallMegabyteFormatter.format(megabytes)
+      : megabytes >= 10_000
+        ? largeMegabyteFormatter.format(megabytes)
+        : megabyteFormatter.format(megabytes);
+  return `${formatted} MB`;
 };

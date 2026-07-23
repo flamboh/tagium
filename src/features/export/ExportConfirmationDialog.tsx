@@ -1,14 +1,16 @@
+import { ChevronDown } from "lucide-react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  formatByteSize,
+  formatMegabyteSize,
+  type ExportConfirmationGroup,
   type ExportConfirmationSummary,
 } from "@/features/export/exportConfirmation";
 
@@ -21,6 +23,56 @@ export interface ExportConfirmationDialogProps {
   onRestoreFocus: () => void;
 }
 
+export function ExportConfirmationDisclosure({
+  group,
+}: {
+  group: ExportConfirmationGroup;
+}) {
+  const [open, setOpen] = useState(false);
+  const contentId = useId();
+
+  return (
+    <div className="group/disclosure px-3 py-2.5" data-state={open ? "open" : "closed"}>
+      <button
+        type="button"
+        className="flex w-full cursor-pointer items-start gap-3 rounded-sm text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-expanded={open}
+        aria-controls={contentId}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium">{group.title}</span>
+          <span className="text-xs text-muted-foreground">
+            {group.tracks.length} {group.tracks.length === 1 ? "track" : "tracks"}
+          </span>
+        </span>
+        <ChevronDown
+          className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out group-data-[state=open]/disclosure:rotate-180 motion-reduce:transition-none"
+          aria-hidden="true"
+        />
+      </button>
+      <div
+        id={contentId}
+        role="region"
+        aria-label={`${group.title} tracks`}
+        aria-hidden={!open}
+        inert={!open}
+        className="grid grid-rows-[0fr] opacity-0 transition-[grid-template-rows,opacity] duration-200 ease-out group-data-[state=open]/disclosure:grid-rows-[1fr] group-data-[state=open]/disclosure:opacity-100 motion-reduce:transition-none"
+      >
+        <div className="min-h-0 overflow-hidden">
+          <ul className="mt-2 space-y-1 border-t pt-2">
+            {group.tracks.map((track) => (
+              <li key={track.id} className="min-w-0 truncate text-xs">
+                {track.title}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ExportConfirmationDialog({
   summary,
   status,
@@ -30,6 +82,7 @@ export default function ExportConfirmationDialog({
   onRestoreFocus,
 }: ExportConfirmationDialogProps) {
   const noun = summary?.trackCount === 1 ? "track" : "tracks";
+  const downloadLabel = summary ? `Download ${formatMegabyteSize(summary.totalSizeBytes)}` : "Download";
 
   return (
     <Dialog open={Boolean(summary)} onOpenChange={(open) => !open && !busy && onCancel()}>
@@ -50,11 +103,8 @@ export default function ExportConfirmationDialog({
       >
         <DialogHeader>
           <DialogTitle>
-            download {summary?.trackCount ?? 0} {noun}?
+            Download {summary?.trackCount ?? 0} {noun}
           </DialogTitle>
-          <DialogDescription>
-            Review the files before Tagium applies metadata and creates the download.
-          </DialogDescription>
           {status !== "ready" && (
             <p
               role="alert"
@@ -69,42 +119,9 @@ export default function ExportConfirmationDialog({
 
         {summary && (
           <div className="min-h-0 overflow-y-auto -mx-2 px-2" data-testid="export-summary">
-            <div className="mb-3 flex items-baseline justify-between gap-4 rounded-md bg-muted px-3 py-2.5 text-sm">
-              <span className="font-medium">estimated download size</span>
-              <span className="text-right tabular-nums text-muted-foreground">
-                {formatByteSize(summary.totalSizeBytes)}
-              </span>
-            </div>
-            <p className="mb-3 text-xs text-muted-foreground">
-              Current file bytes before metadata updates and ZIP compression.
-            </p>
             <div className="divide-y rounded-md border">
               {summary.groups.map((group) => (
-                <details key={group.id} className="group px-3 py-2.5">
-                  <summary className="cursor-pointer select-none list-none rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                    <span className="flex items-start justify-between gap-4 text-sm">
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium">{group.title}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {group.tracks.length} {group.tracks.length === 1 ? "track" : "tracks"}
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                        {formatByteSize(group.sizeBytes)}
-                      </span>
-                    </span>
-                  </summary>
-                  <ul className="mt-2 space-y-1 border-t pt-2" aria-label={`${group.title} tracks`}>
-                    {group.tracks.map((track) => (
-                      <li key={track.id} className="flex justify-between gap-4 text-xs">
-                        <span className="min-w-0 truncate">{track.title}</span>
-                        <span className="shrink-0 tabular-nums text-muted-foreground">
-                          {formatByteSize(track.sizeBytes)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
+                <ExportConfirmationDisclosure key={group.id} group={group} />
               ))}
             </div>
           </div>
@@ -125,8 +142,9 @@ export default function ExportConfirmationDialog({
             onClick={onConfirm}
             disabled={busy || status === "unavailable"}
             aria-busy={busy}
+            className="w-[10.5rem] justify-center tabular-nums"
           >
-            {busy ? "preparing download..." : "download"}
+            {busy ? "preparing download..." : downloadLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

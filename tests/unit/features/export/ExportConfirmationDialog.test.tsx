@@ -1,6 +1,9 @@
 import type { ReactElement, ReactNode } from "react";
+import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it, vi } from "vite-plus/test";
-import ExportConfirmationDialog from "@/features/export/ExportConfirmationDialog";
+import ExportConfirmationDialog, {
+  ExportConfirmationDisclosure,
+} from "@/features/export/ExportConfirmationDialog";
 import { Button } from "@/components/ui/button";
 
 type TestElement = ReactElement<Record<string, unknown> & { children?: ReactNode }>;
@@ -40,7 +43,7 @@ const summary = {
 };
 
 describe("ExportConfirmationDialog", () => {
-  it("renders grouped exact sizes and expandable track details", () => {
+  it("uses concise download copy without exposing byte counts", () => {
     const tree = ExportConfirmationDialog({
       summary,
       status: "ready",
@@ -50,13 +53,49 @@ describe("ExportConfirmationDialog", () => {
       onRestoreFocus: vi.fn(),
     });
 
-    expect(textContent(tree)).toContain("download 1 track?");
-    expect(textContent(tree)).toContain("Album One");
-    expect(textContent(tree)).toContain("1.5 kB (1,500 bytes)");
-    expect(textContent(tree)).toContain("estimated download size");
-    expect(textContent(tree)).toContain("Current file bytes");
-    expect(findAll(tree, (element) => element.type === "details")).toHaveLength(1);
-    expect(textContent(tree)).toContain("A Track");
+    expect(textContent(tree)).toContain("Download 1 track");
+    expect(textContent(tree)).not.toContain("?");
+    expect(textContent(tree)).not.toContain("Review the files");
+    expect(textContent(tree)).not.toContain("estimated download size");
+    expect(textContent(tree)).not.toContain("Current file bytes");
+    expect(textContent(tree)).not.toMatch(/\bbytes?\b/i);
+    const disclosures = findAll(tree, (element) => element.type === ExportConfirmationDisclosure);
+    expect(disclosures).toHaveLength(1);
+    expect(disclosures[0]?.props.group).toMatchObject({ title: "Album One" });
+    const download = findAll(tree, (element) => element.type === Button).find((button) =>
+      textContent(button).startsWith("Download"),
+    );
+    expect(textContent(download)).toBe("Download 0.00 MB");
+    expect(download?.props.className).toContain("w-[10.5rem]");
+    expect(download?.props.className).toContain("tabular-nums");
+    expect(download?.props.className).not.toContain("justify-between");
+  });
+
+  it("keeps album track disclosures keyboard-accessible and animated in both directions", async () => {
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(<ExportConfirmationDisclosure group={summary.groups[0]!} />);
+    });
+
+    const trigger = () => renderer.root.findByType("button");
+    const region = () => renderer.root.findByProps({ role: "region" });
+    expect(trigger().props["aria-expanded"]).toBe(false);
+    expect(trigger().props["aria-controls"]).toBe(region().props.id);
+    expect(region().props["aria-hidden"]).toBe(true);
+    expect(region().props.inert).toBe(true);
+    expect(region().props.className).toContain("grid-rows-[0fr]");
+    expect(region().props.className).toContain("transition-[grid-template-rows,opacity]");
+    expect(region().props.className).toContain("duration-200");
+    expect(region().props.className).toContain("motion-reduce:transition-none");
+
+    await act(() => trigger().props.onClick());
+    expect(trigger().props["aria-expanded"]).toBe(true);
+    expect(region().props["aria-hidden"]).toBe(false);
+    expect(region().props.inert).toBe(false);
+
+    await act(() => trigger().props.onClick());
+    expect(trigger().props["aria-expanded"]).toBe(false);
+    expect(region().props["aria-hidden"]).toBe(true);
   });
 
   it("wires cancel and confirm and locks both controls while busy", () => {
@@ -72,7 +111,7 @@ describe("ExportConfirmationDialog", () => {
     });
     const readyButtons = findAll(readyTree, (element) => element.type === Button);
     const cancel = readyButtons.find((button) => textContent(button) === "cancel");
-    const confirm = readyButtons.find((button) => textContent(button) === "download");
+    const confirm = readyButtons.find((button) => textContent(button) === "Download 0.00 MB");
     expect(cancel).toBeDefined();
     expect(confirm).toBeDefined();
     (cancel?.props.onClick as (() => void) | undefined)?.();
@@ -106,7 +145,7 @@ describe("ExportConfirmationDialog", () => {
     expect(textContent(alert)).toContain("no longer ready");
     expect(alert?.props["aria-live"]).toBeUndefined();
     const download = findAll(tree, (element) => element.type === Button).find((button) =>
-      textContent(button).includes("download"),
+      textContent(button).toLowerCase().includes("download"),
     );
     expect(download?.props.disabled).toBe(true);
   });

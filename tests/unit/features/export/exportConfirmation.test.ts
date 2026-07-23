@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   deriveExportConfirmationSummary,
-  formatByteSize,
+  formatMegabyteSize,
 } from "@/features/export/exportConfirmation";
 import { createLibraryState } from "@/features/library/libraryState";
 import type { AlbumGroup, AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
@@ -137,10 +137,11 @@ describe("export confirmation summary", () => {
     ).toBeNull();
   });
 
-  it("formats a readable size while preserving the exact byte count", () => {
-    expect(formatByteSize(1)).toBe("1 byte");
-    expect(formatByteSize(999)).toBe("999 bytes");
-    expect(formatByteSize(1_234_567)).toBe("1.2 MB (1,234,567 bytes)");
+  it("formats a compact MB-only download size", () => {
+    expect(formatMegabyteSize(1)).toBe("0.00 MB");
+    expect(formatMegabyteSize(999)).toBe("0.00 MB");
+    expect(formatMegabyteSize(1_234_567)).toBe("1.2 MB");
+    expect(formatMegabyteSize(10_000_000_000)).toBe("10K MB");
   });
 
   it("keeps shared large-cover fingerprints bounded and detects same-size replacement artwork", () => {
