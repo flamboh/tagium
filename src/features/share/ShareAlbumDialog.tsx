@@ -281,7 +281,7 @@ function SharePreview({
   coverUrl: string | null;
 }) {
   return (
-    <div className="flex gap-4 px-5 pt-5">
+    <div className="flex min-w-0 gap-4 px-5 pt-5">
       <div
         className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted sm:size-32"
         aria-label={preview.cover ? "album cover" : "no album cover"}
@@ -295,7 +295,7 @@ function SharePreview({
       <ol
         tabIndex={0}
         aria-label="track preview"
-        className="h-24 min-w-0 flex-1 overflow-y-auto rounded-md border p-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:h-32 [&>li+li]:mt-1"
+        className="h-24 min-w-0 flex-1 overflow-x-hidden overflow-y-auto rounded-md border p-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:h-32 [&>li+li]:mt-1"
       >
         {preview.tracks.length ? (
           preview.tracks.map((track, index) => (

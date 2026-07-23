@@ -239,10 +239,55 @@ describe("share album dialog", () => {
       (node) =>
         typeof node.type === "string" &&
         typeof node.props.className === "string" &&
-        node.props.className.includes("flex gap-4"),
+        node.props.className.includes("gap-4") &&
+        node.props.className.includes("px-5"),
     );
     expect(preview).toHaveLength(1);
     expect(preview[0].props.className).toContain("px-5");
+  });
+
+  it("contains unbroken track titles and truncates them with an accessible full label", () => {
+    const unbrokenTitle = "TRACK".repeat(100);
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        createElement(ShareAlbumDialog, {
+          state: {
+            status: "confirm",
+            preview: {
+              ...preview,
+              tracks: [{ key: "long:0", title: unbrokenTitle }],
+            },
+          },
+          onClose: vi.fn(),
+          onPublish: vi.fn(),
+          onStopSharing: vi.fn(async () => undefined),
+        }),
+      );
+    });
+
+    const previewRow = renderer.root.findAll(
+      (node) =>
+        typeof node.type === "string" &&
+        typeof node.props.className === "string" &&
+        node.props.className.includes("gap-4") &&
+        node.props.className.includes("px-5"),
+    )[0];
+    const list = renderer.root.findByProps({ "aria-label": "track preview" });
+    const title = renderer.root.findByProps({ title: unbrokenTitle });
+    const titleText = title.find(
+      (node) =>
+        node.type === "span" &&
+        typeof node.props.className === "string" &&
+        node.props.className.includes("truncate"),
+    );
+
+    expect(previewRow.props.className).toContain("min-w-0");
+    expect(list.props.className).toContain("overflow-x-hidden");
+    expect(title.props.title).toBe(unbrokenTitle);
+    expect(titleText.props.className).toContain("min-w-0");
+    expect(titleText.props.className).toContain("truncate");
+    expect(titleText.children).toContain(unbrokenTitle);
   });
 
   it("keeps labels from resizing copy and create actions", () => {
