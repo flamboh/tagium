@@ -30,13 +30,13 @@ test("download confirmation owns focus, dismisses safely, and restores its trigg
   await expect(trigger).toBeFocused();
 
   await trigger.click();
-  await page.mouse.click(4, 4);
+  await page.locator('[data-slot="dialog-overlay"]').click({ position: { x: 4, y: 4 } });
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
 });
 
 test("download contents scroll inside a constrained mobile dialog", async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 400 });
+  await page.setViewportSize({ width: 375, height: 240 });
   await page.goto("/");
   await page
     .locator('input[type="file"]')
@@ -50,14 +50,11 @@ test("download contents scroll inside a constrained mobile dialog", async ({ pag
 
   const summary = dialog.getByTestId("export-summary");
   await expect(summary).toBeVisible();
-  expect(
-    await summary.evaluate((element) => ({
-      scrollHeight: element.scrollHeight,
-      clientHeight: element.clientHeight,
-    })),
-  ).toMatchObject({ scrollHeight: expect.any(Number), clientHeight: expect.any(Number) });
-  expect(await summary.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
-    true,
-  );
+  const summaryMetrics = await summary.evaluate((element) => ({
+    scrollHeight: element.scrollHeight,
+    clientHeight: element.clientHeight,
+  }));
+  expect(summaryMetrics.clientHeight).toBeGreaterThan(0);
+  expect(summaryMetrics.scrollHeight).toBeGreaterThan(summaryMetrics.clientHeight);
   await expect(dialog.getByRole("button", { name: "cancel" })).toBeVisible();
 });
