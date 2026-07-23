@@ -6,9 +6,10 @@ const mocks = vi.hoisted(() => ({
   fetchSharedAlbum: vi.fn(),
   fetchSharedAlbumArtwork: vi.fn(),
   importSharedAlbum: vi.fn(),
+  toastSuccess: vi.fn(),
 }));
 
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: mocks.toastSuccess, error: vi.fn() } }));
 vi.mock("@/features/share/shareClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/share/shareClient")>()),
   fetchSharedAlbum: mocks.fetchSharedAlbum,
@@ -131,6 +132,8 @@ describe("share workflow pasted links", () => {
     expect(location.pathname).toBe(before);
     expect(mocks.fetchSharedAlbum).toHaveBeenCalledOnce();
     expect(mocks.importSharedAlbum).toHaveBeenCalledWith(sharedManifest, slug, undefined);
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("shared album added · download started");
+    expect(mocks.toastSuccess).not.toHaveBeenCalledWith(expect.stringContaining("at a time"));
     hook.unmount();
   });
 

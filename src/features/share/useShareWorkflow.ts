@@ -163,7 +163,7 @@ export const useShareWorkflow = ({
             : entry,
         );
         await importing.commands.importSharedAlbum(fresh.manifest, slug, picture);
-        toast.success("shared album added · downloading 3 at a time");
+        toast.success("shared album added · download started");
       } catch (error) {
         if (error instanceof SharedAlbumVersionError) throw error;
         throw new SharedAlbumUnavailableError();
@@ -310,7 +310,7 @@ export const useShareWorkflow = ({
         await importing.commands.importSharedAlbum(fresh.manifest, page.slug, picture);
         history.replaceState({}, "", "/");
         setPage(null);
-        toast.success("shared album added · downloading 3 at a time");
+        toast.success("shared album added · download started");
       } catch (error) {
         if (error instanceof SharedAlbumUnavailableError) {
           setPage({
