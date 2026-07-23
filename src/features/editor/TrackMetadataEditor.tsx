@@ -4,10 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode, RefObject, TransitionEvent } from "react";
 import {
   Controller,
+  useFormState,
   useWatch,
   type Control,
+  type FieldErrors,
   type SubmitHandler,
-  type UseFormHandleSubmit,
+  type UseFormGetValues,
+  type UseFormSetError,
+  type UseFormClearErrors,
+  type UseFormSetFocus,
   type UseFormRegister,
   type UseFormRegisterReturn,
 } from "react-hook-form";
@@ -18,8 +23,23 @@ import CoverArt from "@/features/editor/coverArt";
 import { isValidFilenameBase, sanitizeFilenameBase } from "@/features/library/filename";
 import { getAudioFormatInfo } from "@/features/audio/audioFormat";
 import { getSampleTrack, type SampleTrackMetadata } from "@/features/editor/sampleMetadata";
+import {
+  getAdvancedMetadataValidationErrors,
+  validateBpm,
+  validateDiscNumber,
+} from "@/features/editor/audioTaggerUtils";
 import { getTrackFailureDisplay } from "@/features/workspace/systemFailure";
+import {
+  useMetadataEditorMode,
+  type MetadataEditorMode,
+} from "@/features/editor/useMetadataEditorMode";
+import { useLinkedAlbumArtistDisplay } from "@/features/editor/useLinkedAlbumArtistDisplay";
 import type { AlbumGroup, AudioMetadata, TagiumFile } from "@/features/library/types";
+import {
+  getMetadataLinkDescriptor,
+  type MetadataLinkState,
+} from "@/features/library/metadataLinks";
+import { METADATA_EDITOR_FORM_LAYOUT } from "@/features/editor/trackMetadataEditorLayout";
 
 type LoadedTrack = TagiumFile & { metadata: AudioMetadata };
 
@@ -28,7 +48,10 @@ interface TrackMetadataEditorProps {
   selectedFileId: string | null;
   register: UseFormRegister<AudioMetadata>;
   control: Control<AudioMetadata>;
-  handleSubmit: UseFormHandleSubmit<AudioMetadata>;
+  getValues: UseFormGetValues<AudioMetadata>;
+  setError: UseFormSetError<AudioMetadata>;
+  clearErrors: UseFormClearErrors<AudioMetadata>;
+  setFocus: UseFormSetFocus<AudioMetadata>;
   onTrackCoverUpload: (
     picture: NonNullable<AudioMetadata["picture"]>,
     resetKey?: string | null,
@@ -38,7 +61,8 @@ interface TrackMetadataEditorProps {
   onDownloadUpdatedFile: SubmitHandler<AudioMetadata>;
   selectedFileAlbum: AlbumGroup | undefined;
   syncFilenames: boolean;
-  syncTrackNumbers: boolean;
+  advancedMetadata: boolean;
+  metadataLinks: MetadataLinkState;
   onPreviewMetadataChange: (
     field: "filename" | "title" | "artist",
     event: ChangeEvent<HTMLInputElement>,
@@ -48,6 +72,16 @@ interface TrackMetadataEditorProps {
 interface LoadedTrackMetadataEditorProps extends Omit<TrackMetadataEditorProps, "selectedFile"> {
   selectedFile: LoadedTrack;
   focusedTitleFileIdRef: RefObject<string | null>;
+  editorMode: MetadataEditorMode;
+  onEditorModeChange: (mode: MetadataEditorMode) => void;
+}
+
+interface PendingTrackMetadataEditorProps extends Pick<
+  TrackMetadataEditorProps,
+  "selectedFile" | "advancedMetadata"
+> {
+  editorMode: MetadataEditorMode;
+  onEditorModeChange: (mode: MetadataEditorMode) => void;
 }
 
 const hasMetadata = (selectedFile: TagiumFile | null): selectedFile is LoadedTrack =>
@@ -93,6 +127,7 @@ function TrackFilenameHeader({
   filenameRegistration,
   extension,
   failure,
+  hasModeToggle = false,
 }: {
   syncFilenames: boolean;
   watchedFilename: string;
@@ -102,9 +137,14 @@ function TrackFilenameHeader({
   filenameRegistration: UseFormRegisterReturn<"filename">;
   extension: string;
   failure: TrackFailure | null;
+  hasModeToggle?: boolean;
 }) {
   return (
-    <div className="relative h-16 border-b flex-shrink-0 px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6">
+    <div
+      className={`relative h-16 shrink-0 border-b px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6 ${
+        hasModeToggle ? "pr-40 max-lg:[@media(max-height:700px)]:pr-36 lg:pr-44" : ""
+      }`}
+    >
       <div className="flex h-full min-w-0 items-center">
         {syncFilenames ? (
           <h2 className="inline-flex min-w-0 max-w-full items-center text-base font-semibold text-muted-foreground max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
@@ -184,7 +224,7 @@ function TrackDetailsFields({
   placeholder,
   inAlbum,
   syncFilenames,
-  syncTrackNumbers,
+  metadataLinks,
   filenameInvalid,
   onPreviewMetadataChange,
 }: {
@@ -194,7 +234,7 @@ function TrackDetailsFields({
   placeholder: SampleTrackMetadata;
   inAlbum: boolean;
   syncFilenames: boolean;
-  syncTrackNumbers: boolean;
+  metadataLinks: TrackMetadataEditorProps["metadataLinks"];
   filenameInvalid: boolean;
   onPreviewMetadataChange: TrackMetadataEditorProps["onPreviewMetadataChange"];
 }) {
@@ -216,7 +256,7 @@ function TrackDetailsFields({
     },
     [focusedTitleFileIdRef, selectedFileId, titleRegistrationRef],
   );
-  const albumFieldReason = "controlled by the album";
+  const albumFieldReason = "album title is always controlled by the album";
 
   return (
     <>
@@ -238,12 +278,15 @@ function TrackDetailsFields({
         <label htmlFor="track-artist" className={fieldLabelClassName}>
           artist:
         </label>
-        <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
+        <DisabledReason
+          disabled={inAlbum && metadataLinks.artist}
+          reason={getMetadataLinkDescriptor("artist").disabledReason}
+        >
           <Input
             {...artistRegistration}
             id="track-artist"
             placeholder={placeholder.artist}
-            disabled={inAlbum}
+            disabled={inAlbum && metadataLinks.artist}
             className={`${placeholderClassName} ${syncedInputClassName}`}
           />
         </DisabledReason>
@@ -267,13 +310,16 @@ function TrackDetailsFields({
           <label htmlFor="track-year" className={fieldLabelClassName}>
             year:
           </label>
-          <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
+          <DisabledReason
+            disabled={inAlbum && metadataLinks.year}
+            reason={getMetadataLinkDescriptor("year").disabledReason}
+          >
             <Input
               type="number"
               {...register("year", { valueAsNumber: true })}
               id="track-year"
               placeholder={placeholder.year}
-              disabled={inAlbum}
+              disabled={inAlbum && metadataLinks.year}
               className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
             />
           </DisabledReason>
@@ -282,12 +328,15 @@ function TrackDetailsFields({
           <label htmlFor="track-genre" className={fieldLabelClassName}>
             genre:
           </label>
-          <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
+          <DisabledReason
+            disabled={inAlbum && metadataLinks.genre}
+            reason={getMetadataLinkDescriptor("genre").disabledReason}
+          >
             <Input
               {...register("genre")}
               id="track-genre"
               placeholder={placeholder.genre}
-              disabled={inAlbum}
+              disabled={inAlbum && metadataLinks.genre}
               className={`${placeholderClassName} ${syncedInputClassName}`}
             />
           </DisabledReason>
@@ -296,13 +345,16 @@ function TrackDetailsFields({
           <label htmlFor="track-number" className={fieldLabelClassName}>
             track:
           </label>
-          <DisabledReason disabled={inAlbum && syncTrackNumbers} reason="follows album order">
+          <DisabledReason
+            disabled={inAlbum && metadataLinks.trackNumber}
+            reason={getMetadataLinkDescriptor("trackNumber").disabledReason}
+          >
             <Input
               type="number"
               {...register("trackNumber", { valueAsNumber: true })}
               id="track-number"
               placeholder={placeholder.trackNumber}
-              disabled={inAlbum && syncTrackNumbers}
+              disabled={inAlbum && metadataLinks.trackNumber}
               className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
             />
           </DisabledReason>
@@ -312,9 +364,137 @@ function TrackDetailsFields({
   );
 }
 
+const nullableNumberRegistration = {
+  setValueAs: (value: string) => (value === "" ? null : Number(value)),
+};
+
+interface AdvancedFieldRegistrations {
+  albumArtist: UseFormRegisterReturn<"albumArtist">;
+  discNumber: UseFormRegisterReturn<"discNumber">;
+  composer: UseFormRegisterReturn<"composer">;
+  bpm: UseFormRegisterReturn<"bpm">;
+  comment: UseFormRegisterReturn<"comment">;
+}
+
+export function AdvancedTrackDetailsFields({
+  registrations,
+  errors,
+  albumArtistLinked,
+  linkedArtistValue,
+  onFieldsMount,
+}: {
+  registrations: AdvancedFieldRegistrations;
+  errors: FieldErrors<AudioMetadata>;
+  albumArtistLinked: boolean;
+  linkedArtistValue: string;
+  onFieldsMount?: (node: HTMLDivElement | null) => void;
+}) {
+  const albumArtistReason = getMetadataLinkDescriptor("albumArtist").disabledReason;
+  const albumArtistReasonId = "track-album-artist-sync-reason";
+
+  return (
+    <>
+      <div>
+        <label htmlFor="track-album-artist" className={fieldLabelClassName}>
+          album artist:
+        </label>
+        <DisabledReason disabled={albumArtistLinked} reason={albumArtistReason}>
+          <Input
+            key={albumArtistLinked ? "linked" : "unlinked"}
+            {...(albumArtistLinked
+              ? { name: registrations.albumArtist.name }
+              : registrations.albumArtist)}
+            id="track-album-artist"
+            aria-describedby={albumArtistLinked ? albumArtistReasonId : undefined}
+            disabled={albumArtistLinked}
+            readOnly={albumArtistLinked}
+            value={albumArtistLinked ? linkedArtistValue : undefined}
+            placeholder="Album artist"
+            className={`${placeholderClassName} ${syncedInputClassName}`}
+          />
+        </DisabledReason>
+        {albumArtistLinked && (
+          <p id={albumArtistReasonId} className="sr-only">
+            {albumArtistReason}
+          </p>
+        )}
+      </div>
+      <div ref={onFieldsMount} className="grid grid-cols-2 gap-2">
+        <div>
+          <label htmlFor="track-disc-number" className={fieldLabelClassName}>
+            disc:
+          </label>
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step={1}
+            {...registrations.discNumber}
+            id="track-disc-number"
+            aria-invalid={Boolean(errors.discNumber)}
+            aria-describedby={errors.discNumber ? "track-disc-number-error" : undefined}
+            placeholder="1"
+            className={`${placeholderClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+          />
+          {errors.discNumber && (
+            <p id="track-disc-number-error" className="mt-1 text-xs text-destructive">
+              {errors.discNumber.message}
+            </p>
+          )}
+        </div>
+        <div>
+          <label htmlFor="track-bpm" className={fieldLabelClassName}>
+            BPM:
+          </label>
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step="any"
+            {...registrations.bpm}
+            id="track-bpm"
+            aria-invalid={Boolean(errors.bpm)}
+            aria-describedby={errors.bpm ? "track-bpm-error" : undefined}
+            placeholder="120"
+            className={`${placeholderClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+          />
+          {errors.bpm && (
+            <p id="track-bpm-error" className="mt-1 text-xs text-destructive">
+              {errors.bpm.message}
+            </p>
+          )}
+        </div>
+      </div>
+      <div>
+        <label htmlFor="track-composer" className={fieldLabelClassName}>
+          composer:
+        </label>
+        <Input
+          {...registrations.composer}
+          id="track-composer"
+          placeholder="Composer"
+          className={placeholderClassName}
+        />
+      </div>
+      <div>
+        <label htmlFor="track-comment" className={fieldLabelClassName}>
+          comment:
+        </label>
+        <textarea
+          {...registrations.comment}
+          id="track-comment"
+          rows={2}
+          placeholder="Add a comment"
+          className="border-input placeholder:text-muted-foreground/45 selection:bg-primary selection:text-primary-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 flex min-h-16 w-full resize-y rounded-md border bg-transparent px-3 py-2 text-base shadow-xs outline-none focus-visible:ring-[3px] md:text-sm"
+        />
+      </div>
+    </>
+  );
+}
+
 function TrackFileSummary({ selectedFile }: { selectedFile: LoadedTrack }) {
   return (
-    <div className="grid grid-cols-2 gap-2 text-xs md:text-sm">
+    <div data-track-file-summary className="grid grid-cols-2 gap-2 text-xs md:text-sm">
       <div>
         <span className="font-medium">duration: </span>
         {`${Math.floor(selectedFile.metadata.duration / 60)}:${String(Math.round(selectedFile.metadata.duration % 60)).padStart(2, "0")}`}
@@ -336,13 +516,11 @@ function TrackFileSummary({ selectedFile }: { selectedFile: LoadedTrack }) {
 }
 
 function DownloadTrackButton({
-  handleSubmit,
-  onDownloadUpdatedFile,
+  onClick,
   disabled,
   disabledReason,
 }: {
-  handleSubmit: UseFormHandleSubmit<AudioMetadata>;
-  onDownloadUpdatedFile: SubmitHandler<AudioMetadata>;
+  onClick: () => void;
   disabled: boolean;
   disabledReason: string;
 }) {
@@ -351,7 +529,7 @@ function DownloadTrackButton({
       <DisabledReason disabled={disabled} reason={disabledReason}>
         <Button
           type="button"
-          onClick={handleSubmit(onDownloadUpdatedFile)}
+          onClick={onClick}
           disabled={disabled}
           className="min-w-36 max-lg:[@media(max-height:700px)]:h-10 max-lg:[@media(max-height:700px)]:text-xs"
         >
@@ -362,24 +540,147 @@ function DownloadTrackButton({
   );
 }
 
+export function MetadataEditorModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: MetadataEditorMode;
+  onChange: (mode: MetadataEditorMode) => void;
+}) {
+  return (
+    <div
+      className="inline-grid h-7 w-[8.5rem] shrink-0 grid-cols-2 rounded-md bg-muted p-0.5"
+      role="group"
+      aria-label="metadata fields"
+    >
+      {(["normal", "advanced"] as const).map((option) => (
+        <button
+          key={option}
+          type="button"
+          aria-pressed={mode === option}
+          onClick={() => onChange(option)}
+          className={`h-6 min-w-0 cursor-pointer rounded-sm px-1.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-muted ${
+            mode === option
+              ? "bg-background text-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {option}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PendingTrackMetadataEditor({
+  selectedFile,
+  advancedMetadata,
+  editorMode,
+  onEditorModeChange,
+}: PendingTrackMetadataEditorProps) {
+  if (!selectedFile) return null;
+
+  const trackState =
+    selectedFile.downloadStatus === "error"
+      ? "download failed"
+      : selectedFile.downloadStatus === "canceled"
+        ? "download canceled"
+        : selectedFile.status === "error"
+          ? "metadata failed"
+          : "loading metadata";
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6">
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-semibold text-muted-foreground max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
+            {selectedFile.filename}
+          </h2>
+          <p role="status" className="text-xs text-muted-foreground">
+            {trackState}
+          </p>
+        </div>
+        {advancedMetadata && (
+          <MetadataEditorModeToggle mode={editorMode} onChange={onEditorModeChange} />
+        )}
+      </div>
+      <div
+        aria-hidden="true"
+        className="flex flex-1 items-center justify-center bg-muted/5 p-4 text-center text-sm text-muted-foreground"
+      >
+        {trackState}
+      </div>
+    </div>
+  );
+}
+
+const useAdvancedMetadataFormBoundary = ({
+  register,
+  control,
+  enabled,
+}: {
+  register: UseFormRegister<AudioMetadata>;
+  control: Control<AudioMetadata>;
+  enabled: boolean;
+}) => {
+  const registrations: AdvancedFieldRegistrations = {
+    albumArtist: register("albumArtist"),
+    discNumber: register("discNumber", {
+      ...nullableNumberRegistration,
+      validate: (value) => !enabled || validateDiscNumber(value),
+    }),
+    composer: register("composer"),
+    bpm: register("bpm", {
+      ...nullableNumberRegistration,
+      validate: (value) => !enabled || validateBpm(value),
+    }),
+    comment: register("comment"),
+  };
+  const { errors } = useFormState({ control, name: ["discNumber", "bpm"] });
+
+  return { registrations, errors };
+};
+
 function LoadedTrackMetadataEditor({
   selectedFile,
   selectedFileId,
   focusedTitleFileIdRef,
   register,
   control,
-  handleSubmit,
+  getValues,
+  setError,
+  clearErrors,
+  setFocus,
   onTrackCoverUpload,
   onTrackCoverProcessingChange,
   isTrackCoverProcessing,
   onDownloadUpdatedFile,
   selectedFileAlbum,
   syncFilenames,
-  syncTrackNumbers,
+  advancedMetadata,
+  metadataLinks,
   onPreviewMetadataChange,
+  editorMode,
+  onEditorModeChange,
 }: LoadedTrackMetadataEditorProps) {
   const watchedTitle = useWatch({ control, name: "title", defaultValue: "" });
   const watchedFilename = useWatch({ control, name: "filename", defaultValue: "" });
+  const linkedAlbumArtistDisplay = useLinkedAlbumArtistDisplay(control);
+  const advancedFields = useAdvancedMetadataFormBoundary({
+    register,
+    control,
+    enabled: advancedMetadata,
+  });
+  const pendingAdvancedFocusRef = useRef<"discNumber" | "bpm" | null>(null);
+  const focusPendingAdvancedField = useCallback(
+    (node: HTMLDivElement | null) => {
+      const pendingAdvancedFocus = pendingAdvancedFocusRef.current;
+      if (!node || editorMode !== "advanced" || !pendingAdvancedFocus) return;
+      setFocus(pendingAdvancedFocus, { shouldSelect: true });
+      pendingAdvancedFocusRef.current = null;
+    },
+    [editorMode, setFocus],
+  );
   const filenameValue = syncFilenames ? watchedTitle : watchedFilename;
   const filenameInvalid = !isValidFilenameBase(filenameValue);
   const canDownloadTrack =
@@ -401,6 +702,31 @@ function LoadedTrackMetadataEditor({
     : filenameInvalid
       ? "filename is required"
       : "track file is not ready";
+  const submitDownload = () => {
+    if (advancedMetadata) {
+      const validationErrors = getAdvancedMetadataValidationErrors(getValues());
+      clearErrors(["discNumber", "bpm"]);
+      if (validationErrors.discNumber || validationErrors.bpm) {
+        if (validationErrors.discNumber) {
+          setError("discNumber", { type: "validate", message: validationErrors.discNumber });
+        }
+        if (validationErrors.bpm) {
+          setError("bpm", { type: "validate", message: validationErrors.bpm });
+        }
+        const invalidField = validationErrors.discNumber ? "discNumber" : "bpm";
+        if (editorMode === "advanced") {
+          pendingAdvancedFocusRef.current = null;
+          setFocus(invalidField, { shouldSelect: true });
+        } else {
+          pendingAdvancedFocusRef.current = invalidField;
+          onEditorModeChange("advanced");
+        }
+        return;
+      }
+    }
+
+    void onDownloadUpdatedFile(getValues());
+  };
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -410,16 +736,24 @@ function LoadedTrackMetadataEditor({
         }}
         className="flex min-h-0 flex-col h-full"
       >
-        <TrackFilenameHeader
-          syncFilenames={syncFilenames}
-          watchedFilename={watchedFilename}
-          sanitizedFilename={sanitizeFilenameBase(filenameValue)}
-          filenamePlaceholder={placeholder.filename}
-          filenameInvalid={filenameInvalid}
-          filenameRegistration={filenameRegistration}
-          extension={getAudioFormatInfo(selectedFile.format).extension}
-          failure={failure}
-        />
+        <div className="relative">
+          <TrackFilenameHeader
+            syncFilenames={syncFilenames}
+            watchedFilename={watchedFilename}
+            sanitizedFilename={sanitizeFilenameBase(filenameValue)}
+            filenamePlaceholder={placeholder.filename}
+            filenameInvalid={filenameInvalid}
+            filenameRegistration={filenameRegistration}
+            extension={getAudioFormatInfo(selectedFile.format).extension}
+            failure={failure}
+            hasModeToggle={advancedMetadata}
+          />
+          {advancedMetadata && (
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 max-lg:[@media(max-height:700px)]:right-3 lg:right-6">
+              <MetadataEditorModeToggle mode={editorMode} onChange={onEditorModeChange} />
+            </div>
+          )}
+        </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 max-lg:[@media(max-height:700px)]:p-2 lg:p-6 lg:pb-28">
           <div className="flex min-h-full flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:min-h-0 lg:flex-row lg:gap-4">
             <Controller
@@ -431,25 +765,38 @@ function LoadedTrackMetadataEditor({
                   picture={field.value}
                   onCoverUpload={onTrackCoverUpload}
                   onProcessingChange={onTrackCoverProcessingChange}
+                  disabled={Boolean(selectedFileAlbum) && metadataLinks.artwork}
+                  disabledReason={getMetadataLinkDescriptor("artwork").disabledReason}
                 />
               )}
             />
             <div className="flex flex-1 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3">
-              <TrackDetailsFields
-                selectedFileId={selectedFileId}
-                focusedTitleFileIdRef={focusedTitleFileIdRef}
-                register={register}
-                placeholder={placeholder}
-                inAlbum={Boolean(selectedFileAlbum)}
-                syncFilenames={syncFilenames}
-                syncTrackNumbers={syncTrackNumbers}
-                filenameInvalid={filenameInvalid}
-                onPreviewMetadataChange={onPreviewMetadataChange}
-              />
+              <div data-editor-form-area className={METADATA_EDITOR_FORM_LAYOUT.className}>
+                {advancedMetadata && editorMode === "advanced" ? (
+                  <AdvancedTrackDetailsFields
+                    registrations={advancedFields.registrations}
+                    errors={advancedFields.errors}
+                    albumArtistLinked={metadataLinks.albumArtist}
+                    linkedArtistValue={linkedAlbumArtistDisplay}
+                    onFieldsMount={focusPendingAdvancedField}
+                  />
+                ) : (
+                  <TrackDetailsFields
+                    selectedFileId={selectedFileId}
+                    focusedTitleFileIdRef={focusedTitleFileIdRef}
+                    register={register}
+                    placeholder={placeholder}
+                    inAlbum={Boolean(selectedFileAlbum)}
+                    syncFilenames={syncFilenames}
+                    metadataLinks={metadataLinks}
+                    filenameInvalid={filenameInvalid}
+                    onPreviewMetadataChange={onPreviewMetadataChange}
+                  />
+                )}
+              </div>
               <TrackFileSummary selectedFile={selectedFile} />
               <DownloadTrackButton
-                handleSubmit={handleSubmit}
-                onDownloadUpdatedFile={onDownloadUpdatedFile}
+                onClick={submitDownload}
                 disabled={!canDownloadTrack}
                 disabledReason={downloadDisabledReason}
               />
@@ -463,9 +810,11 @@ function LoadedTrackMetadataEditor({
 
 export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
   const focusedTitleFileIdRef = useRef<string | null>(null);
-  const selectedFile = hasMetadata(props.selectedFile) ? props.selectedFile : null;
-  const currentSelection = selectedFile
-    ? { selectedFile, selectedFileAlbum: props.selectedFileAlbum }
+  const { mode: editorMode, setMode: setEditorMode } = useMetadataEditorMode(
+    props.advancedMetadata,
+  );
+  const currentSelection = props.selectedFile
+    ? { selectedFile: props.selectedFile, selectedFileAlbum: props.selectedFileAlbum }
     : null;
   const [retainedSelection, setRetainedSelection] = useState(currentSelection);
   if (
@@ -523,15 +872,25 @@ export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
           trackIsSelected ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
-        {displayedSelection ? (
-          <LoadedTrackMetadataEditor
-            {...props}
-            selectedFile={displayedSelection.selectedFile}
-            selectedFileId={displayedSelection.selectedFile.id}
-            selectedFileAlbum={displayedSelection.selectedFileAlbum}
-            focusedTitleFileIdRef={focusedTitleFileIdRef}
-          />
-        ) : null}
+        {displayedSelection &&
+          (hasMetadata(displayedSelection.selectedFile) ? (
+            <LoadedTrackMetadataEditor
+              {...props}
+              selectedFile={displayedSelection.selectedFile}
+              selectedFileId={displayedSelection.selectedFile.id}
+              selectedFileAlbum={displayedSelection.selectedFileAlbum}
+              focusedTitleFileIdRef={focusedTitleFileIdRef}
+              editorMode={editorMode}
+              onEditorModeChange={setEditorMode}
+            />
+          ) : (
+            <PendingTrackMetadataEditor
+              selectedFile={displayedSelection.selectedFile}
+              advancedMetadata={props.advancedMetadata}
+              editorMode={editorMode}
+              onEditorModeChange={setEditorMode}
+            />
+          ))}
       </div>
     </div>
   );

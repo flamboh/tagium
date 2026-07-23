@@ -56,6 +56,52 @@ export const getNullableNumericPatchValue = (
   value: AudioMetadata["year"] | undefined,
 ): MetadataPatch["year"] => (value === undefined || Number.isNaN(value) ? null : value);
 
+export const validateDiscNumber = (value: number | null | undefined) =>
+  value === null ||
+  (typeof value === "number" &&
+    Number.isFinite(value) &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= 999) ||
+  "disc number must be a whole number from 1 to 999";
+
+export const validateBpm = (value: number | null | undefined) =>
+  value === null ||
+  (typeof value === "number" && Number.isFinite(value) && value >= 1 && value <= 999) ||
+  "BPM must be from 1 to 999";
+
+export const getAdvancedMetadataValidationErrors = (metadata: {
+  discNumber: AudioMetadata["discNumber"] | undefined;
+  bpm: AudioMetadata["bpm"] | undefined;
+}) => {
+  const discNumber = validateDiscNumber(metadata.discNumber);
+  const bpm = validateBpm(metadata.bpm);
+  return {
+    ...(discNumber === true ? {} : { discNumber }),
+    ...(bpm === true ? {} : { bpm }),
+  };
+};
+
+export const getProjectableAudioMetadata = (
+  metadata: AudioMetadata,
+  fallback?: AudioMetadata,
+  validationSource: Pick<AudioMetadata, "discNumber" | "bpm"> = metadata,
+): AudioMetadata => ({
+  ...metadata,
+  discNumber:
+    validateDiscNumber(validationSource.discNumber) === true
+      ? metadata.discNumber
+      : fallback && validateDiscNumber(fallback.discNumber) === true
+        ? fallback.discNumber
+        : null,
+  bpm:
+    validateBpm(validationSource.bpm) === true
+      ? metadata.bpm
+      : fallback && validateBpm(fallback.bpm) === true
+        ? fallback.bpm
+        : null,
+});
+
 export const getSubmittedAudioMetadata = (
   data: AudioMetadata,
   syncFilenames: boolean,
