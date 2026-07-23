@@ -166,7 +166,7 @@ export default function MediaUrlEntry({
       ) {
         showValidationError(error.message);
       } else if (error instanceof SharedAlbumVersionError) {
-        showValidationError("this link was made by a newer Tagium version");
+        showValidationError("this link was made by a newer tagium version");
       } else {
         const presentation = getSystemFailurePresentation(error, "import");
         if (

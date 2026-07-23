@@ -134,7 +134,11 @@ export const useShareWorkflow = ({
       if (existing) {
         // Mirror normal workspace selection: commit any buffered metadata before changing album.
         editor.commands.flush();
-        library.dispatch({ type: "album-selected", albumId: existing.id, mode: "replace" });
+        library.dispatch({
+          type: "album-selected",
+          albumId: existing.id,
+          mode: "replace",
+        });
         return;
       }
 
@@ -240,9 +244,13 @@ export const useShareWorkflow = ({
         });
       } catch {
         await revokeSharedAlbum(receipt.slug, receipt.revocationToken);
-        throw new Error("your browser did not allow Tagium to save the sharing permission");
+        throw new Error("your browser did not allow tagium to save the sharing permission");
       }
-      setDialog({ status: "published", preview: currentDialog.preview, receipt });
+      setDialog({
+        status: "published",
+        preview: currentDialog.preview,
+        receipt,
+      });
     } catch (error) {
       setDialog({
         status: "error",
@@ -258,7 +266,9 @@ export const useShareWorkflow = ({
     await revokeSharedAlbum(receipt.slug, receipt.revocationToken);
     removeRevocationReceipt(receipt.slug);
     setDialog({ status: "closed" });
-    toast.success("sharing stopped", { description: "The link and cover no longer work." });
+    toast.success("sharing stopped", {
+      description: "the link no longer works.",
+    });
   }, [dialog]);
 
   const stopPageShare = useCallback(async () => {
@@ -268,7 +278,9 @@ export const useShareWorkflow = ({
     await revokeSharedAlbum(page.slug, receipt.token);
     removeRevocationReceipt(page.slug);
     setPage({ status: "unavailable", slug: page.slug, reason: "unavailable" });
-    toast.success("sharing stopped", { description: "The link and cover no longer work." });
+    toast.success("sharing stopped", {
+      description: "the link no longer works.",
+    });
   }, [page]);
 
   const addSharedAlbum = useCallback(
@@ -301,10 +313,14 @@ export const useShareWorkflow = ({
         toast.success("shared album added · downloading 3 at a time");
       } catch (error) {
         if (error instanceof SharedAlbumUnavailableError) {
-          setPage({ status: "unavailable", slug: page.slug, reason: "unavailable" });
+          setPage({
+            status: "unavailable",
+            slug: page.slug,
+            reason: "unavailable",
+          });
         } else {
           toast.error("album could not be added", {
-            description: "Your current workspace is unchanged. Try again.",
+            description: "your current workspace is unchanged. try again.",
           });
         }
       } finally {

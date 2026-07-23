@@ -28,8 +28,14 @@ import { shareLinkForSlug } from "@/features/share/shareLink";
 
 export type SharedAlbumPageState =
   | { status: "loading"; slug: string }
-  | { status: "unavailable"; slug: string; reason: "unavailable" | "newer-version" }
+  | {
+      status: "unavailable";
+      slug: string;
+      reason: "unavailable" | "newer-version";
+    }
   | { status: "ready"; slug: string; manifest: Manifest; expiresAt: string };
+
+type ReadySharedAlbumPageState = Extract<SharedAlbumPageState, { status: "ready" }>;
 
 const skeletonRows = ["one", "two", "three", "four", "five", "six"] as const;
 
@@ -172,16 +178,34 @@ function WorkspaceNotice({
   return (
     <aside className="mt-6 space-y-2 text-sm leading-6">
       {workspaceTrackCount > 0 && (
-        <p className="text-muted-foreground">Your current tracks will stay here.</p>
+        <p className="text-muted-foreground">your current tracks will stay here.</p>
       )}
       {anotherTabOpen && (
-        <div className="flex flex-wrap items-center gap-2">
-          <AlertTriangle className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span className="text-muted-foreground">Tagium is open in another tab.</span>
-          <Button type="button" size="sm" onClick={() => void copyShareLink()}>
-            {copyFeedback === "copied" ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-            {copyFeedback === "copied" ? "Copied" : "Copy link"}
-          </Button>
+        <div className="space-y-2">
+          <div className="flex items-start gap-2">
+            <AlertTriangle
+              className="mt-1 size-4 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <span className="text-muted-foreground">
+              tagium is open in another tab, copy the link and download in the open instance.
+            </span>
+          </div>
+          <div className="pl-6">
+            <Button
+              type="button"
+              size="sm"
+              className="w-32 min-w-[7.5rem] justify-center"
+              onClick={() => void copyShareLink()}
+            >
+              {copyFeedback === "copied" ? (
+                <Check aria-hidden="true" />
+              ) : (
+                <Copy aria-hidden="true" />
+              )}
+              {copyFeedback === "copied" ? "copied" : "copy link"}
+            </Button>
+          </div>
           <input
             ref={shareLinkRef}
             readOnly
@@ -195,14 +219,14 @@ function WorkspaceNotice({
           />
           <span role="status" className="sr-only" aria-live="polite">
             {copyFeedback === "copied"
-              ? "Share link copied."
+              ? "share link copied."
               : copyFeedback === "failed"
-                ? "Copy failed. The share link is selected; copy it and paste it in the other tab."
+                ? "copy failed. the share link is selected; copy it and paste it in the other tab."
                 : ""}
           </span>
           {copyFeedback === "failed" && (
             <p className="w-full text-xs text-destructive">
-              Copy failed. Copy the selected link and paste it in the other tab.
+              copy failed. copy the selected link and paste it in the other tab.
             </p>
           )}
         </div>
@@ -229,7 +253,7 @@ function StopSharingDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>stop sharing this album?</DialogTitle>
-          <DialogDescription>The link and cover will stop working immediately.</DialogDescription>
+          <DialogDescription>the link will stop working immediately.</DialogDescription>
           {stopError && (
             <p role="alert" className="text-sm text-destructive">
               {stopError}
@@ -240,9 +264,17 @@ function StopSharingDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             keep sharing
           </Button>
-          <Button type="button" variant="destructive" disabled={stopping} onClick={onStop}>
-            {stopping && <Loader2 className="animate-spin motion-reduce:animate-none" />}stop
-            sharing
+          <Button
+            type="button"
+            variant="destructive"
+            className="w-32 min-w-[7rem] justify-center"
+            disabled={stopping}
+            onClick={onStop}
+          >
+            {stopping && (
+              <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            )}
+            stop sharing
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -263,7 +295,7 @@ function Header({
     <header>
       <div className="mx-auto flex h-14 w-full max-w-3xl items-center gap-3 px-5 sm:px-8">
         <Button type="button" variant="ghost" size="sm" onClick={onOpenTagium}>
-          <ArrowLeft aria-hidden="true" /> Back to Tagium
+          <ArrowLeft aria-hidden="true" /> back to tagium
         </Button>
         <div className="ml-auto flex items-center gap-1">
           {canStopSharing && (
@@ -308,12 +340,13 @@ function ActionBar({
       <div className="flex shrink-0 gap-2 max-sm:w-full max-sm:flex-col-reverse">
         {alreadyAddedAlbumId && (
           <Button type="button" variant="outline" onClick={() => onAdd(true)} disabled={adding}>
-            Download another copy
+            download another copy
           </Button>
         )}
         <Button
           type="button"
           size="lg"
+          className="w-52 justify-center max-sm:w-full"
           disabled={adding}
           onClick={alreadyAddedAlbumId ? onViewAlbum : () => onAdd()}
         >
@@ -322,14 +355,14 @@ function ActionBar({
           ) : (
             <Download aria-hidden="true" />
           )}
-          {adding ? "Downloading album…" : primaryLabel}
+          {adding ? "downloading album…" : primaryLabel}
         </Button>
       </div>
     </div>
   );
 }
 
-export default function SharedAlbumPage({
+function SharedAlbumReadyPage({
   state,
   workspaceTrackCount,
   anotherTabOpen,
@@ -341,7 +374,7 @@ export default function SharedAlbumPage({
   onViewAlbum,
   onStopSharing,
 }: {
-  state: SharedAlbumPageState;
+  state: ReadySharedAlbumPageState;
   workspaceTrackCount: number;
   anotherTabOpen: boolean;
   alreadyAddedAlbumId: string | null;
@@ -356,34 +389,8 @@ export default function SharedAlbumPage({
   const [showStopConfirmation, setShowStopConfirmation] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
-  if (state.status === "loading") return <SharedAlbumSkeleton />;
-  if (state.status === "unavailable") {
-    const newerVersion = state.reason === "newer-version";
-    return (
-      <main className="mx-auto flex min-h-svh w-full max-w-xl flex-col px-6 py-10">
-        <Button type="button" variant="ghost" size="sm" className="w-fit" onClick={onOpenTagium}>
-          <ArrowLeft aria-hidden="true" /> Back to Tagium
-        </Button>
-        <div className="my-auto py-16">
-          <div className="mb-5 flex size-11 items-center justify-center rounded-lg bg-muted">
-            {newerVersion ? <RotateCcw className="size-5" /> : <Music2 className="size-5" />}
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {newerVersion
-              ? "this link was made by a newer Tagium version"
-              : "this shared album is no longer available"}
-          </h1>
-          <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
-            {newerVersion
-              ? "Reload the page after updating Tagium. The album has not been added."
-              : "It may have expired or the creator may have stopped sharing it."}
-          </p>
-        </div>
-      </main>
-    );
-  }
   const { manifest, slug } = state;
-  const primaryLabel = alreadyAddedAlbumId ? "Open album" : "Download album";
+  const primaryLabel = alreadyAddedAlbumId ? "open album" : "download album";
   const stopSharing = async () => {
     setStopping(true);
     setStopError(null);
@@ -391,8 +398,15 @@ export default function SharedAlbumPage({
       await onStopSharing();
       setShowStopConfirmation(false);
     } catch {
-      setStopError("Sharing could not be stopped. Check your connection and try again.");
+      setStopError("sharing could not be stopped. check your connection and try again.");
     } finally {
+      setStopping(false);
+    }
+  };
+  const setStopDialogOpen = (open: boolean) => {
+    setShowStopConfirmation(open);
+    if (!open) {
+      setStopError(null);
       setStopping(false);
     }
   };
@@ -421,11 +435,59 @@ export default function SharedAlbumPage({
       </main>
       <StopSharingDialog
         open={showStopConfirmation}
-        onOpenChange={setShowStopConfirmation}
+        onOpenChange={setStopDialogOpen}
         stopping={stopping}
         stopError={stopError}
         onStop={() => void stopSharing()}
       />
     </div>
   );
+}
+
+export default function SharedAlbumPage(props: {
+  state: SharedAlbumPageState;
+  workspaceTrackCount: number;
+  anotherTabOpen: boolean;
+  alreadyAddedAlbumId: string | null;
+  adding: boolean;
+  canStopSharing: boolean;
+  onBack: () => void;
+  onOpenTagium: () => void;
+  onAdd: (allowDuplicate?: boolean) => void;
+  onViewAlbum: () => void;
+  onStopSharing: () => Promise<void>;
+}) {
+  if (props.state.status === "loading") return <SharedAlbumSkeleton />;
+  if (props.state.status === "unavailable") {
+    const newerVersion = props.state.reason === "newer-version";
+    return (
+      <main className="mx-auto flex min-h-svh w-full max-w-xl flex-col px-6 py-10">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-fit"
+          onClick={props.onOpenTagium}
+        >
+          <ArrowLeft aria-hidden="true" /> back to tagium
+        </Button>
+        <div className="my-auto py-16">
+          <div className="mb-5 flex size-11 items-center justify-center rounded-lg bg-muted">
+            {newerVersion ? <RotateCcw className="size-5" /> : <Music2 className="size-5" />}
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {newerVersion
+              ? "this link was made by a newer tagium version"
+              : "this shared album is no longer available"}
+          </h1>
+          <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            {newerVersion
+              ? "reload the page after updating tagium. the album has not been added."
+              : "it may have expired or the creator may have stopped sharing it."}
+          </p>
+        </div>
+      </main>
+    );
+  }
+  return <SharedAlbumReadyPage key={props.state.slug} {...props} state={props.state} />;
 }

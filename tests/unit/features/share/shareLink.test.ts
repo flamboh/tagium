@@ -21,7 +21,7 @@ describe("share link classification", () => {
     ).toEqual({ kind: "share", slug });
   });
 
-  it("rejects unknown Tagium paths locally while leaving other origins as media", () => {
+  it("rejects unknown tagium paths locally while leaving other origins as media", () => {
     expect(classifyShareLink("https://tagium.app/not-a-share", "http://localhost:5173")).toEqual({
       kind: "invalid-share",
     });

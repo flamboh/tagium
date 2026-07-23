@@ -1,7 +1,7 @@
 import { decodeManifest, MANIFEST_VERSION, type Manifest } from "@/features/share/shareManifest";
 
 const UNAVAILABLE_MESSAGE = "this shared album is no longer available";
-const SHARE_METADATA_TOO_LARGE_MESSAGE = "This album contains too much metadata to share.";
+const SHARE_METADATA_TOO_LARGE_MESSAGE = "this album contains too much metadata to share.";
 
 export class SharedAlbumUnavailableError extends Error {
   constructor() {
@@ -12,7 +12,7 @@ export class SharedAlbumUnavailableError extends Error {
 
 export class SharedAlbumVersionError extends Error {
   constructor() {
-    super("this link was made by a newer Tagium version");
+    super("this link was made by a newer tagium version");
     this.name = "SharedAlbumVersionError";
   }
 }
@@ -69,7 +69,10 @@ export const fetchSharedAlbum = async (
     ) {
       throw new SharedAlbumVersionError();
     }
-    return { manifest: decodeManifest(payload.manifest), expiresAt: payload.expiresAt };
+    return {
+      manifest: decodeManifest(payload.manifest),
+      expiresAt: payload.expiresAt,
+    };
   } catch (error) {
     if (error instanceof SharedAlbumVersionError) throw error;
     throw new SharedAlbumUnavailableError();

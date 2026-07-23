@@ -31,7 +31,7 @@ export const buildShareAlbumPreview = (
     const occurrence = occurrences.get(trackId) ?? 0;
     occurrences.set(trackId, occurrence + 1);
     const file = files[index];
-    const title = file?.metadata?.title?.trim() || file?.filename || "Untitled track";
+    const title = file?.metadata?.title?.trim() || file?.filename || "untitled track";
     return { key: `${trackId}:${occurrence}`, title };
   });
 

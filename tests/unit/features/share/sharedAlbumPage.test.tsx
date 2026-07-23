@@ -65,7 +65,7 @@ const props = {
 const copyButton = (renderer: ReactTestRenderer) =>
   renderer.root
     .findAllByType("button")
-    .find((button) => button.children.some((child) => child === "Copy link"));
+    .find((button) => button.children.some((child) => child === "copy link" || child === "copied"));
 
 const buttonText = (button: ReactTestRenderer["root"]) =>
   button
@@ -111,7 +111,7 @@ describe("shared album preview", () => {
     expect(renderer.root.findByType("h1").children).toContain("Shared");
   });
 
-  it("keeps unavailable state to one Back to Tagium action", async () => {
+  it("keeps unavailable state to one back to tagium action", async () => {
     let renderer!: ReactTestRenderer;
     await act(async () => {
       renderer = create(
@@ -140,7 +140,51 @@ describe("shared album preview", () => {
     const status = renderer.root
       .findByProps({ role: "status" })
       .children.find((child): child is string => typeof child === "string");
-    expect(status).toContain("Share link copied.");
+    expect(status).toContain("share link copied.");
+  });
+
+  it("shows the another-tab warning with copy link below the sentence", async () => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(createElement(SharedAlbumPage, props));
+    });
+    const notice = renderer.root.findByType("aside");
+    const warning = notice
+      .findAllByType("span")
+      .find((node) =>
+        node.children.includes(
+          "tagium is open in another tab, copy the link and download in the open instance.",
+        ),
+      );
+    expect(warning).toBeDefined();
+    const warningRow = warning?.parent;
+    const copyRow = warningRow?.parent?.children.find(
+      (child) =>
+        typeof child !== "string" && child.type === "div" && child.props.className === "pl-6",
+    );
+    expect(copyRow).toBeDefined();
+    expect(
+      notice.findAllByType("button").some((button) => button.children.includes("copy link")),
+    ).toBe(true);
+  });
+
+  it("keeps the copy button width stable after copying", async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(createElement(SharedAlbumPage, props));
+    });
+    const before = copyButton(renderer);
+    const beforeClass = before?.props.className;
+    await act(async () => {
+      await before?.props.onClick();
+    });
+    const after = renderer.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("copied"));
+    expect(beforeClass).toContain("min-w-[7.5rem]");
+    expect(after?.props.className).toBe(beforeClass);
   });
 
   it("shows a recoverable manual-copy path when clipboard access fails", async () => {
@@ -166,7 +210,7 @@ describe("shared album preview", () => {
     const status = renderer.root
       .findByProps({ role: "status" })
       .children.find((child): child is string => typeof child === "string");
-    expect(status).toContain("Copy failed.");
+    expect(status).toContain("copy failed.");
   });
 
   it("does not add a direct-route preview until the explicit download action", async () => {
@@ -204,8 +248,8 @@ describe("shared album preview", () => {
       );
     });
     const buttons = renderer.root.findAllByType("button");
-    const open = buttons.find((button) => button.children.includes("Open album"));
-    const duplicate = buttons.find((button) => button.children.includes("Download another copy"));
+    const open = buttons.find((button) => button.children.includes("open album"));
+    const duplicate = buttons.find((button) => button.children.includes("download another copy"));
     void act(() => open?.props.onClick());
     void act(() => duplicate?.props.onClick());
     expect(onViewAlbum).toHaveBeenCalledOnce();
@@ -247,7 +291,40 @@ describe("shared album preview", () => {
         .findByProps({ role: "alert" })
         .children.filter((child): child is string => typeof child === "string")
         .join(" "),
-    ).toContain("Sharing could not be stopped");
+    ).toContain("sharing could not be stopped");
+  });
+
+  it("uses a link-only stop-sharing warning and stable stop button sizing", async () => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        createElement(SharedAlbumPage, {
+          ...props,
+          canStopSharing: true,
+        }),
+      );
+    });
+    const menuAction = renderer.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("stop sharing"));
+    await act(async () => menuAction?.props.onClick());
+    expect(
+      renderer.root
+        .findAllByType("div")
+        .some((node) => node.children.includes("the link will stop working immediately.")),
+    ).toBe(true);
+    expect(
+      renderer.root
+        .findAllByType("div")
+        .some((node) =>
+          node.children.includes("The link and cover will stop working immediately."),
+        ),
+    ).toBe(false);
+    const stopButton = renderer.root
+      .findAllByType("button")
+      .filter((button) => buttonText(button) === "stop sharing")
+      .at(-1);
+    expect(stopButton?.props.className).toContain("min-w-[7rem]");
   });
 
   it("closes the owner confirmation after sharing is stopped", async () => {

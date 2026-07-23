@@ -5,9 +5,9 @@ describe("share publication errors", () => {
   it("replaces oversized aggregate metadata and schema diagnostics with concise share copy", () => {
     expect(
       sharePublicationErrorMessage(new Error("manifest payload must be 262144 bytes or smaller")),
-    ).toBe("This album contains too much metadata to share.");
+    ).toBe("this album contains too much metadata to share.");
     expect(sharePublicationErrorMessage(new Error("ParseError: Expected string, actual 42"))).toBe(
-      "This album contains too much metadata to share.",
+      "this album contains too much metadata to share.",
     );
   });
 

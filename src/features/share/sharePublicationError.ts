@@ -5,9 +5,9 @@ const metadataContractError = (message: string) =>
 export const sharePublicationErrorMessage = (error: unknown) => {
   if (!(error instanceof Error)) return "the share link could not be created";
   if (metadataContractError(error.message))
-    return "This album contains too much metadata to share.";
+    return "this album contains too much metadata to share.";
   if (error.message === "only downloaded-source tracks with metadata can be shared") {
-    return "This album contains tracks that cannot be shared.";
+    return "this album contains tracks that cannot be shared.";
   }
-  return error.message;
+  return error.message.replace(/[.!?]+$/, "");
 };

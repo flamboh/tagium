@@ -42,7 +42,7 @@ export const shareLinkForSlug = (
 
 export class InvalidShareLinkError extends Error {
   constructor() {
-    super("that isn’t a Tagium share link");
+    super("that isn’t a tagium share link");
     this.name = "InvalidShareLinkError";
   }
 }

@@ -30,7 +30,7 @@ describe("buildShareAlbumPreview", () => {
     expect(preview.tracks.map((track) => track.title)).toEqual([
       "a.mp3",
       "b.mp3",
-      "Untitled track",
+      "untitled track",
     ]);
   });
 
