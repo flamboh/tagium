@@ -41,7 +41,10 @@ test("download contents scroll inside a constrained mobile dialog", async ({ pag
   await page
     .locator('input[type="file"]')
     .setInputFiles(Array.from({ length: 18 }, (_, index) => mp3Upload(`track-${index + 1}.mp3`)));
-  const trigger = downloadAllButton(page);
+  await page.getByRole("button", { name: "open library" }).click();
+  await expect(page.locator("[data-mobile-drawer]")).toHaveAttribute("data-mobile-drawer", "open");
+  const library = page.getByRole("dialog", { name: "library" });
+  const trigger = library.getByRole("button", { name: "download all", exact: true });
   await expect(trigger).toBeAttached();
   await expect(trigger).toBeEnabled();
   await trigger.click();
