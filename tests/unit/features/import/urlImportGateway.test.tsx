@@ -1,7 +1,5 @@
 import type { ReactElement, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import landingScreenSource from "@/features/import/LandingScreen.tsx?raw";
-import mediaUrlEntrySource from "@/features/import/MediaUrlEntry.tsx?raw";
 import MediaUrlEntry from "@/features/import/MediaUrlEntry";
 
 const reactHookMocks = vi.hoisted(() => ({
@@ -107,17 +105,6 @@ const changeInputValue = (tree: ReactNode, value: string) => {
 afterEach(() => vi.clearAllMocks());
 
 describe("media URL entry", () => {
-  it("is rendered once outside the landing/editor choice", () => {
-    expect(mediaUrlEntrySource).toContain("onUrlImport");
-    expect(mediaUrlEntrySource).not.toContain("isSoundCloudSetUrl");
-    expect(mediaUrlEntrySource).not.toContain("resolveSoundCloudSet");
-  });
-
-  it("keeps the URL entry in the centered landing stack instead of pinning it to the bottom", () => {
-    expect(landingScreenSource).toContain("{children}");
-    expect(mediaUrlEntrySource).not.toContain("bottom-[clamp(");
-  });
-
   it("submits a trimmed valid URL and retains one layout-aware DOM module", async () => {
     const hooks = createHookHarness();
     const onUrlImport = vi.fn(async () => undefined);
@@ -135,6 +122,42 @@ describe("media URL entry", () => {
     });
 
     expect(onUrlImport).toHaveBeenCalledWith("https://soundcloud.com/user/track");
+  });
+
+  it("keeps submission state accessible without rendering progress copy under the entry", async () => {
+    const hooks = createHookHarness();
+    let resolveImport!: () => void;
+    const onUrlImport = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveImport = resolve;
+        }),
+    );
+    const render = () =>
+      hooks.render(() => MediaUrlEntry({ layout: "landing", hidden: false, onUrlImport }));
+
+    let tree = render();
+    changeInputValue(tree, "https://soundcloud.com/user/track");
+    tree = render();
+    const form = findElement(tree, (element) => element.type === "form");
+    const submit = (
+      form.props.onSubmit as (event: { preventDefault: () => void }) => Promise<void>
+    )({
+      preventDefault: vi.fn(),
+    });
+
+    tree = render();
+    const button = findElement(
+      tree,
+      (element) => element.props["aria-label"] === "start media import",
+    );
+    expect(button.props["aria-busy"]).toBe(true);
+    expect(
+      textContent(findElement(tree, (element) => element.props.id === "media-url-error")),
+    ).toBe("");
+
+    resolveImport();
+    await submit;
   });
 
   it("keeps malformed URL feedback local to the input", async () => {

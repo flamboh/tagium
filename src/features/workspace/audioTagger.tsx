@@ -195,11 +195,6 @@ export default function AudioTagger() {
               hidden={mediaUrlEntryPresentation.hidden}
               docked={mediaUrlEntryPresentation.docked}
               onUrlImport={handleUrlImport}
-              getSubmissionLabel={(sourceUrl) =>
-                classifyShareLink(sourceUrl).kind === "share"
-                  ? "adding shared album…"
-                  : "importing media…"
-              }
             />
           </LandingScreen>
         </div>

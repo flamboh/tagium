@@ -18,7 +18,6 @@ interface MediaUrlEntryProps {
   hidden: boolean;
   docked?: boolean;
   onUrlImport: (sourceUrl: string) => void | Promise<void>;
-  getSubmissionLabel?: (sourceUrl: string) => string;
 }
 
 const validateMediaUrl = (value: string) => {
@@ -40,12 +39,10 @@ export default function MediaUrlEntry({
   hidden,
   docked = false,
   onUrlImport,
-  getSubmissionLabel,
 }: MediaUrlEntryProps) {
   const [sourceUrl, setSourceUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [submissionLabel, setSubmissionLabel] = useState<string | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const motionRef = useRef<HTMLDivElement>(null);
   const previousRectRef = useRef<DOMRect | null>(null);
@@ -157,7 +154,6 @@ export default function MediaUrlEntry({
     }
 
     setSubmitting(true);
-    setSubmissionLabel(getSubmissionLabel?.(trimmedUrl) ?? "importing media…");
     setValidationError(null);
     try {
       await onUrlImport(trimmedUrl);
@@ -184,7 +180,6 @@ export default function MediaUrlEntry({
       }
     } finally {
       setSubmitting(false);
-      setSubmissionLabel(null);
     }
   };
 
@@ -225,9 +220,7 @@ export default function MediaUrlEntry({
                   value={sourceUrl}
                   aria-label="media url"
                   aria-invalid={Boolean(validationError)}
-                  aria-describedby={
-                    validationError || submissionLabel ? "media-url-error" : undefined
-                  }
+                  aria-describedby={validationError ? "media-url-error" : undefined}
                   onChange={(event) => {
                     setSourceUrl(event.target.value);
                     setValidationError(null);
@@ -241,12 +234,12 @@ export default function MediaUrlEntry({
                 id="media-url-error"
                 className={cn(
                   "h-4 pt-0.5 text-xs leading-4",
-                  validationError ? "text-destructive" : "text-muted-foreground",
+                  validationError && "text-destructive",
                   layout === "landing" && "text-center",
                 )}
                 aria-live="polite"
               >
-                {validationError ?? submissionLabel ?? ""}
+                {validationError ?? ""}
               </p>
             </div>
             <Button
@@ -254,6 +247,7 @@ export default function MediaUrlEntry({
               size="icon"
               disabled={!canSubmit}
               aria-label="start media import"
+              aria-busy={submitting}
               className="size-10 rounded-lg"
             >
               {submitting ? <Loader2 className="animate-spin" /> : <ArrowRight />}
