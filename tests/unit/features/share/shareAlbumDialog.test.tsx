@@ -202,6 +202,7 @@ describe("share album dialog", () => {
     expect(text(renderer)).toContain(
       "anyone with the link can download these tracks with your tags.",
     );
+    expect(text(renderer)).not.toMatch(/\b(?:Anyone|Expires)\b/);
     expect(text(renderer)).not.toContain("permission");
     expect(text(renderer)).not.toContain("3 tracks");
     expect(renderer.root.findAllByProps({ "aria-label": "track preview" })).toHaveLength(1);
