@@ -39,6 +39,7 @@ import {
   getMetadataLinkDescriptor,
   type MetadataLinkState,
 } from "@/features/library/metadataLinks";
+import { METADATA_EDITOR_FORM_LAYOUT } from "@/features/editor/trackMetadataEditorLayout";
 
 type LoadedTrack = TagiumFile & { metadata: AudioMetadata };
 
@@ -90,12 +91,6 @@ const fieldLabelClassName = "mb-1 block text-xs font-medium md:text-sm";
 const placeholderClassName = "placeholder:text-muted-foreground/45";
 const syncedInputClassName =
   "disabled:pointer-events-auto disabled:cursor-not-allowed disabled:border-dashed disabled:bg-muted/10 disabled:text-muted-foreground disabled:opacity-100 dark:disabled:bg-muted/10";
-
-export const METADATA_EDITOR_FORM_LAYOUT = {
-  className:
-    "flex min-h-[19rem] flex-col gap-2 max-lg:[@media(max-height:700px)]:min-h-[18rem] max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3",
-  minimumHeightPx: { desktop: 304, compact: 288 },
-} as const;
 
 function DisabledReason({
   disabled,

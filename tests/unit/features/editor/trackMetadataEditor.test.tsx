@@ -6,9 +6,9 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import TrackMetadataEditor, {
   AdvancedTrackDetailsFields,
-  METADATA_EDITOR_FORM_LAYOUT,
   MetadataEditorModeToggle,
 } from "@/features/editor/TrackMetadataEditor";
+import { METADATA_EDITOR_FORM_LAYOUT } from "@/features/editor/trackMetadataEditorLayout";
 import { getAdvancedMetadataValidationErrors } from "@/features/editor/audioTaggerUtils";
 import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 import {
