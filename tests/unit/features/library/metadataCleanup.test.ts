@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyMetadataCleanupSuggestions,
+  findAlbumMetadataCleanupSuggestions,
   findMetadataCleanupSuggestions,
   suggestTitleCleanup,
   undoMetadataCleanupSuggestions,
@@ -104,6 +105,19 @@ describe("metadata cleanup suggestions", () => {
     expect(
       findMetadataCleanupSuggestions([file("Good Girls (XCX WORLD)")], [album("XCX WORLD")]),
     ).toEqual([expect.objectContaining({ afterTitle: "Good Girls", reasons: ["album"] })]);
+  });
+
+  it("derives suggestions for only the requested album", () => {
+    const first = file("Burial - Archangel (Official Audio)");
+    const second = { ...file("Burial - Ghost Hardware (Official Audio)"), id: "track-2" };
+    const albums = [
+      album("Untrue", first.id),
+      { ...album("Ghost Hardware", second.id), id: "album-2" },
+    ];
+
+    expect(findAlbumMetadataCleanupSuggestions([first, second], albums, "album-2")).toEqual([
+      expect.objectContaining({ trackId: "track-2", afterTitle: "Ghost Hardware" }),
+    ]);
   });
 
   it("uses album artist metadata as a confident prefix match", () => {
