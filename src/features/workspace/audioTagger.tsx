@@ -19,6 +19,7 @@ import { loadAppSettings } from "@/features/settings/settings";
 import { useAudioImportSession } from "@/features/workspace/useAudioImportSession";
 import { useAudioWorkspace, type ActiveView } from "@/features/workspace/useAudioWorkspace";
 import { useExportSession } from "@/features/export/useExportSession";
+import ExportConfirmationDialog from "@/features/export/ExportConfirmationDialog";
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { AppSettings } from "@/features/library/types";
@@ -69,6 +70,14 @@ export default function AudioTagger() {
       <MetadataCleanupDialog {...workspace.cleanupDialogProps} />
       <DestructiveActionDialog {...workspace.removalDialogProps} />
       <AlbumMetadataDialog {...workspace.albumDialogProps} />
+      <ExportConfirmationDialog
+        summary={exporting.confirmation}
+        status={exporting.confirmationStatus}
+        busy={exporting.exporting}
+        onCancel={exporting.cancelConfirmation}
+        onConfirm={() => void exporting.confirmDownload()}
+        onRestoreFocus={exporting.restoreConfirmationFocus}
+      />
       <div className="min-h-svh flex flex-col bg-background md:h-svh md:flex-row md:overflow-hidden">
         <TagSidebarPanel
           loading={busy}
