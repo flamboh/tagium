@@ -387,9 +387,12 @@ const parseMetadata = (
           if (entry.type === "data") itemPayloads.push(payload);
         }
         if (knownFreeformItems.has(name)) {
-          const itemValues = itemPayloads
-            .filter((payload) => payload.type === 1)
-            .map((payload) => decodeUtf8(payload.bytes));
+          const itemValues: string[] = [];
+          for (const payload of itemPayloads) {
+            if (payload.type === 1) {
+              itemValues.push(decodeUtf8(payload.bytes));
+            }
+          }
           if (itemValues.length) freeform.set(name, itemValues);
         }
         continue;

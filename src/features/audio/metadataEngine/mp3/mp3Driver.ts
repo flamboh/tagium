@@ -210,11 +210,27 @@ const ids = {
   language: ["TLAN", "TLA"],
 } as const;
 
+const idSets = {
+  title: new Set(ids.title),
+  artist: new Set(ids.artist),
+  album: new Set(ids.album),
+  year: new Set(ids.year),
+  genre: new Set(ids.genre),
+  trackNumber: new Set(ids.trackNumber),
+  picture: new Set<string>(ids.picture),
+  dateText: new Set(ids.dateText),
+  trackText: new Set(ids.trackText),
+  albumArtist: new Set(ids.albumArtist),
+  composer: new Set(ids.composer),
+  copyright: new Set(ids.copyright),
+  language: new Set(ids.language),
+} as const;
+
 const idFor = (key: keyof typeof ids, version: Id3Version) =>
   version === 2 ? ids[key].at(-1)! : ids[key][0];
 
-const firstText = (tag: ParsedTag | undefined, frameIds: readonly string[]) => {
-  const frame = tag?.frames.find((candidate) => frameIds.includes(candidate.id));
+const firstText = (tag: ParsedTag | undefined, frameIds: ReadonlySet<string>) => {
+  const frame = tag?.frames.find((candidate) => frameIds.has(candidate.id));
   return frame && decodeText(payloadOf(frame, tag!.version), tag!.version);
 };
 
@@ -390,9 +406,10 @@ const buildTag = (parsed: ParsedTag | undefined, changes: MetadataChanges) => {
   for (const key of Object.keys(changes) as Array<keyof MetadataChanges>) {
     if (key in ids) for (const id of ids[key as keyof typeof ids]) changedIds.add(id);
   }
-  const frames = (parsed?.frames ?? [])
-    .filter((frame) => !changedIds.has(frame.id))
-    .map((frame) => frame.bytes);
+  const frames: Uint8Array[] = [];
+  for (const frame of parsed?.frames ?? []) {
+    if (!changedIds.has(frame.id)) frames.push(frame.bytes);
+  }
   const addText = (key: Exclude<keyof typeof ids, "picture">, value: string) => {
     if (value.length > 0)
       frames.push(
@@ -412,7 +429,7 @@ const buildTag = (parsed: ParsedTag | undefined, changes: MetadataChanges) => {
     );
   }
   if ("trackNumber" in changes) {
-    const currentTrack = firstText(parsed, ids.trackNumber);
+    const currentTrack = firstText(parsed, idSets.trackNumber);
     const total = currentTrack?.match(/^\s*\d+\s*\/\s*(\d+)/u)?.[1];
     addText(
       "trackNumber",
@@ -510,15 +527,18 @@ export const mp3Driver: FormatDriver = {
       });
       const get = (key: keyof typeof ids, apeKey: string = key): string | number | undefined => {
         const legacy = (v1 as Record<string, string | number | undefined>)[key];
-        return firstText(parsed, ids[key]) ?? ape.values.get(apeKey.toLowerCase()) ?? legacy;
+        return firstText(parsed, idSets[key]) ?? ape.values.get(apeKey.toLowerCase()) ?? legacy;
       };
       const yearText = String(get("year", "year") ?? "");
       const trackText = String(get("trackNumber", "track") ?? "");
-      const pictures =
-        parsed?.frames
-          .filter((frame) => ids.picture.includes(frame.id as "APIC" | "PIC"))
-          .map((frame) => parsePicture(frame, parsed.version))
-          .filter((picture): picture is ArtworkEntry => Boolean(picture)) ?? [];
+      const pictures: ArtworkEntry[] = [];
+      if (parsed) {
+        for (const frame of parsed.frames) {
+          if (!idSets.picture.has(frame.id)) continue;
+          const picture = parsePicture(frame, parsed.version);
+          if (picture) pictures.push(picture);
+        }
+      }
       let frameInfo: ReturnType<typeof getFrameInfo>;
       let audioFrameOffset = -1;
       const start = parsed?.end ?? 0;

@@ -283,9 +283,12 @@ const inspect = (source: ByteSource) =>
         );
       }
     }
-    const genres = comments
-      .filter((comment) => comment.key?.toUpperCase() === "GENRE")
-      .map((comment) => comment.value ?? "");
+    const genres: string[] = [];
+    for (const comment of comments) {
+      if (comment.key?.toUpperCase() === "GENRE") {
+        genres.push(comment.value ?? "");
+      }
+    }
     const duration = parsed.totalSamples / parsed.sampleRate;
     const trackText = firstValue(comments, "TRACKNUMBER", "TRACK");
     const trackTotalMatch = trackText?.match(/^\s*\d+\s*\/\s*(\d+)/u);
