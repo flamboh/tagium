@@ -111,7 +111,7 @@ export default function ExportConfirmationDialog({
               className="rounded-md bg-accent px-3 py-2 text-sm text-accent-foreground"
             >
               {status === "changed"
-                ? "Your export changed. Review the updated files and confirm again."
+                ? "Your export changed. Confirm the updated download again."
                 : "Your export changed and some files are no longer ready. Close this dialog and try again."}
             </p>
           )}

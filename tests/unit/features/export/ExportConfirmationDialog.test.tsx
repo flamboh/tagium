@@ -133,6 +133,20 @@ describe("ExportConfirmationDialog", () => {
   });
 
   it("announces stale state and prevents an unavailable export", () => {
+    const changedTree = ExportConfirmationDialog({
+      summary,
+      status: "changed",
+      busy: false,
+      onCancel: vi.fn(),
+      onConfirm: vi.fn(),
+      onRestoreFocus: vi.fn(),
+    });
+    const changedAlert = findAll(changedTree, (element) => element.props.role === "alert")[0];
+    expect(textContent(changedAlert)).toBe(
+      "Your export changed. Confirm the updated download again.",
+    );
+    expect(textContent(changedAlert)).not.toMatch(/review/i);
+
     const tree = ExportConfirmationDialog({
       summary,
       status: "unavailable",

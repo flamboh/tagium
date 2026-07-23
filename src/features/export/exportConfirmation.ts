@@ -2,14 +2,22 @@ import type { LibraryState } from "@/features/library/libraryState";
 import type { AppSettings, TagiumFile } from "@/features/library/types";
 import { isTrackReadyForDownload } from "@/features/export/downloadLibrary";
 
-const megabyteFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+const fractionalMegabyteFormatter = new Intl.NumberFormat("en-US", {
+  useGrouping: false,
+  maximumFractionDigits: 1,
+});
+const wholeMegabyteFormatter = new Intl.NumberFormat("en-US", {
+  useGrouping: false,
+  maximumFractionDigits: 0,
+});
 const smallMegabyteFormatter = new Intl.NumberFormat("en-US", {
+  useGrouping: false,
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 const largeMegabyteFormatter = new Intl.NumberFormat("en-US", {
   notation: "compact",
-  maximumFractionDigits: 1,
+  maximumSignificantDigits: 2,
 });
 
 export type ConfirmedExportTarget = { kind: "library" } | { kind: "album"; albumId: string };
@@ -215,8 +223,10 @@ export const formatMegabyteSize = (sizeBytes: number) => {
   const formatted =
     megabytes < 0.1
       ? smallMegabyteFormatter.format(megabytes)
-      : megabytes >= 10_000
+      : megabytes >= 999.5
         ? largeMegabyteFormatter.format(megabytes)
-        : megabyteFormatter.format(megabytes);
+        : megabytes < 100
+          ? fractionalMegabyteFormatter.format(megabytes)
+          : wholeMegabyteFormatter.format(megabytes);
   return `${formatted} MB`;
 };

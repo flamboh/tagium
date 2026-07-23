@@ -141,6 +141,12 @@ describe("export confirmation summary", () => {
     expect(formatMegabyteSize(1)).toBe("0.00 MB");
     expect(formatMegabyteSize(999)).toBe("0.00 MB");
     expect(formatMegabyteSize(1_234_567)).toBe("1.2 MB");
+    expect(formatMegabyteSize(99_940_000)).toBe("99.9 MB");
+    expect(formatMegabyteSize(99_950_000)).toBe("100 MB");
+    expect(formatMegabyteSize(999_490_000)).toBe("999 MB");
+    expect(formatMegabyteSize(999_500_000)).toBe("1K MB");
+    expect(formatMegabyteSize(999_950_000)).toBe("1K MB");
+    expect(formatMegabyteSize(1_000_000_000)).toBe("1K MB");
     expect(formatMegabyteSize(10_000_000_000)).toBe("10K MB");
   });
 
