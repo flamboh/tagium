@@ -27,6 +27,8 @@ const playlistSchema = Schema.Struct({
   year: Schema.optionalKey(Schema.Number),
   isAlbum: Schema.Boolean,
   coverUrl: Schema.optionalKey(Schema.String),
+  /** Original submitted provider URL (client-side provenance). */
+  sourceUrl: Schema.optionalKey(urlStringSchema),
   tracks: Schema.Array(playlistTrackSchema),
 });
 

@@ -15,6 +15,7 @@ const manifest = (): Manifest =>
       title: "Shared Album",
       artist: "Album Artist",
       genre: "Electronic",
+      sourceUrl: "https://www.youtube.com/playlist?list=PL123",
       year: 2026,
       artwork: {
         kind: "stored",
@@ -69,6 +70,7 @@ describe("share manifests", () => {
     const replay = toManifestReplayInput(decoded, { sourceManifestSlug: "shared-album" });
 
     expect(replay.sourceManifestSlug).toBe("shared-album");
+    expect(replay.playlist.sourceUrl).toBe(decoded.album.sourceUrl);
     expect(replay.tracks.map((track) => track.sourceUrl)).toEqual([
       "https://soundcloud.com/artist/first",
       "https://soundcloud.com/artist/first",
@@ -78,6 +80,28 @@ describe("share manifests", () => {
       audioBitrate: "128",
       metadata: decoded.tracks[1]!.metadata,
     });
+  });
+
+  it("omits unsupported album provenance while preserving shareability", () => {
+    const projected = projectAlbumManifest(
+      { title: "Album", artist: "Artist", genre: "Pop", sourceUrl: "https://example.com/list" },
+      [
+        {
+          filename: "track.mp3",
+          downloadRequest: { sourceUrl: "https://youtu.be/abcdefghijk", audioBitrate: "128" },
+          metadata: {
+            filename: "track",
+            title: "Track",
+            artist: "Artist",
+            album: "Album",
+            genre: "Pop",
+            year: 2020,
+            trackNumber: 1,
+          },
+        },
+      ],
+    );
+    expect(projected.album.sourceUrl).toBeUndefined();
   });
 
   it("rejects invalid source URLs, numeric fields, and track counts", () => {

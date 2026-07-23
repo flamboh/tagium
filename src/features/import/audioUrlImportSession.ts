@@ -345,7 +345,9 @@ export const createAudioUrlImportSession = ({
               playlistProvider === "soundcloud"
                 ? await resolveSoundCloudSet(trimmedUrl)
                 : await resolveYouTubePlaylist(trimmedUrl);
-            handlePlaylistDownload(playlist, importOperationId);
+            // Preserve the exact validated URL submitted by the user; provider
+            // responses intentionally do not carry request provenance.
+            handlePlaylistDownload({ ...playlist, sourceUrl: trimmedUrl }, importOperationId);
           } catch (error) {
             importLifecycleTracker.fail(importOperationId, error, "resolve");
             throw error;

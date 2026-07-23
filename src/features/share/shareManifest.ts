@@ -86,6 +86,7 @@ export const manifestSchema = Schema.Struct({
     artist: boundedString(),
     genre: boundedString(),
     year: Schema.optionalKey(positiveInteger(1_000, 9_999)),
+    sourceUrl: Schema.optionalKey(sourceUrlSchema),
     artwork: Schema.optionalKey(artworkSchema),
   }),
   tracks: tracksSchema,
@@ -143,6 +144,7 @@ export interface ManifestReplayInput {
     artist: string;
     genre: string;
     year?: number;
+    sourceUrl?: string;
     isAlbum: true;
     tracks: readonly { title: string; url: string; trackNumber: number }[];
   };
@@ -165,6 +167,7 @@ export const toManifestReplayInput = (
     artist: manifest.album.artist,
     genre: manifest.album.genre,
     ...(manifest.album.year === undefined ? {} : { year: manifest.album.year }),
+    ...(manifest.album.sourceUrl === undefined ? {} : { sourceUrl: manifest.album.sourceUrl }),
     isAlbum: true,
     tracks: manifest.tracks.map((track) => ({
       title: track.metadata.title,
@@ -185,7 +188,13 @@ export interface ManifestAlbumProjection {
   artist: string;
   genre: string;
   year?: number;
+  sourceUrl?: string;
 }
+
+const supportedProvenance = (value: string | undefined) =>
+  value !== undefined && value.length > 0 && value.length <= 2_048 && isSupportedSourceUrl(value)
+    ? value
+    : undefined;
 
 export interface ManifestTrackProjection {
   filename: string;
@@ -227,6 +236,9 @@ export const projectAlbumManifest = (
       artist: album.artist,
       genre: album.genre,
       ...(album.year === undefined ? {} : { year: album.year }),
+      ...(supportedProvenance(album.sourceUrl) === undefined
+        ? {}
+        : { sourceUrl: supportedProvenance(album.sourceUrl) }),
       ...(artwork === undefined ? {} : { artwork }),
     },
     tracks: files.map((file) => {

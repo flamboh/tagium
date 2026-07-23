@@ -62,6 +62,7 @@ export const createSharedAlbumDownloadPlan = (
       artist: manifest.album.artist,
       genre: manifest.album.genre,
       ...(manifest.album.year === undefined ? {} : { year: manifest.album.year }),
+      ...(manifest.album.sourceUrl === undefined ? {} : { sourceUrl: manifest.album.sourceUrl }),
       ...(cover?.length ? { cover } : {}),
       sourceManifestSlug,
     },

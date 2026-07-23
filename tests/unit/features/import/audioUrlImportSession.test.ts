@@ -3,7 +3,11 @@ import { act } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { AppSettings } from "@/features/library/types";
 
-const mocks = vi.hoisted(() => ({ resolveTrackMetadata: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  resolveTrackMetadata: vi.fn(),
+  resolveSoundCloudSet: vi.fn(),
+  resolveYouTubePlaylist: vi.fn(),
+}));
 
 vi.mock("@/features/audio/audioBackend", () => ({
   downloadFromCobalt: () => Effect.never,
@@ -14,6 +18,14 @@ vi.mock("@/features/audio/audioBackend", () => ({
 }));
 vi.mock("@/features/import/trackMetadata", () => ({
   resolveTrackMetadata: mocks.resolveTrackMetadata,
+}));
+vi.mock("@/features/import/soundcloudSet", () => ({
+  isSoundCloudSetUrl: (url: string) => url.includes("soundcloud.com") && url.includes("/sets/"),
+  resolveSoundCloudSet: mocks.resolveSoundCloudSet,
+}));
+vi.mock("@/features/import/youtubePlaylist", () => ({
+  isYouTubePlaylistUrl: (url: string) => url.includes("youtube.com/playlist"),
+  resolveYouTubePlaylist: mocks.resolveYouTubePlaylist,
 }));
 
 import { renderHook } from "../../support/hookTestHarness";
@@ -31,6 +43,36 @@ const settings = (audioBitrate: AppSettings["audioBitrate"]): AppSettings => ({
 afterEach(() => vi.clearAllMocks());
 
 describe("audio URL import session", () => {
+  it.each([
+    ["https://soundcloud.com/artist/sets/exact-set", "resolveSoundCloudSet"],
+    ["https://www.youtube.com/playlist?list=PL_exact", "resolveYouTubePlaylist"],
+  ] as const)("retains the exact submitted URL for %s", async (submittedUrl, resolver) => {
+    const playlist = {
+      title: "Imported playlist",
+      artist: "Artist",
+      genre: "Electronic",
+      isAlbum: true,
+      tracks: [{ title: "Track", url: "https://soundcloud.com/artist/track", trackNumber: 1 }],
+    };
+    mocks[resolver].mockResolvedValue(playlist);
+    const hook = renderHook(() => {
+      const library = useLibraryStore();
+      const editor = useTrackEditorSession({ library, settings: settings("320") });
+      const importing = useAudioImportSession({
+        library,
+        editor,
+        settings: settings("320"),
+        activateEditor: vi.fn(),
+      });
+      return { library, importing };
+    }, undefined);
+    await act(async () => {
+      await hook.result.importing.commands.importUrl(submittedUrl);
+    });
+    expect(hook.result.library.getSnapshot().albums[0]?.sourceUrl).toBe(submittedUrl);
+    hook.unmount();
+  });
+
   it("uses the latest settings and activation callback after asynchronous metadata resolution", async () => {
     let resolveMetadata: ((metadata: { title: string; artist: string }) => void) | undefined;
     mocks.resolveTrackMetadata.mockImplementation(

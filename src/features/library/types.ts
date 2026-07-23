@@ -32,6 +32,8 @@ export interface AlbumGroup {
   cover?: AudioMetadata["picture"];
   trackIds: string[];
   year?: number;
+  /** Original provider playlist/set URL, when available. */
+  sourceUrl?: string;
   /** In-memory provenance used to prevent accidental duplicate share-link imports. */
   sourceManifestSlug?: string;
 }

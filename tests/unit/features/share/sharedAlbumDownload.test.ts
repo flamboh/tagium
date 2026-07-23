@@ -11,6 +11,7 @@ describe("shared album download planning", () => {
         title: "Creator title",
         artist: "Various",
         genre: "Set",
+        sourceUrl: "https://www.youtube.com/playlist?list=PL_exact",
         year: 2024,
         artwork: {
           kind: "stored",
@@ -63,6 +64,7 @@ describe("shared album download planning", () => {
     );
 
     expect(plan.album.sourceManifestSlug).toBe("AbcdEFGHijklmno_123-45");
+    expect(plan.album.sourceUrl).toBe(manifest.album.sourceUrl);
     expect(plan.album.cover).toBe(cover);
     expect(plan.album.cover?.[0]).toMatchObject({ type: 3, description: "shared cover" });
     expect(plan.pendingFiles[0]).toMatchObject({
