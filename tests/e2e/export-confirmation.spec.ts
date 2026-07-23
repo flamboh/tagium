@@ -41,12 +41,21 @@ test("download contents scroll inside a constrained mobile dialog", async ({ pag
   await page
     .locator('input[type="file"]')
     .setInputFiles(Array.from({ length: 18 }, (_, index) => mp3Upload(`track-${index + 1}.mp3`)));
-  const trigger = downloadAllButton(page);
+  await page.getByRole("button", { name: "open library" }).click();
+  await expect(page.locator("[data-mobile-drawer]")).toHaveAttribute("data-mobile-drawer", "open");
+  const library = page.getByRole("dialog", { name: "library" });
+  const trigger = library.getByRole("button", { name: "download all", exact: true });
   await expect(trigger).toBeAttached();
   await expect(trigger).toBeEnabled();
   await trigger.click();
   const dialog = page.getByRole("dialog", { name: "Download 18 tracks" });
-  await dialog.getByRole("button", { name: "Loose tracks 18 tracks" }).click();
+  await expect(page.locator("[data-mobile-drawer]")).toHaveAttribute(
+    "data-mobile-drawer",
+    "closed",
+  );
+  await expect(library).not.toBeVisible();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: /18 tracks$/ }).click();
 
   const summary = dialog.getByTestId("export-summary");
   await expect(summary).toBeVisible();
@@ -57,4 +66,7 @@ test("download contents scroll inside a constrained mobile dialog", async ({ pag
   expect(summaryMetrics.clientHeight).toBeGreaterThan(0);
   expect(summaryMetrics.scrollHeight).toBeGreaterThan(summaryMetrics.clientHeight);
   await expect(dialog.getByRole("button", { name: "cancel" })).toBeVisible();
+  await dialog.getByRole("button", { name: "cancel" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("button", { name: "open library" })).toBeFocused();
 });

@@ -149,13 +149,14 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
 
   return (
     <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
-      <div className="p-6 h-[104px] border-b flex-shrink-0 flex flex-col justify-center gap-1">
+      <div className="flex h-[104px] shrink-0 flex-col justify-center gap-1 border-b py-6 pl-16 pr-6 md:px-6">
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
             className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center text-primary/80 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             onClick={onBack}
             aria-label="back to editor"
+            data-mobile-workspace-destination="settings"
           >
             <ArrowLeft className="size-5" />
           </button>

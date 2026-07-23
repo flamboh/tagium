@@ -1,8 +1,8 @@
 "use client";
 
-import type { MouseEvent as ReactMouseEvent } from "react";
-import { useRef, useState } from "react";
-import { Settings } from "lucide-react";
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Settings, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AlbumSidebar from "@/features/library/AlbumSidebar";
 import PlaylistDownloadQueuePanel, {
@@ -54,6 +54,8 @@ export interface TagSidebarPanelProps {
   onOpenSettings: () => void;
   onCancelPlaylistDownloadQueue?: () => void;
   onRetryPlaylistDownloadQueue?: () => void;
+  mobilePresentation?: "library" | "hidden" | "drawer";
+  onCloseMobileDrawer?: () => void;
 }
 
 const isFileDrag = (event: React.DragEvent<HTMLDivElement>) =>
@@ -90,7 +92,11 @@ export default function TagSidebarPanel({
   onOpenSettings,
   onCancelPlaylistDownloadQueue,
   onRetryPlaylistDownloadQueue,
+  mobilePresentation = "library",
+  onCloseMobileDrawer,
 }: TagSidebarPanelProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeSheetButtonRef = useRef<HTMLButtonElement>(null);
   const dragCounterRef = useRef(0);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const canDownloadAll = files.length > 0 && allTracksReadyForDownload(files);
@@ -104,6 +110,36 @@ export default function TagSidebarPanel({
       : hasInvalidFilename
         ? "every track needs a filename"
         : "tracks need files and metadata";
+
+  useEffect(() => {
+    if (mobilePresentation === "drawer") closeSheetButtonRef.current?.focus();
+  }, [mobilePresentation]);
+
+  const trapDrawerFocus = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (mobilePresentation !== "drawer") return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onCloseMobileDrawer?.();
+      return;
+    }
+    if (event.key !== "Tab") return;
+
+    const focusable = Array.from(
+      panelRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    ).filter((element) => !element.hasAttribute("inert"));
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const handleSidebarDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
     if (!isFileDrag(event)) return;
@@ -135,10 +171,21 @@ export default function TagSidebarPanel({
 
   return (
     <div
+      ref={panelRef}
+      id="tagium-library"
+      data-mobile-library={mobilePresentation}
+      role={mobilePresentation === "drawer" ? "dialog" : undefined}
+      aria-modal={mobilePresentation === "drawer" ? true : undefined}
+      aria-label={mobilePresentation === "drawer" ? "library" : undefined}
+      aria-hidden={mobilePresentation === "hidden" ? true : undefined}
+      inert={mobilePresentation === "hidden" ? true : undefined}
       className={cn(
-        "order-2 h-svh w-full flex-shrink-0 flex flex-col border-t bg-card overflow-hidden transition-colors duration-200 md:order-none md:h-auto md:min-h-0 md:w-72 md:border-t-0 md:border-r",
+        "fixed inset-y-0 left-0 z-40 flex h-svh w-(--mobile-drawer-width) shrink-0 flex-col overflow-hidden border-r bg-card transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:static md:z-auto md:order-none md:h-auto md:min-h-0 md:w-72 md:translate-x-0 md:border-t-0 md:border-r md:transition-none",
+        mobilePresentation === "hidden" && "-translate-x-full",
+        mobilePresentation === "drawer" && "translate-x-0",
         isDraggingFile && "bg-primary/5 shadow-[inset_0_0_0_2px_var(--primary)]",
       )}
+      onKeyDown={trapDrawerFocus}
       onDragEnter={handleSidebarDragEnter}
       onDragLeave={handleSidebarDragLeave}
       onDropCapture={(event) => {
@@ -155,8 +202,21 @@ export default function TagSidebarPanel({
       }}
       onDrop={handleSidebarFileDrop}
     >
-      <div className="h-14 flex items-center px-5 border-b flex-shrink-0">
+      <div className="h-14 flex shrink-0 items-center justify-between border-b px-5">
         <span className="font-bold text-xl tracking-tight select-none">tagium</span>
+        {mobilePresentation === "drawer" && (
+          <Button
+            ref={closeSheetButtonRef}
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-9 md:hidden"
+            onClick={onCloseMobileDrawer}
+            aria-label="close library"
+          >
+            <X className="size-5" />
+          </Button>
+        )}
       </div>
 
       <AlbumSidebar
@@ -191,7 +251,7 @@ export default function TagSidebarPanel({
         onRetry={onRetryPlaylistDownloadQueue}
       />
 
-      <div className="px-3 py-3 border-t flex-shrink-0 flex flex-col gap-2">
+      <div className="flex shrink-0 flex-col gap-2 border-t px-3 py-3">
         {canDownloadAll && !loading ? (
           <Button className="w-full" onClick={onDownloadAll}>
             download all

@@ -143,8 +143,8 @@ function TrackFilenameHeader({
 }) {
   return (
     <div
-      className={`relative h-16 shrink-0 border-b px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6 ${
-        hasModeToggle ? "pr-40 max-lg:[@media(max-height:700px)]:pr-36 lg:pr-44" : ""
+      className={`relative h-16 shrink-0 border-b pl-16 max-lg:[@media(max-height:700px)]:h-14 md:pl-4 lg:h-[104px] lg:pl-6 ${
+        hasModeToggle ? "pr-40 max-lg:[@media(max-height:700px)]:pr-36 lg:pr-44" : "pr-4 lg:pr-6"
       }`}
     >
       <div className="flex h-full min-w-0 items-center">
@@ -180,7 +180,7 @@ function TrackFilenameHeader({
           </label>
         )}
       </div>
-      <div className="absolute inset-x-4 bottom-1 h-4 min-w-0 overflow-hidden text-xs leading-4 text-destructive max-lg:[@media(max-height:700px)]:inset-x-3 max-lg:[@media(max-height:700px)]:bottom-0 lg:inset-x-6 lg:h-8">
+      <div className="absolute bottom-1 left-16 right-4 h-4 min-w-0 overflow-hidden text-xs leading-4 text-destructive max-lg:[@media(max-height:700px)]:bottom-0 md:inset-x-4 lg:inset-x-6 lg:h-8">
         {filenameInvalid ? (
           <div className="flex min-w-0 items-center gap-2">
             <p
