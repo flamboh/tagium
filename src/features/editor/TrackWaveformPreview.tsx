@@ -231,6 +231,7 @@ export default function TrackWaveformPreview({
       aria-label={`preview ${title || file?.name || "selected track"}`}
       data-waveform-status={waveformStatus}
     >
+      {/* react-doctor-disable-next-line media-has-caption -- previews play user-provided music files, and Tagium has no truthful timed-text cue data to attach. */}
       <audio
         ref={audioRef}
         preload="metadata"
@@ -269,9 +270,7 @@ export default function TrackWaveformPreview({
           dispatch({ type: "playbackUnavailable", value: true });
           if (decodeDuration === 0) dispatch({ type: "waveformStatus", value: "unavailable" });
         }}
-      >
-        <track kind="captions" label="No spoken content" />
-      </audio>
+      />
       <div className="flex items-center gap-2">
         <Button
           type="button"

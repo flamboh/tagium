@@ -11,6 +11,18 @@ afterEach(() => {
 });
 
 describe("track waveform transport", () => {
+  it("does not fabricate caption tracks for user-provided music", () => {
+    let renderer: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        <TrackWaveformPreview file={undefined} fileId="" title="" fallbackDuration={0} active />,
+      );
+    });
+
+    expect(renderer!.root.findAllByType("track")).toHaveLength(0);
+    act(() => renderer!.unmount());
+  });
+
   it("plays, seeks by pointer and keyboard, and cleans up without autoplaying a replacement", async () => {
     const createdUrls: string[] = [];
     const revokedUrls: string[] = [];
