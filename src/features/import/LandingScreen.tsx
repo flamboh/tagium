@@ -47,6 +47,7 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
 
   return (
     <div
+      data-view={active ? "landing" : undefined}
       className={cn(
         active
           ? "h-svh min-h-0 overflow-y-auto flex flex-col items-center justify-center p-8 transition-colors duration-200 max-lg:[@media(max-height:700px)]:p-4 md:h-auto md:flex-1"

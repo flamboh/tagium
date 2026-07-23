@@ -115,7 +115,7 @@ test("clicking blank space in the empty library closes settings", async ({ page 
   await page.getByRole("button", { name: "clear track selection and return to editor" }).click();
 
   await expect(page.getByRole("button", { name: "back to editor" })).not.toBeAttached();
-  await expect(page.getByRole("button", { name: /drop your mp3s here/ })).toBeVisible();
+  await expect(page.locator('[data-view="landing"]')).toBeVisible();
 });
 
 test("clicking blank space in a populated track list closes settings and clears the track", async ({
