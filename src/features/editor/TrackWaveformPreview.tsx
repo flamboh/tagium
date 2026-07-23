@@ -351,7 +351,7 @@ export default function TrackWaveformPreview({
               onPointerCancel={() => {
                 dragRef.current.active = false;
               }}
-              className={`relative h-20 min-w-0 w-full touch-pan-x select-none overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+              className={`relative h-20 min-w-0 w-full touch-pan-x select-none overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 ${
                 canSeek ? "cursor-pointer" : "cursor-not-allowed"
               }`}
             >

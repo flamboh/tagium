@@ -279,13 +279,15 @@ describe("track metadata editor form seam", () => {
 
     expect(waveform.props.className).toContain("min-w-0");
     expect(waveform.props.className).toContain("w-full");
-    const waveformContainer = waveform.parent!.parent!;
-    let coverAncestor = cover.parent;
-    while (coverAncestor && coverAncestor !== waveformContainer) {
-      coverAncestor = coverAncestor.parent;
-    }
+    const waveformComponent = waveform.parent!;
+    const waveformContainer = waveformComponent.parent!;
+    const [detailsRow, waveformSibling] = waveformContainer.children;
 
-    expect(coverAncestor).toBe(waveformContainer);
+    expect(waveformContainer.children).toHaveLength(2);
+    expect(waveformSibling).toBe(waveformComponent);
+    expect(typeof detailsRow).not.toBe("string");
+    if (typeof detailsRow === "string") throw new Error("track details row missing");
+    expect(detailsRow.findByProps({ "data-testid": "cover-art" })).toBe(cover);
     expect(waveformContainer.props.className).toContain("min-h-full");
     expect(waveformContainer.props.className).not.toContain("flex-1");
 

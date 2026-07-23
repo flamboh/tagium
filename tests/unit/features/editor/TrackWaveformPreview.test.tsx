@@ -32,6 +32,7 @@ describe("track waveform transport", () => {
     expect(scroller.props.className).not.toContain("border");
     expect(scroller.props.className).not.toContain("bg-");
     expect(slider.props.className).toContain("w-full");
+    expect(slider.props.className).toContain("focus-visible:ring-inset");
     expect(slider.props.style).toBeUndefined();
     act(() => renderer!.unmount());
   });
