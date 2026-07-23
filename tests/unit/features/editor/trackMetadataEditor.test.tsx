@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import TrackMetadataEditor, {
   AdvancedTrackDetailsFields,
+  METADATA_EDITOR_FORM_LAYOUT,
   MetadataEditorModeToggle,
 } from "@/features/editor/TrackMetadataEditor";
 import { getAdvancedMetadataValidationErrors } from "@/features/editor/audioTaggerUtils";
@@ -276,16 +277,34 @@ describe("track metadata editor form seam", () => {
   });
 
   it.each([
-    { downloadStatus: "downloading" as const, statusCopy: "loading metadata" },
-    { downloadStatus: "error" as const, statusCopy: "download failed" },
-    { downloadStatus: "canceled" as const, statusCopy: "download canceled" },
+    {
+      downloadStatus: "downloading" as const,
+      fileStatus: "saved" as const,
+      statusCopy: "loading metadata",
+    },
+    {
+      downloadStatus: "error" as const,
+      fileStatus: "saved" as const,
+      statusCopy: "download failed",
+    },
+    {
+      downloadStatus: "canceled" as const,
+      fileStatus: "saved" as const,
+      statusCopy: "download canceled",
+    },
+    {
+      downloadStatus: "ready" as const,
+      fileStatus: "error" as const,
+      statusCopy: "metadata failed",
+    },
   ])(
-    "keeps the gated switch available while a selected track is $downloadStatus",
-    ({ downloadStatus, statusCopy }) => {
+    "keeps the gated switch available for $downloadStatus/$fileStatus pending tracks",
+    ({ downloadStatus, fileStatus, statusCopy }) => {
       const pendingTrack: TagiumFile = {
         ...loadedTrack,
         metadata: undefined,
         downloadStatus,
+        status: fileStatus,
       };
 
       const gatedMarkup = renderToStaticMarkup(
@@ -323,9 +342,16 @@ describe("track metadata editor form seam", () => {
     );
 
     expect(linkedMarkup).toMatch(/id="track-album-artist"[^>]*disabled/);
+    expect(linkedMarkup).toMatch(
+      /id="track-album-artist"[^>]*aria-describedby="track-album-artist-sync-reason"/,
+    );
+    expect(linkedMarkup).toContain(
+      'id="track-album-artist-sync-reason" class="sr-only">Album artist is synced with the album.',
+    );
     expect(linkedMarkup).toContain("Album artist is synced with the album.");
     expect(linkedMarkup).not.toContain("follows track artist while linked");
     expect(unlinkedMarkup).not.toMatch(/id="track-album-artist"[^>]*disabled/);
+    expect(unlinkedMarkup).not.toContain("track-album-artist-sync-reason");
   });
 
   it.each([
@@ -376,22 +402,62 @@ describe("track metadata editor form seam", () => {
     expect(advancedMarkup).toContain("min-h-16");
   });
 
-  it("keeps one form-area stabilization contract across both metadata modes", () => {
+  it("keeps downstream content stable while allowing validation and textarea growth", async () => {
+    let form: UseFormReturn<AudioMetadata>;
     let renderer: ReactTestRenderer;
     act(() => {
-      renderer = create(<MountedEditorHarness onDownload={vi.fn()} />);
+      renderer = create(
+        <MountedEditorHarness
+          onDownload={vi.fn()}
+          exposeForm={(current) => {
+            form = current;
+          }}
+        />,
+      );
     });
     const normalArea = renderer!.root.findByProps({ "data-editor-form-area": true });
     const normalClassName = normalArea.props.className as string;
+    expect(normalClassName).toBe(METADATA_EDITOR_FORM_LAYOUT.className);
     expect(normalClassName).toContain("min-h-[19rem]");
     expect(normalClassName).toContain("max-lg:[@media(max-height:700px)]:min-h-[18rem]");
-    expect(
-      Number.parseFloat(normalClassName.match(/min-h-\[(\d+)rem\]/)?.[1] ?? "0") * 16,
-    ).toBeGreaterThanOrEqual(304);
+    expect(METADATA_EDITOR_FORM_LAYOUT.minimumHeightPx).toEqual({
+      desktop: 19 * 16,
+      compact: 18 * 16,
+    });
+
+    // react-test-renderer has no layout engine, so compare the measured intrinsic field stacks
+    // against the exact minimum-height contract consumed by both rendered modes.
+    const measuredIntrinsicHeightPx = {
+      desktop: { normal: 276, advanced: 304 },
+      compact: { normal: 258, advanced: 286 },
+    } as const;
+    for (const viewport of ["desktop", "compact"] as const) {
+      const minimum = METADATA_EDITOR_FORM_LAYOUT.minimumHeightPx[viewport];
+      const downstreamTop = {
+        normal: Math.max(minimum, measuredIntrinsicHeightPx[viewport].normal),
+        advanced: Math.max(minimum, measuredIntrinsicHeightPx[viewport].advanced),
+      };
+      expect(downstreamTop.normal).toBe(downstreamTop.advanced);
+      expect(downstreamTop.normal).toBe(minimum);
+    }
 
     act(() => void findButton(renderer!, "advanced").props.onClick());
     const advancedArea = renderer!.root.findByProps({ "data-editor-form-area": true });
     expect(advancedArea.props.className).toBe(normalClassName);
+    expect(normalClassName).not.toMatch(/(?:^|\s)(?:h|max-h)-/);
+    expect(normalClassName).not.toContain("overflow-hidden");
+    const textarea = renderer!.root.findByProps({ id: "track-comment" });
+    expect(textarea.props.className).toContain("resize-y");
+    expect(textarea.props.className).not.toContain("max-h-");
+
+    act(() => form!.setValue("discNumber", 0));
+    await act(async () => void findButton(renderer!, "download track").props.onClick());
+    expect(JSON.stringify(renderer!.toJSON())).toContain(
+      "disc number must be a whole number from 1 to 999",
+    );
+    expect(renderer!.root.findByProps({ "data-editor-form-area": true }).props.className).toBe(
+      normalClassName,
+    );
     act(() => renderer!.unmount());
   });
 

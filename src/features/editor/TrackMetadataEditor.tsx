@@ -91,6 +91,12 @@ const placeholderClassName = "placeholder:text-muted-foreground/45";
 const syncedInputClassName =
   "disabled:pointer-events-auto disabled:cursor-not-allowed disabled:border-dashed disabled:bg-muted/10 disabled:text-muted-foreground disabled:opacity-100 dark:disabled:bg-muted/10";
 
+export const METADATA_EDITOR_FORM_LAYOUT = {
+  className:
+    "flex min-h-[19rem] flex-col gap-2 max-lg:[@media(max-height:700px)]:min-h-[18rem] max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3",
+  minimumHeightPx: { desktop: 304, compact: 288 },
+} as const;
+
 function DisabledReason({
   disabled,
   reason,
@@ -389,6 +395,7 @@ export function AdvancedTrackDetailsFields({
   onFieldsMount?: (node: HTMLDivElement | null) => void;
 }) {
   const albumArtistReason = getMetadataLinkDescriptor("albumArtist").disabledReason;
+  const albumArtistReasonId = "track-album-artist-sync-reason";
 
   return (
     <>
@@ -403,6 +410,7 @@ export function AdvancedTrackDetailsFields({
               ? { name: registrations.albumArtist.name }
               : registrations.albumArtist)}
             id="track-album-artist"
+            aria-describedby={albumArtistLinked ? albumArtistReasonId : undefined}
             disabled={albumArtistLinked}
             readOnly={albumArtistLinked}
             value={albumArtistLinked ? linkedArtistValue : undefined}
@@ -410,6 +418,11 @@ export function AdvancedTrackDetailsFields({
             className={`${placeholderClassName} ${syncedInputClassName}`}
           />
         </DisabledReason>
+        {albumArtistLinked && (
+          <p id={albumArtistReasonId} className="sr-only">
+            {albumArtistReason}
+          </p>
+        )}
       </div>
       <div ref={onFieldsMount} className="grid grid-cols-2 gap-2">
         <div>
@@ -577,7 +590,9 @@ function PendingTrackMetadataEditor({
       ? "download failed"
       : selectedFile.downloadStatus === "canceled"
         ? "download canceled"
-        : "loading metadata";
+        : selectedFile.status === "error"
+          ? "metadata failed"
+          : "loading metadata";
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -763,7 +778,7 @@ function LoadedTrackMetadataEditor({
             <div className="flex flex-1 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3">
               <div
                 data-editor-form-area
-                className="flex min-h-[19rem] flex-col gap-2 max-lg:[@media(max-height:700px)]:min-h-[18rem] max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3"
+                className={METADATA_EDITOR_FORM_LAYOUT.className}
               >
                 {advancedMetadata && editorMode === "advanced" ? (
                   <AdvancedTrackDetailsFields
