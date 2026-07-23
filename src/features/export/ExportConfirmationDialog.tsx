@@ -58,7 +58,6 @@ export default function ExportConfirmationDialog({
           {status !== "ready" && (
             <p
               role="status"
-              aria-live="assertive"
               className="rounded-md bg-accent px-3 py-2 text-sm text-accent-foreground"
             >
               {status === "changed"

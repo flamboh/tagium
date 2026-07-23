@@ -2,6 +2,9 @@ import type { LibraryState } from "@/features/library/libraryState";
 import type { AppSettings, TagiumFile } from "@/features/library/types";
 import { isTrackReadyForDownload } from "@/features/export/downloadLibrary";
 
+const byteFormatter = new Intl.NumberFormat("en-US");
+const compactByteFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+
 export type ConfirmedExportTarget = { kind: "library" } | { kind: "album"; albumId: string };
 
 export interface ExportConfirmationTrack {
@@ -72,10 +75,20 @@ export const deriveExportConfirmationSummary = (
   }
 
   if (target.kind === "library") {
-    const looseIds = [
-      ...state.looseTrackIds,
-      ...state.files.filter((file) => !includedTrackIds.has(file.id)).map((file) => file.id),
-    ].filter((id, index, ids) => ids.indexOf(id) === index && !includedTrackIds.has(id));
+    const looseIds: string[] = [];
+    const seenLooseIds = new Set<string>();
+    for (const id of state.looseTrackIds) {
+      if (!includedTrackIds.has(id) && !seenLooseIds.has(id)) {
+        seenLooseIds.add(id);
+        looseIds.push(id);
+      }
+    }
+    for (const { id } of state.files) {
+      if (!includedTrackIds.has(id) && !seenLooseIds.has(id)) {
+        seenLooseIds.add(id);
+        looseIds.push(id);
+      }
+    }
     const looseTracks = looseIds.map((id) => filesById.get(id));
     if (!looseTracks.every(readyTrack)) return null;
     if (looseTracks.length > 0) groups.push(summarizeGroup("loose", "Loose tracks", looseTracks));
@@ -134,11 +147,13 @@ const normalizeFingerprintValue = (value: unknown): unknown => {
   if (value instanceof Uint8Array) return getBinaryFingerprint(value);
   if (Array.isArray(value)) return value.map(normalizeFingerprintValue);
   if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, entry]) => [key, normalizeFingerprintValue(entry)]),
-    );
+    const normalizedEntries: [string, unknown][] = [];
+    for (const [key, entry] of Object.entries(value).sort(([left], [right]) =>
+      left.localeCompare(right),
+    )) {
+      normalizedEntries.push([key, normalizeFingerprintValue(entry)]);
+    }
+    return Object.fromEntries(normalizedEntries);
   }
   return value;
 };
@@ -173,19 +188,23 @@ export const createExportPlanFingerprint = (
     target.kind === "album"
       ? new Set(albums.flatMap((album) => album.trackIds))
       : new Set(state.files.map(({ id }) => id));
+  const files: ReturnType<typeof fileFingerprint>[] = [];
+  for (const file of state.files) {
+    if (trackIds.has(file.id)) files.push(fileFingerprint(file));
+  }
   return JSON.stringify(
     normalizeFingerprintValue({
       target,
       settings,
       albums,
       looseTrackIds: target.kind === "library" ? state.looseTrackIds : [],
-      files: state.files.filter(({ id }) => trackIds.has(id)).map(fileFingerprint),
+      files,
     }),
   );
 };
 
 export const formatByteSize = (sizeBytes: number) => {
-  const exact = `${new Intl.NumberFormat("en-US").format(sizeBytes)} ${sizeBytes === 1 ? "byte" : "bytes"}`;
+  const exact = `${byteFormatter.format(sizeBytes)} ${sizeBytes === 1 ? "byte" : "bytes"}`;
   if (sizeBytes < 1_000) return exact;
   const units = ["kB", "MB", "GB", "TB"];
   let value = sizeBytes / 1_000;
@@ -194,5 +213,5 @@ export const formatByteSize = (sizeBytes: number) => {
     value /= 1_000;
     unit = units[index];
   }
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value)} ${unit} (${exact})`;
+  return `${compactByteFormatter.format(value)} ${unit} (${exact})`;
 };
