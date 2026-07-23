@@ -58,6 +58,21 @@ export default function AudioTagger() {
   const mobileNavigation = useMobileWorkspaceNavigation({
     libraryEmpty: libraryIsEmpty,
   });
+  const { closeDrawer, drawerOpen, isMobile } = mobileNavigation;
+  const handoffMobileExport = useCallback(
+    (startExport: () => void) => {
+      if (!isMobile || !drawerOpen) {
+        startExport();
+        return;
+      }
+
+      // Let the drawer close and restore focus before the export dialog captures
+      // its trigger. This keeps the trigger visible and outside the inert drawer.
+      closeDrawer();
+      requestAnimationFrame(startExport);
+    },
+    [closeDrawer, drawerOpen, isMobile],
+  );
   const startsInSwipeZone = useCallback(
     (touch: Touch, surface: HTMLElement) => {
       const bounds = surface.getBoundingClientRect();
@@ -143,12 +158,12 @@ export default function AudioTagger() {
           onCloseMobileDrawer={mobileNavigation.closeDrawer}
           onAudioUpload={importing.commands.upload}
           onRetryDownload={importing.commands.retryTrack}
-          onDownloadAlbum={exporting.downloadAlbum}
+          onDownloadAlbum={(albumId) => handoffMobileExport(() => exporting.downloadAlbum(albumId))}
           onUploadToAlbum={(albumId, filesToUpload) =>
             importing.commands.upload(filesToUpload, albumId)
           }
           playlistDownloadQueue={importing.queue}
-          onDownloadAll={exporting.downloadAll}
+          onDownloadAll={() => handoffMobileExport(exporting.downloadAll)}
           onCancelPlaylistDownloadQueue={importing.commands.cancelQueue}
           onRetryPlaylistDownloadQueue={importing.commands.retryQueue}
         />
