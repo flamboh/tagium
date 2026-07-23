@@ -499,7 +499,7 @@ export function AdvancedTrackDetailsFields({
 
 function TrackFileSummary({ selectedFile }: { selectedFile: LoadedTrack }) {
   return (
-    <div className="grid grid-cols-2 gap-2 text-xs md:text-sm">
+    <div data-track-file-summary className="grid grid-cols-2 gap-2 text-xs md:text-sm">
       <div>
         <span className="font-medium">duration: </span>
         {`${Math.floor(selectedFile.metadata.duration / 60)}:${String(Math.round(selectedFile.metadata.duration % 60)).padStart(2, "0")}`}

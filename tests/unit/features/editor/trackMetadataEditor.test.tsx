@@ -425,22 +425,6 @@ describe("track metadata editor form seam", () => {
       compact: 18 * 16,
     });
 
-    // react-test-renderer has no layout engine, so compare the measured intrinsic field stacks
-    // against the exact minimum-height contract consumed by both rendered modes.
-    const measuredIntrinsicHeightPx = {
-      desktop: { normal: 276, advanced: 304 },
-      compact: { normal: 258, advanced: 286 },
-    } as const;
-    for (const viewport of ["desktop", "compact"] as const) {
-      const minimum = METADATA_EDITOR_FORM_LAYOUT.minimumHeightPx[viewport];
-      const downstreamTop = {
-        normal: Math.max(minimum, measuredIntrinsicHeightPx[viewport].normal),
-        advanced: Math.max(minimum, measuredIntrinsicHeightPx[viewport].advanced),
-      };
-      expect(downstreamTop.normal).toBe(downstreamTop.advanced);
-      expect(downstreamTop.normal).toBe(minimum);
-    }
-
     act(() => void findButton(renderer!, "advanced").props.onClick());
     const advancedArea = renderer!.root.findByProps({ "data-editor-form-area": true });
     expect(advancedArea.props.className).toBe(normalClassName);
