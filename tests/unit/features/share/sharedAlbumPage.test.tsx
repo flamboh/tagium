@@ -108,4 +108,26 @@ describe("shared album preview", () => {
     });
     expect(props.onAdd).toHaveBeenCalledOnce();
   });
+
+  it("keeps duplicate manifest tracks as separate rows", async () => {
+    const duplicateProps = {
+      ...props,
+      state: {
+        ...props.state,
+        manifest: {
+          ...props.state.manifest,
+          tracks: [props.state.manifest.tracks[0]!, props.state.manifest.tracks[0]!],
+        },
+      },
+    };
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(createElement(SharedAlbumPage, duplicateProps));
+    });
+
+    expect(renderer.root.findAllByType("li")).toHaveLength(2);
+    expect(
+      renderer.root.findAllByType("p").filter((node) => node.children.includes("Track")),
+    ).toHaveLength(2);
+  });
 });
