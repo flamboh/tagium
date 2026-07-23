@@ -2,7 +2,7 @@
 
 import { Pause, Play } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef } from "react";
-import type { KeyboardEvent, PointerEvent } from "react";
+import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
 import { Button } from "@/components/ui/button";
 import {
   formatPreviewTime,
@@ -44,26 +44,44 @@ type PreviewAction =
 const previewReducer = (state: PreviewState, action: PreviewAction): PreviewState => {
   switch (action.type) {
     case "reset":
-      return { waveform: null, waveformStatus: action.file ? "loading" : "idle", playbackUnavailable: false, playing: false, currentTime: 0, mediaDuration: null };
-    case "playing": return { ...state, playing: action.value };
-    case "currentTime": return { ...state, currentTime: action.value };
-    case "mediaDuration": return { ...state, mediaDuration: action.value };
-    case "playbackUnavailable": return { ...state, playbackUnavailable: action.value };
-    case "waveform": return { ...state, waveform: action.value };
-    case "waveformStatus": return { ...state, waveformStatus: action.value };
+      return {
+        waveform: null,
+        waveformStatus: action.file ? "loading" : "idle",
+        playbackUnavailable: false,
+        playing: false,
+        currentTime: 0,
+        mediaDuration: null,
+      };
+    case "playing":
+      return { ...state, playing: action.value };
+    case "currentTime":
+      return { ...state, currentTime: action.value };
+    case "mediaDuration":
+      return { ...state, mediaDuration: action.value };
+    case "playbackUnavailable":
+      return { ...state, playbackUnavailable: action.value };
+    case "waveform":
+      return { ...state, waveform: action.value };
+    case "waveformStatus":
+      return { ...state, waveformStatus: action.value };
   }
 };
 
-const initialPreviewState: PreviewState = { waveform: null, waveformStatus: "idle", playbackUnavailable: false, playing: false, currentTime: 0, mediaDuration: null };
-
-const getWaveformWidth = (duration: number) =>
-  Math.min(4_800, Math.max(640, Math.round(duration * 6)));
+const initialPreviewState: PreviewState = {
+  waveform: null,
+  waveformStatus: "idle",
+  playbackUnavailable: false,
+  playing: false,
+  currentTime: 0,
+  mediaDuration: null,
+};
 
 const getStatusMessage = ({
   file,
   playbackUnavailable,
   waveformStatus,
-}: Pick<TrackWaveformPreviewProps, "file"> & Pick<PreviewState, "playbackUnavailable" | "waveformStatus">) =>
+}: Pick<TrackWaveformPreviewProps, "file"> &
+  Pick<PreviewState, "playbackUnavailable" | "waveformStatus">) =>
   !file
     ? "preview is available after this track finishes downloading"
     : playbackUnavailable
@@ -86,7 +104,8 @@ export default function TrackWaveformPreview({
   const mediaGenerationRef = useRef<number | null>(null);
   const dragRef = useRef({ active: false, startX: 0, moved: false });
   const [state, dispatch] = useReducer(previewReducer, initialPreviewState);
-  const { waveform, waveformStatus, playbackUnavailable, playing, currentTime, mediaDuration } = state;
+  const { waveform, waveformStatus, playbackUnavailable, playing, currentTime, mediaDuration } =
+    state;
   const currentMediaDuration = mediaDuration?.fileId === fileId ? mediaDuration.duration : 0;
   const duration =
     normalizePreviewDuration(currentMediaDuration) ||
@@ -94,7 +113,6 @@ export default function TrackWaveformPreview({
     normalizePreviewDuration(fallbackDuration);
   const normalizedCurrentTime = Math.min(duration, normalizePreviewDuration(currentTime));
   const progress = duration > 0 ? Math.min(1, normalizedCurrentTime / duration) : 0;
-  const waveformWidth = getWaveformWidth(duration);
   const canPlay = active && Boolean(file) && !playbackUnavailable;
   const canSeek = canPlay && duration > 0;
   const decodeDuration =
@@ -145,7 +163,8 @@ export default function TrackWaveformPreview({
     const generation = sourceGenerationRef.current;
     if (decodeDuration === 0) {
       const timeoutId = globalThis.setTimeout(() => {
-        if (sourceGenerationRef.current === generation) dispatch({ type: "waveformStatus", value: "unavailable" });
+        if (sourceGenerationRef.current === generation)
+          dispatch({ type: "waveformStatus", value: "unavailable" });
       }, METADATA_WAIT_TIMEOUT_MS);
       return () => globalThis.clearTimeout(timeoutId);
     }
@@ -227,7 +246,7 @@ export default function TrackWaveformPreview({
 
   return (
     <section
-      className="flex min-h-32 flex-1 flex-col justify-end gap-2 pt-1"
+      className="flex min-h-32 min-w-0 w-full flex-col justify-end gap-2 pt-1"
       aria-label={`preview ${title || file?.name || "selected track"}`}
       data-waveform-status={waveformStatus}
     >
@@ -237,27 +256,38 @@ export default function TrackWaveformPreview({
         preload="metadata"
         onLoadedMetadata={(event) =>
           mediaGenerationRef.current === sourceGenerationRef.current &&
-          dispatch({ type: "mediaDuration", value: {
-            fileId,
-            duration: normalizePreviewDuration(event.currentTarget.duration),
-          } })
+          dispatch({
+            type: "mediaDuration",
+            value: {
+              fileId,
+              duration: normalizePreviewDuration(event.currentTarget.duration),
+            },
+          })
         }
         onDurationChange={(event) =>
           mediaGenerationRef.current === sourceGenerationRef.current &&
-          dispatch({ type: "mediaDuration", value: {
-            fileId,
-            duration: normalizePreviewDuration(event.currentTarget.duration),
-          } })
+          dispatch({
+            type: "mediaDuration",
+            value: {
+              fileId,
+              duration: normalizePreviewDuration(event.currentTarget.duration),
+            },
+          })
         }
         onTimeUpdate={(event) => {
           if (mediaGenerationRef.current !== sourceGenerationRef.current) return;
-          dispatch({ type: "currentTime", value: normalizePreviewDuration(event.currentTarget.currentTime) });
+          dispatch({
+            type: "currentTime",
+            value: normalizePreviewDuration(event.currentTarget.currentTime),
+          });
         }}
         onPlay={() => {
-          if (mediaGenerationRef.current === sourceGenerationRef.current) dispatch({ type: "playing", value: true });
+          if (mediaGenerationRef.current === sourceGenerationRef.current)
+            dispatch({ type: "playing", value: true });
         }}
         onPause={() => {
-          if (mediaGenerationRef.current === sourceGenerationRef.current) dispatch({ type: "playing", value: false });
+          if (mediaGenerationRef.current === sourceGenerationRef.current)
+            dispatch({ type: "playing", value: false });
         }}
         onEnded={(event) => {
           if (mediaGenerationRef.current !== sourceGenerationRef.current) return;
@@ -288,10 +318,7 @@ export default function TrackWaveformPreview({
             <span>{formatPreviewTime(normalizedCurrentTime)}</span>
             <span>{formatPreviewTime(duration)}</span>
           </div>
-          <div
-            className="overflow-x-auto overscroll-x-contain rounded-md border bg-muted/15 focus-within:ring-2 focus-within:ring-ring/50"
-            data-waveform-scroller
-          >
+          <div className="min-w-0 w-full overflow-hidden" data-waveform-scroller>
             <div
               role="slider"
               tabIndex={canSeek ? 0 : -1}
@@ -324,25 +351,18 @@ export default function TrackWaveformPreview({
               onPointerCancel={() => {
                 dragRef.current.active = false;
               }}
-              className={`relative h-20 touch-pan-x select-none overflow-hidden outline-none motion-reduce:scroll-auto ${
+              className={`relative h-20 min-w-0 w-full touch-pan-x select-none overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
                 canSeek ? "cursor-pointer" : "cursor-not-allowed"
               }`}
-              style={{ width: waveformWidth }}
             >
               {waveform ? (
                 <>
                   <WaveformBars samples={waveform.samples} className="fill-muted-foreground/35" />
-                  <div
-                    className="pointer-events-none absolute inset-y-0 left-0 overflow-hidden"
-                    style={{ width: `${progress * 100}%` }}
-                    aria-hidden
-                  >
-                    <WaveformBars
-                      samples={waveform.samples}
-                      className="fill-primary"
-                      width={waveformWidth}
-                    />
-                  </div>
+                  <WaveformBars
+                    samples={waveform.samples}
+                    className="fill-primary"
+                    style={{ clipPath: `inset(0 ${100 - progress * 100}% 0 0)` }}
+                  />
                   <span
                     className="pointer-events-none absolute inset-y-1 w-px bg-primary motion-reduce:transition-none"
                     style={{ left: `${progress * 100}%` }}
@@ -373,20 +393,21 @@ export default function TrackWaveformPreview({
 function WaveformBars({
   samples,
   className,
-  width = "100%",
+  style,
 }: {
   samples: number[];
   className: string;
-  width?: number | string;
+  style?: CSSProperties;
 }) {
   return (
     <svg
       className={`pointer-events-none absolute inset-0 h-full ${className}`}
-      width={width}
+      width="100%"
       height="100%"
       viewBox={`0 0 ${samples.length * 3} 80`}
       preserveAspectRatio="none"
       aria-hidden
+      style={style}
     >
       {samples.map((sample, index) => {
         const height = Math.max(2, sample * 68);

@@ -113,11 +113,11 @@ test("keeps metadata editing available when waveform decoding is unsupported", a
   await expect(page.getByRole("button", { name: "download track" })).toBeEnabled();
 });
 
-test("plays, seeks, and horizontally pans without blocking editor interaction", async ({
+test("plays and seeks within the responsive waveform without widening the mobile editor", async ({
   page,
 }) => {
   await installPlayablePreview(page);
-  await page.setViewportSize({ width: 900, height: 700 });
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await page.locator('input[type="file"]').setInputFiles(previewUpload());
 
@@ -151,11 +151,21 @@ test("plays, seeks, and horizontally pans without blocking editor interaction", 
 
   const scroller = page.locator("[data-waveform-scroller]");
   await expect(scroller).toBeVisible();
-  const scrollLeft = await scroller.evaluate((element) => {
-    element.scrollLeft = 120;
-    return element.scrollLeft;
+  const dimensions = await scroller.evaluate((element) => {
+    const slider = element.querySelector('[role="slider"]');
+    if (!slider) throw new Error("waveform slider missing");
+    return {
+      scrollerOverflows: element.scrollWidth > element.clientWidth,
+      sliderWidth: slider.getBoundingClientRect().width,
+      scrollerWidth: element.getBoundingClientRect().width,
+    };
   });
-  expect(scrollLeft).toBeGreaterThan(0);
+  const editorOverflows = await page
+    .locator("html")
+    .evaluate((element) => element.scrollWidth > element.clientWidth);
+  expect(editorOverflows).toBe(false);
+  expect(dimensions.scrollerOverflows).toBe(false);
+  expect(dimensions.sliderWidth).toBeCloseTo(dimensions.scrollerWidth, 0);
 
   await page.getByLabel("title:").fill("transport remains editable");
   await expect(page.getByLabel("title:")).toHaveValue("transport remains editable");

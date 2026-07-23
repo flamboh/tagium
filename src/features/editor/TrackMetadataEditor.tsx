@@ -740,7 +740,7 @@ function LoadedTrackMetadataEditor({
         onSubmit={(event) => {
           event.preventDefault();
         }}
-        className="flex min-h-0 flex-col h-full"
+        className="flex h-full min-h-0 min-w-0 flex-col"
       >
         <div className="relative">
           <TrackFilenameHeader
@@ -760,60 +760,62 @@ function LoadedTrackMetadataEditor({
             </div>
           )}
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 max-lg:[@media(max-height:700px)]:p-2 lg:p-6 lg:pb-28">
-          <div className="flex min-h-full flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:min-h-0 lg:flex-row lg:gap-4">
-            <Controller
-              name="picture"
-              control={control}
-              render={({ field }) => (
-                <CoverArt
-                  resetKey={selectedFileId}
-                  picture={field.value}
-                  onCoverUpload={onTrackCoverUpload}
-                  onProcessingChange={onTrackCoverProcessingChange}
-                  disabled={Boolean(selectedFileAlbum) && metadataLinks.artwork}
-                  disabledReason={getMetadataLinkDescriptor("artwork").disabledReason}
-                />
-              )}
-            />
-            <div className="flex flex-1 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3">
-              <div data-editor-form-area className={METADATA_EDITOR_FORM_LAYOUT.className}>
-                {advancedMetadata && editorMode === "advanced" ? (
-                  <AdvancedTrackDetailsFields
-                    registrations={advancedFields.registrations}
-                    errors={advancedFields.errors}
-                    albumArtistLinked={metadataLinks.albumArtist}
-                    linkedArtistValue={linkedAlbumArtistDisplay}
-                    onFieldsMount={focusPendingAdvancedField}
-                  />
-                ) : (
-                  <TrackDetailsFields
-                    selectedFileId={selectedFileId}
-                    focusedTitleFileIdRef={focusedTitleFileIdRef}
-                    register={register}
-                    placeholder={placeholder}
-                    inAlbum={Boolean(selectedFileAlbum)}
-                    syncFilenames={syncFilenames}
-                    metadataLinks={metadataLinks}
-                    filenameInvalid={filenameInvalid}
-                    onPreviewMetadataChange={onPreviewMetadataChange}
+        <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 pb-3 max-lg:[@media(max-height:700px)]:p-2 lg:p-6 lg:pb-28">
+          <div className="flex min-h-full min-w-0 flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:min-h-0 lg:gap-4">
+            <div className="flex min-w-0 flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:flex-row lg:gap-4">
+              <Controller
+                name="picture"
+                control={control}
+                render={({ field }) => (
+                  <CoverArt
+                    resetKey={selectedFileId}
+                    picture={field.value}
+                    onCoverUpload={onTrackCoverUpload}
+                    onProcessingChange={onTrackCoverProcessingChange}
+                    disabled={Boolean(selectedFileAlbum) && metadataLinks.artwork}
+                    disabledReason={getMetadataLinkDescriptor("artwork").disabledReason}
                   />
                 )}
+              />
+              <div className="flex min-w-0 flex-1 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3">
+                <div data-editor-form-area className={METADATA_EDITOR_FORM_LAYOUT.className}>
+                  {advancedMetadata && editorMode === "advanced" ? (
+                    <AdvancedTrackDetailsFields
+                      registrations={advancedFields.registrations}
+                      errors={advancedFields.errors}
+                      albumArtistLinked={metadataLinks.albumArtist}
+                      linkedArtistValue={linkedAlbumArtistDisplay}
+                      onFieldsMount={focusPendingAdvancedField}
+                    />
+                  ) : (
+                    <TrackDetailsFields
+                      selectedFileId={selectedFileId}
+                      focusedTitleFileIdRef={focusedTitleFileIdRef}
+                      register={register}
+                      placeholder={placeholder}
+                      inAlbum={Boolean(selectedFileAlbum)}
+                      syncFilenames={syncFilenames}
+                      metadataLinks={metadataLinks}
+                      filenameInvalid={filenameInvalid}
+                      onPreviewMetadataChange={onPreviewMetadataChange}
+                    />
+                  )}
+                </div>
+                <TrackFileSummary selectedFile={selectedFile} />
+                <DownloadTrackButton
+                  onClick={submitDownload}
+                  disabled={!canDownloadTrack}
+                  disabledReason={downloadDisabledReason}
+                />
               </div>
-              <TrackFileSummary selectedFile={selectedFile} />
-              <TrackWaveformPreview
-                active={previewActive}
-                file={selectedFile.file}
-                fileId={selectedFile.id}
-                fallbackDuration={selectedFile.metadata.duration}
-                title={watchedTitle}
-              />
-              <DownloadTrackButton
-                onClick={submitDownload}
-                disabled={!canDownloadTrack}
-                disabledReason={downloadDisabledReason}
-              />
             </div>
+            <TrackWaveformPreview
+              active={previewActive}
+              file={selectedFile.file}
+              fileId={selectedFile.id}
+              fallbackDuration={selectedFile.metadata.duration}
+              title={watchedTitle}
+            />
           </div>
         </div>
       </form>

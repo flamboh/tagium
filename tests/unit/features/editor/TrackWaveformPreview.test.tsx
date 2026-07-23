@@ -20,6 +20,19 @@ describe("track waveform transport", () => {
     });
 
     expect(renderer!.root.findAllByType("track")).toHaveLength(0);
+    const waveform = renderer!.root.findByType("section");
+    const scroller = renderer!.root.findByProps({ "data-waveform-scroller": true });
+    const slider = renderer!.root.findByProps({ role: "slider" });
+
+    expect(waveform.props.className).toContain("min-w-0");
+    expect(waveform.props.className).toContain("w-full");
+    expect(scroller.props.className).toContain("min-w-0");
+    expect(scroller.props.className).toContain("w-full");
+    expect(scroller.props.className).toContain("overflow-hidden");
+    expect(scroller.props.className).not.toContain("border");
+    expect(scroller.props.className).not.toContain("bg-");
+    expect(slider.props.className).toContain("w-full");
+    expect(slider.props.style).toBeUndefined();
     act(() => renderer!.unmount());
   });
 

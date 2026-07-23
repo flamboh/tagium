@@ -268,6 +268,30 @@ describe("track metadata editor form seam", () => {
     }
   });
 
+  it("places the full-width waveform after the cover and metadata row", () => {
+    let renderer: ReactTestRenderer;
+    act(() => {
+      renderer = create(<EditorHarness />, createFormNodeMocks());
+    });
+
+    const waveform = renderer!.root.findByType("section");
+    const cover = renderer!.root.findByProps({ "data-testid": "cover-art" });
+
+    expect(waveform.props.className).toContain("min-w-0");
+    expect(waveform.props.className).toContain("w-full");
+    const waveformContainer = waveform.parent!.parent!;
+    let coverAncestor = cover.parent;
+    while (coverAncestor && coverAncestor !== waveformContainer) {
+      coverAncestor = coverAncestor.parent;
+    }
+
+    expect(coverAncestor).toBe(waveformContainer);
+    expect(waveformContainer.props.className).toContain("min-h-full");
+    expect(waveformContainer.props.className).not.toContain("flex-1");
+
+    act(() => renderer!.unmount());
+  });
+
   it("exposes an accessible selected-track preview without native audio controls", () => {
     const markup = renderToStaticMarkup(<EditorHarness />);
 
