@@ -378,7 +378,7 @@ export function AdvancedTrackDetailsFields({
 
   return (
     <>
-      <div ref={onFieldsMount}>
+      <div>
         <label htmlFor="track-album-artist" className={fieldLabelClassName}>
           album artist:
         </label>
@@ -402,7 +402,7 @@ export function AdvancedTrackDetailsFields({
           </p>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div ref={onFieldsMount} className="grid grid-cols-2 gap-2">
         <div>
           <label htmlFor="track-disc-number" className={fieldLabelClassName}>
             disc:
@@ -654,8 +654,14 @@ function LoadedTrackMetadataEditor({
         if (validationErrors.bpm) {
           setError("bpm", { type: "validate", message: validationErrors.bpm });
         }
-        pendingAdvancedFocusRef.current = validationErrors.discNumber ? "discNumber" : "bpm";
-        onEditorModeChange("advanced");
+        const invalidField = validationErrors.discNumber ? "discNumber" : "bpm";
+        if (editorMode === "advanced") {
+          pendingAdvancedFocusRef.current = null;
+          setFocus(invalidField, { shouldSelect: true });
+        } else {
+          pendingAdvancedFocusRef.current = invalidField;
+          onEditorModeChange("advanced");
+        }
         return;
       }
     }

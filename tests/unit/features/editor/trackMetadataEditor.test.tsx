@@ -394,6 +394,38 @@ describe("track metadata editor form seam", () => {
     },
   );
 
+  it("focuses invalid advanced fields both when revealing and while already advanced", async () => {
+    const formNodes = createFormNodeMocks();
+    let form: UseFormReturn<AudioMetadata>;
+    let renderer: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        <MountedEditorHarness
+          onDownload={vi.fn()}
+          exposeForm={(current) => {
+            form = current;
+          }}
+        />,
+        { createNodeMock: formNodes.createNodeMock },
+      );
+    });
+    act(() => void findButton(renderer!, "advanced").props.onClick());
+    act(() => form!.setValue("discNumber", 0));
+    act(() => void findButton(renderer!, "normal").props.onClick());
+
+    await act(async () => void findButton(renderer!, "download track").props.onClick());
+    const revealedDiscInput = formNodes.nodes.get("track-disc-number")!;
+    expect(revealedDiscInput.focus).toHaveBeenCalledOnce();
+    expect(revealedDiscInput.select).toHaveBeenCalledOnce();
+
+    revealedDiscInput.focus.mockClear();
+    revealedDiscInput.select.mockClear();
+    await act(async () => void findButton(renderer!, "download track").props.onClick());
+    expect(revealedDiscInput.focus).toHaveBeenCalledOnce();
+    expect(revealedDiscInput.select).toHaveBeenCalledOnce();
+    act(() => renderer!.unmount());
+  });
+
   it("shows the current artist as linked album artist after an edit", async () => {
     const formNodes = createFormNodeMocks();
     let renderer: ReactTestRenderer;
