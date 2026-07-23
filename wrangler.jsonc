@@ -1,23 +1,5 @@
 {
   "name": "tagium",
-  "ratelimits": [
-    {
-      "name": "COBALT_SESSION_RATE_LIMITER",
-      "namespace_id": "1042701",
-      "simple": {
-        "limit": 20,
-        "period": 60,
-      },
-    },
-    {
-      "name": "COBALT_CLIENT_RATE_LIMITER",
-      "namespace_id": "1042702",
-      "simple": {
-        "limit": 60,
-        "period": 60,
-      },
-    },
-  ],
   "observability": {
     "enabled": false,
     "head_sampling_rate": 1,

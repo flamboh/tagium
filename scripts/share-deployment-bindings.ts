@@ -1,108 +1,85 @@
-import { env } from "node:process";
+export type DeployEnvironment = "preview" | "production";
 
-type WranglerConfig = {
+/** Stable, provisioned Cloudflare resources. Keep this as the sole target map. */
+export const SHARE_DEPLOYMENT_RESOURCES = {
+  preview: {
+    deployEnv: "preview",
+    databaseId: "dcca5842-a2a2-48a1-b130-7aee831ad1b5",
+    databaseName: "tagium-share-manifests-preview",
+    bucketName: "tagium-share-artwork-preview",
+    createRateLimitNamespace: "128100001",
+    readRateLimitNamespace: "128100002",
+    revokeRateLimitNamespace: "128100003",
+  },
+  production: {
+    deployEnv: "production",
+    databaseId: "8d393f39-1df1-48f9-b249-4b3a116b6c49",
+    databaseName: "tagium-share-manifests-production",
+    bucketName: "tagium-share-artwork-production",
+    createRateLimitNamespace: "128200001",
+    readRateLimitNamespace: "128200002",
+    revokeRateLimitNamespace: "128200003",
+  },
+} as const;
+
+export const getShareDeploymentResources = (environment: DeployEnvironment) =>
+  SHARE_DEPLOYMENT_RESOURCES[environment];
+
+export type WranglerConfig = {
+  name?: string;
+  vars?: Record<string, string>;
   d1_databases?: unknown[];
   r2_buckets?: unknown[];
   ratelimits?: unknown[];
+  env?: unknown;
 };
 
-const required = (name: string) => {
-  const value = env[name]?.trim();
-  if (!value || /placeholder|replace[-_ ]?me/i.test(value)) {
-    throw new Error(
-      `${name} must name a provisioned share resource; refusing to deploy without it.`,
-    );
-  }
-  return value;
-};
-
-export const getShareDeploymentResources = (environment: "preview" | "production") => {
-  const prefix = environment === "production" ? "SHARE_" : "SHARE_PREVIEW_";
-  const otherPrefix = environment === "production" ? "SHARE_PREVIEW_" : "SHARE_";
-  const resources = {
-    databaseId: required(`${prefix}D1_DATABASE_ID`),
-    databaseName: required(`${prefix}D1_DATABASE_NAME`),
-    bucketName: required(`${prefix}R2_BUCKET_NAME`),
-    createRateLimitNamespace: required(`${prefix}CREATE_RATE_LIMIT_NAMESPACE_ID`),
-    readRateLimitNamespace: required(`${prefix}READ_RATE_LIMIT_NAMESPACE_ID`),
-    revokeRateLimitNamespace: required(`${prefix}REVOKE_RATE_LIMIT_NAMESPACE_ID`),
-  };
-  const isolationChecks: readonly [string, string, string | undefined][] = [
-    ["D1 database", resources.databaseName, env[`${otherPrefix}D1_DATABASE_NAME`]],
-    ["R2 bucket", resources.bucketName, env[`${otherPrefix}R2_BUCKET_NAME`]],
-  ];
-  for (const [name, value, other] of isolationChecks) {
-    if (value === other?.trim())
-      throw new Error(`${name} must be isolated between preview and production.`);
-  }
-  return resources;
-};
-
-/** Adds only deployment-time bindings, keeping preview and production isolated. */
+/** Materialize one target into the top-level config used by both Wrangler commands. */
 export const configureShareDeploymentBindings = (
   config: WranglerConfig,
-  environment: "preview" | "production",
+  environment: DeployEnvironment,
 ) => {
-  const {
-    databaseId,
-    databaseName,
-    bucketName,
-    createRateLimitNamespace,
-    readRateLimitNamespace,
-    revokeRateLimitNamespace,
-  } = getShareDeploymentResources(environment);
+  if (config.name !== "tagium")
+    throw new Error(
+      `refusing deploy: Worker name must be tagium, got ${JSON.stringify(config.name)}`,
+    );
+  if (config.env != null)
+    throw new Error("refusing deploy: generated config must not contain Wrangler env arrays");
+  const resources = getShareDeploymentResources(environment);
+  config.vars = { ...config.vars, TAGIUM_DEPLOY_ENV: resources.deployEnv };
   config.d1_databases = [
-    ...(config.d1_databases ?? []).filter(
-      (binding) =>
-        !(
-          binding &&
-          typeof binding === "object" &&
-          (binding as { binding?: string }).binding === "SHARE_MANIFESTS"
-        ),
-    ),
-    { binding: "SHARE_MANIFESTS", database_id: databaseId, database_name: databaseName },
+    {
+      binding: "SHARE_MANIFESTS",
+      database_id: resources.databaseId,
+      database_name: resources.databaseName,
+    },
   ];
-  config.r2_buckets = [
-    ...(config.r2_buckets ?? []).filter(
-      (binding) =>
-        !(
-          binding &&
-          typeof binding === "object" &&
-          (binding as { binding?: string }).binding === "SHARE_ARTWORK"
-        ),
-    ),
-    { binding: "SHARE_ARTWORK", bucket_name: bucketName },
-  ];
+  config.r2_buckets = [{ binding: "SHARE_ARTWORK", bucket_name: resources.bucketName }];
   const shareRateLimits = [
     {
       name: "SHARE_CREATE_RATE_LIMITER",
-      namespace_id: createRateLimitNamespace,
+      namespace_id: resources.createRateLimitNamespace,
       simple: { limit: 10, period: 60 },
     },
     {
       name: "SHARE_READ_RATE_LIMITER",
-      namespace_id: readRateLimitNamespace,
+      namespace_id: resources.readRateLimitNamespace,
       simple: { limit: 120, period: 60 },
     },
     {
       name: "SHARE_REVOKE_RATE_LIMITER",
-      namespace_id: revokeRateLimitNamespace,
+      namespace_id: resources.revokeRateLimitNamespace,
       simple: { limit: 20, period: 60 },
     },
   ];
-  config.ratelimits = [
-    ...(config.ratelimits ?? []).filter(
-      (binding) =>
-        !(
-          binding &&
-          typeof binding === "object" &&
-          [
-            "SHARE_CREATE_RATE_LIMITER",
-            "SHARE_READ_RATE_LIMITER",
-            "SHARE_REVOKE_RATE_LIMITER",
-          ].includes((binding as { name?: string }).name ?? "")
-        ),
-    ),
-    ...shareRateLimits,
-  ];
+  const cobalt = (config.ratelimits ?? []).filter(
+    (binding) =>
+      binding &&
+      typeof binding === "object" &&
+      ["COBALT_SESSION_RATE_LIMITER", "COBALT_CLIENT_RATE_LIMITER"].includes(
+        (binding as { name?: string }).name ?? "",
+      ),
+  );
+  config.ratelimits = [...cobalt, ...shareRateLimits];
+  return config;
 };
