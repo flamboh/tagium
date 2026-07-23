@@ -23,6 +23,7 @@ import { shareSlugFromPathname } from "@/features/share/shareLink";
 import { shareEligibility } from "@/features/share/shareEligibility";
 import { sharePublicationErrorMessage } from "@/features/share/sharePublicationError";
 import type { ShareDialogState } from "@/features/share/ShareAlbumDialog";
+import { buildShareAlbumPreview } from "@/features/share/sharePreview";
 import type { SharedAlbumPageState } from "@/features/share/SharedAlbumPage";
 
 const pictureToFile = (
@@ -193,11 +194,10 @@ export const useShareWorkflow = ({
         return;
       }
       setCreatorAlbumId(albumId);
+      const preview = buildShareAlbumPreview(album, files);
       setDialog({
         status: "confirm",
-        albumTitle: album.title,
-        trackCount: album.trackIds.length,
-        hasCover: Boolean(album.cover?.length),
+        preview,
       });
     },
     [library],
@@ -242,13 +242,11 @@ export const useShareWorkflow = ({
         await revokeSharedAlbum(receipt.slug, receipt.revocationToken);
         throw new Error("your browser did not allow Tagium to save the sharing permission");
       }
-      setDialog({ status: "published", albumTitle: album.title, receipt });
+      setDialog({ status: "published", preview: currentDialog.preview, receipt });
     } catch (error) {
       setDialog({
         status: "error",
-        albumTitle: currentDialog.albumTitle,
-        trackCount: currentDialog.trackCount,
-        hasCover: currentDialog.hasCover,
+        preview: currentDialog.preview,
         message: sharePublicationErrorMessage(error),
       });
     }

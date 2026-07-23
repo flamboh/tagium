@@ -1,23 +1,23 @@
-import { useRef, useState } from "react";
-import { Check, Copy, Loader2, Share2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Copy, Loader2, Music2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { SharePublicationReceipt } from "@/features/share/shareClient";
+import type { ShareAlbumPreview } from "@/features/share/sharePreview";
 
 export type ShareDialogState =
   | { status: "closed" }
-  | { status: "confirm"; albumTitle: string; trackCount: number; hasCover: boolean }
-  | { status: "publishing"; albumTitle: string; trackCount: number; hasCover: boolean }
-  | { status: "published"; albumTitle: string; receipt: SharePublicationReceipt }
-  | { status: "error"; albumTitle: string; trackCount: number; hasCover: boolean; message: string };
+  | { status: "confirm"; preview: ShareAlbumPreview }
+  | { status: "publishing"; preview: ShareAlbumPreview }
+  | { status: "published"; preview: ShareAlbumPreview; receipt: SharePublicationReceipt }
+  | { status: "error"; preview: ShareAlbumPreview; message: string };
 
 export default function ShareAlbumDialog({
   state,
@@ -31,11 +31,44 @@ export default function ShareAlbumDialog({
   onStopSharing: () => Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const copyTimerRef = useRef<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const open = state.status !== "closed";
+  const receiptKey =
+    state.status === "published" ? `${state.receipt.slug}:${state.receipt.expiresAt}` : null;
+
+  useEffect(() => {
+    setCopied(false);
+    setConfirmStop(false);
+    setStopError(null);
+    setStopping(false);
+    if (copyTimerRef.current !== null) {
+      window.clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = null;
+    }
+  }, [open, receiptKey]);
+
+  useEffect(
+    () => () => {
+      if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+    },
+    [],
+  );
+
+  const cover = state.status === "closed" ? null : state.preview.cover;
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!cover) {
+      setCoverUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(cover.blob);
+    setCoverUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [cover]);
 
   const copyLink = async () => {
     if (state.status !== "published") return;
@@ -46,7 +79,11 @@ export default function ShareAlbumDialog({
       document.execCommand("copy");
     }
     setCopied(true);
-    window.setTimeout(() => setCopied(false), 2_000);
+    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = window.setTimeout(() => {
+      setCopied(false);
+      copyTimerRef.current = null;
+    }, 2_000);
   };
 
   const stopSharing = async () => {
@@ -69,24 +106,21 @@ export default function ShareAlbumDialog({
         if (!nextOpen && state.status !== "publishing" && !stopping) onClose();
       }}
     >
-      <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
+      <DialogContent
+        aria-describedby={undefined}
+        className="max-h-[calc(100dvh-2rem)] max-w-lg gap-0 overflow-y-auto p-0"
+      >
         {state.status !== "closed" && (
           <>
-            <DialogHeader className="border-b p-5">
-              <div className="mb-1 flex size-9 items-center justify-center rounded-lg bg-muted">
-                <Share2 className="size-4" aria-hidden="true" />
-              </div>
-              <DialogTitle>
+            <DialogHeader className="border-b px-5 py-4 pr-12">
+              <DialogTitle className="truncate text-left">
                 {state.status === "published"
                   ? "share link ready"
-                  : `share album: ${state.albumTitle}`}
+                  : `share album: ${state.preview.albumTitle}`}
               </DialogTitle>
-              <DialogDescription>
-                {state.status === "published"
-                  ? "Download from the original sources with the shared tags and cover."
-                  : `${state.trackCount} track${state.trackCount === 1 ? "" : "s"}.`}
-              </DialogDescription>
             </DialogHeader>
+
+            <SharePreview preview={state.preview} coverUrl={coverUrl} />
 
             {state.status === "published" ? (
               <div className="space-y-5 p-5">
@@ -104,21 +138,17 @@ export default function ShareAlbumDialog({
                     {copied ? "copied" : "copy link"}
                   </Button>
                 </div>
-                <p className="text-sm leading-6 text-muted-foreground">
-                  This share link expires in 90 days. Stop sharing to revoke it immediately.
+                <p className="text-sm text-muted-foreground">
+                  Expires {formatExpiry(state.receipt.expiresAt)}. Stop sharing to revoke it
+                  immediately.
                 </p>
               </div>
             ) : (
               <div className="space-y-4 p-5">
                 <p className="text-sm leading-6 text-foreground">
-                  Recipients download from the original sources with your tags and cover.
+                  Anyone with the link can download these tracks with your tags.
                 </p>
-                <p className="text-sm leading-6 text-foreground">
-                  Confirm you have permission to share these sources.
-                </p>
-                <div className="rounded-lg bg-muted p-4 text-sm leading-6 text-muted-foreground">
-                  This share link expires in 90 days.
-                </div>
+                <p className="text-sm text-muted-foreground">Expires in 90 days.</p>
                 {state.status === "error" && (
                   <p role="alert" className="text-sm text-destructive">
                     {state.message}. Your album is unchanged.
@@ -194,5 +224,51 @@ export default function ShareAlbumDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+const formatExpiry = (expiresAt: string) => {
+  const date = new Date(expiresAt);
+  return Number.isNaN(date.getTime()) ? "in 90 days" : `on ${date.toLocaleDateString()}`;
+};
+
+function SharePreview({
+  preview,
+  coverUrl,
+}: {
+  preview: ShareAlbumPreview;
+  coverUrl: string | null;
+}) {
+  return (
+    <div className="grid h-24 grid-cols-[96px_minmax(0,1fr)] gap-4 px-5 pt-5 sm:h-[136px] sm:grid-cols-[136px_minmax(0,1fr)]">
+      <div
+        className="flex h-full items-center justify-center overflow-hidden rounded-md bg-muted"
+        aria-label={preview.cover ? "album cover" : "no album cover"}
+      >
+        {coverUrl ? (
+          <img src={coverUrl} alt="" className="size-full object-cover" />
+        ) : (
+          <Music2 className="size-8 text-muted-foreground" aria-hidden="true" />
+        )}
+      </div>
+      <ol
+        tabIndex={0}
+        aria-label="track preview"
+        className="h-full min-h-0 overflow-y-auto rounded-md border p-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&>li+li]:mt-1"
+      >
+        {preview.tracks.length ? (
+          preview.tracks.map((track, index) => (
+            <li key={track.key} className="flex min-w-0 gap-2 leading-5" title={track.title}>
+              <span className="w-5 shrink-0 text-right text-muted-foreground" aria-hidden="true">
+                {index + 1}.
+              </span>
+              <span className="min-w-0 truncate">{track.title}</span>
+            </li>
+          ))
+        ) : (
+          <li className="list-none p-1 text-muted-foreground">No tracks</li>
+        )}
+      </ol>
+    </div>
   );
 }
