@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 const mp3Upload = (name: string) => {
   const bytes = new Uint8Array(834);
@@ -8,16 +8,20 @@ const mp3Upload = (name: string) => {
   return { name, mimeType: "audio/mpeg", buffer: Buffer.from(bytes) };
 };
 
+const downloadAllButton = (page: Page) =>
+  page.getByRole("button", { name: "download all", exact: true });
+
 test("download confirmation owns focus, dismisses safely, and restores its trigger", async ({
   page,
 }) => {
   await page.goto("/");
   await page.locator('input[type="file"]').setInputFiles(mp3Upload("focus-track.mp3"));
-  const trigger = page.getByRole("button", { name: "download all" });
+  const trigger = downloadAllButton(page);
+  await expect(trigger).toBeAttached();
   await expect(trigger).toBeEnabled();
 
   await trigger.click();
-  const dialog = page.getByRole("dialog", { name: "download 1 track?" });
+  const dialog = page.getByRole("dialog", { name: "Download 1 track" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("button", { name: "cancel" })).toBeFocused();
 
@@ -37,9 +41,12 @@ test("download contents scroll inside a constrained mobile dialog", async ({ pag
   await page
     .locator('input[type="file"]')
     .setInputFiles(Array.from({ length: 18 }, (_, index) => mp3Upload(`track-${index + 1}.mp3`)));
-  await page.getByRole("button", { name: "download all" }).click();
-  const dialog = page.getByRole("dialog", { name: "download 18 tracks?" });
-  await dialog.getByText("Loose tracks", { exact: true }).click();
+  const trigger = downloadAllButton(page);
+  await expect(trigger).toBeAttached();
+  await expect(trigger).toBeEnabled();
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "Download 18 tracks" });
+  await dialog.getByRole("button", { name: "Loose tracks 18 tracks" }).click();
 
   const summary = dialog.getByTestId("export-summary");
   await expect(summary).toBeVisible();
