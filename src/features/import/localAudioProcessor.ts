@@ -8,6 +8,10 @@ import {
   decodeCobaltLocalProcessingMessageEffect,
   type CobaltDownloadPlan,
 } from "@/features/import/cobaltAudioSchemas";
+import {
+  inspectAudioFile,
+  patchAudioFileWithChanges,
+} from "@/features/audio/metadataEngine/engine";
 
 type LocalAudioPlan = Extract<CobaltDownloadPlan, { status: "local-processing" }>;
 
@@ -258,35 +262,48 @@ const tagCobaltAudioFile = async (
   coverFile: File | undefined,
   lastModified: number,
 ) => {
-  const MP3Tag = (await import("mp3tag.js")).default;
-  const mp3tag = new MP3Tag(await file.arrayBuffer(), true) as unknown as MP3TagReader;
-  mp3tag.read();
-
-  if (mp3tag.error) {
-    throw new Error(mp3tag.error);
-  }
-
-  applyCobaltAudioMetadata(mp3tag, plan.output.metadata);
-
-  if (coverFile) {
-    mp3tag.tags.v2 ??= {};
-    mp3tag.tags.v2.APIC = [
+  const { metadata } = await Effect.runPromise(inspectAudioFile(file));
+  const supplied = plan.output.metadata;
+  const tagged = await Effect.runPromise(
+    patchAudioFileWithChanges(
+      file,
       {
-        format: coverFile.type,
-        type: 3,
-        description: "cover",
-        data: Array.from(new Uint8Array(await coverFile.arrayBuffer())),
+        ...(supplied?.title ? { title: stripMetadataControlCharacters(supplied.title) } : {}),
+        ...(supplied?.artist ? { artist: stripMetadataControlCharacters(supplied.artist) } : {}),
+        ...(supplied?.album ? { album: stripMetadataControlCharacters(supplied.album) } : {}),
+        ...(supplied?.date ? { dateText: stripMetadataControlCharacters(supplied.date) } : {}),
+        ...(supplied?.genre ? { genre: stripMetadataControlCharacters(supplied.genre) } : {}),
+        ...(supplied?.track ? { trackText: stripMetadataControlCharacters(supplied.track) } : {}),
+        ...(supplied?.album_artist
+          ? { albumArtist: stripMetadataControlCharacters(supplied.album_artist) }
+          : {}),
+        ...(supplied?.composer
+          ? { composer: stripMetadataControlCharacters(supplied.composer) }
+          : {}),
+        ...(supplied?.copyright
+          ? { copyright: stripMetadataControlCharacters(supplied.copyright) }
+          : {}),
+        ...(supplied?.sublanguage
+          ? { language: stripMetadataControlCharacters(supplied.sublanguage) }
+          : {}),
+        ...(coverFile
+          ? {
+              picture: [
+                {
+                  format: coverFile.type || "image/jpeg",
+                  type: 3,
+                  description: "cover",
+                  data: new Uint8Array(await coverFile.arrayBuffer()),
+                },
+              ],
+            }
+          : {}),
       },
-    ];
-  }
-
-  mp3tag.save?.();
-  if (mp3tag.error || !mp3tag.buffer) {
-    throw new Error(mp3tag.error ?? "unable to save metadata");
-  }
-
-  return new File([new Uint8Array(mp3tag.buffer)], plan.output.filename, {
-    type: file.type,
+      metadata.filename,
+    ),
+  );
+  return new File([tagged], plan.output.filename, {
+    type: tagged.type,
     lastModified,
   });
 };

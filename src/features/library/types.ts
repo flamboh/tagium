@@ -1,10 +1,12 @@
 import type { AudioDownloadBitrate } from "@/features/import/cobaltAudio";
 import type { AudioMetadata, MetadataPatch } from "@/features/audio/metadata";
+import type { AudioFormat } from "@/features/audio/metadataEngine/types";
 
 export type { AudioMetadata, MetadataPatch } from "@/features/audio/metadata";
 
 export interface TagiumFile {
   id: string;
+  format?: AudioFormat;
   file?: File;
   originalFile?: File;
   sourceImportKey?: string;

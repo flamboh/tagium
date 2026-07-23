@@ -19,6 +19,7 @@ import { isValidFilenameBase, sanitizeFilenameBase } from "@/features/library/fi
 import { getSampleTrack, type SampleTrackMetadata } from "@/features/editor/sampleMetadata";
 import { getTrackFailureDisplay } from "@/features/workspace/systemFailure";
 import type { AlbumGroup, AudioMetadata, TagiumFile } from "@/features/library/types";
+import { getAudioFormat } from "@/features/audio/audioFormat";
 
 type LoadedTrack = TagiumFile & { metadata: AudioMetadata };
 
@@ -91,6 +92,7 @@ function TrackFilenameHeader({
   filenameInvalid,
   filenameRegistration,
   failure,
+  extension,
 }: {
   syncFilenames: boolean;
   watchedFilename: string;
@@ -99,6 +101,7 @@ function TrackFilenameHeader({
   filenameInvalid: boolean;
   filenameRegistration: UseFormRegisterReturn<"filename">;
   failure: TrackFailure | null;
+  extension: string;
 }) {
   return (
     <div className="relative h-16 border-b flex-shrink-0 px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6">
@@ -113,7 +116,7 @@ function TrackFilenameHeader({
               </TooltipTrigger>
               <TooltipContent>filename follows the title</TooltipContent>
             </Tooltip>
-            <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
+            <span className="shrink-0 select-none text-muted-foreground/70">.{extension}</span>
           </h2>
         ) : (
           <label className="inline-flex min-w-0 max-w-full items-center text-base font-semibold max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
@@ -131,7 +134,7 @@ function TrackFilenameHeader({
                 placeholder={filenamePlaceholder}
               />
             </span>
-            <span className="shrink-0 select-none text-muted-foreground/70">.mp3</span>
+            <span className="shrink-0 select-none text-muted-foreground/70">.{extension}</span>
           </label>
         )}
       </div>
@@ -267,6 +270,9 @@ function TrackDetailsFields({
           <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
             <Input
               type="number"
+              min={0}
+              max={9999}
+              step={1}
               {...register("year", { valueAsNumber: true })}
               id="track-year"
               placeholder={placeholder.year}
@@ -296,6 +302,9 @@ function TrackDetailsFields({
           <DisabledReason disabled={inAlbum && syncTrackNumbers} reason="follows album order">
             <Input
               type="number"
+              min={1}
+              max={65535}
+              step={1}
               {...register("trackNumber", { valueAsNumber: true })}
               id="track-number"
               placeholder={placeholder.trackNumber}
@@ -415,6 +424,7 @@ function LoadedTrackMetadataEditor({
           filenameInvalid={filenameInvalid}
           filenameRegistration={filenameRegistration}
           failure={failure}
+          extension={getAudioFormat(selectedFile).extension}
         />
         <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 max-lg:[@media(max-height:700px)]:p-2 lg:p-6 lg:pb-28">
           <div className="flex min-h-full flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:min-h-0 lg:flex-row lg:gap-4">

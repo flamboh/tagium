@@ -62,7 +62,7 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
         <input
           ref={fileInputRef}
           type="file"
-          accept=".mp3,audio/mpeg"
+          accept=".mp3,.flac,.m4a,.mp4,audio/mpeg,audio/flac,audio/mp4"
           multiple
           className="hidden"
           onChange={handleFileChange}
@@ -102,10 +102,10 @@ export default function LandingScreen({ active, children, onAudioUpload }: Landi
               )}
               <div className="text-center">
                 <p className="text-lg font-semibold text-foreground">
-                  {isDragging ? "drop to import" : "drop your mp3s here"}
+                  {isDragging ? "drop to import" : "drop your audio here"}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  mp3 files only · or click to browse
+                  MP3, FLAC, and M4A/MP4 · or click to browse
                 </p>
               </div>
             </button>

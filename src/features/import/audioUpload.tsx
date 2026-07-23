@@ -34,7 +34,7 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
         type="file"
         id={inputId}
         className="hidden"
-        accept=".mp3,audio/mpeg"
+        accept=".mp3,.flac,.m4a,.mp4,audio/mpeg,audio/flac,audio/mp4"
         onChange={handleAudioUpload}
         multiple
         ref={fileInputRef}
@@ -46,7 +46,7 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
         aria-label="upload audio files"
       >
         <Upload className="h-6 w-6 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">upload mp3 files only</span>
+        <span className="text-xs text-muted-foreground">upload MP3, FLAC, or M4A/MP4 files</span>
       </Button>
     </div>
   );

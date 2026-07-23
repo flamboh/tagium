@@ -136,7 +136,8 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
                 tagium exists to make device-local music more accessible to everyone.
               </p>
               <p className="text-sm leading-6 text-muted-foreground">
-                listening guide: tagium currently imports, edits, and downloads mp3 audio only.
+                listening guide: tagium imports, edits, and downloads MP3, FLAC, and unencrypted
+                M4A/MP4 audio locally in your browser.
               </p>
             </div>
 
@@ -178,17 +179,6 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
                   </a>
                   , for their incredible downloading api service. they're a huge inspiration for
                   this tool!
-                </p>
-                <p>
-                  <a
-                    href="https://mp3tag.js.org/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="cursor-pointer text-primary underline-offset-4 hover:underline"
-                  >
-                    mp3tag.js
-                  </a>
-                  , for the fantastic metadata editing library.
                 </p>
               </div>
             </div>

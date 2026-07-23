@@ -113,6 +113,10 @@ export const useWorkspaceAlbumDialog = ({
             editorRef.current.form.reset(covered.selectedMetadata);
           }
         }
+        const selectedMetadata = taggedFiles.find(
+          (file) => file.id === library.getSnapshot().selectedFileId,
+        )?.metadata;
+        if (selectedMetadata) editorRef.current.form.reset(selectedMetadata);
         finalFiles = taggedFiles;
         analytics.capture({
           type: "album_edited",

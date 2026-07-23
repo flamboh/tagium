@@ -2,7 +2,7 @@
 
 Frontend product code is grouped by behavior instead of by file type:
 
-- `audio`: local audio metadata and MP3 processing
+- `audio`: bounded local metadata inspection and lossless MP3, FLAC, and M4A patching
 - `editor`: track, album, and cover-art editing
 - `export`: validation and file export
 - `import`: uploads, URL imports, Cobalt, and download queues

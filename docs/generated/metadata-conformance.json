@@ -1,0 +1,246 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-20T20:08:22.065Z",
+  "seed": 1413564233,
+  "corpus": {
+    "cases": 540,
+    "byFamily": {
+      "mp3": 180,
+      "flac": 180,
+      "m4a": 180
+    },
+    "accepted": 486,
+    "adversarial": 54,
+    "manifestDigest": "ee2420231512a47264276090c278703702b4893efcab0301f895fcaf1b1b4fe9"
+  },
+  "assertions": [
+    {
+      "name": "corpus contains at least 500 cases",
+      "status": "passed",
+      "detail": "540 cases"
+    },
+    {
+      "name": "mp3: format family represented",
+      "status": "passed",
+      "detail": "180 cases"
+    },
+    {
+      "name": "flac: format family represented",
+      "status": "passed",
+      "detail": "180 cases"
+    },
+    {
+      "name": "m4a: format family represented",
+      "status": "passed",
+      "detail": "180 cases"
+    },
+    {
+      "name": "corpus feature: duplicates",
+      "status": "passed",
+      "detail": "135 cases"
+    },
+    {
+      "name": "corpus feature: multiple-artwork",
+      "status": "passed",
+      "detail": "57 cases"
+    },
+    {
+      "name": "corpus feature: large-artwork",
+      "status": "passed",
+      "detail": "3 cases"
+    },
+    {
+      "name": "corpus feature: long-text",
+      "status": "passed",
+      "detail": "90 cases"
+    },
+    {
+      "name": "corpus feature: unicode",
+      "status": "passed",
+      "detail": "450 cases"
+    },
+    {
+      "name": "corpus feature: mislabeled",
+      "status": "passed",
+      "detail": "18 cases"
+    },
+    {
+      "name": "corpus feature: malformed-or-truncated",
+      "status": "passed",
+      "detail": "36 cases"
+    },
+    {
+      "name": "manifest generation is deterministic",
+      "status": "passed"
+    },
+    {
+      "name": "independent structural audio-payload hashes reproduce",
+      "status": "passed",
+      "detail": "0 mismatches"
+    },
+    {
+      "name": "adversarial fixtures are structurally rejected",
+      "status": "passed",
+      "detail": "0 unexpectedly accepted"
+    },
+    {
+      "name": "mp3: production inspect accepts every valid corpus fixture",
+      "status": "passed",
+      "detail": "162/162 inspected"
+    },
+    {
+      "name": "mp3: canonical editable projection matches golden metadata",
+      "status": "passed",
+      "detail": "162/162 golden projections matched"
+    },
+    {
+      "name": "mp3: production no-op patch is byte-identical",
+      "status": "passed",
+      "detail": "162/162 byte-identical"
+    },
+    {
+      "name": "mp3: production edit preserves independent audio hash",
+      "status": "passed",
+      "detail": "162/162 edits preserved essence"
+    },
+    {
+      "name": "mp3: production rejects every adversarial corpus fixture",
+      "status": "passed",
+      "detail": "18/18 rejected"
+    },
+    {
+      "name": "flac: production inspect accepts every valid corpus fixture",
+      "status": "passed",
+      "detail": "162/162 inspected"
+    },
+    {
+      "name": "flac: canonical editable projection matches golden metadata",
+      "status": "passed",
+      "detail": "162/162 golden projections matched"
+    },
+    {
+      "name": "flac: production no-op patch is byte-identical",
+      "status": "passed",
+      "detail": "162/162 byte-identical"
+    },
+    {
+      "name": "flac: production edit preserves independent audio hash",
+      "status": "passed",
+      "detail": "162/162 edits preserved essence"
+    },
+    {
+      "name": "flac: production rejects every adversarial corpus fixture",
+      "status": "passed",
+      "detail": "18/18 rejected"
+    },
+    {
+      "name": "m4a: production inspect accepts every valid corpus fixture",
+      "status": "passed",
+      "detail": "162/162 inspected"
+    },
+    {
+      "name": "m4a: canonical editable projection matches golden metadata",
+      "status": "passed",
+      "detail": "162/162 golden projections matched"
+    },
+    {
+      "name": "m4a: production no-op patch is byte-identical",
+      "status": "passed",
+      "detail": "162/162 byte-identical"
+    },
+    {
+      "name": "m4a: production edit preserves independent audio hash",
+      "status": "passed",
+      "detail": "162/162 edits preserved essence"
+    },
+    {
+      "name": "m4a: production rejects every adversarial corpus fixture",
+      "status": "passed",
+      "detail": "18/18 rejected"
+    },
+    {
+      "name": "mp3: edit preserves audio essence, opaque metadata, and extra artwork",
+      "status": "passed"
+    },
+    {
+      "name": "flac: edit preserves audio essence, opaque metadata, and extra artwork",
+      "status": "passed"
+    },
+    {
+      "name": "m4a: edit preserves audio essence, opaque metadata, and extra artwork",
+      "status": "passed"
+    },
+    {
+      "name": "mp3: mutation runner completed without harness crashes",
+      "status": "passed",
+      "detail": "333333/333333, 0 crashes"
+    },
+    {
+      "name": "flac: mutation runner completed without harness crashes",
+      "status": "passed",
+      "detail": "333333/333333, 0 crashes"
+    },
+    {
+      "name": "m4a: mutation runner completed without harness crashes",
+      "status": "passed",
+      "detail": "333334/333334, 0 crashes"
+    }
+  ],
+  "mutations": [
+    {
+      "family": "mp3",
+      "requested": 333333,
+      "completed": 333333,
+      "accepted": 220723,
+      "rejected": 112610,
+      "crashes": 0,
+      "digest": "806014e8801108f234937c31b0b324d45192d6110e36e690b142f52ac8164e9d"
+    },
+    {
+      "family": "flac",
+      "requested": 333333,
+      "completed": 333333,
+      "accepted": 186707,
+      "rejected": 146626,
+      "crashes": 0,
+      "digest": "a939f8ed2dbba5b28b8ad199077be2809bf09659b73cad227d8824600753cbca"
+    },
+    {
+      "family": "m4a",
+      "requested": 333334,
+      "completed": 333334,
+      "accepted": 156301,
+      "rejected": 177033,
+      "crashes": 0,
+      "digest": "8e752f9873334f4d10c6d2de671c4bfe35229e1ef2cf5b27b96fe47375d6185e"
+    }
+  ],
+  "oracles": [
+    {
+      "oracle": "ffprobe",
+      "status": "passed",
+      "version": "ffprobe version 8.1.1 Copyright (c) 2007-2026 the FFmpeg developers",
+      "checkedCases": 13,
+      "detail": "8/9 synthetic inputs and outputs readable with 8 patched titles; 4/4 decoder-valid MP3, FLAC, AAC, and ALAC patched outputs decoded; by family {\"mp3\":{\"input\":3,\"output\":3,\"title\":3},\"flac\":{\"input\":3,\"output\":3,\"title\":3},\"m4a\":{\"input\":2,\"output\":2,\"title\":2}}; pinned 8.1.1"
+    },
+    {
+      "oracle": "mutagen",
+      "status": "passed",
+      "version": "1.47.0",
+      "checkedCases": 9,
+      "detail": "9/9 inputs and 9/9 patched outputs recognized; 9 patched titles confirmed; by family {\"mp3\":{\"input\":3,\"output\":3,\"title\":3},\"flac\":{\"input\":3,\"output\":3,\"title\":3},\"m4a\":{\"input\":3,\"output\":3,\"title\":3}}; pinned 1.47.0"
+    },
+    {
+      "oracle": "taglib",
+      "status": "passed",
+      "version": "2.3",
+      "checkedCases": 9,
+      "detail": "9/9 inputs and 9/9 patched outputs recognized; 9 patched titles confirmed; by family {\"mp3\":{\"input\":3,\"output\":3,\"title\":3},\"flac\":{\"input\":3,\"output\":3,\"title\":3},\"m4a\":{\"input\":3,\"output\":3,\"title\":3}}; pinned 2.3"
+    }
+  ],
+  "summary": {
+    "passed": 38,
+    "failed": 0,
+    "skipped": 0
+  }
+}

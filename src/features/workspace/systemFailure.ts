@@ -106,7 +106,8 @@ const FALLBACKS = {
   },
   upload: {
     title: "some files could not be imported",
-    description: "tagium could not read one or more audio files. Try another mp3 file.",
+    description:
+      "tagium could not read one or more audio files. Try a valid MP3, FLAC, or M4A file.",
     trackDescription: "one or more audio files could not be read.",
   },
   export: {

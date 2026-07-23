@@ -10,7 +10,7 @@ const fileInput = (markup: string) => {
 };
 
 describe("upload input attributes", () => {
-  it("keeps mobile MP3 uploads scoped to files instead of capture", () => {
+  it("keeps supported audio uploads scoped to files instead of capture", () => {
     const inputs = [
       fileInput(renderToStaticMarkup(<AudioUpload onAudioUpload={() => {}} />)),
       fileInput(
@@ -23,7 +23,7 @@ describe("upload input attributes", () => {
     ];
 
     for (const input of inputs) {
-      expect(input).toContain('accept=".mp3,audio/mpeg"');
+      expect(input).toContain('accept=".mp3,.flac,.m4a,.mp4,audio/mpeg,audio/flac,audio/mp4"');
       expect(input).toContain("multiple");
       expect(input).not.toContain("capture");
     }
