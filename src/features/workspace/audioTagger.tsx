@@ -58,20 +58,15 @@ export default function AudioTagger() {
   const mobileNavigation = useMobileWorkspaceNavigation({
     libraryEmpty: libraryIsEmpty,
   });
-  const { closeDrawer, isMobile } = mobileNavigation;
+  const closeMobileDrawer = mobileNavigation.closeDrawer;
   const handoffMobileExport = useCallback(
     (startExport: () => void) => {
-      if (!isMobile) {
-        startExport();
-        return;
-      }
-
       // Let the drawer close and restore focus before the export dialog captures
       // its trigger. This keeps the trigger visible and outside the inert drawer.
-      closeDrawer();
+      closeMobileDrawer();
       requestAnimationFrame(startExport);
     },
-    [closeDrawer, isMobile],
+    [closeMobileDrawer],
   );
   const startsInSwipeZone = useCallback(
     (touch: Touch, surface: HTMLElement) => {
