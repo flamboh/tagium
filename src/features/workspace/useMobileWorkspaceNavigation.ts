@@ -32,6 +32,7 @@ export const useMobileWorkspaceNavigation = ({
 }): MobileWorkspaceNavigation => {
   const [isMobile, setIsMobile] = useState(getInitialMobile);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerOpenRef = useRef(false);
   const drawerTriggerRef = useRef<HTMLElement | null>(null);
   const previousLibraryEmptyRef = useRef(libraryEmpty);
 
@@ -39,10 +40,12 @@ export const useMobileWorkspaceNavigation = ({
     if (!isMobile) return;
     drawerTriggerRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    drawerOpenRef.current = true;
     setDrawerOpen(true);
   }, [isMobile]);
 
   const closeDrawer = useCallback(() => {
+    drawerOpenRef.current = false;
     setDrawerOpen(false);
     restoreFocus(drawerTriggerRef.current);
   }, []);
@@ -51,13 +54,11 @@ export const useMobileWorkspaceNavigation = ({
     const media = window.matchMedia(MOBILE_QUERY);
     const update = () => {
       setIsMobile(media.matches);
-      setDrawerOpen((wasOpen) => {
-        if (wasOpen) {
-          if (media.matches) restoreFocus(drawerTriggerRef.current);
-          else focusDesktopSidebar();
-        }
-        return false;
-      });
+      if (!drawerOpenRef.current) return;
+      drawerOpenRef.current = false;
+      setDrawerOpen(false);
+      if (media.matches) restoreFocus(drawerTriggerRef.current);
+      else focusDesktopSidebar();
     };
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
@@ -66,8 +67,8 @@ export const useMobileWorkspaceNavigation = ({
   useEffect(() => {
     const wasEmpty = previousLibraryEmptyRef.current;
     previousLibraryEmptyRef.current = libraryEmpty;
-    if (!wasEmpty && libraryEmpty && drawerOpen) closeDrawer();
-  }, [closeDrawer, drawerOpen, libraryEmpty]);
+    if (!wasEmpty && libraryEmpty && drawerOpen) restoreFocus(drawerTriggerRef.current);
+  }, [drawerOpen, libraryEmpty]);
 
-  return { isMobile, drawerOpen, openDrawer, closeDrawer };
+  return { isMobile, drawerOpen: drawerOpen && !libraryEmpty, openDrawer, closeDrawer };
 };

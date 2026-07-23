@@ -159,10 +159,15 @@ export default function AudioTagger() {
               ? "translate-x-[var(--mobile-drawer-width)]"
               : "translate-x-0"
           }`}
-          onClick={() => {
-            if (mobileNavigation.drawerOpen) mobileNavigation.closeDrawer();
-          }}
         >
+          {mobileNavigation.drawerOpen && (
+            <button
+              type="button"
+              className="absolute inset-0 z-10 cursor-default"
+              aria-label="close library"
+              onClick={mobileNavigation.closeDrawer}
+            />
+          )}
           <div
             className={`flex h-full w-full flex-col ${
               mobileNavigation.drawerOpen ? "pointer-events-none" : ""

@@ -180,7 +180,7 @@ export default function TagSidebarPanel({
       aria-hidden={mobilePresentation === "hidden" ? true : undefined}
       inert={mobilePresentation === "hidden" ? true : undefined}
       className={cn(
-        "fixed inset-y-0 left-0 z-40 flex h-svh w-(--mobile-drawer-width) flex-shrink-0 flex-col overflow-hidden border-r bg-card transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:static md:z-auto md:order-none md:h-auto md:min-h-0 md:w-72 md:translate-x-0 md:border-t-0 md:border-r md:transition-none",
+        "fixed inset-y-0 left-0 z-40 flex h-svh w-(--mobile-drawer-width) shrink-0 flex-col overflow-hidden border-r bg-card transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:static md:z-auto md:order-none md:h-auto md:min-h-0 md:w-72 md:translate-x-0 md:border-t-0 md:border-r md:transition-none",
         mobilePresentation === "hidden" && "-translate-x-full",
         mobilePresentation === "drawer" && "translate-x-0",
         isDraggingFile && "bg-primary/5 shadow-[inset_0_0_0_2px_var(--primary)]",
@@ -202,7 +202,7 @@ export default function TagSidebarPanel({
       }}
       onDrop={handleSidebarFileDrop}
     >
-      <div className="h-14 flex items-center justify-between px-5 border-b flex-shrink-0">
+      <div className="h-14 flex shrink-0 items-center justify-between border-b px-5">
         <span className="font-bold text-xl tracking-tight select-none">tagium</span>
         {mobilePresentation === "drawer" && (
           <Button
@@ -251,7 +251,7 @@ export default function TagSidebarPanel({
         onRetry={onRetryPlaylistDownloadQueue}
       />
 
-      <div className="px-3 py-3 border-t flex-shrink-0 flex flex-col gap-2">
+      <div className="flex shrink-0 flex-col gap-2 border-t px-3 py-3">
         {canDownloadAll && !loading ? (
           <Button className="w-full" onClick={onDownloadAll}>
             download all
