@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
@@ -64,6 +65,9 @@ export function SortableTrackRow({
   onRemove,
   onRetry,
 }: TrackRowProps) {
+  const previousStatusRef = useRef(track.status);
+  const successTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+  const [showSavedCheck, setShowSavedCheck] = useState(false);
   const {
     attributes,
     listeners,
@@ -79,6 +83,33 @@ export function SortableTrackRow({
         ? ({ type: "track", trackId: track.id, container, albumId } satisfies SidebarDragData)
         : ({ type: "track", trackId: track.id, container } satisfies SidebarDragData),
   });
+
+  useEffect(() => {
+    const transitionedToSaved = previousStatusRef.current !== "saved" && track.status === "saved";
+    previousStatusRef.current = track.status;
+
+    if (successTimerRef.current !== null) {
+      globalThis.clearTimeout(successTimerRef.current);
+      successTimerRef.current = null;
+    }
+
+    if (transitionedToSaved) {
+      setShowSavedCheck(true);
+      successTimerRef.current = globalThis.setTimeout(() => {
+        setShowSavedCheck(false);
+        successTimerRef.current = null;
+      }, 3_000);
+    } else if (track.status !== "saved") {
+      setShowSavedCheck(false);
+    }
+
+    return () => {
+      if (successTimerRef.current !== null) {
+        globalThis.clearTimeout(successTimerRef.current);
+        successTimerRef.current = null;
+      }
+    };
+  }, [track.status]);
 
   return (
     <div
@@ -108,22 +139,25 @@ export function SortableTrackRow({
         <div className="flex flex-col gap-1 w-full min-w-0">
           <div className="flex items-center gap-1.5 w-full overflow-hidden">
             {container === "loose" ? (
-              <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+              <FileMusic className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             ) : (
               <span className="min-w-3 text-[11px] text-muted-foreground">{index}</span>
             )}
             <span className="truncate text-sm flex-1">{track.filename}</span>
             {track.downloadStatus === "downloading" && (
-              <Loader2 className="h-3 w-3 text-muted-foreground flex-shrink-0 animate-spin" />
+              <Loader2 className="h-3 w-3 text-muted-foreground shrink-0 animate-spin" />
             )}
-            {track.downloadStatus !== "downloading" && track.status === "saved" && (
-              <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+            {track.downloadStatus !== "downloading" && showSavedCheck && (
+              <Check
+                aria-hidden="true"
+                className="h-3 w-3 shrink-0 text-green-500 animate-in fade-in motion-reduce:animate-none"
+              />
             )}
             {(track.downloadStatus === "error" || track.status === "error") && (
               <AlertCircle
                 aria-label="track has an error"
                 className={cn(
-                  "h-3 w-3 text-red-500 flex-shrink-0",
+                  "h-3 w-3 text-red-500 shrink-0",
                   retryable ? "group-hover:opacity-0" : "",
                 )}
               />
@@ -134,6 +168,11 @@ export function SortableTrackRow({
           </div>
         </div>
       </Button>
+      {showSavedCheck && (
+        <span role="status" aria-live="polite" className="sr-only">
+          track saved
+        </span>
+      )}
       {retryable && (
         <button
           type="button"

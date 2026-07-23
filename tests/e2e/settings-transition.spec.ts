@@ -32,61 +32,13 @@ const clickBlankTrackList = async (page: Page) => {
   });
 };
 
-test("keeps the media entry within its return transition endpoints", async ({
-  page,
-  browserName,
-}) => {
-  test.skip(browserName !== "chromium", "geometry sampling is covered in Chromium");
+test("unmounts the media entry in settings and restores it in the editor", async ({ page }) => {
   await page.goto("/");
+  await expect(page.locator('input[name="media-url"]')).toBeAttached();
   await page.getByRole("button", { name: "settings" }).click();
-  await page.waitForTimeout(500);
-
-  const transition = await page.evaluate(async () => {
-    interface BrowserElement {
-      click: () => void;
-      closest: (selector: string) => BrowserElement | null;
-      getBoundingClientRect: () => { left: number };
-      parentElement: BrowserElement | null;
-    }
-
-    const browser = globalThis as unknown as {
-      document: { querySelector: (selector: string) => BrowserElement | null };
-      performance: { now: () => number };
-      requestAnimationFrame: (callback: () => void) => number;
-    };
-    const input = browser.document.querySelector('input[name="media-url"]');
-    const motion = input?.closest("form")?.parentElement;
-    const back = browser.document.querySelector('button[aria-label="back to editor"]');
-    if (!motion || !back) {
-      throw new Error("media entry transition elements were not found");
-    }
-
-    const startLeft = motion.getBoundingClientRect().left;
-    back.click();
-    const samples: number[] = [];
-    const startedAt = browser.performance.now();
-    await new Promise<void>((resolve) => {
-      const sample = () => {
-        samples.push(motion.getBoundingClientRect().left);
-        if (browser.performance.now() - startedAt >= 550) {
-          resolve();
-          return;
-        }
-        browser.requestAnimationFrame(sample);
-      };
-      browser.requestAnimationFrame(sample);
-    });
-
-    return {
-      startLeft,
-      endLeft: motion.getBoundingClientRect().left,
-      samples,
-    };
-  });
-
-  const minimumLeft = Math.min(transition.startLeft, transition.endLeft) - 2;
-  const maximumLeft = Math.max(transition.startLeft, transition.endLeft) + 2;
-  expect(transition.samples.every((left) => left >= minimumLeft && left <= maximumLeft)).toBe(true);
+  await expect(page.locator('input[name="media-url"]')).not.toBeAttached();
+  await page.getByRole("button", { name: "back to editor" }).click();
+  await expect(page.locator('input[name="media-url"]')).toBeAttached();
 });
 
 test("switches the metadata editor and settings without unmounting either panel", async ({
@@ -132,7 +84,7 @@ test("clicking blank space in a populated track list closes settings and clears 
 
   await expect(settings).toHaveAttribute("aria-hidden", "true");
   await expect(editor).toHaveAttribute("aria-hidden", "false");
-  await expect(page.getByText("select a track to edit its tags", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /drop your mp3s here/ })).toBeVisible();
 });
 
 test("switches between the empty selection and track editor in both directions", async ({
@@ -141,7 +93,7 @@ test("switches between the empty selection and track editor in both directions",
   await uploadTrack(page);
   await page.getByRole("button", { name: "settings" }).focus();
   await page.keyboard.press("Escape");
-  await expect(page.getByText("select a track to edit its tags", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /drop your mp3s here/ })).toBeVisible();
   await expect(page.locator('[data-editor-state="empty-selection"]')).toHaveCSS("opacity", "1");
 
   await getPopulatedTrackList(page).getByRole("button").first().click();
@@ -149,7 +101,7 @@ test("switches between the empty selection and track editor in both directions",
   await expect(page.locator('[data-editor-state="loaded-track"]')).toHaveCSS("opacity", "1");
 
   await page.getByRole("button", { name: "clear track selection and return to editor" }).click();
-  await expect(page.getByText("select a track to edit its tags", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /drop your mp3s here/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "download track" })).not.toBeAttached();
 });
 

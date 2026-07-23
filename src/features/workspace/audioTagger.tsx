@@ -54,6 +54,7 @@ export default function AudioTagger() {
   const mediaUrlEntryPresentation = getMediaUrlEntryPresentation(
     libraryIsEmpty,
     activeView === "settings",
+    Boolean(editor.selectedFile),
   );
   useBeforeUnloadProtection(
     hasRecoverableSessionWork({
@@ -129,6 +130,7 @@ export default function AudioTagger() {
                     onPreviewMetadataChange={(field, event) =>
                       editor.commands.preview(field, event.target.value)
                     }
+                    onAudioUpload={importing.commands.upload}
                   />
                 </div>
                 <div
@@ -149,12 +151,12 @@ export default function AudioTagger() {
             ) : null}
           </div>
           <LandingScreen active={landingIsActive} onAudioUpload={importing.commands.upload}>
-            <MediaUrlEntry
-              layout={mediaUrlEntryPresentation.layout}
-              hidden={mediaUrlEntryPresentation.hidden}
-              docked={mediaUrlEntryPresentation.docked}
-              onUrlImport={importing.commands.importUrl}
-            />
+            {mediaUrlEntryPresentation && (
+              <MediaUrlEntry
+                layout={mediaUrlEntryPresentation.layout}
+                onUrlImport={importing.commands.importUrl}
+              />
+            )}
           </LandingScreen>
         </div>
       </div>

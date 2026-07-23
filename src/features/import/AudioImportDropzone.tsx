@@ -1,0 +1,99 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { Music4, Upload } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+export interface AudioImportDropzoneProps {
+  onAudioUpload: (files: File[]) => void | Promise<void>;
+  showBrand?: boolean;
+  className?: string;
+}
+
+const handleDragOver = (event: React.DragEvent) => {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "copy";
+};
+
+export default function AudioImportDropzone({
+  onAudioUpload,
+  showBrand = false,
+  className,
+}: AudioImportDropzoneProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const importFiles = (files: FileList | null) => {
+    const audioFiles = Array.from(files ?? []);
+    if (audioFiles.length > 0) void onAudioUpload(audioFiles);
+  };
+
+  return (
+    <div
+      className={cn(
+        "flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6",
+        className,
+      )}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".mp3,audio/mpeg"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          importFiles(event.target.files);
+          event.target.value = "";
+        }}
+      />
+      {showBrand && (
+        <div className="text-center select-none">
+          <h1 className="text-7xl font-bold tracking-tighter text-foreground">tagium</h1>
+          <p className="text-muted-foreground mt-3 text-base">tag your music</p>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          dragCounterRef.current++;
+          setIsDragging(true);
+        }}
+        onDragLeave={() => {
+          dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+          if (dragCounterRef.current === 0) setIsDragging(false);
+        }}
+        onDragOver={handleDragOver}
+        onDrop={(event) => {
+          event.preventDefault();
+          dragCounterRef.current = 0;
+          setIsDragging(false);
+          importFiles(event.dataTransfer.files);
+        }}
+        className={cn(
+          "w-full rounded-3xl border-2 border-dashed transition-all duration-200 motion-reduce:transition-none cursor-pointer",
+          "flex flex-col items-center justify-center gap-5 py-16 px-8 outline-none max-lg:[@media(max-height:700px)]:gap-3 max-lg:[@media(max-height:700px)]:py-8",
+          isDragging
+            ? "border-primary bg-primary/10 scale-[1.015] shadow-xl shadow-primary/10 motion-reduce:scale-100"
+            : "border-border hover:border-primary/50 hover:bg-accent/20 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        )}
+      >
+        {isDragging ? (
+          <Music4 className="h-14 w-14 text-primary" />
+        ) : (
+          <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center">
+            <Upload className="h-7 w-7 text-muted-foreground" />
+          </div>
+        )}
+        <div className="text-center select-none">
+          <p className="text-lg font-semibold text-foreground">
+            {isDragging ? "drop to import" : "drop your mp3s here"}
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">mp3 files only · or click to browse</p>
+        </div>
+      </button>
+    </div>
+  );
+}
