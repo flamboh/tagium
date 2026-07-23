@@ -27,6 +27,7 @@ import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { AppSettings } from "@/features/library/types";
 import { useMobileWorkspaceNavigation } from "@/features/workspace/useMobileWorkspaceNavigation";
 import { useDrawerSwipe } from "@/features/workspace/drawerSwipe";
+import { isTrackPreviewActive } from "@/features/workspace/trackPreviewVisibility";
 
 export default function AudioTagger() {
   const library = useLibraryStore();
@@ -107,6 +108,11 @@ export default function AudioTagger() {
     : mobileNavigation.drawerOpen
       ? "drawer"
       : "hidden";
+  const previewActive = isTrackPreviewActive({
+    activeView,
+    isMobile: mobileNavigation.isMobile,
+    drawerOpen: mobileNavigation.drawerOpen,
+  });
   const sidebarProps = {
     ...workspace.sidebarProps,
     onSelectFile: (...args: Parameters<typeof workspace.sidebarProps.onSelectFile>) => {
@@ -226,6 +232,7 @@ export default function AudioTagger() {
                     }`}
                   >
                     <TrackMetadataEditor
+                      previewActive={previewActive}
                       selectedFile={editor.selectedFile}
                       selectedFileId={selectedFileId}
                       register={editor.form.register}

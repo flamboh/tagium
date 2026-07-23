@@ -53,6 +53,7 @@ const metadata: AudioMetadata = {
 const loadedTrack: TagiumFile = {
   id: "track-1",
   format: "mp3",
+  file: new File(["audio"], "track-1.mp3", { type: "audio/mpeg" }),
   filename: "track-1.mp3",
   status: "saved",
   downloadStatus: "ready",
@@ -80,12 +81,14 @@ function EditorHarness({
   advancedMetadata = false,
   albumArtistLinked = true,
   inAlbum = false,
+  previewActive = true,
 }: {
   selectedFile?: TagiumFile | null;
   syncFilenames?: boolean;
   advancedMetadata?: boolean;
   albumArtistLinked?: boolean;
   inAlbum?: boolean;
+  previewActive?: boolean;
 }) {
   const { register, control, getValues, setError, clearErrors, setFocus } = useForm<AudioMetadata>({
     defaultValues: metadata,
@@ -94,6 +97,7 @@ function EditorHarness({
   return (
     <TooltipProvider>
       <TrackMetadataEditor
+        previewActive={previewActive}
         selectedFile={selectedFile}
         selectedFileId={selectedFile?.id ?? null}
         register={register}
@@ -172,6 +176,7 @@ function MountedEditorHarness({
   }, [exposeForm, form]);
   return (
     <TrackMetadataEditor
+      previewActive
       selectedFile={readyTrack}
       selectedFileId={readyTrack.id}
       register={form.register}
@@ -212,6 +217,18 @@ const createFormNodeMocks = () => {
     nodes,
     createNodeMock: (element: ReactElement) => {
       if (typeof element.type !== "string") return {};
+      if (element.type === "audio") {
+        return {
+          currentTime: 0,
+          duration: 0,
+          paused: true,
+          src: "",
+          load: vi.fn(),
+          pause: vi.fn(),
+          play: vi.fn(async () => undefined),
+          removeAttribute: vi.fn(),
+        };
+      }
       const props = element.props as Record<string, unknown>;
       const node = {
         focus: vi.fn(),
@@ -249,6 +266,51 @@ describe("track metadata editor form seam", () => {
       expect(markup).toContain(`for="${id}"`);
       expect(markup).toContain(`id="${id}"`);
     }
+  });
+
+  it("places the full-width waveform after the cover and metadata row", () => {
+    let renderer: ReactTestRenderer;
+    act(() => {
+      renderer = create(<EditorHarness />, createFormNodeMocks());
+    });
+
+    const waveform = renderer!.root.findByType("section");
+    const cover = renderer!.root.findByProps({ "data-testid": "cover-art" });
+
+    expect(waveform.props.className).toContain("min-w-0");
+    expect(waveform.props.className).toContain("w-full");
+    const waveformComponent = waveform.parent!;
+    const waveformContainer = waveformComponent.parent!;
+    const [detailsRow, waveformSibling] = waveformContainer.children;
+
+    expect(waveformContainer.children).toHaveLength(2);
+    expect(waveformSibling).toBe(waveformComponent);
+    expect(typeof detailsRow).not.toBe("string");
+    if (typeof detailsRow === "string") throw new Error("track details row missing");
+    expect(detailsRow.findByProps({ "data-testid": "cover-art" })).toBe(cover);
+    expect(waveformContainer.props.className).toContain("min-h-full");
+    expect(waveformContainer.props.className).not.toContain("flex-1");
+
+    act(() => renderer!.unmount());
+  });
+
+  it("exposes an accessible selected-track preview without native audio controls", () => {
+    const markup = renderToStaticMarkup(<EditorHarness />);
+
+    expect(markup).toContain('aria-label="preview track-1.mp3"');
+    expect(markup).toContain('aria-label="play preview"');
+    expect(markup).toContain('role="slider"');
+    expect(markup).toContain('aria-label="track position"');
+    expect(markup).not.toContain(" controls=");
+  });
+
+  it("keeps selection rendered but disables playback when its editor is inaccessible", () => {
+    const markup = renderToStaticMarkup(<EditorHarness previewActive={false} />);
+
+    expect(markup).toContain('aria-label="preview track-1.mp3"');
+    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*aria-label="play preview"/);
+    expect(markup).toContain('aria-label="track position"');
+    expect(markup).toContain('aria-disabled="true"');
   });
 
   it("describes a synced filename error from the title field", () => {
