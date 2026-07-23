@@ -58,10 +58,10 @@ export default function AudioTagger() {
   const mobileNavigation = useMobileWorkspaceNavigation({
     libraryEmpty: libraryIsEmpty,
   });
-  const { closeDrawer, drawerOpen, isMobile } = mobileNavigation;
+  const { closeDrawer, isMobile } = mobileNavigation;
   const handoffMobileExport = useCallback(
     (startExport: () => void) => {
-      if (!isMobile || !drawerOpen) {
+      if (!isMobile) {
         startExport();
         return;
       }
@@ -71,7 +71,7 @@ export default function AudioTagger() {
       closeDrawer();
       requestAnimationFrame(startExport);
     },
-    [closeDrawer, drawerOpen, isMobile],
+    [closeDrawer, isMobile],
   );
   const startsInSwipeZone = useCallback(
     (touch: Touch, surface: HTMLElement) => {
