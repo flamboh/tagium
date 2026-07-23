@@ -82,9 +82,7 @@ for (const viewport of [
     });
     const resizedLayout = await readEditorLayout(page);
     expect(resizedLayout.areaHeight).toBeGreaterThan(advancedLayout.areaHeight + 64);
-    expect(resizedLayout.summaryOffsetTop).toBeGreaterThan(
-      advancedLayout.summaryOffsetTop + 64,
-    );
+    expect(resizedLayout.summaryOffsetTop).toBeGreaterThan(advancedLayout.summaryOffsetTop + 64);
     expect(resizedLayout.textareaBottom).not.toBeNull();
     expect(resizedLayout.textareaBottom!).toBeLessThanOrEqual(resizedLayout.summaryTop);
 

@@ -316,9 +316,7 @@ describe("track metadata editor form seam", () => {
       expect(gatedMarkup).toContain("advanced</button>");
       expect(normalMarkup).not.toContain("advanced</button>");
       expect(gatedMarkup.match(/role="status"/g)).toHaveLength(1);
-      expect(gatedMarkup).toMatch(
-        new RegExp(`<div aria-hidden="true"[^>]*>${statusCopy}</div>`),
-      );
+      expect(gatedMarkup).toMatch(new RegExp(`<div aria-hidden="true"[^>]*>${statusCopy}</div>`));
     },
   );
 
@@ -361,7 +359,7 @@ describe("track metadata editor form seam", () => {
     ["artwork", "Artwork is synced with the album."],
     ["trackNumber", "Track number is synced with the album."],
     ["albumArtist", "Album artist is synced with the album."],
-  ] satisfies [MetadataLinkId, string][])('%s uses the exact synced tooltip copy', (id, copy) => {
+  ] satisfies [MetadataLinkId, string][])("%s uses the exact synced tooltip copy", (id, copy) => {
     expect(getMetadataLinkDescriptor(id).disabledReason).toBe(copy);
   });
 

@@ -771,10 +771,7 @@ function LoadedTrackMetadataEditor({
               )}
             />
             <div className="flex flex-1 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3">
-              <div
-                data-editor-form-area
-                className={METADATA_EDITOR_FORM_LAYOUT.className}
-              >
+              <div data-editor-form-area className={METADATA_EDITOR_FORM_LAYOUT.className}>
                 {advancedMetadata && editorMode === "advanced" ? (
                   <AdvancedTrackDetailsFields
                     registrations={advancedFields.registrations}
