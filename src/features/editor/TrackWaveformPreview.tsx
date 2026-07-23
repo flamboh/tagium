@@ -1,7 +1,7 @@
 "use client";
 
 import { Pause, Play } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,8 +23,56 @@ interface TrackWaveformPreviewProps {
 type WaveformStatus = "idle" | "loading" | "ready" | "unavailable";
 const METADATA_WAIT_TIMEOUT_MS = 5_000;
 
+interface PreviewState {
+  waveform: WaveformPreviewData | null;
+  waveformStatus: WaveformStatus;
+  playbackUnavailable: boolean;
+  playing: boolean;
+  currentTime: number;
+  mediaDuration: { fileId: string; duration: number } | null;
+}
+
+type PreviewAction =
+  | { type: "reset"; file?: File }
+  | { type: "playing"; value: boolean }
+  | { type: "currentTime"; value: number }
+  | { type: "mediaDuration"; value: PreviewState["mediaDuration"] }
+  | { type: "playbackUnavailable"; value: boolean }
+  | { type: "waveform"; value: WaveformPreviewData | null }
+  | { type: "waveformStatus"; value: WaveformStatus };
+
+const previewReducer = (state: PreviewState, action: PreviewAction): PreviewState => {
+  switch (action.type) {
+    case "reset":
+      return { waveform: null, waveformStatus: action.file ? "loading" : "idle", playbackUnavailable: false, playing: false, currentTime: 0, mediaDuration: null };
+    case "playing": return { ...state, playing: action.value };
+    case "currentTime": return { ...state, currentTime: action.value };
+    case "mediaDuration": return { ...state, mediaDuration: action.value };
+    case "playbackUnavailable": return { ...state, playbackUnavailable: action.value };
+    case "waveform": return { ...state, waveform: action.value };
+    case "waveformStatus": return { ...state, waveformStatus: action.value };
+  }
+};
+
+const initialPreviewState: PreviewState = { waveform: null, waveformStatus: "idle", playbackUnavailable: false, playing: false, currentTime: 0, mediaDuration: null };
+
 const getWaveformWidth = (duration: number) =>
   Math.min(4_800, Math.max(640, Math.round(duration * 6)));
+
+const getStatusMessage = ({
+  file,
+  playbackUnavailable,
+  waveformStatus,
+}: Pick<TrackWaveformPreviewProps, "file"> & Pick<PreviewState, "playbackUnavailable" | "waveformStatus">) =>
+  !file
+    ? "preview is available after this track finishes downloading"
+    : playbackUnavailable
+      ? "this audio format cannot be previewed here"
+      : waveformStatus === "loading"
+        ? "building waveform"
+        : waveformStatus === "unavailable"
+          ? "waveform unavailable — playback may still work"
+          : null;
 
 export default function TrackWaveformPreview({
   active,
@@ -37,14 +85,8 @@ export default function TrackWaveformPreview({
   const sourceGenerationRef = useRef(0);
   const mediaGenerationRef = useRef<number | null>(null);
   const dragRef = useRef({ active: false, startX: 0, moved: false });
-  const [waveform, setWaveform] = useState<WaveformPreviewData | null>(null);
-  const [waveformStatus, setWaveformStatus] = useState<WaveformStatus>("idle");
-  const [playbackUnavailable, setPlaybackUnavailable] = useState(false);
-  const [playing, setPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [mediaDuration, setMediaDuration] = useState<{ fileId: string; duration: number } | null>(
-    null,
-  );
+  const [state, dispatch] = useReducer(previewReducer, initialPreviewState);
+  const { waveform, waveformStatus, playbackUnavailable, playing, currentTime, mediaDuration } = state;
   const currentMediaDuration = mediaDuration?.fileId === fileId ? mediaDuration.duration : 0;
   const duration =
     normalizePreviewDuration(currentMediaDuration) ||
@@ -63,8 +105,8 @@ export default function TrackWaveformPreview({
     const audio = audioRef.current;
     audio?.pause();
     if (audio) audio.currentTime = 0;
-    setPlaying(false);
-    setCurrentTime(0);
+    dispatch({ type: "playing", value: false });
+    dispatch({ type: "currentTime", value: 0 });
   }, [active]);
 
   useLayoutEffect(() => {
@@ -72,12 +114,7 @@ export default function TrackWaveformPreview({
     const audio = audioRef.current;
     audio?.pause();
     if (audio) audio.currentTime = 0;
-    setPlaying(false);
-    setCurrentTime(0);
-    setMediaDuration(null);
-    setPlaybackUnavailable(false);
-    setWaveform(null);
-    setWaveformStatus(file ? "loading" : "idle");
+    dispatch({ type: "reset", file });
   }, [file, fileId]);
 
   useEffect(() => {
@@ -87,6 +124,7 @@ export default function TrackWaveformPreview({
       return;
     }
 
+    // react-doctor-disable-next-line no-create-object-url-without-revoke -- the cleanup below revokes this exact URL before the source is replaced or unmounted.
     const objectUrl = URL.createObjectURL(file);
     const generation = sourceGenerationRef.current;
     mediaGenerationRef.current = generation;
@@ -107,18 +145,18 @@ export default function TrackWaveformPreview({
     const generation = sourceGenerationRef.current;
     if (decodeDuration === 0) {
       const timeoutId = globalThis.setTimeout(() => {
-        if (sourceGenerationRef.current === generation) setWaveformStatus("unavailable");
+        if (sourceGenerationRef.current === generation) dispatch({ type: "waveformStatus", value: "unavailable" });
       }, METADATA_WAIT_TIMEOUT_MS);
       return () => globalThis.clearTimeout(timeoutId);
     }
 
     const controller = new AbortController();
-    setWaveformStatus("loading");
+    dispatch({ type: "waveformStatus", value: "loading" });
     void loadWaveformPreview(file, controller.signal, decodeDuration).then(
       (preview) => {
         if (controller.signal.aborted || sourceGenerationRef.current !== generation) return;
-        setWaveform(preview);
-        setWaveformStatus("ready");
+        dispatch({ type: "waveform", value: preview });
+        dispatch({ type: "waveformStatus", value: "ready" });
       },
       (error: unknown) => {
         if (
@@ -128,7 +166,7 @@ export default function TrackWaveformPreview({
         ) {
           return;
         }
-        setWaveformStatus("unavailable");
+        dispatch({ type: "waveformStatus", value: "unavailable" });
       },
     );
 
@@ -143,7 +181,7 @@ export default function TrackWaveformPreview({
       if (!audio || !canSeek) return;
       const nextTime = Math.min(duration, Math.max(0, time));
       audio.currentTime = nextTime;
-      setCurrentTime(nextTime);
+      dispatch({ type: "currentTime", value: nextTime });
     },
     [canSeek, duration],
   );
@@ -164,8 +202,8 @@ export default function TrackWaveformPreview({
     try {
       await audio.play();
     } catch {
-      setPlaybackUnavailable(true);
-      setPlaying(false);
+      dispatch({ type: "playbackUnavailable", value: true });
+      dispatch({ type: "playing", value: false });
     }
   };
 
@@ -185,15 +223,7 @@ export default function TrackWaveformPreview({
     }
   };
 
-  const statusMessage = !file
-    ? "preview is available after this track finishes downloading"
-    : playbackUnavailable
-      ? "this audio format cannot be previewed here"
-      : waveformStatus === "loading"
-        ? "building waveform"
-        : waveformStatus === "unavailable"
-          ? "waveform unavailable — playback may still work"
-          : null;
+  const statusMessage = getStatusMessage({ file, playbackUnavailable, waveformStatus });
 
   return (
     <section
@@ -206,40 +236,42 @@ export default function TrackWaveformPreview({
         preload="metadata"
         onLoadedMetadata={(event) =>
           mediaGenerationRef.current === sourceGenerationRef.current &&
-          setMediaDuration({
+          dispatch({ type: "mediaDuration", value: {
             fileId,
             duration: normalizePreviewDuration(event.currentTarget.duration),
-          })
+          } })
         }
         onDurationChange={(event) =>
           mediaGenerationRef.current === sourceGenerationRef.current &&
-          setMediaDuration({
+          dispatch({ type: "mediaDuration", value: {
             fileId,
             duration: normalizePreviewDuration(event.currentTarget.duration),
-          })
+          } })
         }
         onTimeUpdate={(event) => {
           if (mediaGenerationRef.current !== sourceGenerationRef.current) return;
-          setCurrentTime(normalizePreviewDuration(event.currentTarget.currentTime));
+          dispatch({ type: "currentTime", value: normalizePreviewDuration(event.currentTarget.currentTime) });
         }}
         onPlay={() => {
-          if (mediaGenerationRef.current === sourceGenerationRef.current) setPlaying(true);
+          if (mediaGenerationRef.current === sourceGenerationRef.current) dispatch({ type: "playing", value: true });
         }}
         onPause={() => {
-          if (mediaGenerationRef.current === sourceGenerationRef.current) setPlaying(false);
+          if (mediaGenerationRef.current === sourceGenerationRef.current) dispatch({ type: "playing", value: false });
         }}
         onEnded={(event) => {
           if (mediaGenerationRef.current !== sourceGenerationRef.current) return;
           event.currentTarget.currentTime = 0;
-          setPlaying(false);
-          setCurrentTime(0);
+          dispatch({ type: "playing", value: false });
+          dispatch({ type: "currentTime", value: 0 });
         }}
         onError={() => {
           if (mediaGenerationRef.current !== sourceGenerationRef.current) return;
-          setPlaybackUnavailable(true);
-          if (decodeDuration === 0) setWaveformStatus("unavailable");
+          dispatch({ type: "playbackUnavailable", value: true });
+          if (decodeDuration === 0) dispatch({ type: "waveformStatus", value: "unavailable" });
         }}
-      />
+      >
+        <track kind="captions" label="No spoken content" />
+      </audio>
       <div className="flex items-center gap-2">
         <Button
           type="button"
