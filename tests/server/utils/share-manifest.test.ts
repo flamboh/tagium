@@ -45,7 +45,11 @@ const createFakePersistence = () => {
     getArtwork: async (key) => {
       const bytes = artwork.get(key);
       return bytes
-        ? { body: new Blob([bytes]).stream(), type: "image/png", size: bytes.byteLength }
+        ? {
+            body: new Blob([Uint8Array.from(bytes).buffer]).stream(),
+            type: "image/png",
+            size: bytes.byteLength,
+          }
         : undefined;
     },
     create: async (record) => {

@@ -115,7 +115,7 @@ const createRuntime = () => {
       const object = artwork.get(key);
       return object
         ? {
-            body: new Blob([object.bytes]).stream(),
+            body: new Blob([Uint8Array.from(object.bytes).buffer]).stream(),
             httpMetadata: { contentType: object.type },
             size: object.bytes.byteLength,
             etag: object.sha256,
@@ -342,8 +342,8 @@ describe("share manifest endpoints", () => {
         method: "POST",
         headers: { "content-type": "multipart/form-data; boundary=test" },
         body,
-        duplex: "half" as never,
-      },
+        duplex: "half",
+      } as RequestInit,
       runtime.env,
     );
     const response = await publishHandler(event(requestWithStream));

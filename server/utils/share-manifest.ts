@@ -78,9 +78,12 @@ const base64url = (bytes: Uint8Array) =>
 
 const utf8 = new TextEncoder();
 const nowMs = () => Date.now();
+const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer => Uint8Array.from(bytes).buffer;
 
 export const hashShareSecret = async (value: string) =>
-  base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", utf8.encode(value))));
+  base64url(
+    new Uint8Array(await crypto.subtle.digest("SHA-256", toArrayBuffer(utf8.encode(value)))),
+  );
 
 const randomToken = (bytes = 32) => {
   const value = new Uint8Array(bytes);
@@ -105,7 +108,7 @@ export const parseShareArtwork = async (
 };
 
 const hashBytes = async (bytes: Uint8Array) =>
-  base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
+  base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", toArrayBuffer(bytes))));
 
 /** Validates complete encoded images, dimensions, and type without trusting MIME headers. */
 const detectImageType = (bytes: Uint8Array): ShareArtwork["type"] | undefined => {
