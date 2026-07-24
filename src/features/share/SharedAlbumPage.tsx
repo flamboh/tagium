@@ -26,6 +26,10 @@ export type SharedAlbumPageState =
 type ReadySharedAlbumPageState = Extract<SharedAlbumPageState, { status: "ready" }>;
 
 const skeletonRows = ["one", "two", "three", "four", "five", "six"] as const;
+const shortExpiryFormatter = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+});
 
 function Header({
   canStopSharing = false,
@@ -253,9 +257,7 @@ function AnotherTabToast({ slug, anotherTabOpen }: { slug: string; anotherTabOpe
 }
 
 function formatExpiry(expiresAt: string) {
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" })
-    .format(new Date(expiresAt))
-    .toLowerCase();
+  return shortExpiryFormatter.format(new Date(expiresAt)).toLowerCase();
 }
 
 function RecipientContext({ trackCount, expiresAt }: { trackCount: number; expiresAt: string }) {
