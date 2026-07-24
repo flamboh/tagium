@@ -3,6 +3,19 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import SharedAlbumPage from "@/features/share/SharedAlbumPage";
 
+const toastMocks = vi.hoisted(() => ({
+  show: vi.fn(),
+  success: vi.fn(),
+  error: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({
+  toast: Object.assign(toastMocks.show, {
+    success: toastMocks.success,
+    error: toastMocks.error,
+  }),
+}));
+
 vi.mock("@/components/ui/dialog", () => {
   const passthrough = ({ children, ...props }: { children?: unknown; [key: string]: unknown }) =>
     createElement("div", props, children as never);
@@ -13,15 +26,6 @@ vi.mock("@/components/ui/dialog", () => {
     DialogFooter: passthrough,
     DialogHeader: passthrough,
     DialogTitle: passthrough,
-  };
-});
-vi.mock("@/components/ui/popover", () => {
-  const passthrough = ({ children, ...props }: { children?: unknown; [key: string]: unknown }) =>
-    createElement("div", props, children as never);
-  return {
-    Popover: passthrough,
-    PopoverContent: passthrough,
-    PopoverTrigger: passthrough,
   };
 });
 
@@ -51,7 +55,7 @@ const props = {
     },
   },
   workspaceTrackCount: 1,
-  anotherTabOpen: true,
+  anotherTabOpen: false,
   alreadyAddedAlbumId: null,
   adding: false,
   canStopSharing: false,
@@ -62,11 +66,6 @@ const props = {
   onStopSharing: vi.fn(async () => undefined),
 };
 
-const copyButton = (renderer: ReactTestRenderer) =>
-  renderer.root
-    .findAllByType("button")
-    .find((button) => button.children.some((child) => child === "copy link" || child === "copied"));
-
 const buttonText = (button: ReactTestRenderer["root"]) =>
   button
     .findAll((node) => typeof node.type === "string")
@@ -76,10 +75,17 @@ const buttonText = (button: ReactTestRenderer["root"]) =>
     .replace(/\s+/g, " ")
     .trim();
 
-afterEach(() => vi.unstubAllGlobals());
+const findButton = (renderer: ReactTestRenderer, text: string) =>
+  renderer.root.findAllByType("button").find((button) => buttonText(button) === text);
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.clearAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("shared album preview", () => {
-  it("links the album title to its exact source with a safe external target", async () => {
+  it("uses a wordmark link and demotes the album source below a plain title", async () => {
     const sourceUrl = "https://www.youtube.com/playlist?list=PL_exact";
     let renderer!: ReactTestRenderer;
     await act(async () => {
@@ -96,145 +102,130 @@ describe("shared album preview", () => {
         }),
       );
     });
-    const titleLink = renderer.root.findByType("a");
-    expect(titleLink.props.href).toBe(sourceUrl);
-    expect(titleLink.props.target).toBe("_blank");
-    expect(titleLink.props.rel).toBe("noopener noreferrer");
+
+    const wordmark = renderer.root
+      .findAllByType("a")
+      .find((link) => link.children.includes("tagium"));
+    const source = renderer.root.findAllByType("a").find((link) => link.props.href === sourceUrl);
+    expect(wordmark?.props.href).toBe("/");
+    expect(source?.props.target).toBe("_blank");
+    expect(source?.props.rel).toBe("noopener noreferrer");
+    expect(buttonText(renderer.root.findByType("h1"))).toBe("Shared");
+    expect(renderer.root.findByType("h1").findAllByType("a")).toHaveLength(0);
   });
 
-  it("renders a plain album title without falling back to a track source", async () => {
+  it("shows recipient context and explains the add behavior without existing-track copy", async () => {
     let renderer!: ReactTestRenderer;
     await act(async () => {
       renderer = create(createElement(SharedAlbumPage, props));
     });
-    expect(renderer.root.findAllByType("a")).toHaveLength(0);
-    expect(renderer.root.findByType("h1").children).toContain("Shared");
-  });
-
-  it("keeps unavailable state to one back to tagium action", async () => {
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(
-        createElement(SharedAlbumPage, {
-          ...props,
-          state: { status: "unavailable", slug, reason: "unavailable" },
-        }),
-      );
-    });
-    expect(renderer.root.findAllByType("button")).toHaveLength(1);
-  });
-
-  it("copies the canonical link for another tab and confirms success", async () => {
-    const writeText = vi.fn(async () => undefined);
-    vi.stubGlobal("navigator", { clipboard: { writeText } });
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(createElement(SharedAlbumPage, props));
-    });
-
-    await act(async () => {
-      await copyButton(renderer)?.props.onClick();
-    });
-
-    expect(writeText).toHaveBeenCalledWith(`https://tagium.app/share/${slug}`);
-    const status = renderer.root
-      .findByProps({ role: "status" })
-      .children.find((child): child is string => typeof child === "string");
-    expect(status).toContain("share link copied.");
-  });
-
-  it("shows the another-tab warning with a flush-left copy link below the sentence", async () => {
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(createElement(SharedAlbumPage, props));
-    });
-    const notice = renderer.root.findByType("aside");
-    const warning = notice
-      .findAllByType("span")
-      .find((node) =>
-        node.children.includes(
-          "tagium is open in another tab, copy the link and download in the open instance.",
-        ),
-      );
-    expect(warning).toBeDefined();
-    const copyRow = notice
-      .findAllByType("div")
-      .find((node) => node.props.className === "flex justify-start");
-    expect(copyRow).toBeDefined();
-    expect(copyRow?.props.className).toContain("justify-start");
-    expect(copyRow?.props.className).not.toContain("pl-6");
-    expect(copyRow?.findAllByType("button")).toHaveLength(1);
-    expect(
-      notice.findAllByType("button").some((button) => button.children.includes("copy link")),
-    ).toBe(true);
-  });
-
-  it("keeps the copy button width stable after copying", async () => {
-    const writeText = vi.fn(async () => undefined);
-    vi.stubGlobal("navigator", { clipboard: { writeText } });
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(createElement(SharedAlbumPage, props));
-    });
-    const before = copyButton(renderer);
-    const beforeClass = before?.props.className;
-    await act(async () => {
-      await before?.props.onClick();
-    });
-    const after = renderer.root
-      .findAllByType("button")
-      .find((button) => button.children.includes("copied"));
-    expect(beforeClass).toContain("min-w-[7.5rem]");
-    expect(after?.props.className).toBe(beforeClass);
-  });
-
-  it("shows a recoverable manual-copy path when clipboard access fails", async () => {
-    vi.stubGlobal("navigator", {
-      clipboard: {
-        writeText: vi.fn(async () => {
-          throw new Error("denied");
-        }),
-      },
-    });
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(createElement(SharedAlbumPage, props));
-    });
-
-    await act(async () => {
-      await copyButton(renderer)?.props.onClick();
-    });
-
-    expect(renderer.root.findByProps({ "aria-label": "share link" }).props.className).not.toContain(
-      "sr-only",
+    const text = buttonText(renderer.root);
+    expect(text).toContain("shared album · 1 track · link expires oct 20");
+    expect(text).toContain(
+      "adding downloads each track from its original source with the shared tags.",
     );
-    const status = renderer.root
-      .findByProps({ role: "status" })
-      .children.find((child): child is string => typeof child === "string");
-    expect(status).toContain("copy failed.");
+    expect(text).not.toContain("your current tracks will stay here");
   });
 
-  it("does not add a direct-route preview until the explicit download action", async () => {
+  it("keeps loading, ready, and unavailable states in the same header and max-width shell", async () => {
+    const states = [
+      { status: "loading" as const, slug },
+      props.state,
+      { status: "unavailable" as const, slug, reason: "unavailable" as const },
+    ];
+
+    for (const state of states) {
+      let renderer!: ReactTestRenderer;
+      await act(async () => {
+        renderer = create(createElement(SharedAlbumPage, { ...props, state }));
+      });
+      expect(renderer.root.findByType("header").props.className).toContain("h-14");
+      expect(renderer.root.findByType("main").props.className).toContain("max-w-3xl");
+    }
+  });
+
+  it("uses clear unavailable and newer-version recovery copy", async () => {
+    for (const [reason, expected] of [
+      ["unavailable", "the link may have expired, or sharing was stopped."],
+      ["newer-version", "update tagium, then reload this page. the album has not been added."],
+    ] as const) {
+      let renderer!: ReactTestRenderer;
+      await act(async () => {
+        renderer = create(
+          createElement(SharedAlbumPage, {
+            ...props,
+            state: { status: "unavailable", slug, reason },
+          }),
+        );
+      });
+      expect(buttonText(renderer.root)).toContain(expected);
+    }
+  });
+
+  it("delays the another-tab toast and copies its canonical link action", async () => {
+    vi.useFakeTimers();
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
     let renderer!: ReactTestRenderer;
     await act(async () => {
-      renderer = create(createElement(SharedAlbumPage, props));
+      renderer = create(createElement(SharedAlbumPage, { ...props, anotherTabOpen: true }));
     });
-    expect(props.onAdd).not.toHaveBeenCalled();
 
-    const download = renderer.root
-      .findAllByType("button")
-      .find((button) =>
-        button.children.some(
-          (child) => typeof child === "string" && child.toLowerCase().includes("download"),
-        ),
-      );
     act(() => {
-      download?.props.onClick();
+      vi.advanceTimersByTime(1_499);
     });
-    expect(props.onAdd).toHaveBeenCalledOnce();
+    expect(toastMocks.show).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(toastMocks.show).toHaveBeenCalledWith(
+      "tagium is already open in another tab. copy the link and add the album there instead.",
+      expect.objectContaining({ action: expect.objectContaining({ label: "copy link" }) }),
+    );
+
+    const options = toastMocks.show.mock.calls[0]?.[1] as {
+      action: { onClick: () => Promise<void> | void };
+    };
+    await act(async () => options.action.onClick());
+    expect(writeText).toHaveBeenCalledWith(`https://tagium.app/share/${slug}`);
+    expect(toastMocks.success).toHaveBeenCalledWith("share link copied");
+    renderer.unmount();
   });
 
-  it("offers Open album and an explicit duplicate download when already added", async () => {
+  it("keeps a visible manual-copy recovery in the toast when clipboard access fails", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("navigator", {
+      clipboard: { writeText: vi.fn(async () => Promise.reject(new Error("denied"))) },
+    });
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(createElement(SharedAlbumPage, { ...props, anotherTabOpen: true }));
+    });
+    act(() => {
+      vi.advanceTimersByTime(1_500);
+    });
+    const options = toastMocks.show.mock.calls[0]?.[1] as {
+      action: { onClick: () => Promise<void> | void };
+    };
+    await act(async () => options.action.onClick());
+    expect(toastMocks.error).toHaveBeenCalledWith("copy failed", {
+      description: `copy this link and paste it in the other tab: https://tagium.app/share/${slug}`,
+    });
+    renderer.unmount();
+  });
+
+  it("adds to the library only after the explicit action", async () => {
+    const onAdd = vi.fn();
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(createElement(SharedAlbumPage, { ...props, onAdd }));
+    });
+    expect(onAdd).not.toHaveBeenCalled();
+    void act(() => findButton(renderer, "add to library")?.props.onClick());
+    expect(onAdd).toHaveBeenCalledOnce();
+  });
+
+  it("opens an added album and offers a secondary add-another-copy action", async () => {
     const onAdd = vi.fn();
     const onViewAlbum = vi.fn();
     let renderer!: ReactTestRenderer;
@@ -248,20 +239,17 @@ describe("shared album preview", () => {
         }),
       );
     });
-    const buttons = renderer.root.findAllByType("button");
-    const open = buttons.find((button) => button.children.includes("open album"));
-    const duplicate = buttons.find((button) => button.children.includes("download another copy"));
-    void act(() => open?.props.onClick());
-    void act(() => duplicate?.props.onClick());
+    void act(() => findButton(renderer, "open in tagium")?.props.onClick());
+    void act(() => findButton(renderer, "add another copy")?.props.onClick());
     expect(onViewAlbum).toHaveBeenCalledOnce();
     expect(onAdd).toHaveBeenCalledWith(true);
   });
 
-  it("matches every desktop primary state to the cover width while staying full-width on mobile", async () => {
+  it("keeps every primary action state the same size", async () => {
     const states = [
-      { alreadyAddedAlbumId: null, adding: false, label: "download album" },
-      { alreadyAddedAlbumId: null, adding: true, label: "downloading album…" },
-      { alreadyAddedAlbumId: "album-1", adding: false, label: "open album" },
+      { alreadyAddedAlbumId: null, adding: false, label: "add to library" },
+      { alreadyAddedAlbumId: null, adding: true, label: "adding album…" },
+      { alreadyAddedAlbumId: "album-1", adding: false, label: "open in tagium" },
     ] as const;
 
     for (const state of states) {
@@ -269,35 +257,26 @@ describe("shared album preview", () => {
       await act(async () => {
         renderer = create(createElement(SharedAlbumPage, { ...props, ...state }));
       });
-      const primary = renderer.root
-        .findAllByType("button")
-        .find((button) => buttonText(button) === state.label);
+      const primary = findButton(renderer, state.label);
+      expect(primary?.props.className).toContain("h-10");
       expect(primary?.props.className).toContain("w-40");
       expect(primary?.props.className).toContain("max-sm:w-full");
-      expect(primary?.props.className).not.toContain("w-52");
     }
   });
 
-  it("shows a recoverable error when the owner cannot stop sharing", async () => {
-    const onStopSharing = vi.fn(async () => {
-      throw new Error("offline");
-    });
+  it("shows the owner stop-sharing action directly and keeps failure recoverable", async () => {
+    const onStopSharing = vi.fn(async () => Promise.reject(new Error("offline")));
     let renderer!: ReactTestRenderer;
     await act(async () => {
       renderer = create(
-        createElement(SharedAlbumPage, {
-          ...props,
-          canStopSharing: true,
-          onStopSharing,
-        }),
+        createElement(SharedAlbumPage, { ...props, canStopSharing: true, onStopSharing }),
       );
     });
 
-    const menuAction = renderer.root
-      .findAllByType("button")
-      .find((button) => button.children.includes("stop sharing"));
-    void act(() => menuAction?.props.onClick());
-
+    const header = renderer.root.findByType("header");
+    expect(findButton(renderer, "stop sharing")).toBeDefined();
+    expect(header.findAllByProps({ "aria-label": "shared album menu" })).toHaveLength(0);
+    void act(() => findButton(renderer, "stop sharing")?.props.onClick());
     const confirmation = renderer.root
       .findAllByType("button")
       .filter((button) => buttonText(button) === "stop sharing")
@@ -306,104 +285,44 @@ describe("shared album preview", () => {
       confirmation?.props.onClick();
       await Promise.resolve();
     });
-
     expect(onStopSharing).toHaveBeenCalledOnce();
-    expect(
-      renderer.root
-        .findByProps({ role: "alert" })
-        .children.filter((child): child is string => typeof child === "string")
-        .join(" "),
-    ).toContain("sharing could not be stopped");
+    expect(buttonText(renderer.root.findByProps({ role: "alert" }))).toContain(
+      "sharing could not be stopped",
+    );
   });
 
-  it("uses a link-only stop-sharing warning and stable stop button sizing", async () => {
+  it("renders numbered bordered rows and only shows a differing track artist", async () => {
     let renderer!: ReactTestRenderer;
     await act(async () => {
       renderer = create(
         createElement(SharedAlbumPage, {
           ...props,
-          canStopSharing: true,
-        }),
-      );
-    });
-    const menuAction = renderer.root
-      .findAllByType("button")
-      .find((button) => button.children.includes("stop sharing"));
-    await act(async () => menuAction?.props.onClick());
-    expect(
-      renderer.root
-        .findAllByType("div")
-        .some((node) => node.children.includes("the link will stop working immediately.")),
-    ).toBe(true);
-    expect(
-      renderer.root
-        .findAllByType("div")
-        .some((node) =>
-          node.children.includes("The link and cover will stop working immediately."),
-        ),
-    ).toBe(false);
-    const stopButton = renderer.root
-      .findAllByType("button")
-      .filter((button) => buttonText(button) === "stop sharing")
-      .at(-1);
-    expect(stopButton?.props.className).toContain("min-w-[7rem]");
-  });
-
-  it("closes the owner confirmation after sharing is stopped", async () => {
-    const onStopSharing = vi.fn(async () => undefined);
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(
-        createElement(SharedAlbumPage, {
-          ...props,
-          canStopSharing: true,
-          onStopSharing,
+          state: {
+            ...props.state,
+            manifest: {
+              ...props.state.manifest,
+              tracks: [
+                props.state.manifest.tracks[0]!,
+                {
+                  ...props.state.manifest.tracks[0]!,
+                  metadata: {
+                    ...props.state.manifest.tracks[0]!.metadata,
+                    title: "Guest Track",
+                    artist: "Guest",
+                  },
+                },
+              ],
+            },
+          },
         }),
       );
     });
 
-    const menuAction = renderer.root
-      .findAllByType("button")
-      .find((button) => button.children.includes("stop sharing"));
-    void act(() => menuAction?.props.onClick());
-    expect(
-      renderer.root.findAllByType("div").filter((node) => node.props.open === true),
-    ).toHaveLength(1);
-
-    const confirmation = renderer.root
-      .findAllByType("button")
-      .filter((button) => buttonText(button) === "stop sharing")
-      .at(-1);
-    await act(async () => {
-      confirmation?.props.onClick();
-      await Promise.resolve();
-    });
-
-    expect(onStopSharing).toHaveBeenCalledOnce();
-    expect(
-      renderer.root.findAllByType("div").filter((node) => node.props.open === true),
-    ).toHaveLength(0);
-  });
-
-  it("keeps duplicate manifest tracks as separate rows", async () => {
-    const duplicateProps = {
-      ...props,
-      state: {
-        ...props.state,
-        manifest: {
-          ...props.state.manifest,
-          tracks: [props.state.manifest.tracks[0]!, props.state.manifest.tracks[0]!],
-        },
-      },
-    };
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(createElement(SharedAlbumPage, duplicateProps));
-    });
-
-    expect(renderer.root.findAllByType("li")).toHaveLength(2);
-    expect(
-      renderer.root.findAllByType("li").filter((node) => node.children.includes("Track")),
-    ).toHaveLength(2);
+    const rows = renderer.root.findAllByType("li");
+    expect(rows).toHaveLength(2);
+    expect(buttonText(renderer.root)).toContain("2 tracks");
+    expect(buttonText(rows[0]!)).toBe("1Track");
+    expect(buttonText(rows[1]!)).toBe("2Guest TrackGuest");
+    expect(rows[0]?.parent?.props.className).toContain("border");
   });
 });

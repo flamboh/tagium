@@ -1,17 +1,14 @@
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  AlertTriangle,
-  ArrowLeft,
-  Check,
-  Copy,
-  Download,
   ExternalLink,
   ImageOff,
+  Library,
   Loader2,
-  MoreHorizontal,
   Music2,
+  Plus,
   RotateCcw,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { sharedArtworkUrl } from "@/features/share/shareClient";
 import type { Manifest, ManifestTrack } from "@/features/share/shareManifest";
 import { shareLinkForSlug } from "@/features/share/shareLink";
@@ -39,35 +35,89 @@ type ReadySharedAlbumPageState = Extract<SharedAlbumPageState, { status: "ready"
 
 const skeletonRows = ["one", "two", "three", "four", "five", "six"] as const;
 
-function SharedAlbumSkeleton() {
+function Header({
+  canStopSharing = false,
+  onOpenTagium,
+  onStop,
+}: {
+  canStopSharing?: boolean;
+  onOpenTagium: () => void;
+  onStop?: () => void;
+}) {
   return (
-    <main
-      aria-busy="true"
-      aria-label="opening shared album"
-      className="mx-auto w-full max-w-3xl px-5 pb-10 pt-10 sm:px-8"
-    >
-      <div className="mb-8 flex items-center">
-        <div className="h-6 w-20 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+    <header className="h-14 border-b">
+      <div className="mx-auto flex h-full w-full max-w-3xl items-center gap-3 px-5 sm:px-8">
+        <a
+          href="/"
+          className="rounded-sm text-xl font-bold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={(event) => {
+            if (
+              event.button !== 0 ||
+              event.metaKey ||
+              event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey
+            )
+              return;
+            event.preventDefault();
+            onOpenTagium();
+          }}
+        >
+          tagium
+        </a>
+        {canStopSharing && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="ml-auto text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={onStop}
+          >
+            stop sharing
+          </Button>
+        )}
       </div>
-      <div className="flex items-start gap-6 max-sm:flex-col max-sm:gap-4">
-        <div className="size-40 shrink-0 animate-pulse rounded-xl bg-muted motion-reduce:animate-none max-sm:size-24" />
-        <div className="w-full space-y-3 py-1">
-          <div className="h-8 w-3/4 animate-pulse rounded bg-muted motion-reduce:animate-none" />
-          <div className="h-5 w-2/5 animate-pulse rounded bg-muted motion-reduce:animate-none" />
-        </div>
-      </div>
-      <div className="mt-8 flex gap-2">
-        <div className="h-10 w-36 animate-pulse rounded-md bg-muted motion-reduce:animate-none" />
-      </div>
-      <div className="mt-8 space-y-3">
-        {skeletonRows.map((row) => (
-          <div key={row} className="flex h-5 items-center">
-            <div className="h-4 w-1/2 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+    </header>
+  );
+}
+
+function SharedAlbumSkeleton({ onOpenTagium }: { onOpenTagium: () => void }) {
+  return (
+    <div className="min-h-svh bg-background">
+      <Header onOpenTagium={onOpenTagium} />
+      <main
+        aria-busy="true"
+        aria-label="opening shared album"
+        className="mx-auto w-full max-w-3xl px-5 pb-10 pt-9 sm:px-8 sm:pt-12"
+      >
+        <div className="mb-5 h-4 w-56 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+        <div className="flex items-start gap-6 max-sm:gap-4">
+          <div className="size-40 shrink-0 animate-pulse rounded-xl bg-muted motion-reduce:animate-none max-sm:size-24" />
+          <div className="w-full space-y-3 py-1">
+            <div className="h-8 w-3/4 animate-pulse rounded bg-muted motion-reduce:animate-none max-sm:h-7" />
+            <div className="h-5 w-2/5 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+            <div className="h-4 w-28 animate-pulse rounded bg-muted motion-reduce:animate-none" />
           </div>
-        ))}
-      </div>
-      <span className="sr-only">opening shared album…</span>
-    </main>
+        </div>
+        <div className="mt-7 h-10 w-full max-w-lg animate-pulse rounded bg-muted motion-reduce:animate-none" />
+        <div className="mt-5 h-10 w-40 animate-pulse rounded-md bg-muted motion-reduce:animate-none max-sm:w-full" />
+        <div className="mt-10">
+          <div className="mb-3 h-5 w-20 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+          <div className="overflow-hidden rounded-lg border">
+            {skeletonRows.map((row) => (
+              <div
+                key={row}
+                className="flex min-h-14 items-center gap-3 border-b px-4 last:border-b-0"
+              >
+                <div className="h-4 w-5 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+                <div className="h-4 w-1/2 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <span className="sr-only">opening shared album…</span>
+      </main>
+    </div>
   );
 }
 
@@ -92,22 +142,11 @@ function Artwork({ slug, title }: { slug: string; title: string }) {
 
 function AlbumHero({ manifest, slug }: { manifest: Manifest; slug: string }) {
   const title = manifest.album.title || "untitled album";
-  const titleNode = manifest.album.sourceUrl ? (
-    <a
-      href={manifest.album.sourceUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="underline decoration-muted-foreground/50 underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      aria-label={`${title} (opens source in a new tab)`}
-    >
-      {title}
-      <ExternalLink className="ml-2 inline size-4 align-[0.1em]" aria-hidden="true" />
-    </a>
-  ) : (
-    title
-  );
+  const sourceLabel = manifest.album.sourceUrl
+    ? new URL(manifest.album.sourceUrl).hostname.replace(/^www\./, "")
+    : null;
   return (
-    <section className="flex items-start gap-6 max-sm:flex-col max-sm:gap-4">
+    <section className="flex items-start gap-6 max-sm:gap-4">
       {manifest.album.artwork ? (
         <Artwork slug={slug} title={manifest.album.title} />
       ) : (
@@ -118,17 +157,35 @@ function AlbumHero({ manifest, slug }: { manifest: Manifest; slug: string }) {
       )}
       <div className="min-w-0 py-1">
         <h1 className="break-words text-3xl font-semibold tracking-tight [overflow-wrap:anywhere] max-sm:text-xl">
-          {titleNode}
+          {title}
         </h1>
         <p className="mt-2 text-lg text-muted-foreground max-sm:text-sm">
           {manifest.album.artist || "unknown artist"}
         </p>
+        {manifest.album.sourceUrl && sourceLabel && (
+          <a
+            href={manifest.album.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-1 rounded-sm text-sm text-muted-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:text-foreground hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={`from ${sourceLabel} (opens in a new tab)`}
+          >
+            from {sourceLabel}
+            <ExternalLink className="size-3.5" aria-hidden="true" />
+          </a>
+        )}
       </div>
     </section>
   );
 }
 
-function TrackList({ tracks }: { tracks: readonly ManifestTrack[] }) {
+function TrackList({
+  tracks,
+  albumArtist,
+}: {
+  tracks: readonly ManifestTrack[];
+  albumArtist: string;
+}) {
   const occurrences = new Map<string, number>();
   const rows = tracks.map((track, index) => {
     const identity = JSON.stringify(track);
@@ -139,13 +196,30 @@ function TrackList({ tracks }: { tracks: readonly ManifestTrack[] }) {
   return (
     <section className="mt-8" aria-labelledby="shared-track-list-title">
       <h2 id="shared-track-list-title" className="mb-3 text-sm font-semibold">
-        tracks
+        {tracks.length} {tracks.length === 1 ? "track" : "tracks"}
       </h2>
-      <ol className="list-decimal space-y-2 pl-6 marker:text-muted-foreground">
-        {rows.map(({ track, key }) => {
+      <ol className="overflow-hidden rounded-lg border">
+        {rows.map(({ track, index, key }) => {
+          const trackArtist = track.metadata.artist.trim();
+          const showArtist = trackArtist.length > 0 && trackArtist !== albumArtist.trim();
           return (
-            <li key={key} className="break-words pl-1 text-sm font-medium [overflow-wrap:anywhere]">
-              {track.metadata.title || "untitled track"}
+            <li
+              key={key}
+              className="flex min-h-14 items-center gap-3 border-b px-4 py-2.5 last:border-b-0"
+            >
+              <span className="w-6 shrink-0 text-right text-sm tabular-nums text-muted-foreground">
+                {index + 1}
+              </span>
+              <div className="min-w-0">
+                <p className="break-words text-sm font-medium [overflow-wrap:anywhere]">
+                  {track.metadata.title || "untitled track"}
+                </p>
+                {showArtist && (
+                  <p className="mt-0.5 break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                    {trackArtist}
+                  </p>
+                )}
+              </div>
             </li>
           );
         })}
@@ -154,84 +228,61 @@ function TrackList({ tracks }: { tracks: readonly ManifestTrack[] }) {
   );
 }
 
-function WorkspaceNotice({
-  slug,
-  workspaceTrackCount,
-  anotherTabOpen,
+function AnotherTabToast({ slug, anotherTabOpen }: { slug: string; anotherTabOpen: boolean }) {
+  useEffect(() => {
+    if (!anotherTabOpen) return;
+    const link = shareLinkForSlug(slug);
+    const copyShareLink = async () => {
+      try {
+        await navigator.clipboard.writeText(link);
+        toast.success("share link copied");
+      } catch {
+        toast.error("copy failed", {
+          description: `copy this link and paste it in the other tab: ${link}`,
+        });
+      }
+    };
+    const timeout = globalThis.setTimeout(() => {
+      toast("tagium is already open in another tab. copy the link and add the album there instead.", {
+        duration: 12_000,
+        action: {
+          label: "copy link",
+          onClick: () => void copyShareLink(),
+        },
+      });
+    }, 1_500);
+    return () => globalThis.clearTimeout(timeout);
+  }, [anotherTabOpen, slug]);
+
+  return null;
+}
+
+function formatExpiry(expiresAt: string) {
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" })
+    .format(new Date(expiresAt))
+    .toLowerCase();
+}
+
+function RecipientContext({
+  trackCount,
+  expiresAt,
 }: {
-  slug: string;
-  workspaceTrackCount: number;
-  anotherTabOpen: boolean;
+  trackCount: number;
+  expiresAt: string;
 }) {
-  const [copyFeedback, setCopyFeedback] = useState<"copied" | "failed" | null>(null);
-  const shareLinkRef = useRef<HTMLInputElement>(null);
-  if (workspaceTrackCount === 0 && !anotherTabOpen) return null;
-  const copyShareLink = async () => {
-    try {
-      await navigator.clipboard.writeText(shareLinkForSlug(slug));
-      setCopyFeedback("copied");
-    } catch {
-      shareLinkRef.current?.select();
-      setCopyFeedback("failed");
-    }
-  };
+  const noun = trackCount === 1 ? "track" : "tracks";
   return (
-    <aside className="mt-6 space-y-2 text-sm leading-6">
-      {workspaceTrackCount > 0 && (
-        <p className="text-muted-foreground">your current tracks will stay here.</p>
-      )}
-      {anotherTabOpen && (
-        <div className="space-y-2">
-          <div className="flex items-start gap-2">
-            <AlertTriangle
-              className="mt-1 size-4 shrink-0 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <span className="text-muted-foreground">
-              tagium is open in another tab, copy the link and download in the open instance.
-            </span>
-          </div>
-          <div className="flex justify-start">
-            <Button
-              type="button"
-              size="sm"
-              className="w-32 min-w-[7.5rem] justify-center"
-              onClick={() => void copyShareLink()}
-            >
-              {copyFeedback === "copied" ? (
-                <Check aria-hidden="true" />
-              ) : (
-                <Copy aria-hidden="true" />
-              )}
-              {copyFeedback === "copied" ? "copied" : "copy link"}
-            </Button>
-          </div>
-          <input
-            ref={shareLinkRef}
-            readOnly
-            aria-label="share link"
-            value={shareLinkForSlug(slug)}
-            className={
-              copyFeedback === "failed"
-                ? "w-full min-w-0 rounded-md border bg-background px-2 py-1 font-mono text-xs"
-                : "sr-only"
-            }
-          />
-          <span role="status" className="sr-only" aria-live="polite">
-            {copyFeedback === "copied"
-              ? "share link copied."
-              : copyFeedback === "failed"
-                ? "copy failed. the share link is selected; copy it and paste it in the other tab."
-                : ""}
-          </span>
-          {copyFeedback === "failed" && (
-            <p className="w-full text-xs text-destructive">
-              copy failed. copy the selected link and paste it in the other tab.
-            </p>
-          )}
-        </div>
-      )}
-    </aside>
+    <p className="mb-5 text-sm text-muted-foreground">
+      shared album · {trackCount} {noun} · link expires {formatExpiry(expiresAt)}
+    </p>
+  );
+}
+
+function AddingExplanation() {
+  return (
+    <p className="mt-7 max-w-lg text-sm leading-6 text-muted-foreground">
+      adding downloads each track from its original source with the shared tags.
+    </p>
   );
 }
 
@@ -282,46 +333,6 @@ function StopSharingDialog({
   );
 }
 
-function Header({
-  canStopSharing,
-  onOpenTagium,
-  onStop,
-}: {
-  canStopSharing: boolean;
-  onOpenTagium: () => void;
-  onStop: () => void;
-}) {
-  return (
-    <header>
-      <div className="mx-auto flex h-14 w-full max-w-3xl items-center gap-3 px-5 sm:px-8">
-        <Button type="button" variant="ghost" size="sm" onClick={onOpenTagium}>
-          <ArrowLeft aria-hidden="true" /> back to tagium
-        </Button>
-        <div className="ml-auto flex items-center gap-1">
-          {canStopSharing && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button type="button" variant="ghost" size="icon" aria-label="shared album menu">
-                  <MoreHorizontal aria-hidden="true" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-44 p-1">
-                <button
-                  type="button"
-                  className="w-full rounded-md px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
-                  onClick={onStop}
-                >
-                  stop sharing
-                </button>
-              </PopoverContent>
-            </Popover>
-          )}
-        </div>
-      </div>
-    </header>
-  );
-}
-
 function ActionBar({
   alreadyAddedAlbumId,
   adding,
@@ -337,26 +348,33 @@ function ActionBar({
 }) {
   return (
     <div className="mt-8 flex flex-wrap items-center gap-2">
-      <div className="flex shrink-0 gap-2 max-sm:w-full max-sm:flex-col-reverse">
-        {alreadyAddedAlbumId && (
-          <Button type="button" variant="outline" onClick={() => onAdd(true)} disabled={adding}>
-            download another copy
-          </Button>
-        )}
+      <div className="flex shrink-0 items-center gap-4 max-sm:w-full max-sm:flex-col max-sm:items-stretch">
         <Button
           type="button"
-          size="lg"
-          className="w-40 justify-center max-sm:w-full"
+          className="h-10 w-40 justify-center max-sm:w-full"
           disabled={adding}
           onClick={alreadyAddedAlbumId ? onViewAlbum : () => onAdd()}
         >
           {adding ? (
             <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          ) : alreadyAddedAlbumId ? (
+            <Library aria-hidden="true" />
           ) : (
-            <Download aria-hidden="true" />
+            <Plus aria-hidden="true" />
           )}
-          {adding ? "downloading album…" : primaryLabel}
+          {adding ? "adding album…" : primaryLabel}
         </Button>
+        {alreadyAddedAlbumId && (
+          <Button
+            type="button"
+            variant="link"
+            className="h-10 px-0 max-sm:self-center"
+            onClick={() => onAdd(true)}
+            disabled={adding}
+          >
+            add another copy
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -364,7 +382,6 @@ function ActionBar({
 
 function SharedAlbumReadyPage({
   state,
-  workspaceTrackCount,
   anotherTabOpen,
   alreadyAddedAlbumId,
   adding,
@@ -375,7 +392,6 @@ function SharedAlbumReadyPage({
   onStopSharing,
 }: {
   state: ReadySharedAlbumPageState;
-  workspaceTrackCount: number;
   anotherTabOpen: boolean;
   alreadyAddedAlbumId: string | null;
   adding: boolean;
@@ -390,7 +406,7 @@ function SharedAlbumReadyPage({
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const { manifest, slug } = state;
-  const primaryLabel = alreadyAddedAlbumId ? "open album" : "download album";
+  const primaryLabel = alreadyAddedAlbumId ? "open in tagium" : "add to library";
   const stopSharing = async () => {
     setStopping(true);
     setStopError(null);
@@ -418,7 +434,9 @@ function SharedAlbumReadyPage({
         onStop={() => setShowStopConfirmation(true)}
       />
       <main className="mx-auto w-full max-w-3xl px-5 pb-10 pt-9 sm:px-8 sm:pt-12">
+        <RecipientContext trackCount={manifest.tracks.length} expiresAt={state.expiresAt} />
         <AlbumHero manifest={manifest} slug={slug} />
+        <AddingExplanation />
         <ActionBar
           alreadyAddedAlbumId={alreadyAddedAlbumId}
           adding={adding}
@@ -426,12 +444,8 @@ function SharedAlbumReadyPage({
           onAdd={onAdd}
           onViewAlbum={onViewAlbum}
         />
-        <WorkspaceNotice
-          slug={slug}
-          workspaceTrackCount={workspaceTrackCount}
-          anotherTabOpen={anotherTabOpen}
-        />
-        <TrackList tracks={manifest.tracks} />
+        <AnotherTabToast slug={slug} anotherTabOpen={anotherTabOpen} />
+        <TrackList tracks={manifest.tracks} albumArtist={manifest.album.artist} />
       </main>
       <StopSharingDialog
         open={showStopConfirmation}
@@ -457,36 +471,35 @@ export default function SharedAlbumPage(props: {
   onViewAlbum: () => void;
   onStopSharing: () => Promise<void>;
 }) {
-  if (props.state.status === "loading") return <SharedAlbumSkeleton />;
+  if (props.state.status === "loading")
+    return <SharedAlbumSkeleton onOpenTagium={props.onOpenTagium} />;
   if (props.state.status === "unavailable") {
     const newerVersion = props.state.reason === "newer-version";
     return (
-      <main className="mx-auto flex min-h-svh w-full max-w-xl flex-col px-6 py-10">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="w-fit"
-          onClick={props.onOpenTagium}
-        >
-          <ArrowLeft aria-hidden="true" /> back to tagium
-        </Button>
-        <div className="my-auto py-16">
-          <div className="mb-5 flex size-11 items-center justify-center rounded-lg bg-muted">
-            {newerVersion ? <RotateCcw className="size-5" /> : <Music2 className="size-5" />}
+      <div className="min-h-svh bg-background">
+        <Header onOpenTagium={props.onOpenTagium} />
+        <main className="mx-auto flex min-h-[calc(100svh-3.5rem)] w-full max-w-3xl items-center px-5 py-10 sm:px-8">
+          <div className="py-16">
+            <div className="mb-5 flex size-11 items-center justify-center rounded-lg bg-muted">
+              {newerVersion ? (
+                <RotateCcw className="size-5" aria-hidden="true" />
+              ) : (
+                <Music2 className="size-5" aria-hidden="true" />
+              )}
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {newerVersion
+                ? "this link needs a newer version of tagium"
+                : "this shared album is no longer available"}
+            </h1>
+            <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+              {newerVersion
+                ? "update tagium, then reload this page. the album has not been added."
+                : "the link may have expired, or sharing was stopped."}
+            </p>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {newerVersion
-              ? "this link was made by a newer tagium version"
-              : "this shared album is no longer available"}
-          </h1>
-          <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
-            {newerVersion
-              ? "reload the page after updating tagium. the album has not been added."
-              : "it may have expired or the creator may have stopped sharing it."}
-          </p>
-        </div>
-      </main>
+        </main>
+      </div>
     );
   }
   return <SharedAlbumReadyPage key={props.state.slug} {...props} state={props.state} />;
