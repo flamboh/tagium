@@ -129,6 +129,8 @@ export default function CoverArt({
 
   useEffect(() => {
     if (uploadedCover) {
+      // The cleanup below revokes this exact URL when the cover changes or the component unmounts.
+      // react-doctor-disable-next-line react-doctor/no-create-object-url-without-revoke
       const url = URL.createObjectURL(uploadedCover);
       setCoverSrc(url);
       return () => URL.revokeObjectURL(url);
@@ -136,6 +138,8 @@ export default function CoverArt({
 
     if (picture && picture.length > 0) {
       const blob = new Blob([picture[0].data as unknown as BlobPart], { type: picture[0].format });
+      // The cleanup below revokes this exact URL when the picture changes or the component unmounts.
+      // react-doctor-disable-next-line react-doctor/no-create-object-url-without-revoke
       const url = URL.createObjectURL(blob);
       setCoverSrc(url);
       return () => URL.revokeObjectURL(url);
