@@ -60,6 +60,8 @@ function ShareAlbumDialogSession({
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const open = true;
+  const dialogView =
+    state.status === "published" || state.status === "link" ? "share-link" : "share-creator";
   const linkUrl =
     state.status === "published"
       ? state.receipt.url
@@ -137,6 +139,7 @@ function ShareAlbumDialogSession({
       }}
     >
       <DialogContent
+        contentKey={dialogView}
         aria-describedby={undefined}
         className="max-h-[calc(100dvh-2rem)] max-w-lg gap-0 overflow-y-auto p-0"
         showCloseButton={state.status !== "publishing" && !stopping}
@@ -157,11 +160,7 @@ function ShareAlbumDialogSession({
                   share link
                 </label>
                 <span role="status" aria-live="polite" className="text-xs text-muted-foreground">
-                  {copyStatus === "copied"
-                    ? "copied"
-                    : copyStatus === "manual"
-                      ? "select and copy the link"
-                      : null}
+                  {copyStatus === "manual" ? "select and copy the link" : null}
                 </span>
               </div>
               <div className="flex gap-2">

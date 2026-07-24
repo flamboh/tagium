@@ -6,18 +6,15 @@ import ShareAlbumDialog from "@/features/share/ShareAlbumDialog";
 const lifecycle = vi.hoisted(() => ({
   mounts: 0,
   unmounts: 0,
+  rootMounts: 0,
+  rootUnmounts: 0,
   dialogOpens: [] as boolean[],
+  contentKeys: [] as string[],
   footerStructures: [] as number[],
 }));
 
 vi.mock("@/components/ui/dialog", () => {
-  const DialogContent = ({
-    children,
-    ...props
-  }: {
-    children?: unknown;
-    [key: string]: unknown;
-  }) => {
+  const DialogPanel = ({ children, ...props }: { children?: unknown; [key: string]: unknown }) => {
     useEffect(() => {
       lifecycle.mounts += 1;
       return () => {
@@ -25,6 +22,18 @@ vi.mock("@/components/ui/dialog", () => {
       };
     }, []);
     return createElement("div", props, children as never);
+  };
+  const DialogContent = ({
+    children,
+    contentKey,
+    ...props
+  }: {
+    children?: unknown;
+    contentKey?: string;
+    [key: string]: unknown;
+  }) => {
+    lifecycle.contentKeys.push(contentKey ?? "");
+    return createElement(DialogPanel, { ...props, key: contentKey }, children as never);
   };
   const Dialog = ({
     children,
@@ -35,6 +44,12 @@ vi.mock("@/components/ui/dialog", () => {
     open?: boolean;
     [key: string]: unknown;
   }) => {
+    useEffect(() => {
+      lifecycle.rootMounts += 1;
+      return () => {
+        lifecycle.rootUnmounts += 1;
+      };
+    }, []);
     lifecycle.dialogOpens.push(Boolean(open));
     return createElement("div", props, children as never);
   };
@@ -114,10 +129,13 @@ const text = (renderer: ReactTestRenderer) =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe("share album dialog", () => {
-  it("keeps one dialog session mounted through publishing and publication", () => {
+  it("mounts a new result panel without closing or remounting the dialog root", () => {
     lifecycle.mounts = 0;
     lifecycle.unmounts = 0;
+    lifecycle.rootMounts = 0;
+    lifecycle.rootUnmounts = 0;
     lifecycle.dialogOpens = [];
+    lifecycle.contentKeys = [];
     lifecycle.footerStructures = [];
     const renderer = render();
     const receipt = {
@@ -148,9 +166,12 @@ describe("share album dialog", () => {
       );
     });
 
-    expect(lifecycle.mounts).toBe(1);
-    expect(lifecycle.unmounts).toBe(0);
+    expect(lifecycle.mounts).toBe(2);
+    expect(lifecycle.unmounts).toBe(1);
+    expect(lifecycle.rootMounts).toBe(1);
+    expect(lifecycle.rootUnmounts).toBe(0);
     expect(lifecycle.dialogOpens).toEqual([true, true, true]);
+    expect(lifecycle.contentKeys).toEqual(["share-creator", "share-creator", "share-link"]);
   });
 
   it("keeps footer layout structure stable while entering stop confirmation", () => {
