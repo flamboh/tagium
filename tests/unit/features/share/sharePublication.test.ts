@@ -74,13 +74,13 @@ describe("shared album publication state", () => {
     expect(new Set([original, renamed, reordered, newArtwork])).toHaveLength(4);
   });
 
-  it("never republishes imported albums", () => {
+  it("lets imported albums reopen their original share link", () => {
     expect(
       shareAlbumActionState(album({ sourceManifestSlug: "source" }), undefined, false),
     ).toEqual({
-      enabled: false,
-      label: "share album",
-      reason: "shared albums cannot be shared again",
+      enabled: true,
+      label: "view share link",
+      reason: "view share link",
     });
   });
 

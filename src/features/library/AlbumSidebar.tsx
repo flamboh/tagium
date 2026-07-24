@@ -182,8 +182,11 @@ export default function AlbumSidebar({
                   ? "add imported tracks first"
                   : "albums with local tracks cannot be shared";
               const shareAction = shareAlbumActions[album.id];
+              const retrievesExistingLink = shareAction?.label === "view share link";
               const canShareAlbum =
-                Boolean(onShareAlbum) && contentCanShare && (shareAction?.enabled ?? true);
+                Boolean(onShareAlbum) &&
+                (retrievesExistingLink || contentCanShare) &&
+                (shareAction?.enabled ?? true);
               const shareDisabledReason = shareAction?.reason ?? contentDisabledReason;
               const fileDropProps = albumFileDropProps(album.id);
               return (

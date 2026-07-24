@@ -31,6 +31,69 @@ afterEach(() => {
 });
 
 describe("share creator preview state", () => {
+  it("reopens the original link for a received album", () => {
+    const location = { pathname: "/", origin: "https://tagium.app" };
+    vi.stubGlobal("location", location);
+    vi.stubGlobal("history", { state: {}, replaceState: vi.fn(), back: vi.fn() });
+    vi.stubGlobal("window", new EventTarget());
+
+    const album = {
+      id: "album",
+      title: "Received",
+      artist: "Artist",
+      genre: "Electronic",
+      trackIds: ["a"],
+      sourceManifestSlug: "received-album",
+    };
+    const files = [
+      {
+        id: "a",
+        filename: "first.mp3",
+        metadata: {
+          filename: "first.mp3",
+          title: "First",
+          artist: "Artist",
+          album: "Received",
+          year: null,
+          genre: "Electronic",
+          duration: 120,
+          bitrate: 320,
+          sampleRate: 44100,
+          picture: [],
+          trackNumber: 1,
+        },
+      },
+    ];
+    const library = {
+      state: { albums: [album], files },
+      getSnapshot: () => ({ albums: [album], files }),
+      dispatch: vi.fn(),
+    } as unknown as LibraryStore;
+    const hook = renderHook(
+      () =>
+        useShareWorkflow({
+          library,
+          editor: { commands: { flush: vi.fn() } } as never,
+          importing: { commands: { importSharedAlbum: vi.fn() } } as never,
+          enabled: true,
+        }),
+      undefined,
+    );
+
+    expect(hook.result.shareActions.album).toMatchObject({
+      enabled: true,
+      label: "view share link",
+    });
+    act(() => hook.result.openCreator("album"));
+    expect(hook.result.dialog).toMatchObject({
+      status: "link",
+      url: "https://tagium.app/share/received-album",
+      preview: { albumTitle: "Received" },
+    });
+    expect(publishSharedAlbum).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
   it("reopens an unchanged publication so its existing link can be copied again", () => {
     const location = { pathname: "/" };
     vi.stubGlobal("location", location);

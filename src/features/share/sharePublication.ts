@@ -91,7 +91,7 @@ export const shareAlbumActionState = (
   now = Date.now(),
 ): ShareAlbumActionState => {
   if (album.sourceManifestSlug) {
-    return { enabled: false, label: "share album", reason: "shared albums cannot be shared again" };
+    return { enabled: true, label: "view share link", reason: "view share link" };
   }
   const publication = album.sharePublication;
   if (!publication) return { enabled: true, label: "share album", reason: "share album" };

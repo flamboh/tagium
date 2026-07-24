@@ -55,11 +55,12 @@ describe("SortableAlbumCard sharing state", () => {
     expect(markup).toContain('aria-label="share album: Signal"');
   });
 
-  it("uses a subtle link affordance for an active publication", () => {
+  it("uses the standard untinted link affordance for an active publication", () => {
     const markup = renderCard("view share link");
 
     expect(markup).toContain("lucide-link-2");
-    expect(markup).toContain("text-primary");
     expect(markup).toContain('aria-label="view share link: Signal"');
+    expect(markup).not.toContain("bg-primary/8");
+    expect(markup).not.toContain("text-primary");
   });
 });

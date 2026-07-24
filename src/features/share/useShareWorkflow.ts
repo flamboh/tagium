@@ -19,7 +19,7 @@ import {
   storeRevocationReceipt,
 } from "@/features/share/revocationReceipt";
 import { detectAnotherTagiumTab, listenForTagiumPresence } from "@/features/share/sharePresence";
-import { shareSlugFromPathname } from "@/features/share/shareLink";
+import { shareLinkForSlug, shareSlugFromPathname } from "@/features/share/shareLink";
 import { shareEligibility } from "@/features/share/shareEligibility";
 import { sharePublicationErrorMessage } from "@/features/share/sharePublicationError";
 import type { ShareDialogState } from "@/features/share/ShareAlbumDialog";
@@ -139,6 +139,9 @@ export const useShareWorkflow = ({
   const currentLibrary = library.getSnapshot();
   const shareActions = Object.fromEntries(
     currentLibrary.albums.map((album): [string, ShareAlbumActionState] => {
+      if (album.sourceManifestSlug) {
+        return [album.id, shareAlbumActionState(album, undefined, false)];
+      }
       const files = (album.trackIds ?? []).map((trackId) =>
         currentLibrary.files?.find((file) => file.id === trackId),
       );
@@ -275,6 +278,15 @@ export const useShareWorkflow = ({
       const files = album.trackIds.map((trackId) =>
         snapshot.files.find((file) => file.id === trackId),
       );
+      if (album.sourceManifestSlug) {
+        setCreatorAlbumId(null);
+        setDialog({
+          status: "link",
+          preview: buildShareAlbumPreview(album, files),
+          url: shareLinkForSlug(album.sourceManifestSlug),
+        });
+        return;
+      }
       const ineligibleReason = shareEligibility(album, files);
       if (ineligibleReason) {
         toast.error("this album cannot be shared", {
@@ -328,7 +340,8 @@ export const useShareWorkflow = ({
       publicationActionInFlightRef.current ||
       !creatorAlbumId ||
       dialog.status === "closed" ||
-      dialog.status === "published"
+      dialog.status === "published" ||
+      dialog.status === "link"
     )
       return;
     publicationActionInFlightRef.current = true;

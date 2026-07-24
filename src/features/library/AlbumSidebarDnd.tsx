@@ -269,10 +269,7 @@ export function SortableAlbumCard({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className={cn(
-                  "h-7 w-7",
-                  hasActiveShare && "bg-primary/8 text-primary hover:bg-primary/12",
-                )}
+                className="h-7 w-7"
                 onClick={onShare}
                 disabled={!canShare}
                 aria-label={`${shareLabel}: ${album.title}`}

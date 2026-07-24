@@ -22,6 +22,11 @@ export type ShareDialogState =
       receipt: SharePublicationReceipt;
     }
   | {
+      status: "link";
+      preview: ShareAlbumPreview;
+      url: string;
+    }
+  | {
       status: "error";
       preview: ShareAlbumPreview;
       intent?: "create" | "update";
@@ -55,6 +60,12 @@ function ShareAlbumDialogSession({
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const open = true;
+  const linkUrl =
+    state.status === "published"
+      ? state.receipt.url
+      : state.status === "link"
+        ? state.url
+        : undefined;
 
   const closeDialog = () => {
     setCopyStatus("idle");
@@ -88,10 +99,10 @@ function ShareAlbumDialogSession({
   }, [cover]);
 
   const copyLink = async () => {
-    if (state.status !== "published") return;
+    if (!linkUrl) return;
     try {
       if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
-      await navigator.clipboard.writeText(state.receipt.url);
+      await navigator.clipboard.writeText(linkUrl);
       setCopyStatus("copied");
     } catch {
       inputRef.current?.focus();
@@ -139,17 +150,26 @@ function ShareAlbumDialogSession({
 
           <SharePreview preview={state.preview} coverUrl={coverUrl} />
 
-          {state.status === "published" ? (
-            <div className="space-y-2 p-5 pb-3">
-              <label htmlFor="album-share-link" className="text-sm font-medium">
-                share link
-              </label>
+          {state.status === "published" || state.status === "link" ? (
+            <div className="space-y-2 px-5 py-4">
+              <div className="flex min-h-5 items-center justify-between gap-3">
+                <label htmlFor="album-share-link" className="text-sm font-medium">
+                  share link
+                </label>
+                <span role="status" aria-live="polite" className="text-xs text-muted-foreground">
+                  {copyStatus === "copied"
+                    ? "copied"
+                    : copyStatus === "manual"
+                      ? "select and copy the link"
+                      : null}
+                </span>
+              </div>
               <div className="flex gap-2">
                 <Input
                   id="album-share-link"
                   ref={inputRef}
                   readOnly
-                  value={state.receipt.url}
+                  value={linkUrl}
                   onFocus={(event) => event.currentTarget.select()}
                   className="min-w-0 font-mono text-xs"
                 />
@@ -162,16 +182,9 @@ function ShareAlbumDialogSession({
                   {copyStatus === "copied" ? "copied" : "copy link"}
                 </Button>
               </div>
-              <p role="status" aria-live="polite" className="min-h-5 text-sm text-muted-foreground">
-                {copyStatus === "copied"
-                  ? "share link copied."
-                  : copyStatus === "manual"
-                    ? "the link is selected. copy it from the field."
-                    : null}
-              </p>
             </div>
           ) : (
-            <div className="space-y-4 p-5">
+            <div className="space-y-2 px-5 pb-4 pt-1">
               <p className="text-sm leading-6 text-foreground">
                 anyone with the link can add this album. tracks are added from their original
                 sources with these shared tags.
@@ -181,27 +194,25 @@ function ShareAlbumDialogSession({
                   ? "the link keeps its current expiration."
                   : "expires in 90 days."}
               </p>
-              <p
-                role={state.status === "error" ? "alert" : undefined}
-                className="min-h-5 text-sm text-destructive"
-              >
-                {state.status === "error" ? state.message : null}
-              </p>
+              {state.status === "error" && (
+                <p role="alert" className="text-sm text-destructive">
+                  {state.message}
+                </p>
+              )}
             </div>
           )}
 
           {state.status === "published" && (
-            <div className="min-h-16 px-5 pt-1 text-left text-sm text-muted-foreground">
+            <div className="px-5 pb-4 text-left text-sm text-muted-foreground">
               {confirmStop ? (
                 <>
                   the link will stop working immediately. anyone who already added the album keeps
                   their copy.
-                  <span
-                    role={stopError ? "alert" : undefined}
-                    className="mt-1 block min-h-5 text-destructive"
-                  >
-                    {stopError}
-                  </span>
+                  {stopError && (
+                    <span role="alert" className="mt-1 block text-destructive">
+                      {stopError}
+                    </span>
+                  )}
                 </>
               ) : (
                 `expires ${formatExpiry(
@@ -211,7 +222,7 @@ function ShareAlbumDialogSession({
             </div>
           )}
 
-          <DialogFooter className="border-t p-5">
+          <DialogFooter className="border-t p-4">
             {state.status === "published" ? (
               <div className="grid w-full grid-cols-2 gap-2">
                 <div className="min-w-0">
@@ -257,12 +268,16 @@ function ShareAlbumDialogSession({
                   </Button>
                 )}
               </div>
+            ) : state.status === "link" ? (
+              <Button type="button" className="h-9 w-full" onClick={closeDialog}>
+                done
+              </Button>
             ) : (
-              <>
+              <div className="grid w-full grid-cols-2 gap-2">
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-9 w-36 min-w-32"
+                  className="h-9 w-full"
                   disabled={state.status === "publishing"}
                   onClick={closeDialog}
                 >
@@ -270,7 +285,7 @@ function ShareAlbumDialogSession({
                 </Button>
                 <Button
                   type="button"
-                  className="h-9 w-44 min-w-32"
+                  className="h-9 w-full"
                   disabled={state.status === "publishing"}
                   onClick={onPublish}
                 >
@@ -288,7 +303,7 @@ function ShareAlbumDialogSession({
                       ? "update shared album"
                       : "create share link"}
                 </Button>
-              </>
+              </div>
             )}
           </DialogFooter>
         </>
@@ -316,7 +331,7 @@ function SharePreview({
   coverUrl: string | null;
 }) {
   return (
-    <div className="flex min-w-0 gap-4 px-5 pt-5">
+    <div className="flex min-w-0 gap-4 px-5 py-4">
       <div
         className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted sm:size-32"
         aria-label={preview.cover ? "album cover" : "no album cover"}

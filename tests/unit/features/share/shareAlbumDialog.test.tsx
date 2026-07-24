@@ -72,7 +72,7 @@ const preview = {
   cover: null,
 } as const;
 
-const render = (status: "confirm" | "published" | "error" = "confirm") => {
+const render = (status: "confirm" | "published" | "link" | "error" = "confirm") => {
   const state =
     status === "published"
       ? {
@@ -85,9 +85,11 @@ const render = (status: "confirm" | "published" | "error" = "confirm") => {
             revocationToken: "token",
           },
         }
-      : status === "error"
-        ? { status, preview, message: "Could not publish" }
-        : { status, preview };
+      : status === "link"
+        ? { status, preview, url: "https://tagium.app/share/received" }
+        : status === "error"
+          ? { status, preview, message: "Could not publish" }
+          : { status, preview };
   let renderer!: ReactTestRenderer;
   act(() => {
     renderer = create(
@@ -159,7 +161,7 @@ describe("share album dialog", () => {
         (node) =>
           typeof node.type === "string" &&
           typeof node.props.className === "string" &&
-          node.props.className.includes("border-t p-5"),
+          node.props.className.includes("border-t p-4"),
       )[0];
     const before = footer();
     const stop = renderer.root
@@ -181,7 +183,7 @@ describe("share album dialog", () => {
   it("reserves stable action slots and uses cover-free stop warning", () => {
     const renderer = render("published");
     const footer = renderer.root.findAllByProps({
-      className: "border-t p-5",
+      className: "border-t p-4",
     })[0];
     const before = renderer.root.findAllByType("button").map((button) => button.props.className);
     const stop = renderer.root
@@ -189,7 +191,7 @@ describe("share album dialog", () => {
       .find((button) => button.children.includes("stop sharing"))!;
     act(() => void stop.props.onClick());
     const after = renderer.root.findAllByType("button").map((button) => button.props.className);
-    expect(footer.props.className).toBe("border-t p-5");
+    expect(footer.props.className).toBe("border-t p-4");
     expect(before.filter((value) => value.includes("w-full"))).toHaveLength(2);
     expect(after.filter((value) => value.includes("w-full"))).toHaveLength(2);
     expect(text(renderer)).toContain("the link will stop working immediately.");
@@ -231,7 +233,7 @@ describe("share album dialog", () => {
     const updateButton = renderer.root
       .findAllByType("button")
       .find((button) => button.children.includes("update shared album"));
-    expect(updateButton?.props.className).toContain("w-44");
+    expect(updateButton?.props.className).toContain("w-full");
 
     act(() => {
       renderer.update(
@@ -279,7 +281,30 @@ describe("share album dialog", () => {
     await act(async () => void (await copy.props.onClick()));
 
     expect(writeText).toHaveBeenCalledWith("https://tagium.app/share/slug");
-    expect(text(renderer)).toContain("the link is selected. copy it from the field.");
+    expect(text(renderer)).toContain("select and copy the link");
+  });
+
+  it("reopens a received album link without owner-only controls", async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const renderer = render("link");
+
+    expect(text(renderer)).toContain("share link");
+    expect(text(renderer)).not.toContain("expires");
+    expect(text(renderer)).not.toContain("stop sharing");
+    expect(
+      renderer.root
+        .findAllByType("button")
+        .flatMap((button) =>
+          button.children.filter((child): child is string => typeof child === "string"),
+        ),
+    ).toEqual(expect.arrayContaining(["copy link", "done"]));
+
+    const copy = renderer.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("copy link"))!;
+    await act(async () => void (await copy.props.onClick()));
+    expect(writeText).toHaveBeenCalledWith("https://tagium.app/share/received");
   });
 
   it("removes the close control while a publication action is running", () => {
@@ -377,7 +402,7 @@ describe("share album dialog", () => {
     const createButton = renderer.root
       .findAllByType("button")
       .find((button) => button.children.includes("create share link"));
-    expect(createButton?.props.className).toContain("w-44");
+    expect(createButton?.props.className).toContain("w-full");
 
     const publishingProps = {
       state: { status: "publishing" as const, preview },
