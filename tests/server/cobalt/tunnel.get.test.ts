@@ -45,6 +45,17 @@ const makeTunnelRequestForMachine = () => {
   return machineRequest;
 };
 
+const withObservability = (request: RuntimeRequest) => {
+  const url = new URL(request.url);
+  url.searchParams.set("parentRequestId", "plan-request-1");
+  url.searchParams.set("importId", "import-1");
+  url.searchParams.set("sourceFingerprint", `sha256:${"a".repeat(32)}`);
+  url.searchParams.set("trackIndex", "7");
+  const correlatedRequest = new Request(url, request) as RuntimeRequest;
+  correlatedRequest.runtime = request.runtime;
+  return correlatedRequest;
+};
+
 const makeEvent = (request: RuntimeRequest) => {
   return { req: request } as unknown as Parameters<typeof handler>[0];
 };
@@ -87,13 +98,17 @@ describe("cobalt tunnel endpoint", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    const response = await handler(makeEvent(makeTunnelRequestForMachine()));
+    const response = await handler(makeEvent(withObservability(makeTunnelRequestForMachine())));
     const [, init] = fetchMock.mock.calls[0];
     const headers = new Headers(init?.headers);
 
     expect(response.status).toBe(200);
     expect(headers.get("Fly-Force-Instance-Id")).toBe("cobalt-machine-1");
     expect(headers.get("X-Tagium-Tunnel-Request-Id")).toMatch(/^tagium-tunnel-/);
+    expect(headers.get("X-Tagium-Parent-Request-Id")).toBe("plan-request-1");
+    expect(headers.get("X-Tagium-Import-Id")).toBe("import-1");
+    expect(headers.get("X-Tagium-Source-Fingerprint")).toBe(`sha256:${"a".repeat(32)}`);
+    expect(headers.get("X-Tagium-Track-Index")).toBe("7");
   });
 
   it("logs upstream tunnel failures with machine affinity context", async () => {
@@ -116,7 +131,7 @@ describe("cobalt tunnel endpoint", () => {
       machineId: "cobalt-machine-1",
       tunnelId: "123456789012345678901",
       status: 404,
-      body: "missing tunnel",
+      responseBytes: 14,
     });
   });
 
@@ -210,5 +225,35 @@ describe("cobalt tunnel endpoint", () => {
 
     expect(response.status).toBe(502);
     expect(await response.text()).toBe("Cobalt tunnel response was empty.");
+  });
+
+  it("returns a safe compatibility response when the upstream fetch throws", async () => {
+    const warnMock = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("private upstream detail");
+      }),
+    );
+
+    const response = await handler(makeEvent(makeTunnelRequest()));
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe("private upstream detail");
+    expect(JSON.stringify(warnMock.mock.calls)).not.toContain("private upstream detail");
+  });
+
+  it("preserves the established timeout wording for aborted upstream fetches", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new DOMException("timed out", "TimeoutError");
+      }),
+    );
+
+    const response = await handler(makeEvent(makeTunnelRequest()));
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe("Cobalt tunnel request timed out.");
   });
 });

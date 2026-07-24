@@ -8,13 +8,20 @@ const proxyPort = 9000;
 const cobaltHost = "127.0.0.1";
 const cobaltPort = 9001;
 let nextRequestId = 0;
+const maxCapturedResponseBytes = 4_096;
+const correlationValuePattern = /^[A-Za-z0-9_-]{1,128}$/;
+const sourceFingerprintPattern = /^sha256:[a-f0-9]{32}$/;
+
+const getSafeHeader = (clientRequest, name, pattern = correlationValuePattern) => {
+  const value = clientRequest.headers[name];
+  const header = Array.isArray(value) ? value[0] : value;
+  return header && pattern.test(header) ? header : undefined;
+};
 
 const getProxyRequestId = (clientRequest) => {
-  const header = clientRequest.headers["x-tagium-tunnel-request-id"];
-  if (Array.isArray(header)) {
-    const [firstHeader] = header;
-    if (firstHeader) return firstHeader;
-  }
+  const header =
+    getSafeHeader(clientRequest, "x-tagium-request-id") ??
+    getSafeHeader(clientRequest, "x-tagium-tunnel-request-id");
   if (header) return header;
 
   nextRequestId += 1;
@@ -34,8 +41,52 @@ const getRequestContext = (clientRequest, requestId, runtimeEnv) => {
   if (tunnelId) {
     context.tunnelId = tunnelId;
   }
+  const importId = getSafeHeader(clientRequest, "x-tagium-import-id");
+  if (importId) {
+    context.importId = importId;
+  }
+  const parentRequestId = getSafeHeader(clientRequest, "x-tagium-parent-request-id");
+  if (parentRequestId) {
+    context.parentRequestId = parentRequestId;
+  }
+  const sourceFingerprint = getSafeHeader(
+    clientRequest,
+    "x-tagium-source-fingerprint",
+    sourceFingerprintPattern,
+  );
+  if (sourceFingerprint) {
+    context.sourceFingerprint = sourceFingerprint;
+  }
+  const trackIndex = getSafeHeader(clientRequest, "x-tagium-track-index", /^\d{1,5}$/);
+  if (trackIndex) {
+    context.trackIndex = Number(trackIndex);
+  }
 
   return context;
+};
+
+const getCobaltErrorContext = (responseHeaders, chunks, capturedBytes, responseBytes) => {
+  if (
+    capturedBytes !== responseBytes ||
+    !String(responseHeaders["content-type"] ?? "").includes("application/json")
+  ) {
+    return {};
+  }
+
+  try {
+    const body = JSON.parse(Buffer.concat(chunks, capturedBytes).toString("utf8"));
+    if (body?.status !== "error" || typeof body.error?.code !== "string") {
+      return {};
+    }
+    return {
+      errorCode: body.error.code,
+      ...(typeof body.error.context?.service === "string"
+        ? { service: body.error.context.service }
+        : {}),
+    };
+  } catch {
+    return {};
+  }
 };
 
 const logProxy = (message, context) => {
@@ -267,9 +318,15 @@ export const createCobaltProxyServer = ({
         (responseFromUpstream) => {
           upstreamResponse = responseFromUpstream;
           let responseBytes = 0;
+          let capturedBytes = 0;
+          const responseChunks = [];
 
           responseFromUpstream.on("data", (chunk) => {
             responseBytes += chunk.length;
+            if (capturedBytes + chunk.length <= maxCapturedResponseBytes) {
+              responseChunks.push(chunk);
+              capturedBytes += chunk.length;
+            }
           });
           responseFromUpstream.on("end", () => {
             upstreamResponseEnded = true;
@@ -278,6 +335,12 @@ export const createCobaltProxyServer = ({
               elapsedMs: Date.now() - startedAt,
               status: responseFromUpstream.statusCode,
               responseBytes,
+              ...getCobaltErrorContext(
+                responseFromUpstream.headers,
+                responseChunks,
+                capturedBytes,
+                responseBytes,
+              ),
             });
             releaseGate();
           });

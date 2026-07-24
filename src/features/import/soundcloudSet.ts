@@ -13,11 +13,16 @@ export const isSoundCloudSetUrl = (url: string) => {
   }
 };
 
-export const resolveSoundCloudSet = async (url: string) => {
+export const resolveSoundCloudSet = async (url: string, importId?: string) => {
   const endpoint = new URL("/api/soundcloud-set", window.location.origin);
   endpoint.searchParams.set("url", url);
 
-  const response = await fetch(endpoint);
+  const headers = new Headers();
+  headers.set("X-Tagium-Request-Id", crypto.randomUUID());
+  if (importId) {
+    headers.set("X-Tagium-Import-Id", importId);
+  }
+  const response = await fetch(endpoint, { headers });
   if (!response.ok) {
     throw new Error(`soundcloud set request failed (${response.status})`);
   }

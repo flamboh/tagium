@@ -39,6 +39,7 @@ const makeAudioRequest = (signal?: AbortSignal, year: number | null = 2020) => {
     headers: {
       "Content-Type": "application/json",
       Origin: "https://tagium.test",
+      "X-Tagium-Request-Id": "request-test",
     },
     body: JSON.stringify({
       url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
@@ -68,6 +69,7 @@ const makeEvent = (request: RuntimeRequest) => {
 describe("cobalt audio endpoint", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("maps invalid request bodies to HTTP 400 errors", async () => {
@@ -124,17 +126,16 @@ describe("cobalt audio endpoint", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    const response = await handler(makeEvent(makeAudioRequest()));
+    const request = makeAudioRequest();
+    request.headers.set("X-Tagium-Import-Id", "import-1");
+    request.headers.set("X-Tagium-Track-Index", "7");
+    const response = await handler(makeEvent(request));
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(cobaltBodies).toMatchObject([{ youtubeHLS: false }]);
     expect(body).toMatchObject({
       status: "local-processing",
-      tunnel: [
-        `/api/cobalt/tunnel?url=${encodeURIComponent(audioTunnel)}`,
-        `/api/cobalt/tunnel?url=${encodeURIComponent(coverTunnel)}`,
-      ],
       output: {
         filename: "download.mp3",
         metadata: {
@@ -142,18 +143,85 @@ describe("cobalt audio endpoint", () => {
         },
       },
     });
+    const tunnelUrls = body.tunnel.map((url: string) => new URL(url, "https://tagium.test"));
+    expect(tunnelUrls.map((url: URL) => url.searchParams.get("url"))).toEqual([
+      audioTunnel,
+      coverTunnel,
+    ]);
+    expect(tunnelUrls.map((url: URL) => url.searchParams.get("parentRequestId"))).toEqual([
+      "request-test",
+      "request-test",
+    ]);
+    expect(tunnelUrls.map((url: URL) => url.searchParams.get("importId"))).toEqual([
+      "import-1",
+      "import-1",
+    ]);
+    expect(tunnelUrls.map((url: URL) => url.searchParams.get("trackIndex"))).toEqual(["7", "7"]);
+    expect(
+      tunnelUrls.every((url: URL) =>
+        /^sha256:[a-f0-9]{32}$/.test(url.searchParams.get("sourceFingerprint") ?? ""),
+      ),
+    ).toBe(true);
   });
 
   it("classifies malformed upstream payloads as gateway failures", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const sentinel = "https://soundcloud.com/private/s-secret-token";
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => Response.json({ status: "a-future-cobalt-status" })),
+      vi.fn(async () => Response.json({ status: "a-future-cobalt-status", echoed: sentinel })),
     );
 
     const response = await handler(makeEvent(makeAudioRequest()));
 
     expect(response.status).toBe(502);
-    expect(await response.text()).toContain("a-future-cobalt-status");
+    expect(await response.text()).toBe("error.api.invalid_response");
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(sentinel);
+  });
+
+  it("logs SoundCloud adapter detail without changing the public Cobalt error", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          {
+            status: "error",
+            error: {
+              code: "error.api.fetch.soundcloud.resolve_fetch.429.errorType-TypeError.contentType-application%2Fjson",
+            },
+          },
+          { status: 200 },
+        ),
+      ),
+    );
+
+    const response = await handler(makeEvent(makeAudioRequest()));
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe("error.api.fetch.fail");
+    expect(JSON.stringify(warn.mock.calls)).toContain(
+      "error.api.fetch.soundcloud.resolve_fetch.429.errorType-TypeError.contentType-application%2Fjson",
+    );
+  });
+
+  it("preserves the public empty-stream error for SoundCloud stream failures", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          status: "error",
+          error: { code: "error.api.fetch.soundcloud.stream_parse" },
+        }),
+      ),
+    );
+
+    const response = await handler(makeEvent(makeAudioRequest()));
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe("error.api.fetch.empty");
+    expect(JSON.stringify(warn.mock.calls)).toContain("error.api.fetch.soundcloud.stream_parse");
   });
 
   it("infers direct YouTube track year from its upload date", async () => {
@@ -258,11 +326,16 @@ describe("cobalt audio endpoint", () => {
     expect(response.status).toBe(200);
     expect(body).toMatchObject({
       status: "local-processing",
-      tunnel: [
-        `/api/cobalt/tunnel?url=${encodeURIComponent(audioTunnel)}&machine=cobalt-machine-1&signature=2302919c93e4a4b8486de4ab75fff6f2030499d2c6e85b65a3195de735782113`,
-        `/api/cobalt/tunnel?url=${encodeURIComponent(coverTunnel)}&machine=cobalt-machine-1&signature=93217531746bfde711a0169d7ecc2f1598eb8cf2b43521bad3e476194706a1b7`,
-      ],
     });
+    const tunnelUrls = body.tunnel.map((url: string) => new URL(url, "https://tagium.test"));
+    expect(tunnelUrls.map((url: URL) => url.searchParams.get("machine"))).toEqual([
+      "cobalt-machine-1",
+      "cobalt-machine-1",
+    ]);
+    expect(tunnelUrls.map((url: URL) => url.searchParams.get("signature"))).toEqual([
+      "2302919c93e4a4b8486de4ab75fff6f2030499d2c6e85b65a3195de735782113",
+      "93217531746bfde711a0169d7ecc2f1598eb8cf2b43521bad3e476194706a1b7",
+    ]);
   });
 
   it("rejects malformed Cobalt machine ids at ingestion", async () => {
@@ -332,6 +405,56 @@ describe("cobalt audio endpoint", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(response.status).toBe(502);
     expect(await response.text()).toBe("error.api.fetch.fail");
+  });
+
+  it("correlates and logs structured Cobalt failures without the source URL", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    let upstreamHeaders = new Headers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        upstreamHeaders = new Headers(init?.headers);
+        return Response.json(
+          {
+            status: "error",
+            error: {
+              code: "error.api.fetch.fail",
+              context: { service: "soundcloud" },
+            },
+          },
+          {
+            status: 400,
+            headers: { "X-Cobalt-Machine-Id": "cobalt-machine-1" },
+          },
+        );
+      }),
+    );
+    const request = makeAudioRequest();
+    request.headers.set("X-Tagium-Request-Id", "request-1");
+    request.headers.set("X-Tagium-Import-Id", "import-1");
+    request.headers.set("X-Tagium-Track-Index", "7");
+
+    const response = await handler(makeEvent(request));
+
+    expect(response.status).toBe(502);
+    expect(response.headers.get("X-Tagium-Request-Id")).toBe("request-1");
+    expect(upstreamHeaders.get("X-Tagium-Request-Id")).toBe("request-1");
+    expect(upstreamHeaders.get("X-Tagium-Import-Id")).toBe("import-1");
+    expect(upstreamHeaders.get("X-Tagium-Track-Index")).toBe("7");
+    expect(upstreamHeaders.get("X-Tagium-Source-Fingerprint")).toMatch(/^sha256:[a-f0-9]{32}$/);
+    const event = warn.mock.calls
+      .map(([entry]) => JSON.parse(entry))
+      .find((entry) => entry.event === "cobalt_audio_failure");
+    expect(event).toMatchObject({
+      requestId: "request-1",
+      importId: "import-1",
+      trackIndex: 7,
+      stage: "cobalt.resolve_error",
+      upstreamStatus: 400,
+      errorCode: "error.api.fetch.fail",
+      machineId: "cobalt-machine-1",
+    });
+    expect(JSON.stringify(event)).not.toContain("youtube.com");
   });
 
   it("propagates client cancellation to the upstream Cobalt request", async () => {

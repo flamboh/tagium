@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import handler from "../../server/api/soundcloud-set.get";
 
-const makeEvent = () => {
+const makeEvent = (headers?: HeadersInit) => {
   const request = new Request(
     "https://tagium.test/api/soundcloud-set?url=https%3A%2F%2Fsoundcloud.com%2Fartist%2Fsets%2Falbum",
+    { headers },
   );
 
   return { req: request } as unknown as Parameters<typeof handler>[0];
@@ -12,6 +13,7 @@ const makeEvent = () => {
 describe("soundcloud set endpoint", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("returns album kind and prefers release date for album year", async () => {
@@ -180,6 +182,228 @@ describe("soundcloud set endpoint", () => {
 
     await expect(handler(makeEvent())).resolves.toMatchObject({
       coverUrl: "https://i1.sndcdn.com/artworks-000603058507-5buc5j-t1080x1080.jpg",
+    });
+  });
+
+  it("logs playlist upstream failures with correlation but without the source URL", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = input instanceof Request ? input.url : new URL(input).toString();
+        if (url === "https://soundcloud.com/") {
+          return new Response(
+            '<script>window.__sc_version="1234567890"</script>{"hydratable":"apiClient","data":{"id":"client-id"}}',
+          );
+        }
+        return new Response("rate limited", {
+          status: 429,
+          headers: { "Content-Type": "text/html", "Retry-After": "30" },
+        });
+      }),
+    );
+
+    await expect(
+      handler(
+        makeEvent({
+          "X-Tagium-Request-Id": "request-1",
+          "X-Tagium-Import-Id": "import-1",
+        }),
+      ),
+    ).rejects.toThrow("soundcloud.playlist.resolve_http_429");
+
+    const event = warn.mock.calls
+      .map(([entry]) => JSON.parse(entry))
+      .find((entry) => entry.stage === "playlist.resolve_fetch");
+    expect(event).toMatchObject({
+      event: "soundcloud_upstream_failure",
+      requestId: "request-1",
+      importId: "import-1",
+      stage: "playlist.resolve_fetch",
+      upstreamStatus: 429,
+      contentType: "text/html",
+      retryAfter: "30",
+    });
+    expect(event.urlFingerprint).toMatch(/^sha256:[a-f0-9]{32}$/);
+    expect(JSON.stringify(event)).not.toContain("soundcloud.com/artist/sets/album");
+  });
+
+  it("logs thrown playlist fetches once at the fetch stage", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = input instanceof Request ? input.url : new URL(input).toString();
+        if (url === "https://soundcloud.com/") {
+          return new Response(
+            '<script>window.__sc_version="1234567890"</script>{"hydratable":"apiClient","data":{"id":"client-id"}}',
+          );
+        }
+        throw new TypeError("network unavailable");
+      }),
+    );
+
+    await expect(handler(makeEvent({ "X-Tagium-Request-Id": "request-throw" }))).rejects.toThrow(
+      "network unavailable",
+    );
+
+    const failures = warn.mock.calls
+      .map(([entry]) => JSON.parse(entry))
+      .filter((entry) => entry.event === "soundcloud_upstream_failure");
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatchObject({
+      requestId: "request-throw",
+      stage: "playlist.resolve_fetch",
+      errorType: "TypeError",
+    });
+  });
+
+  it("logs partial track failures and an aggregate completion", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = input instanceof Request ? input.url : new URL(input).toString();
+        if (url === "https://soundcloud.com/") {
+          return new Response(
+            '<script>window.__sc_version="1234567890"</script>{"hydratable":"apiClient","data":{"id":"client-id"}}',
+          );
+        }
+        if (url.startsWith("https://api-v2.soundcloud.com/tracks/2")) {
+          return new Response("unavailable", {
+            status: 503,
+            headers: { "Content-Type": "text/plain" },
+          });
+        }
+        return Response.json({
+          kind: "playlist",
+          title: "Album",
+          user: { username: "Artist" },
+          tracks: [
+            {
+              id: 1,
+              kind: "track",
+              title: "Resolved",
+              permalink_url: "https://soundcloud.com/artist/resolved",
+            },
+            null,
+            { id: 2, kind: "track" },
+            {
+              id: 3,
+              kind: "track",
+              title: "Still Resolved",
+              permalink_url: "https://soundcloud.com/artist/still-resolved",
+            },
+          ],
+        });
+      }),
+    );
+
+    const result = await handler(
+      makeEvent({
+        "X-Tagium-Request-Id": "request-2",
+        "X-Tagium-Import-Id": "import-2",
+      }),
+    );
+
+    expect(result.tracks).toMatchObject([
+      { title: "Resolved", trackNumber: 1 },
+      { title: "Still Resolved", trackNumber: 4 },
+    ]);
+    const failure = warn.mock.calls
+      .map(([entry]) => JSON.parse(entry))
+      .find((entry) => entry.stage === "track.resolve_fetch");
+    expect(failure).toMatchObject({
+      requestId: "request-2",
+      importId: "import-2",
+      trackIndex: 3,
+      upstreamStatus: 503,
+    });
+    const completion = info.mock.calls
+      .map(([entry]) => JSON.parse(entry))
+      .find((entry) => entry.event === "soundcloud_set_completion");
+    expect(completion).toMatchObject({
+      requestId: "request-2",
+      importId: "import-2",
+      trackCount: 4,
+      succeeded: 2,
+      failed: 2,
+      failuresByStage: { "track.entry_parse": 1, "track.resolve_fetch": 1 },
+    });
+    const decodeFailure = warn.mock.calls
+      .map(([entry]) => JSON.parse(entry))
+      .find((entry) => entry.stage === "track.entry_parse");
+    expect(decodeFailure).toMatchObject({
+      requestId: "request-2",
+      importId: "import-2",
+      trackIndex: 2,
+    });
+  });
+
+  it("continues client id discovery after a failed CDN script", async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = input instanceof Request ? input.url : new URL(input).toString();
+      if (url === "https://soundcloud.com/") {
+        return new Response(
+          '<script>window.__sc_version="2234567890"</script>' +
+            '<script src="https://a-v2.sndcdn.com/first.js"></script>' +
+            '<script src="https://a-v2.sndcdn.com/second.js"></script>',
+        );
+      }
+      if (url.endsWith("/first.js")) throw new TypeError("cdn unavailable");
+      if (url.endsWith("/second.js")) {
+        return new Response(',client_id:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",');
+      }
+      return Response.json({
+        kind: "playlist",
+        title: "Playlist",
+        tracks: [
+          { id: 1, kind: "track", title: "Track", permalink_url: "https://soundcloud.com/a/t" },
+        ],
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(handler(makeEvent())).resolves.toMatchObject({ title: "Playlist" });
+    expect(
+      fetchMock.mock.calls.map(([input]) =>
+        input instanceof Request ? input.url : input instanceof URL ? input.toString() : input,
+      ),
+    ).toContain("https://a-v2.sndcdn.com/second.js");
+  });
+
+  it("logs a terminal completion when every playlist track fails", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = input instanceof Request ? input.url : new URL(input).toString();
+        if (url === "https://soundcloud.com/") {
+          return new Response(
+            '<script>window.__sc_version="3234567890"</script>{"hydratable":"apiClient","data":{"id":"client-id"}}',
+          );
+        }
+        if (url.includes("api-v2.soundcloud.com/tracks/")) {
+          return new Response("missing", { status: 404 });
+        }
+        return Response.json({
+          kind: "playlist",
+          title: "Empty",
+          tracks: [{ id: 99, kind: "track" }],
+        });
+      }),
+    );
+
+    await expect(handler(makeEvent())).rejects.toThrow("soundcloud.no_resolvable_tracks");
+    const completion = info.mock.calls
+      .map(([entry]) => JSON.parse(entry))
+      .find((entry) => entry.event === "soundcloud_set_completion");
+    expect(completion).toMatchObject({
+      trackCount: 1,
+      succeeded: 0,
+      failed: 1,
+      failuresByStage: { "track.resolve_fetch": 1 },
     });
   });
 });

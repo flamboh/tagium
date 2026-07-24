@@ -16,6 +16,8 @@ export interface TagiumFile {
   downloadRequest?: {
     sourceUrl: string;
     audioBitrate: AudioDownloadBitrate;
+    importId?: string;
+    trackIndex?: number;
     year?: number;
   };
   pendingMetadataPatch?: MetadataPatch;

@@ -58,7 +58,9 @@ jobs:
             fly.cobalt.toml \
             Dockerfile.cobalt \
             .dockerignore \
-            cobalt-machine-proxy.mjs; then
+            cobalt-machine-proxy.mjs \
+            cobalt-soundcloud.mjs \
+            cobalt-soundcloud-helpers.mjs; then
             echo "should_deploy=false" >> "$GITHUB_OUTPUT"
           else
             echo "should_deploy=true" >> "$GITHUB_OUTPUT"

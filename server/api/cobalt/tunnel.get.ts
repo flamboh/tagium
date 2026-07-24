@@ -22,6 +22,13 @@ type CloudflareRequest = Request & {
   };
 };
 
+type TunnelObservabilityContext = {
+  parentRequestId?: string;
+  importId?: string;
+  sourceFingerprint?: string;
+  trackIndex?: number;
+};
+
 const COBALT_TUNNEL_TIMEOUT_MS = 300_000;
 
 const createTunnelRequestId = () => `tagium-tunnel-${crypto.randomUUID()}`;
@@ -73,8 +80,9 @@ const getTunnelLogContext = (
   requestId: string,
   tunnelUrl: URL | undefined,
   machineId: string | null | undefined,
+  observability: TunnelObservabilityContext = {},
 ) => {
-  const context: Record<string, string> = { requestId };
+  const context: Record<string, string | number> = { requestId, ...observability };
   if (machineId) {
     context.machineId = machineId;
   }
@@ -86,6 +94,26 @@ const getTunnelLogContext = (
   }
 
   return context;
+};
+
+const getTunnelObservabilityContext = (requestUrl: URL) => {
+  const read = (name: string, pattern: RegExp) => {
+    const value = requestUrl.searchParams.get(name);
+    if (value === null) return undefined;
+    if (!pattern.test(value)) throw new Error(`invalid ${name}`);
+    return value;
+  };
+
+  const parentRequestId = read("parentRequestId", /^[A-Za-z0-9_-]{1,128}$/);
+  const importId = read("importId", /^[A-Za-z0-9_-]{1,128}$/);
+  const sourceFingerprint = read("sourceFingerprint", /^sha256:[a-f0-9]{32}$/);
+  const rawTrackIndex = read("trackIndex", /^\d{1,5}$/);
+  return {
+    parentRequestId,
+    importId,
+    sourceFingerprint,
+    trackIndex: rawTrackIndex === undefined ? undefined : Number(rawTrackIndex),
+  };
 };
 
 const logTunnelFailure = (
@@ -183,7 +211,11 @@ const parseTunnelRequest = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
       return undefined;
     }
 
-    return { tunnelUrl, machineId };
+    try {
+      return { tunnelUrl, machineId, observability: getTunnelObservabilityContext(requestUrl) };
+    } catch {
+      return undefined;
+    }
   }
 
   if (!isCobaltMachineId(machineId) || signature === null) {
@@ -194,7 +226,11 @@ const parseTunnelRequest = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
     return undefined;
   }
 
-  return { tunnelUrl, machineId };
+  try {
+    return { tunnelUrl, machineId, observability: getTunnelObservabilityContext(requestUrl) };
+  } catch {
+    return undefined;
+  }
 };
 
 export default defineHandler(async (event) => {
@@ -202,6 +238,7 @@ export default defineHandler(async (event) => {
   const startedAt = Date.now();
   let tunnelUrl: URL | undefined;
   let machineId: string | null | undefined;
+  let observability: TunnelObservabilityContext = {};
 
   try {
     const runtimeEnv = getRuntimeEnv(event.req);
@@ -219,8 +256,21 @@ export default defineHandler(async (event) => {
 
     tunnelUrl = tunnelRequest.tunnelUrl;
     machineId = tunnelRequest.machineId;
+    observability = tunnelRequest.observability;
     const requestHeaders = new Headers();
     requestHeaders.set("X-Tagium-Tunnel-Request-Id", requestId);
+    if (observability.parentRequestId) {
+      requestHeaders.set("X-Tagium-Parent-Request-Id", observability.parentRequestId);
+    }
+    if (observability.importId) {
+      requestHeaders.set("X-Tagium-Import-Id", observability.importId);
+    }
+    if (observability.sourceFingerprint) {
+      requestHeaders.set("X-Tagium-Source-Fingerprint", observability.sourceFingerprint);
+    }
+    if (observability.trackIndex !== undefined) {
+      requestHeaders.set("X-Tagium-Track-Index", String(observability.trackIndex));
+    }
     if (tunnelRequest.machineId) {
       requestHeaders.set("Fly-Force-Instance-Id", tunnelRequest.machineId);
     }
@@ -236,7 +286,7 @@ export default defineHandler(async (event) => {
         response.status === 503 ? tryParseCobaltCapacityError(responseText) : undefined;
       if (capacityError) {
         logTunnelFailure("upstream capacity exceeded", {
-          ...getTunnelLogContext(requestId, tunnelUrl, machineId),
+          ...getTunnelLogContext(requestId, tunnelUrl, machineId, observability),
           elapsedMs: Date.now() - startedAt,
           status: response.status,
           retryAfter: response.headers.get("Retry-After") ?? undefined,
@@ -245,10 +295,11 @@ export default defineHandler(async (event) => {
       }
 
       logTunnelFailure("upstream non-ok", {
-        ...getTunnelLogContext(requestId, tunnelUrl, machineId),
+        ...getTunnelLogContext(requestId, tunnelUrl, machineId, observability),
         elapsedMs: Date.now() - startedAt,
         status: response.status,
-        body: responseText.slice(0, 200),
+        responseBytes: new TextEncoder().encode(responseText).byteLength,
+        contentType: response.headers.get("content-type") ?? undefined,
       });
       return new Response(`Cobalt tunnel request failed (${response.status}).`, { status: 502 });
     }
@@ -256,7 +307,7 @@ export default defineHandler(async (event) => {
     const body = await streamNonEmptyBody(response);
     if (!body) {
       logTunnelFailure("upstream empty body", {
-        ...getTunnelLogContext(requestId, tunnelUrl, machineId),
+        ...getTunnelLogContext(requestId, tunnelUrl, machineId, observability),
         elapsedMs: Date.now() - startedAt,
         status: response.status,
         contentLength: response.headers.get("content-length") ?? undefined,
@@ -274,16 +325,18 @@ export default defineHandler(async (event) => {
   } catch (error) {
     if (error instanceof Error) {
       logTunnelFailure("fetch threw", {
-        ...getTunnelLogContext(requestId, tunnelUrl, machineId),
+        ...getTunnelLogContext(requestId, tunnelUrl, machineId, observability),
         elapsedMs: Date.now() - startedAt,
         errorName: error.name,
-        errorMessage: error.message,
       });
+      if (error.name === "TimeoutError" || error.name === "AbortError") {
+        return new Response("Cobalt tunnel request timed out.", { status: 502 });
+      }
       return new Response(error.message, { status: 502 });
     }
 
     logTunnelFailure("fetch threw non-error", {
-      ...getTunnelLogContext(requestId, tunnelUrl, machineId),
+      ...getTunnelLogContext(requestId, tunnelUrl, machineId, observability),
       elapsedMs: Date.now() - startedAt,
     });
     return new Response("Cobalt tunnel request failed.", { status: 502 });

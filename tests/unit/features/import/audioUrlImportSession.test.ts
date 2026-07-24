@@ -110,6 +110,9 @@ describe("audio URL import session", () => {
     expect(firstActivation).not.toHaveBeenCalled();
     expect(latestActivation).toHaveBeenCalledOnce();
     expect(hook.result.library.getSnapshot().files[0].downloadRequest?.audioBitrate).toBe("128");
+    expect(hook.result.library.getSnapshot().files[0].downloadRequest?.importId).toMatch(
+      /^[0-9a-f-]{36}$/,
+    );
     act(() => hook.result.importing.commands.cancelQueue());
     hook.unmount();
   });

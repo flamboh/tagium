@@ -103,6 +103,35 @@ describe("resolveSoundCloudSet", () => {
 
     await expect(resolveSoundCloudSet("https://soundcloud.com/artist/sets/set")).rejects.toThrow();
   });
+
+  it("sends the import correlation id with the set request", async () => {
+    vi.stubGlobal("window", {
+      location: {
+        origin: "https://tagium.test",
+      },
+    });
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
+      Response.json({
+        title: "Imported Set",
+        artist: "Set Artist",
+        genre: "Electronic",
+        isAlbum: true,
+        tracks: [],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await resolveSoundCloudSet(
+      "https://soundcloud.com/artist/sets/set",
+      "0196cc37-9b66-7e7a-a1d4-7c7c1f86c242",
+    );
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    expect(new Headers(init?.headers).get("X-Tagium-Import-Id")).toBe(
+      "0196cc37-9b66-7e7a-a1d4-7c7c1f86c242",
+    );
+    expect(new Headers(init?.headers).get("X-Tagium-Request-Id")).toMatch(/^[0-9a-f-]{36}$/);
+  });
 });
 
 const createHarness = (settings: AppSettings = defaultSettings) => {
@@ -276,6 +305,7 @@ describe("download track plans", () => {
         downloadRequest: {
           sourceUrl: "https://soundcloud.com/artist/first-track",
           audioBitrate: "320",
+          trackIndex: 1,
           year: 2024,
         },
       },
@@ -285,6 +315,7 @@ describe("download track plans", () => {
         downloadRequest: {
           sourceUrl: "https://soundcloud.com/artist/second-track",
           audioBitrate: "320",
+          trackIndex: 2,
           year: 2024,
         },
       },
@@ -318,11 +349,13 @@ describe("soundcloud set import", () => {
       {
         sourceUrl: "https://soundcloud.com/artist/first-track",
         audioBitrate: "320",
+        trackIndex: 1,
         year: 2024,
       },
       {
         sourceUrl: "https://soundcloud.com/artist/second-track",
         audioBitrate: "320",
+        trackIndex: 2,
         year: 2024,
       },
     ]);
@@ -351,6 +384,7 @@ describe("soundcloud set import", () => {
         downloadRequest: {
           sourceUrl: "https://soundcloud.com/artist/first-track",
           audioBitrate: "320",
+          trackIndex: 1,
           year: 2024,
         },
       },
@@ -360,6 +394,7 @@ describe("soundcloud set import", () => {
         downloadRequest: {
           sourceUrl: "https://soundcloud.com/artist/second-track",
           audioBitrate: "320",
+          trackIndex: 2,
           year: 2024,
         },
       },

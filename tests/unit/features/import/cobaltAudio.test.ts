@@ -79,6 +79,35 @@ describe("CobaltAudio download", () => {
     mp3tagMock.instances = [];
   });
 
+  it("sends the import correlation id with the plan request", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "/api/cobalt/audio") {
+        expect(new Headers(init?.headers).get("X-Tagium-Import-Id")).toBe(
+          "0196cc37-9b66-7e7a-a1d4-7c7c1f86c242",
+        );
+        expect(new Headers(init?.headers).get("X-Tagium-Request-Id")).toMatch(/^[0-9a-f-]{36}$/);
+        expect(new Headers(init?.headers).get("X-Tagium-Track-Index")).toBe("7");
+        return new Response("stop after plan headers", { status: 502 });
+      }
+
+      return new Response("audio-bytes", {
+        headers: { "Content-Type": "audio/mpeg" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      runCobaltDownload({
+        sourceUrl: "https://soundcloud.com/artist/correlated",
+        audioBitrate: "128",
+        importId: "0196cc37-9b66-7e7a-a1d4-7c7c1f86c242",
+        trackIndex: 7,
+      }),
+    ).rejects.toThrow("stop after plan headers");
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("paces Cobalt tunnel download starts", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);

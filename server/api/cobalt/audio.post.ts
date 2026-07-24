@@ -11,6 +11,11 @@ import { defineHandler, HTTPError } from "nitro";
 import { env as processEnv } from "node:process";
 import { parseCobaltMachineId, signCobaltMachine } from "../../utils/cobalt-machine-affinity";
 import {
+  fingerprintUrl,
+  getRequestLogContext,
+  type RequestLogContext,
+} from "../../utils/request-observability";
+import {
   createCloudflareCobaltRequestAdmission,
   createInMemoryCobaltRequestAdmission,
   type CloudflareRateLimitBinding,
@@ -92,6 +97,10 @@ type CobaltAudioResult = {
   response: CobaltResponse;
   machineId: string | undefined;
   retryAfter: string | undefined;
+  upstreamStatus?: number;
+  contentType?: string;
+  failureStage?: "cobalt.resolve_fetch" | "cobalt.resolve_parse";
+  failureReason?: "fetch_threw" | "non_json" | "invalid_json_or_schema" | "invalid_machine_id";
 };
 type CobaltRuntimeEnv = {
   COBALT_ALLOWED_ORIGIN?: string;
@@ -124,12 +133,22 @@ const getCobaltApiUrl = (runtimeEnv: CobaltRuntimeEnv) => {
   return runtimeEnv.COBALT_API_URL;
 };
 
-const getCobaltHeaders = (runtimeEnv: CobaltRuntimeEnv) => {
+const getCobaltHeaders = (
+  runtimeEnv: CobaltRuntimeEnv,
+  context: RequestLogContext,
+  sourceFingerprint: string,
+) => {
   const headers: Record<string, string> = {
     Accept: "application/json",
     "Content-Type": "application/json",
+    "X-Tagium-Request-Id": context.requestId,
+    "X-Tagium-Source-Fingerprint": sourceFingerprint,
   };
 
+  if (context.importId) headers["X-Tagium-Import-Id"] = context.importId;
+  if (context.trackIndex !== undefined) {
+    headers["X-Tagium-Track-Index"] = String(context.trackIndex);
+  }
   if (runtimeEnv.COBALT_API_KEY) {
     headers.Authorization = `Api-Key ${runtimeEnv.COBALT_API_KEY}`;
   }
@@ -192,6 +211,8 @@ const requestCobaltAudio = async (
   url: string,
   audioBitrate: string,
   requestSignal: AbortSignal,
+  context: RequestLogContext,
+  sourceFingerprint: string,
 ): Promise<CobaltAudioResult> => {
   let response: Response;
 
@@ -201,7 +222,7 @@ const requestCobaltAudio = async (
       method: "POST",
       redirect: "manual",
       signal: AbortSignal.any([requestSignal, AbortSignal.timeout(COBALT_REQUEST_TIMEOUT_MS)]),
-      headers: getCobaltHeaders(runtimeEnv),
+      headers: getCobaltHeaders(runtimeEnv, context, sourceFingerprint),
       body: JSON.stringify({
         url,
         downloadMode: "audio",
@@ -226,29 +247,68 @@ const requestCobaltAudio = async (
       },
       machineId: undefined,
       retryAfter: undefined,
+      failureStage: "cobalt.resolve_fetch",
+      failureReason: "fetch_threw",
     };
   }
 
+  const upstreamStatus = response.status;
+  const contentType = response.headers.get("content-type") ?? undefined;
   try {
     return {
       response: await parseCobaltJson(response),
       machineId: parseCobaltMachineId(response.headers.get("X-Cobalt-Machine-Id")),
       retryAfter: response.headers.get("Retry-After") ?? undefined,
+      upstreamStatus,
+      contentType,
     };
   } catch (error) {
-    let code = "error.api.invalid_response";
-    if (error instanceof Error) {
-      code = error.message;
-    }
+    const invalidMachineId =
+      error instanceof Error && error.message === "Cobalt returned invalid machine id.";
+    const failureReason = invalidMachineId
+      ? "invalid_machine_id"
+      : error instanceof Error && error.message.startsWith("Cobalt API returned non-JSON")
+        ? "non_json"
+        : "invalid_json_or_schema";
 
     return {
       response: {
         status: CobaltResponseType.Error,
-        error: { code },
+        error: {
+          code: invalidMachineId
+            ? "Cobalt returned invalid machine id."
+            : "error.api.invalid_response",
+        },
       },
       machineId: undefined,
       retryAfter: undefined,
+      upstreamStatus,
+      contentType,
+      failureStage: "cobalt.resolve_parse",
+      failureReason,
     };
+  }
+};
+
+const logCobaltAudioEvent = (
+  event: "cobalt_audio_completion" | "cobalt_audio_failure",
+  context: RequestLogContext,
+  sourceFingerprint: string,
+  details: Record<string, unknown>,
+) => {
+  const entry = {
+    event,
+    requestId: context.requestId,
+    ...(context.importId ? { importId: context.importId } : {}),
+    ...(context.trackIndex !== undefined ? { trackIndex: context.trackIndex } : {}),
+    sourceFingerprint,
+    ...details,
+  };
+  const serialized = JSON.stringify(entry);
+  if (event === "cobalt_audio_failure") {
+    console.warn(serialized);
+  } else {
+    console.info(serialized);
   }
 };
 
@@ -259,6 +319,16 @@ const cobaltErrorResponse = (message: string) =>
       "Content-Type": "text/plain;charset=UTF-8",
     },
   });
+
+const publicCobaltErrorCode = (code: string) => {
+  if (
+    code.startsWith("error.api.fetch.soundcloud.stream_fetch") ||
+    code.startsWith("error.api.fetch.soundcloud.stream_parse")
+  ) {
+    return "error.api.fetch.empty";
+  }
+  return code.startsWith("error.api.fetch.soundcloud.") ? "error.api.fetch.fail" : code;
+};
 
 const cobaltCapacityErrorResponse = (response: CobaltResponse, retryAfter: string | undefined) => {
   const headers = new Headers({ "Content-Type": "application/json" });
@@ -310,12 +380,20 @@ const toTunnelProxyUrl = (
   runtimeEnv: CobaltRuntimeEnv,
   tunnelUrl: string,
   machineId: string | undefined,
+  context: RequestLogContext,
+  sourceFingerprint: string,
 ) => {
   const proxyUrl = new URL("/api/cobalt/tunnel", request.url);
   proxyUrl.searchParams.set("url", tunnelUrl);
   if (machineId) {
     proxyUrl.searchParams.set("machine", machineId);
     proxyUrl.searchParams.set("signature", signCobaltMachine(runtimeEnv, tunnelUrl, machineId));
+  }
+  proxyUrl.searchParams.set("parentRequestId", context.requestId);
+  proxyUrl.searchParams.set("sourceFingerprint", sourceFingerprint);
+  if (context.importId) proxyUrl.searchParams.set("importId", context.importId);
+  if (context.trackIndex !== undefined) {
+    proxyUrl.searchParams.set("trackIndex", String(context.trackIndex));
   }
   return `${proxyUrl.pathname}${proxyUrl.search}`;
 };
@@ -325,10 +403,12 @@ const proxiedTunnelResponse = (
   runtimeEnv: CobaltRuntimeEnv,
   response: Extract<CobaltResponse, { url: string }>,
   machineId: string | undefined,
+  context: RequestLogContext,
+  sourceFingerprint: string,
 ) =>
   Response.json({
     status: CobaltResponseType.Tunnel,
-    url: toTunnelProxyUrl(request, runtimeEnv, response.url, machineId),
+    url: toTunnelProxyUrl(request, runtimeEnv, response.url, machineId, context, sourceFingerprint),
     filename: response.filename,
   });
 
@@ -337,11 +417,13 @@ const localProcessingResponse = (
   runtimeEnv: CobaltRuntimeEnv,
   response: Extract<CobaltResponse, { status: CobaltResponseType.LocalProcessing }>,
   machineId: string | undefined,
+  context: RequestLogContext,
+  sourceFingerprint: string,
 ) =>
   Response.json({
     ...response,
     tunnel: response.tunnel.map((tunnelUrl) =>
-      toTunnelProxyUrl(request, runtimeEnv, tunnelUrl, machineId),
+      toTunnelProxyUrl(request, runtimeEnv, tunnelUrl, machineId, context, sourceFingerprint),
     ),
   });
 
@@ -398,6 +480,9 @@ const withAdmissionCookie = (response: Response, setCookie: string | undefined) 
 };
 
 export default defineHandler(async (event) => {
+  const startedAt = Date.now();
+  let context = getRequestLogContext(event.req);
+  let sourceFingerprint: string | undefined;
   try {
     const runtimeEnv = getRuntimeEnv(event.req);
     const forbidden = enforceSameOrigin(event.req, runtimeEnv);
@@ -412,13 +497,19 @@ export default defineHandler(async (event) => {
     }
 
     const body = await decodeRequestBody(event.req, audioRequestSchema);
+    context = getRequestLogContext(event.req, body.url);
+    const requestSourceFingerprint = await fingerprintUrl(body.url);
+    if (!requestSourceFingerprint) throw new Error("Download URL fingerprint is unavailable.");
+    sourceFingerprint = requestSourceFingerprint;
 
     const admission = getCobaltRequestAdmission(event.req, runtimeEnv);
     if (!admission) return admissionUnavailableResponse();
 
     const admissionDecision = await admission.admit(event.req);
-    const respond = (response: Response) =>
-      withAdmissionCookie(response, admissionDecision.setCookie);
+    const respond = (response: Response) => {
+      response.headers.set("X-Tagium-Request-Id", context.requestId);
+      return withAdmissionCookie(response, admissionDecision.setCookie);
+    };
     if (admissionDecision.status === "unavailable") {
       return respond(admissionUnavailableResponse());
     }
@@ -437,21 +528,54 @@ export default defineHandler(async (event) => {
       body.url,
       body.audioBitrate,
       event.req.signal,
+      context,
+      requestSourceFingerprint,
     );
     const cobaltResponse = cobaltResult.response;
+
+    if (cobaltResponse.status === CobaltResponseType.Error) {
+      logCobaltAudioEvent("cobalt_audio_failure", context, requestSourceFingerprint, {
+        stage: cobaltResult.failureStage ?? "cobalt.resolve_error",
+        elapsedMs: Date.now() - startedAt,
+        errorCode: cobaltResponse.error.code,
+        ...(cobaltResult.upstreamStatus === undefined
+          ? {}
+          : { upstreamStatus: cobaltResult.upstreamStatus }),
+        ...(cobaltResult.contentType ? { contentType: cobaltResult.contentType } : {}),
+        ...(cobaltResult.retryAfter ? { retryAfter: cobaltResult.retryAfter } : {}),
+        ...(cobaltResult.machineId ? { machineId: cobaltResult.machineId } : {}),
+        ...(cobaltResult.failureReason ? { failureReason: cobaltResult.failureReason } : {}),
+      });
+    } else {
+      logCobaltAudioEvent("cobalt_audio_completion", context, requestSourceFingerprint, {
+        elapsedMs: Date.now() - startedAt,
+        outcome: cobaltResponse.status,
+        ...(cobaltResult.upstreamStatus === undefined
+          ? {}
+          : { upstreamStatus: cobaltResult.upstreamStatus }),
+        ...(cobaltResult.machineId ? { machineId: cobaltResult.machineId } : {}),
+      });
+    }
 
     if (isCobaltCapacityError(cobaltResponse)) {
       return respond(cobaltCapacityErrorResponse(cobaltResponse, cobaltResult.retryAfter));
     }
 
     if (cobaltResponse.status === CobaltResponseType.Error) {
-      return respond(cobaltErrorResponse(cobaltResponse.error.code));
+      return respond(cobaltErrorResponse(publicCobaltErrorCode(cobaltResponse.error.code)));
     }
 
     if (cobaltResponse.status === CobaltResponseType.LocalProcessing) {
       const responseWithYear = withYearMetadata(cobaltResponse, await yearPromise);
       return respond(
-        localProcessingResponse(event.req, runtimeEnv, responseWithYear, cobaltResult.machineId),
+        localProcessingResponse(
+          event.req,
+          runtimeEnv,
+          responseWithYear,
+          cobaltResult.machineId,
+          context,
+          requestSourceFingerprint,
+        ),
       );
     }
 
@@ -472,16 +596,33 @@ export default defineHandler(async (event) => {
             filename: cobaltResponse.audioFilename,
           },
           cobaltResult.machineId,
+          context,
+          requestSourceFingerprint,
         ),
       );
     }
 
     return respond(
-      proxiedTunnelResponse(event.req, runtimeEnv, cobaltResponse, cobaltResult.machineId),
+      proxiedTunnelResponse(
+        event.req,
+        runtimeEnv,
+        cobaltResponse,
+        cobaltResult.machineId,
+        context,
+        requestSourceFingerprint,
+      ),
     );
   } catch (error) {
     if (HTTPError.isError(error)) throw error;
 
+    if (sourceFingerprint) {
+      logCobaltAudioEvent("cobalt_audio_failure", context, sourceFingerprint, {
+        stage: "tagium.audio_handler",
+        elapsedMs: Date.now() - startedAt,
+        errorType: error instanceof Error ? error.name : "UnknownError",
+        errorCode: "error.api.handler_failure",
+      });
+    }
     if (error instanceof Error) {
       return cobaltErrorResponse(error.message);
     }
