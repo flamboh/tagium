@@ -208,7 +208,9 @@ describe("share workflow pasted links", () => {
     expect(location.pathname).toBe(before);
     expect(mocks.fetchSharedAlbum).toHaveBeenCalledOnce();
     expect(mocks.importSharedAlbum).toHaveBeenCalledWith(sharedManifest, slug, undefined);
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("shared album added · download started");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("album added to your library", {
+      description: "downloading 1 track — watch progress in the sidebar.",
+    });
     expect(mocks.toastSuccess).not.toHaveBeenCalledWith(expect.stringContaining("at a time"));
     hook.unmount();
   });
@@ -223,6 +225,23 @@ describe("share workflow pasted links", () => {
 
     await vi.waitFor(() => expect(hook.result.page).toMatchObject({ status: "ready", slug }));
     expect(mocks.importSharedAlbum).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it("reports download progress after adding from a share preview", async () => {
+    history.replaceState({}, "", `/share/${slug}`);
+    mocks.fetchSharedAlbum.mockResolvedValue({
+      manifest: sharedManifest,
+      expiresAt: "2026-10-20T12:00:00.000Z",
+    });
+    const { hook } = workflow();
+
+    await vi.waitFor(() => expect(hook.result.page).toMatchObject({ status: "ready", slug }));
+    await act(async () => hook.result.addSharedAlbum());
+
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("album added to your library", {
+      description: "downloading 1 track — watch progress in the sidebar.",
+    });
     hook.unmount();
   });
 

@@ -40,6 +40,9 @@ const safelyGetRevocationReceipt = (slug: string) => {
   }
 };
 
+const sharedAlbumAddedDescription = (trackCount: number) =>
+  `downloading ${trackCount} ${trackCount === 1 ? "track" : "tracks"} — watch progress in the sidebar.`;
+
 export const useShareWorkflow = ({
   library,
   editor,
@@ -243,7 +246,9 @@ export const useShareWorkflow = ({
             : entry,
         );
         await importing.commands.importSharedAlbum(fresh.manifest, slug, picture);
-        toast.success("shared album added · download started");
+        toast.success("album added to your library", {
+          description: sharedAlbumAddedDescription(fresh.manifest.tracks.length),
+        });
       } catch (error) {
         if (error instanceof SharedAlbumVersionError) throw error;
         throw new SharedAlbumUnavailableError();
@@ -524,7 +529,9 @@ export const useShareWorkflow = ({
         await importing.commands.importSharedAlbum(fresh.manifest, page.slug, picture);
         history.replaceState({}, "", "/");
         setPage(null);
-        toast.success("shared album added · download started");
+        toast.success("album added to your library", {
+          description: sharedAlbumAddedDescription(fresh.manifest.tracks.length),
+        });
       } catch (error) {
         if (error instanceof SharedAlbumUnavailableError) {
           setPage({
