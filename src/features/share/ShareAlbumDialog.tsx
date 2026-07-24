@@ -49,20 +49,20 @@ function ShareAlbumDialogSession({
   state: Exclude<ShareDialogState, { status: "closed" }>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const copyTimerRef = useRef<number | null>(null);
-  const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "manual">("idle");
   const [confirmStop, setConfirmStop] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const open = true;
 
   const closeDialog = () => {
-    setCopied(false);
+    setCopyStatus("idle");
     setConfirmStop(false);
     setStopError(null);
     setStopping(false);
     if (copyTimerRef.current !== null) {
-      window.clearTimeout(copyTimerRef.current);
+      clearTimeout(copyTimerRef.current);
       copyTimerRef.current = null;
     }
     onClose();
@@ -70,7 +70,7 @@ function ShareAlbumDialogSession({
 
   useEffect(
     () => () => {
-      if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+      if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
     },
     [],
   );
@@ -90,17 +90,19 @@ function ShareAlbumDialogSession({
   const copyLink = async () => {
     if (state.status !== "published") return;
     try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
       await navigator.clipboard.writeText(state.receipt.url);
+      setCopyStatus("copied");
     } catch {
+      inputRef.current?.focus();
       inputRef.current?.select();
-      document.execCommand("copy");
+      setCopyStatus("manual");
     }
-    setCopied(true);
-    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
-    copyTimerRef.current = window.setTimeout(() => {
-      setCopied(false);
+    if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => {
+      setCopyStatus("idle");
       copyTimerRef.current = null;
-    }, 2_000);
+    }, 3_000);
   };
 
   const stopSharing = async () => {
@@ -126,41 +128,57 @@ function ShareAlbumDialogSession({
       <DialogContent
         aria-describedby={undefined}
         className="max-h-[calc(100dvh-2rem)] max-w-lg gap-0 overflow-y-auto p-0"
+        showCloseButton={state.status !== "publishing" && !stopping}
       >
         <>
           <DialogHeader className="border-b px-5 py-4 pr-12">
             <DialogTitle className="truncate text-left">
-              {state.status === "published"
-                ? "share link ready"
-                : `${state.intent === "update" ? "update shared album" : "share album"}: ${state.preview.albumTitle}`}
+              {`share album: ${state.preview.albumTitle}`}
             </DialogTitle>
           </DialogHeader>
 
           <SharePreview preview={state.preview} coverUrl={coverUrl} />
 
           {state.status === "published" ? (
-            <div className="space-y-5 p-5">
+            <div className="space-y-2 p-5 pb-3">
+              <label htmlFor="album-share-link" className="text-sm font-medium">
+                share link
+              </label>
               <div className="flex gap-2">
                 <Input
+                  id="album-share-link"
                   ref={inputRef}
                   readOnly
-                  aria-label="share link"
                   value={state.receipt.url}
                   onFocus={(event) => event.currentTarget.select()}
                   className="min-w-0 font-mono text-xs"
                 />
                 <Button type="button" onClick={copyLink} className="h-9 w-32 shrink-0">
-                  {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-                  {copied ? "copied" : "copy link"}
+                  {copyStatus === "copied" ? (
+                    <Check aria-hidden="true" />
+                  ) : (
+                    <Copy aria-hidden="true" />
+                  )}
+                  {copyStatus === "copied" ? "copied" : "copy link"}
                 </Button>
               </div>
+              <p
+                role="status"
+                aria-live="polite"
+                className="min-h-5 text-sm text-muted-foreground"
+              >
+                {copyStatus === "copied"
+                  ? "share link copied."
+                  : copyStatus === "manual"
+                    ? "the link is selected. copy it from the field."
+                    : null}
+              </p>
             </div>
           ) : (
             <div className="space-y-4 p-5">
               <p className="text-sm leading-6 text-foreground">
-                {state.intent === "update"
-                  ? "the existing link will use these tags."
-                  : "anyone with the link can download these tracks with your tags."}
+                anyone with the link can add this album. tracks are added from their original sources
+                with these shared tags.
               </p>
               <p className="text-sm text-muted-foreground">
                 {state.intent === "update"
@@ -180,7 +198,8 @@ function ShareAlbumDialogSession({
             <div className="min-h-16 px-5 pt-1 text-left text-sm text-muted-foreground">
               {confirmStop ? (
                 <>
-                  the link will stop working immediately.
+                  the link will stop working immediately. anyone who already added the album keeps
+                  their copy.
                   <span
                     role={stopError ? "alert" : undefined}
                     className="mt-1 block min-h-5 text-destructive"
@@ -189,10 +208,9 @@ function ShareAlbumDialogSession({
                   </span>
                 </>
               ) : (
-                <>
-                  expires {formatExpiry(state.receipt.expiresAt)}. stop sharing to revoke it
-                  immediately.
-                </>
+                `expires ${formatExpiry(
+                  state.receipt.expiresAt,
+                )} · stop sharing to turn the link off at any time`
               )}
             </div>
           )}
@@ -285,7 +303,13 @@ function ShareAlbumDialogSession({
 
 const formatExpiry = (expiresAt: string) => {
   const date = new Date(expiresAt);
-  return Number.isNaN(date.getTime()) ? "in 90 days" : `on ${date.toLocaleDateString()}`;
+  return Number.isNaN(date.getTime())
+    ? "in 90 days"
+    : date.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
 };
 
 function SharePreview({

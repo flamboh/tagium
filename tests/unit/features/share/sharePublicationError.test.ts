@@ -16,4 +16,13 @@ describe("share publication errors", () => {
       sharePublicationErrorMessage(new Error("too many share requests; try again shortly")),
     ).toBe("too many share requests; try again shortly");
   });
+
+  it("does not leak unknown browser or transport errors", () => {
+    expect(sharePublicationErrorMessage(new Error("Failed to fetch https://private.example"))).toBe(
+      "the share link could not be created",
+    );
+    expect(sharePublicationErrorMessage(new Error("Load failed"))).toBe(
+      "the share link could not be created",
+    );
+  });
 });

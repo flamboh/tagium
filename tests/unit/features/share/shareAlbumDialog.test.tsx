@@ -193,14 +193,15 @@ describe("share album dialog", () => {
     expect(before.filter((value) => value.includes("w-full"))).toHaveLength(2);
     expect(after.filter((value) => value.includes("w-full"))).toHaveLength(2);
     expect(text(renderer)).toContain("the link will stop working immediately.");
+    expect(text(renderer)).toContain("anyone who already added the album keeps their copy.");
     expect(text(renderer)).not.toContain("cover");
   });
 
-  it("renders the compact preview and minimal confirmation copy", () => {
+  it("renders the compact preview and explains what recipients add", () => {
     const renderer = render();
     expect(text(renderer)).toContain("share album: Night Drive");
     expect(text(renderer)).toContain(
-      "anyone with the link can download these tracks with your tags.",
+      "anyone with the link can add this album. tracks are added from their original sources with these shared tags.",
     );
     expect(text(renderer)).not.toMatch(/\b(?:Anyone|Expires)\b/);
     expect(text(renderer)).not.toContain("permission");
@@ -222,8 +223,9 @@ describe("share album dialog", () => {
         }),
       );
     });
-    expect(text(renderer)).toContain("update shared album: Night Drive");
-    expect(text(renderer)).toContain("the existing link will use these tags.");
+    expect(text(renderer)).toContain("share album: Night Drive");
+    expect(text(renderer)).toContain("anyone with the link can add this album.");
+    expect(text(renderer)).toContain("from their original sources with these shared tags.");
     expect(text(renderer)).toContain("the link keeps its current expiration.");
     expect(text(renderer)).not.toContain("expires in 90 days.");
     const updateButton = renderer.root
@@ -246,16 +248,62 @@ describe("share album dialog", () => {
 
   it("keeps published copy and revoke actions available", () => {
     const renderer = render("published");
-    expect(text(renderer)).toContain("share link ready");
-    expect(text(renderer)).toContain("expires");
-    const expectedDate = new Date("2030-01-02T00:00:00Z").toLocaleDateString();
-    expect(text(renderer)).toContain(`on ${expectedDate}`);
+    expect(text(renderer)).toContain("share album: Night Drive");
+    expect(text(renderer)).toContain("share link");
+    const expectedDate = new Date("2030-01-02T00:00:00Z").toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    expect(text(renderer)).toContain(
+      `expires ${expectedDate} · stop sharing to turn the link off at any time`,
+    );
     const buttonText = renderer.root
       .findAllByType("button")
       .flatMap((button) =>
         button.children.filter((child): child is string => typeof child === "string"),
       );
     expect(buttonText).toEqual(expect.arrayContaining(["copy link", "stop sharing", "done"]));
+  });
+
+  it("selects the link and announces manual copy when clipboard access fails", async () => {
+    const writeText = vi.fn(async () => {
+      throw new Error("denied");
+    });
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const renderer = render("published");
+    const copy = renderer.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("copy link"))!;
+
+    await act(async () => void (await copy.props.onClick()));
+
+    expect(writeText).toHaveBeenCalledWith("https://tagium.app/share/slug");
+    expect(text(renderer)).toContain("the link is selected. copy it from the field.");
+  });
+
+  it("removes the close control while a publication action is running", () => {
+    const renderer = render();
+    const dialogContent = () =>
+      renderer.root.findAll(
+        (node) =>
+          typeof node.type === "string" &&
+          typeof node.props.className === "string" &&
+          node.props.className.includes("max-h-[calc(100dvh-2rem)]"),
+      )[0];
+    expect(dialogContent().props.showCloseButton).toBe(true);
+
+    act(() => {
+      renderer.update(
+        createElement(ShareAlbumDialog, {
+          state: { status: "publishing", preview },
+          onClose: vi.fn(),
+          onPublish: vi.fn(),
+          onStopSharing: vi.fn(async () => undefined),
+        }),
+      );
+    });
+    expect(dialogContent().props.showCloseButton).toBe(false);
   });
 
   it("keeps the square cover and track list matched at both responsive sizes", () => {
