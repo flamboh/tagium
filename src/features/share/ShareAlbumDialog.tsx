@@ -162,11 +162,7 @@ function ShareAlbumDialogSession({
                   {copyStatus === "copied" ? "copied" : "copy link"}
                 </Button>
               </div>
-              <p
-                role="status"
-                aria-live="polite"
-                className="min-h-5 text-sm text-muted-foreground"
-              >
+              <p role="status" aria-live="polite" className="min-h-5 text-sm text-muted-foreground">
                 {copyStatus === "copied"
                   ? "share link copied."
                   : copyStatus === "manual"
@@ -177,8 +173,8 @@ function ShareAlbumDialogSession({
           ) : (
             <div className="space-y-4 p-5">
               <p className="text-sm leading-6 text-foreground">
-                anyone with the link can add this album. tracks are added from their original sources
-                with these shared tags.
+                anyone with the link can add this album. tracks are added from their original
+                sources with these shared tags.
               </p>
               <p className="text-sm text-muted-foreground">
                 {state.intent === "update"

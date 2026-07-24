@@ -1,13 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  ExternalLink,
-  ImageOff,
-  Library,
-  Loader2,
-  Music2,
-  Plus,
-  RotateCcw,
-} from "lucide-react";
+import { ExternalLink, ImageOff, Library, Loader2, Music2, Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -243,13 +235,16 @@ function AnotherTabToast({ slug, anotherTabOpen }: { slug: string; anotherTabOpe
       }
     };
     const timeout = globalThis.setTimeout(() => {
-      toast("tagium is already open in another tab. copy the link and add the album there instead.", {
-        duration: 12_000,
-        action: {
-          label: "copy link",
-          onClick: () => void copyShareLink(),
+      toast(
+        "tagium is already open in another tab. copy the link and add the album there instead.",
+        {
+          duration: 12_000,
+          action: {
+            label: "copy link",
+            onClick: () => void copyShareLink(),
+          },
         },
-      });
+      );
     }, 1_500);
     return () => globalThis.clearTimeout(timeout);
   }, [anotherTabOpen, slug]);
@@ -263,13 +258,7 @@ function formatExpiry(expiresAt: string) {
     .toLowerCase();
 }
 
-function RecipientContext({
-  trackCount,
-  expiresAt,
-}: {
-  trackCount: number;
-  expiresAt: string;
-}) {
+function RecipientContext({ trackCount, expiresAt }: { trackCount: number; expiresAt: string }) {
   const noun = trackCount === 1 ? "track" : "tracks";
   return (
     <p className="mb-5 text-sm text-muted-foreground">
