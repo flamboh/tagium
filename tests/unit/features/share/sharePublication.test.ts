@@ -107,16 +107,39 @@ describe("shared album publication state", () => {
       enabled: false,
       reason: "this browser cannot update the shared album",
     });
+  });
+
+  it("creates a fresh link after a publication stops or expires", () => {
+    const publication = {
+      slug: "slug",
+      url: "https://tagium.app/share/slug",
+      expiresAt: "2030-01-01T00:00:00.000Z",
+      publishedFingerprint: "published",
+      status: "active" as const,
+    };
     expect(
       shareAlbumActionState(
-        album({ sharePublication: { ...published.sharePublication!, status: "stopped" } }),
+        album({ sharePublication: { ...publication, status: "stopped" } }),
         "edited",
-        true,
+        false,
         0,
-      ).reason,
-    ).toBe("sharing has stopped");
+      ),
+    ).toEqual({
+      enabled: true,
+      label: "share album",
+      reason: "create a new share link",
+    });
     expect(
-      shareAlbumActionState(published, "edited", true, Date.parse("2031-01-01")),
-    ).toMatchObject({ enabled: false, reason: "the shared album has expired" });
+      shareAlbumActionState(
+        album({ sharePublication: publication }),
+        "edited",
+        false,
+        Date.parse("2031-01-01"),
+      ),
+    ).toEqual({
+      enabled: true,
+      label: "share album",
+      reason: "create a new share link",
+    });
   });
 });

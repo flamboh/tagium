@@ -76,6 +76,14 @@ export interface ShareAlbumActionState {
   reason: string;
 }
 
+export const isActiveSharePublication = (
+  publication: AlbumGroup["sharePublication"],
+  now = Date.now(),
+) =>
+  publication?.status === "active" &&
+  Number.isFinite(Date.parse(publication.expiresAt)) &&
+  Date.parse(publication.expiresAt) > now;
+
 export const shareAlbumActionState = (
   album: AlbumGroup,
   currentFingerprint: string | undefined,
@@ -87,11 +95,8 @@ export const shareAlbumActionState = (
   }
   const publication = album.sharePublication;
   if (!publication) return { enabled: true, label: "share album", reason: "share album" };
-  if (publication.status === "stopped") {
-    return { enabled: false, label: "update shared album", reason: "sharing has stopped" };
-  }
-  if (Date.parse(publication.expiresAt) <= now) {
-    return { enabled: false, label: "update shared album", reason: "the shared album has expired" };
+  if (!isActiveSharePublication(publication, now)) {
+    return { enabled: true, label: "share album", reason: "create a new share link" };
   }
   if (!hasCapability) {
     return {

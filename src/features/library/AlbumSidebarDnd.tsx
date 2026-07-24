@@ -9,6 +9,7 @@ import {
   Check,
   Download,
   FileMusic,
+  Link2,
   Loader2,
   Pencil,
   RefreshCw,
@@ -196,6 +197,8 @@ export function SortableAlbumCard({
   onFileDragOver,
   onFileDrop,
 }: AlbumCardProps) {
+  const hasActiveShare = shareLabel !== "share album";
+  const ShareIcon = hasActiveShare ? Link2 : Share2;
   const {
     attributes,
     listeners,
@@ -266,12 +269,15 @@ export function SortableAlbumCard({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className={cn(
+                  "h-7 w-7",
+                  hasActiveShare && "bg-primary/8 text-primary hover:bg-primary/12",
+                )}
                 onClick={onShare}
                 disabled={!canShare}
                 aria-label={`${shareLabel}: ${album.title}`}
               >
-                <Share2 className="h-3.5 w-3.5" />
+                <ShareIcon className="h-3.5 w-3.5" />
               </Button>
             </span>
           </TooltipTrigger>

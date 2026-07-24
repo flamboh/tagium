@@ -25,6 +25,7 @@ import { sharePublicationErrorMessage } from "@/features/share/sharePublicationE
 import type { ShareDialogState } from "@/features/share/ShareAlbumDialog";
 import { buildShareAlbumPreview } from "@/features/share/sharePreview";
 import {
+  isActiveSharePublication,
   projectShareSnapshot,
   shareAlbumActionState,
   type ShareAlbumActionState,
@@ -89,7 +90,7 @@ export const useShareWorkflow = ({
     if (!expiries.length) return;
     const timer = globalThis.setTimeout(
       () => setExpiryTick((tick) => tick + 1),
-      Math.max(0, Math.min(...expiries) - now + 1),
+      Math.min(2_147_483_647, Math.max(0, Math.min(...expiries) - now + 1)),
     );
     return () => globalThis.clearTimeout(timer);
   }, [library.state.albums]);
@@ -290,7 +291,12 @@ export const useShareWorkflow = ({
       const preview = buildShareAlbumPreview(album, files);
       if (publication && action.label === "view share link") {
         const capability = getPublicationCapability(publication.slug);
-        if (!capability) return;
+        if (!capability) {
+          toast.error("share link permission unavailable", {
+            description: "try the browser that created this link",
+          });
+          return;
+        }
         setDialog({
           status: "published",
           preview,
@@ -306,7 +312,7 @@ export const useShareWorkflow = ({
       setDialog({
         status: "confirm",
         preview,
-        intent: publication ? "update" : "create",
+        intent: action.label === "update shared album" ? "update" : "create",
       });
     },
     [albumFingerprints, getPublicationCapability, library],
@@ -322,6 +328,7 @@ export const useShareWorkflow = ({
       return;
     publicationActionInFlightRef.current = true;
     const currentDialog = dialog;
+    let attemptedIntent = currentDialog.intent;
     setDialog({ ...currentDialog, status: "publishing" });
     try {
       editor.commands.flush();
@@ -339,16 +346,18 @@ export const useShareWorkflow = ({
         albumFingerprints[album.id],
         Boolean(existingPublication && getPublicationCapability(existingPublication.slug)),
       );
-      if (
-        !latestAction.enabled ||
-        (existingPublication && latestAction.label !== "update shared album")
-      ) {
+      const updating = latestAction.label === "update shared album";
+      const creating = latestAction.label === "share album";
+      if (!latestAction.enabled || (!updating && !creating)) {
         throw new Error(latestAction.reason);
       }
+      attemptedIntent = updating ? "update" : "create";
       const shareSnapshot = await projectShareSnapshot(album, files);
       let receipt;
-      if (existingPublication) {
-        if (!existingPublication) throw new Error("the shared album could not be updated");
+      if (updating) {
+        if (!existingPublication || !isActiveSharePublication(existingPublication)) {
+          throw new Error("the shared album can no longer be updated");
+        }
         const capability = getPublicationCapability(existingPublication.slug);
         if (!capability) throw new Error("this browser cannot update the shared album");
         await updateSharedAlbum(
@@ -425,11 +434,11 @@ export const useShareWorkflow = ({
       setDialog({
         status: "error",
         preview: currentDialog.preview,
-        intent: currentDialog.intent,
+        intent: attemptedIntent,
         message:
-          currentDialog.intent === "update"
-            ? "the shared album could not be updated. your album is unchanged."
-            : `${sharePublicationErrorMessage(error).replace(/[.!?]+$/, "")}. your album is unchanged.`,
+          attemptedIntent === "update"
+            ? "the shared album could not be updated. the link still has the previous version."
+            : `${sharePublicationErrorMessage(error).replace(/[.!?]+$/, "")}. no link was created.`,
       });
     } finally {
       publicationActionInFlightRef.current = false;

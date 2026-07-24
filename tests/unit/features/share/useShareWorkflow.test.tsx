@@ -1,19 +1,37 @@
 import { act } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 
 const mocks = vi.hoisted(() => ({
   fetchSharedAlbum: vi.fn(),
   fetchSharedAlbumArtwork: vi.fn(),
+  publishSharedAlbum: vi.fn(),
+  updateSharedAlbum: vi.fn(),
+  revokeSharedAlbum: vi.fn(),
+  getRevocationReceipt: vi.fn(),
+  storeRevocationReceipt: vi.fn(),
+  removeRevocationReceipt: vi.fn(),
   importSharedAlbum: vi.fn(),
   toastSuccess: vi.fn(),
+  toastError: vi.fn(),
 }));
 
-vi.mock("sonner", () => ({ toast: { success: mocks.toastSuccess, error: vi.fn() } }));
+vi.mock("sonner", () => ({
+  toast: { success: mocks.toastSuccess, error: mocks.toastError },
+}));
 vi.mock("@/features/share/shareClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/share/shareClient")>()),
   fetchSharedAlbum: mocks.fetchSharedAlbum,
   fetchSharedAlbumArtwork: mocks.fetchSharedAlbumArtwork,
+  publishSharedAlbum: mocks.publishSharedAlbum,
+  updateSharedAlbum: mocks.updateSharedAlbum,
+  revokeSharedAlbum: mocks.revokeSharedAlbum,
+}));
+vi.mock("@/features/share/revocationReceipt", () => ({
+  getRevocationReceipt: mocks.getRevocationReceipt,
+  storeRevocationReceipt: mocks.storeRevocationReceipt,
+  removeRevocationReceipt: mocks.removeRevocationReceipt,
 }));
 vi.mock("@/features/share/sharePresence", () => ({
   detectAnotherTagiumTab: vi.fn(async () => false),
@@ -65,6 +83,64 @@ const workflow = (albums: Array<{ id: string; sourceManifestSlug?: string }> = [
   );
   return { hook, library, editor, events };
 };
+
+const creatorWorkflow = (album: AlbumGroup, file: TagiumFile) => {
+  const albums = [album];
+  const files = [file];
+  const library = {
+    state: { albums, files },
+    getSnapshot: () => ({ albums, files }),
+    dispatch: vi.fn((action: { type: string; albumId?: string; publication?: unknown }) => {
+      if (action.type === "album-share-publication-set" && action.albumId === album.id) {
+        album.sharePublication = action.publication as AlbumGroup["sharePublication"];
+      }
+    }),
+  } as unknown as LibraryStore;
+  const hook = renderHook(
+    () =>
+      useShareWorkflow({
+        library,
+        editor: { commands: { flush: vi.fn() } } as never,
+        importing: { commands: { importSharedAlbum: vi.fn() } } as never,
+        enabled: true,
+      }),
+    undefined,
+  );
+  return { hook, library };
+};
+
+const creatorFile: TagiumFile = {
+  id: "track-1",
+  filename: "one.mp3",
+  status: "saved",
+  downloadStatus: "ready",
+  downloadRequest: {
+    sourceUrl: "https://soundcloud.com/artist/one",
+    audioBitrate: "320",
+  },
+  metadata: {
+    filename: "one",
+    title: "One",
+    artist: "Artist",
+    album: "Shared",
+    genre: "Pop",
+    year: null,
+    trackNumber: null,
+    picture: [],
+    bitrate: 320,
+    duration: 180,
+    sampleRate: 44_100,
+  },
+};
+
+const creatorAlbum = (sharePublication?: AlbumGroup["sharePublication"]): AlbumGroup => ({
+  id: "album-1",
+  title: "Shared",
+  artist: "Artist",
+  genre: "Pop",
+  trackIds: [creatorFile.id],
+  sharePublication,
+});
 
 beforeEach(() => {
   const location = { pathname: "/" };
@@ -170,6 +246,96 @@ describe("share workflow pasted links", () => {
     await expect(hook.result.importFromInput(slug)).rejects.toBeInstanceOf(
       SharedAlbumUnavailableError,
     );
+    hook.unmount();
+  });
+});
+
+describe("share workflow publication lifecycle", () => {
+  const oldPublication = {
+    slug: "old-share",
+    url: "https://tagium.app/share/old-share",
+    expiresAt: "2030-01-01T00:00:00.000Z",
+    publishedFingerprint: "old-fingerprint",
+    status: "active" as const,
+  };
+  const capability = {
+    slug: oldPublication.slug,
+    expiresAt: oldPublication.expiresAt,
+    token: "old-token",
+  };
+
+  it("replaces a stopped publication with a fresh link", async () => {
+    const album = creatorAlbum({ ...oldPublication, status: "stopped" });
+    const { hook } = creatorWorkflow(album, creatorFile);
+    mocks.publishSharedAlbum.mockResolvedValue({
+      slug: "new-share",
+      url: "https://tagium.app/share/new-share",
+      expiresAt: "2031-01-01T00:00:00.000Z",
+      revocationToken: "new-token",
+    });
+
+    act(() => hook.result.openCreator(album.id));
+    expect(hook.result.dialog).toMatchObject({ status: "confirm", intent: "create" });
+    await act(async () => hook.result.publish());
+
+    expect(mocks.publishSharedAlbum).toHaveBeenCalledOnce();
+    expect(mocks.updateSharedAlbum).not.toHaveBeenCalled();
+    expect(album.sharePublication).toMatchObject({
+      slug: "new-share",
+      status: "active",
+    });
+    hook.unmount();
+  });
+
+  it("surfaces a recovery message if view-link permission disappears", () => {
+    const album = creatorAlbum(oldPublication);
+    mocks.getRevocationReceipt.mockReturnValue(capability);
+    const { hook } = creatorWorkflow(album, creatorFile);
+    mocks.getRevocationReceipt.mockReset().mockReturnValueOnce(capability).mockReturnValueOnce(null);
+
+    act(() => hook.result.openCreator(album.id));
+
+    expect(hook.result.dialog).toEqual({ status: "closed" });
+    expect(mocks.toastError).toHaveBeenCalledWith("share link permission unavailable", {
+      description: "try the browser that created this link",
+    });
+    hook.unmount();
+  });
+
+  it("explains that a failed create did not produce a link", async () => {
+    const album = creatorAlbum();
+    mocks.publishSharedAlbum.mockRejectedValue(new Error("sharing is unavailable"));
+    const { hook } = creatorWorkflow(album, creatorFile);
+
+    act(() => hook.result.openCreator(album.id));
+    await act(async () => hook.result.publish());
+
+    expect(hook.result.dialog).toMatchObject({
+      status: "error",
+      intent: "create",
+      message: "sharing is unavailable. no link was created.",
+    });
+    hook.unmount();
+  });
+
+  it("explains that a failed update left the previous link version intact", async () => {
+    const album = creatorAlbum(oldPublication);
+    mocks.getRevocationReceipt.mockReturnValue(capability);
+    mocks.updateSharedAlbum.mockRejectedValue(new Error("offline"));
+    const { hook } = creatorWorkflow(album, creatorFile);
+
+    await vi.waitFor(() =>
+      expect(hook.result.shareActions[album.id]?.label).toBe("update shared album"),
+    );
+    act(() => hook.result.openCreator(album.id));
+    await act(async () => hook.result.publish());
+
+    expect(hook.result.dialog).toMatchObject({
+      status: "error",
+      intent: "update",
+      message:
+        "the shared album could not be updated. the link still has the previous version.",
+    });
     hook.unmount();
   });
 });
