@@ -38,10 +38,10 @@ const normalizedDetails = (details) => {
 export const buildSoundCloudFailureCode = (stage, details = {}) => {
   const safe = normalizedDetails(details);
   const status = safe.upstreamStatus ? `.${safe.upstreamStatus}` : "";
-  const suffix = Object.entries(safe)
-    .filter(([key]) => key !== "upstreamStatus")
-    .map(([key, value]) => `.${key}-${value}`)
-    .join("");
+  let suffix = "";
+  for (const [key, value] of Object.entries(safe)) {
+    if (key !== "upstreamStatus") suffix += `.${key}-${value}`;
+  }
   return `fetch.soundcloud.${stage}${status}${suffix}`;
 };
 

@@ -271,6 +271,7 @@ export default defineHandler(async (event) => {
     throw error;
   }
   const trackEntries: IndexedSoundCloudTrack[] = [];
+  const decodeFailureLogs: Promise<void>[] = [];
   let decodeFailures = 0;
   for (const [index, entry] of playlist.tracks.entries()) {
     const track = decodeSoundCloudTrackOption(entry);
@@ -280,11 +281,14 @@ export default defineHandler(async (event) => {
     }
 
     decodeFailures++;
-    await logSoundCloudFailure("track.entry_parse", {
-      ...context,
-      trackIndex: index + 1,
-    });
+    decodeFailureLogs.push(
+      logSoundCloudFailure("track.entry_parse", {
+        ...context,
+        trackIndex: index + 1,
+      }),
+    );
   }
+  await Promise.all(decodeFailureLogs);
   const tracks = await resolveTracks(
     clientId,
     trackEntries,
