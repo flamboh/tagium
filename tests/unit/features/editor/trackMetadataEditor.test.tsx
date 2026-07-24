@@ -3,12 +3,14 @@ import { useForm } from "react-hook-form";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import TrackMetadataEditor from "@/features/editor/TrackMetadataEditor";
+import { getMetadataLinkDescriptor } from "@/features/library/metadataLinks";
 import type { AudioMetadata, TagiumFile } from "@/features/library/types";
 
 const metadata: AudioMetadata = {
   filename: "",
   title: "",
   artist: "",
+  albumArtist: "",
   album: "",
   year: null,
   genre: "",
@@ -17,6 +19,10 @@ const metadata: AudioMetadata = {
   sampleRate: 44_100,
   picture: [],
   trackNumber: null,
+  composer: "",
+  comment: "",
+  discNumber: null,
+  bpm: null,
 };
 
 const loadedTrack: TagiumFile = {
@@ -34,7 +40,7 @@ function EditorHarness({
   selectedFile?: TagiumFile | null;
   syncFilenames?: boolean;
 }) {
-  const { register, control, handleSubmit } = useForm<AudioMetadata>({
+  const { register, control, getValues, setError, clearErrors, setFocus } = useForm<AudioMetadata>({
     defaultValues: metadata,
   });
 
@@ -45,14 +51,25 @@ function EditorHarness({
         selectedFileId={selectedFile?.id ?? null}
         register={register}
         control={control}
-        handleSubmit={handleSubmit}
+        getValues={getValues}
+        setError={setError}
+        clearErrors={clearErrors}
+        setFocus={setFocus}
         onTrackCoverUpload={vi.fn()}
         onTrackCoverProcessingChange={vi.fn()}
         isTrackCoverProcessing={false}
         onDownloadUpdatedFile={vi.fn()}
         selectedFileAlbum={undefined}
         syncFilenames={syncFilenames}
-        syncTrackNumbers
+        advancedMetadata
+        metadataLinks={{
+          artist: true,
+          year: true,
+          genre: true,
+          artwork: true,
+          albumArtist: true,
+          trackNumber: true,
+        }}
         onPreviewMetadataChange={vi.fn()}
       />
     </TooltipProvider>
@@ -67,6 +84,21 @@ describe("track metadata editor form seam", () => {
     expect(markup).not.toContain('id="track-title"');
   });
 
+  it("keeps the selected track header and mode control while metadata hydrates", () => {
+    const pendingTrack: TagiumFile = {
+      id: "pending-track",
+      filename: "pending-track.flac",
+      status: "pending",
+      downloadStatus: "downloading",
+    };
+    const markup = renderToStaticMarkup(<EditorHarness selectedFile={pendingTrack} />);
+
+    expect(markup).toContain("pending-track.flac");
+    expect(markup).toContain("loading metadata");
+    expect(markup.match(/aria-label="metadata fields"/g)).toHaveLength(1);
+    expect(markup).not.toContain('id="track-title"');
+  });
+
   it("associates every metadata label with its input", () => {
     const markup = renderToStaticMarkup(<EditorHarness />);
 
@@ -77,10 +109,33 @@ describe("track metadata editor form seam", () => {
       "track-year",
       "track-genre",
       "track-number",
+      "track-album-artist",
+      "track-disc-number",
+      "track-bpm",
+      "track-composer",
+      "track-comment",
     ]) {
       expect(markup).toContain(`for="${id}"`);
       expect(markup).toContain(`id="${id}"`);
     }
+  });
+
+  it("renders one mode control and keeps the inactive advanced pane out of focus order", () => {
+    const markup = renderToStaticMarkup(<EditorHarness />);
+
+    expect(markup.match(/aria-label="metadata fields"/g)).toHaveLength(1);
+    expect(markup).toContain('data-editor-pane="advanced"');
+    expect(markup).toMatch(/data-editor-pane="advanced"[^>]*aria-hidden="true"[^>]*inert/);
+  });
+
+  it("provides a persistent accessible reason for a linked album artist", () => {
+    const markup = renderToStaticMarkup(<EditorHarness />);
+
+    expect(markup).toMatch(
+      /id="track-album-artist"[^>]*aria-describedby="track-album-artist-sync-reason"/,
+    );
+    expect(markup).toContain('id="track-album-artist-sync-reason"');
+    expect(markup).toContain(getMetadataLinkDescriptor("albumArtist").disabledReason);
   });
 
   it("describes a synced filename error from the title field", () => {

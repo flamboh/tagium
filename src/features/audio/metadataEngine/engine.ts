@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import { AudioMetadataWriteError } from "@/features/audio/audioErrors";
 import { audioFilenameBase, audioFilename } from "@/features/audio/audioFormat";
 import type { AudioMetadata } from "@/features/audio/metadata";
+import { validateAdvancedMetadataNumber } from "@/features/audio/metadataFields";
 import { makeBlobByteSource } from "@/features/audio/metadataEngine/byteSource";
 import { detectAudioFormat } from "@/features/audio/metadataEngine/detect";
 import type { FormatDriver } from "@/features/audio/metadataEngine/driver";
@@ -56,7 +57,9 @@ const genreEqual = (left: string | string[], right: string | string[]) =>
     ? left.length === right.length && left.every((value, index) => value === right[index])
     : left === right);
 
-const validateEditableNumbers = (metadata: Pick<AudioMetadata, "year" | "trackNumber">) => {
+const validateEditableNumbers = (
+  metadata: Pick<AudioMetadata, "year" | "trackNumber" | "discNumber" | "bpm">,
+) => {
   const validInteger = (value: number | null) =>
     value === null || (Number.isFinite(value) && Number.isInteger(value));
   if (
@@ -77,7 +80,21 @@ const validateEditableNumbers = (metadata: Pick<AudioMetadata, "year" | "trackNu
       cause: undefined,
     });
   }
+  for (const field of ["discNumber", "bpm"] as const) {
+    const message = validateAdvancedMetadataNumber(field, metadata[field]);
+    if (message) {
+      return new AudioMetadataWriteError({ message, cause: undefined });
+    }
+  }
 };
+
+const validateChangedNumbers = (changes: MetadataChanges) =>
+  validateEditableNumbers({
+    year: changes.year ?? null,
+    trackNumber: changes.trackNumber ?? null,
+    discNumber: changes.discNumber ?? null,
+    bpm: changes.bpm ?? null,
+  });
 
 export const diffEditableMetadata = (
   current: AudioInspection["metadata"],
@@ -86,10 +103,15 @@ export const diffEditableMetadata = (
   const changes: MetadataChanges = {};
   if (current.title !== next.title) changes.title = next.title;
   if (current.artist !== next.artist) changes.artist = next.artist;
+  if (current.albumArtist !== next.albumArtist) changes.albumArtist = next.albumArtist;
   if (current.album !== next.album) changes.album = next.album;
   if (current.year !== next.year) changes.year = next.year;
   if (!genreEqual(current.genre, next.genre)) changes.genre = next.genre;
   if (current.trackNumber !== next.trackNumber) changes.trackNumber = next.trackNumber;
+  if (current.discNumber !== next.discNumber) changes.discNumber = next.discNumber;
+  if (current.composer !== next.composer) changes.composer = next.composer;
+  if (current.bpm !== next.bpm) changes.bpm = next.bpm;
+  if (current.comment !== next.comment) changes.comment = next.comment;
   if (!artworkEqual(current.picture, next.picture)) {
     // The current UI edits the primary cover only. Keep secondary artwork unless the
     // caller explicitly supplies a complete multi-picture replacement.
@@ -144,6 +166,8 @@ export const patchAudioFileWithChanges = (
   filenameBase: string,
 ) =>
   Effect.gen(function* () {
+    const validationError = validateChangedNumbers(changes);
+    if (validationError) return yield* Effect.fail(validationError);
     const source = makeBlobByteSource(file);
     const kind = yield* detectAudioFormat(source).pipe(
       Effect.mapError(

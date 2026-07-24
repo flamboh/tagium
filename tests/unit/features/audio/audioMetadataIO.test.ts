@@ -24,6 +24,7 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   filename: "track",
   title: "",
   artist: "",
+  albumArtist: "",
   album: "",
   year: null,
   genre: "",
@@ -32,6 +33,10 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   sampleRate: 44_100,
   picture: [],
   trackNumber: null,
+  composer: "",
+  comment: "",
+  discNumber: null,
+  bpm: null,
   ...overrides,
 });
 

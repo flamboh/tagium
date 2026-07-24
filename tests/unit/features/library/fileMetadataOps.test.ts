@@ -11,11 +11,13 @@ import {
   resolveDownloadedTrackHydrationWriteError,
 } from "@/features/library/fileMetadataOps";
 import { AudioMetadata, TagiumFile } from "@/features/library/types";
+import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 
 const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   filename: "track",
   title: "Track",
   artist: "Artist",
+  albumArtist: "Artist",
   album: "Album",
   year: 2024,
   genre: "",
@@ -24,6 +26,10 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   sampleRate: 0,
   picture: [],
   trackNumber: null,
+  composer: "",
+  comment: "",
+  discNumber: null,
+  bpm: null,
   ...overrides,
 });
 
@@ -50,19 +56,7 @@ describe("fileMetadataOps", () => {
         status: "saved" as const,
         downloadStatus: "ready" as const,
         hasBufferedChanges: false,
-        metadata: {
-          filename: "track-1",
-          title: "Track 1",
-          artist: "Artist",
-          album: "Album",
-          year: 2024,
-          genre: "",
-          duration: 0,
-          bitrate: 0,
-          sampleRate: 0,
-          picture: [],
-          trackNumber: null,
-        },
+        metadata: metadata({ filename: "track-1", title: "Track 1" }),
       },
       {
         id: "track-2",
@@ -72,19 +66,7 @@ describe("fileMetadataOps", () => {
         status: "pending" as const,
         downloadStatus: "ready" as const,
         hasBufferedChanges: false,
-        metadata: {
-          filename: "track-2",
-          title: "Track 2",
-          artist: "Artist",
-          album: "Album",
-          year: 2024,
-          genre: "",
-          duration: 0,
-          bitrate: 0,
-          sampleRate: 0,
-          picture: [],
-          trackNumber: null,
-        },
+        metadata: metadata({ filename: "track-2", title: "Track 2" }),
       },
     ];
 
@@ -127,19 +109,14 @@ describe("fileMetadataOps", () => {
         status: "saved" as const,
         downloadStatus: "ready" as const,
         hasBufferedChanges: false,
-        metadata: {
+        metadata: metadata({
           filename: "track-1",
           title: "Track 1",
           artist: "Old Artist",
           album: "Old Album",
-          year: 2024,
-          genre: "",
-          duration: 0,
-          bitrate: 0,
-          sampleRate: 0,
           picture: originalCover,
           trackNumber: 9,
-        },
+        }),
       },
     ];
 
@@ -177,6 +154,113 @@ describe("fileMetadataOps", () => {
       Object.prototype.hasOwnProperty.call(updatedFile.pendingMetadataPatch ?? {}, "year"),
     ).toBe(false);
   });
+
+  it("applies the complete album policy while leaving unlinked and unrelated fields alone", () => {
+    const cover = [
+      {
+        format: "image/jpeg",
+        type: 3,
+        description: "cover",
+        data: new Uint8Array([1]),
+      },
+    ];
+    const file = readyFile({
+      metadata: metadata({
+        artist: "Track Artist",
+        albumArtist: "Custom Album Artist",
+        album: "Old Album",
+        year: 1999,
+        genre: "Track Genre",
+        picture: [],
+        trackNumber: 9,
+        discNumber: 2,
+        composer: "Composer",
+        bpm: 123,
+        comment: "Keep",
+      }),
+    });
+    const album = {
+      id: "album-1",
+      title: "New Album",
+      artist: "Album Artist",
+      genre: "Album Genre",
+      year: 2026,
+      cover,
+      trackIds: [file.id],
+    };
+    const settings = {
+      ...DEFAULT_APP_SETTINGS,
+      advancedMetadata: true,
+      metadataLinks: {
+        artist: false,
+        year: true,
+        genre: false,
+        artwork: true,
+        albumArtist: false,
+      },
+    };
+
+    const [shared] = applyAlbumSharedTagsToFiles([file], album, settings);
+    const [covered] = applyAlbumCoverToFiles([shared], album.trackIds, cover, settings);
+    const [ordered] = applyTrackOrderNumbersToFiles([covered], [album], [album.id], settings);
+
+    expect(ordered.metadata).toMatchObject({
+      artist: "Track Artist",
+      albumArtist: "Custom Album Artist",
+      album: "New Album",
+      year: 2026,
+      genre: "Track Genre",
+      picture: cover,
+      trackNumber: 1,
+      discNumber: 2,
+      composer: "Composer",
+      bpm: 123,
+      comment: "Keep",
+    });
+    expect(ordered.pendingMetadataPatch).toEqual({
+      album: "New Album",
+      year: 2026,
+      picture: cover,
+      trackNumber: 1,
+    });
+  });
+
+  it.each([
+    { linked: false, expected: "Custom Album Artist" },
+    { linked: true, expected: "Album Artist" },
+  ])(
+    "treats album-artist linking as authoritative with Advanced UI off (linked=$linked)",
+    ({ linked, expected }) => {
+      const file = readyFile({
+        metadata: metadata({
+          artist: "Track Artist",
+          albumArtist: "Custom Album Artist",
+        }),
+      });
+      const policySettings = {
+        ...DEFAULT_APP_SETTINGS,
+        advancedMetadata: false,
+        metadataLinks: {
+          ...DEFAULT_APP_SETTINGS.metadataLinks,
+          albumArtist: linked,
+        },
+      };
+      const [updated] = applyAlbumSharedTagsToFiles(
+        [file],
+        {
+          id: "album-1",
+          title: "Album",
+          artist: "Album Artist",
+          genre: "",
+          trackIds: [file.id],
+        },
+        policySettings,
+      );
+
+      expect(updated.metadata?.albumArtist).toBe(expected);
+      expect(updated.pendingMetadataPatch?.albumArtist).toBe(linked ? "Album Artist" : undefined);
+    },
+  );
 
   it("explicitly applies album cover to album tracks", () => {
     const albumCover = [
@@ -561,6 +645,64 @@ describe("fileMetadataOps", () => {
     expect(hydratedFile.metadata?.trackNumber).toBe(3);
     expect(metadataToWrite?.year).toBe(2025);
     expect(metadataToWrite?.trackNumber).toBe(3);
+  });
+
+  it("hydrates sparse advanced changes and drops invalid form artifacts", () => {
+    const currentFile = readyFile({
+      file: undefined,
+      originalFile: undefined,
+      downloadStatus: "downloading",
+      hasBufferedChanges: true,
+      pendingMetadataPatch: {
+        albumArtist: "",
+        composer: "Edited Composer",
+        comment: "",
+        discNumber: Number.NaN,
+        bpm: 140,
+      },
+      metadata: metadata({
+        albumArtist: "",
+        composer: "Edited Composer",
+        comment: "",
+        discNumber: 2,
+        bpm: 140,
+      }),
+    });
+    const parsedFile = readyFile({
+      metadata: metadata({
+        albumArtist: "Parsed Album Artist",
+        composer: "Parsed Composer",
+        comment: "Parsed comment",
+        discNumber: 4,
+        bpm: 128,
+      }),
+    });
+
+    const { hydratedFile, metadataToWrite } = prepareDownloadedTrackHydration(
+      currentFile,
+      parsedFile,
+    );
+
+    expect(hydratedFile.metadata).toMatchObject({
+      albumArtist: "",
+      composer: "Edited Composer",
+      comment: "",
+      discNumber: 4,
+      bpm: 140,
+    });
+    expect(metadataToWrite).toMatchObject({
+      albumArtist: "",
+      composer: "Edited Composer",
+      comment: "",
+      discNumber: 4,
+      bpm: 140,
+    });
+    expect(hydratedFile.pendingMetadataPatch).toEqual({
+      albumArtist: "",
+      composer: "Edited Composer",
+      comment: "",
+      bpm: 140,
+    });
   });
 
   it("preserves sparse SoundCloud set intent while hydrating parsed downloads", () => {

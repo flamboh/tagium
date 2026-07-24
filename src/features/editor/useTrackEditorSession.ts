@@ -6,9 +6,11 @@ import {
   prepareDownloadedTrackHydration,
   resolveDownloadedTrackHydrationWrite,
   resolveDownloadedTrackHydrationWriteError,
+  sanitizePendingMetadataPatch,
 } from "@/features/library/fileMetadataOps";
 import {
   createDirtyMetadataPatch,
+  getProjectableAudioMetadata,
   getNullableNumericMetadataValue,
   getNullableNumericPatchValue,
   getSubmittedAudioMetadata,
@@ -43,11 +45,16 @@ const createSubmittedMetadataPatch = (metadata: AudioMetadata): MetadataPatch =>
   filename: metadata.filename,
   title: metadata.title,
   artist: metadata.artist,
+  albumArtist: metadata.albumArtist,
   album: metadata.album,
   year: getNullableNumericPatchValue(metadata.year),
   genre: metadata.genre,
   picture: metadata.picture,
   trackNumber: getNullableNumericPatchValue(metadata.trackNumber),
+  discNumber: getNullableNumericPatchValue(metadata.discNumber),
+  composer: metadata.composer,
+  bpm: getNullableNumericPatchValue(metadata.bpm),
+  comment: metadata.comment,
 });
 
 const applyMetadataPatch = (metadata: AudioMetadata, patch: MetadataPatch): AudioMetadata => ({
@@ -55,6 +62,7 @@ const applyMetadataPatch = (metadata: AudioMetadata, patch: MetadataPatch): Audi
   ...(hasOwn(patch, "filename") ? { filename: patch.filename } : {}),
   ...(hasOwn(patch, "title") ? { title: patch.title } : {}),
   ...(hasOwn(patch, "artist") ? { artist: patch.artist } : {}),
+  ...(hasOwn(patch, "albumArtist") ? { albumArtist: patch.albumArtist } : {}),
   ...(hasOwn(patch, "album") ? { album: patch.album } : {}),
   ...(hasOwn(patch, "year") ? { year: getNullableNumericMetadataValue(patch.year) } : {}),
   ...(hasOwn(patch, "genre") ? { genre: patch.genre } : {}),
@@ -62,6 +70,12 @@ const applyMetadataPatch = (metadata: AudioMetadata, patch: MetadataPatch): Audi
   ...(hasOwn(patch, "trackNumber")
     ? { trackNumber: getNullableNumericMetadataValue(patch.trackNumber) }
     : {}),
+  ...(hasOwn(patch, "discNumber")
+    ? { discNumber: getNullableNumericMetadataValue(patch.discNumber) }
+    : {}),
+  ...(hasOwn(patch, "composer") ? { composer: patch.composer } : {}),
+  ...(hasOwn(patch, "bpm") ? { bpm: getNullableNumericMetadataValue(patch.bpm) } : {}),
+  ...(hasOwn(patch, "comment") ? { comment: patch.comment } : {}),
 });
 
 const getFilenameFromPatch = (file: TagiumFile, patch: MetadataPatch) =>
@@ -72,11 +86,16 @@ const getFilenameFromPatch = (file: TagiumFile, patch: MetadataPatch) =>
 const withPendingMetadataPatch = (
   file: TagiumFile,
   pendingMetadataPatch: MetadataPatch | undefined,
-) => ({
-  ...file,
-  pendingMetadataPatch,
-  hasBufferedChanges: Boolean(pendingMetadataPatch),
-});
+) => {
+  const sanitizedPatch = pendingMetadataPatch
+    ? sanitizePendingMetadataPatch(pendingMetadataPatch)
+    : undefined;
+  return {
+    ...file,
+    pendingMetadataPatch: sanitizedPatch,
+    hasBufferedChanges: Boolean(sanitizedPatch),
+  };
+};
 
 const withMergedPendingMetadataPatch = (file: TagiumFile, patch: MetadataPatch | undefined) =>
   patch ? withPendingMetadataPatch(file, { ...file.pendingMetadataPatch, ...patch }) : file;
@@ -89,7 +108,7 @@ export interface TrackEditorSession {
   isCoverProcessing: boolean;
   form: Pick<
     ReturnType<typeof useForm<AudioMetadata>>,
-    "register" | "control" | "handleSubmit" | "reset"
+    "register" | "control" | "getValues" | "setError" | "clearErrors" | "setFocus" | "reset"
   >;
   commands: {
     flush: (trackIds?: string[]) => TagiumFile[];
@@ -121,11 +140,13 @@ export const useTrackEditorSession = ({
   const [isCoverProcessing, setCoverProcessing] = useState(false);
   const {
     register,
-    handleSubmit,
     control,
     setValue,
     reset,
     getValues,
+    setError,
+    clearErrors,
+    setFocus,
     formState: { dirtyFields },
   } = useForm<AudioMetadata>();
   const formIsDirty = Object.keys(dirtyFields).length > 0;
@@ -161,7 +182,35 @@ export const useTrackEditorSession = ({
   }, [formIsDirty, library.state.selectedFileId, reset, selectedFile]);
 
   const getSubmittedMetadata = useCallback(
-    (data: AudioMetadata) => getSubmittedAudioMetadata(data, settingsRef.current.syncFilenames),
+    (data: AudioMetadata) =>
+      getSubmittedAudioMetadata(
+        data,
+        settingsRef.current.syncFilenames,
+        settingsRef.current.metadataLinks.albumArtist,
+      ),
+    [],
+  );
+
+  const createCurrentMetadataPatch = useCallback(
+    (
+      metadata: AudioMetadata,
+      dirtyFields: Partial<Record<keyof AudioMetadata, unknown>>,
+      extraFields: Iterable<keyof MetadataPatch> = [],
+    ) => {
+      const fields = new Set(extraFields);
+      if (
+        settingsRef.current.metadataLinks.albumArtist &&
+        (dirtyFields.artist || fields.has("artist"))
+      ) {
+        fields.add("albumArtist");
+      }
+      return createDirtyMetadataPatch(
+        metadata,
+        dirtyFields,
+        settingsRef.current.syncFilenames,
+        fields,
+      );
+    },
     [],
   );
 
@@ -171,12 +220,14 @@ export const useTrackEditorSession = ({
       if (!selectedId || !formDirtyRef.current) return files;
       if (trackIds && !trackIds.includes(selectedId)) return files;
 
-      const submittedData = getSubmittedMetadata(getValues());
-      const metadataPatch = createDirtyMetadataPatch(
-        submittedData,
-        dirtyFieldsRef.current,
-        settingsRef.current.syncFilenames,
+      const currentFile = files.find((file) => file.id === selectedId);
+      if (!currentFile) return files;
+      const submittedData = getProjectableAudioMetadata(
+        getSubmittedMetadata(getValues()),
+        currentFile.metadata,
+        getValues(),
       );
+      const metadataPatch = createCurrentMetadataPatch(submittedData, dirtyFieldsRef.current);
       if (!metadataPatch) return files;
       return files.map((file) =>
         file.id === selectedId
@@ -194,7 +245,7 @@ export const useTrackEditorSession = ({
           : file,
       );
     },
-    [getSubmittedMetadata, getValues],
+    [createCurrentMetadataPatch, getSubmittedMetadata, getValues],
   );
 
   const flush = useCallback(
@@ -215,15 +266,20 @@ export const useTrackEditorSession = ({
       if (!selectedId) return;
 
       formDirtyRef.current = true;
-      const submittedData = getSubmittedMetadata({ ...getValues(), [field]: value });
-      const metadataPatch = createDirtyMetadataPatch(
-        submittedData,
-        dirtyFieldsRef.current,
-        settingsRef.current.syncFilenames,
-        [field],
+      const currentFiles = library.getSnapshot().files;
+      const currentFile = currentFiles.find((file) => file.id === selectedId);
+      if (!currentFile) return;
+      const formValues = { ...getValues(), [field]: value };
+      const submittedData = getProjectableAudioMetadata(
+        getSubmittedMetadata(formValues),
+        currentFile.metadata,
+        formValues,
       );
+      const metadataPatch = createCurrentMetadataPatch(submittedData, dirtyFieldsRef.current, [
+        field,
+      ]);
       if (!metadataPatch) return;
-      const nextFiles = library.getSnapshot().files.map((file) =>
+      const nextFiles = currentFiles.map((file) =>
         file.id === selectedId
           ? withMergedPendingMetadataPatch(
               {
@@ -240,7 +296,7 @@ export const useTrackEditorSession = ({
       );
       library.dispatch({ type: "content-replaced", files: nextFiles });
     },
-    [getSubmittedMetadata, getValues, library],
+    [createCurrentMetadataPatch, getSubmittedMetadata, getValues, library],
   );
 
   const updateTags = useCallback(
@@ -248,14 +304,19 @@ export const useTrackEditorSession = ({
       const snapshot = library.getSnapshot();
       const latestFileToUpdate =
         snapshot.files.find((file) => file.id === fileToUpdate.id) ?? fileToUpdate;
+      const submittedMetadata = getProjectableAudioMetadata(
+        getSubmittedMetadata(newTags),
+        latestFileToUpdate.metadata,
+        newTags,
+      );
       const metadata = {
-        ...newTags,
-        year: getNullableNumericMetadataValue(newTags.year),
-        trackNumber: getNullableNumericMetadataValue(newTags.trackNumber),
+        ...submittedMetadata,
+        year: getNullableNumericMetadataValue(submittedMetadata.year),
+        trackNumber: getNullableNumericMetadataValue(submittedMetadata.trackNumber),
         duration: latestFileToUpdate.metadata?.duration || 0,
         bitrate: latestFileToUpdate.metadata?.bitrate || 0,
         sampleRate: latestFileToUpdate.metadata?.sampleRate || 0,
-        picture: newTags.picture || [],
+        picture: submittedMetadata.picture || [],
       };
 
       if (!latestFileToUpdate.file) {
@@ -264,8 +325,8 @@ export const useTrackEditorSession = ({
             ? withPendingMetadataPatch(
                 {
                   ...file,
-                  filename: newTags.filename
-                    ? audioFilename(newTags.filename, getAudioFormat(file))
+                  filename: metadata.filename
+                    ? audioFilename(metadata.filename, getAudioFormat(file))
                     : file.filename,
                   metadata,
                   status: "pending" as const,
@@ -280,7 +341,7 @@ export const useTrackEditorSession = ({
       }
 
       try {
-        const updatedFile = await runAudioBackendEffect(writeTags(latestFileToUpdate, newTags));
+        const updatedFile = await runAudioBackendEffect(writeTags(latestFileToUpdate, metadata));
         const nextFiles = library.getSnapshot().files.map((file) =>
           file.id === fileToUpdate.id
             ? clearPendingMetadataPatch({
@@ -311,12 +372,12 @@ export const useTrackEditorSession = ({
                     bitrate: file.metadata?.bitrate || 0,
                     sampleRate: file.metadata?.sampleRate || 0,
                   },
-                  filename: newTags.filename
-                    ? audioFilename(newTags.filename, getAudioFormat(file))
+                  filename: metadata.filename
+                    ? audioFilename(metadata.filename, getAudioFormat(file))
                     : file.filename,
                   downloadError: message,
                 },
-                createSubmittedMetadataPatch(newTags),
+                createSubmittedMetadataPatch(metadata),
               )
             : file,
         );
@@ -324,7 +385,7 @@ export const useTrackEditorSession = ({
         throw error;
       }
     },
-    [library, reset],
+    [getSubmittedMetadata, library, reset],
   );
 
   const hydrateDownloadedTrack = useCallback(
@@ -345,14 +406,20 @@ export const useTrackEditorSession = ({
             const parsedFile = parsedUpload.file;
             const formMetadata =
               selectedFileIdRef.current === fileId && formDirtyRef.current && currentFile.metadata
-                ? getSubmittedMetadata(getValues())
+                ? getProjectableAudioMetadata(
+                    getSubmittedMetadata(getValues()),
+                    currentFile.metadata,
+                    getValues(),
+                  )
                 : undefined;
-            const currentPendingPatch = formMetadata
-              ? createDirtyMetadataPatch(
-                  formMetadata,
-                  dirtyFieldsRef.current,
-                  settingsRef.current.syncFilenames,
-                )
+            const currentFormPatch = formMetadata
+              ? createCurrentMetadataPatch(formMetadata, dirtyFieldsRef.current)
+              : undefined;
+            const currentPendingPatch = currentFormPatch
+              ? sanitizePendingMetadataPatch({
+                  ...getPendingMetadataPatch(currentFile),
+                  ...currentFormPatch,
+                })
               : getPendingMetadataPatch(currentFile);
             const currentFileWithPendingPatch =
               currentPendingPatch && currentPendingPatch !== currentFile.pendingMetadataPatch
@@ -378,27 +445,35 @@ export const useTrackEditorSession = ({
             const nextHydratedFile = yield* Effect.sync(() => {
               const latestFile = library.getSnapshot().files.find((file) => file.id === fileId);
               if (!latestFile) return null;
-              if (Exit.isSuccess(writeResult)) {
-                const latestFormMetadata =
-                  selectedFileIdRef.current === fileId && formDirtyRef.current
-                    ? getSubmittedMetadata(getValues())
-                    : undefined;
-                const latestFormPatch = latestFormMetadata
-                  ? createDirtyMetadataPatch(
-                      latestFormMetadata,
-                      dirtyFieldsRef.current,
-                      settingsRef.current.syncFilenames,
+              const latestFormMetadata =
+                selectedFileIdRef.current === fileId && formDirtyRef.current
+                  ? getProjectableAudioMetadata(
+                      getSubmittedMetadata(getValues()),
+                      latestFile.metadata,
+                      getValues(),
                     )
                   : undefined;
-                const latestMetadataForResolve =
-                  latestFormPatch && latestFile.metadata
-                    ? applyMetadataPatch(latestFile.metadata, latestFormPatch)
-                    : latestFormMetadata;
+              const latestFormPatch = latestFormMetadata
+                ? createCurrentMetadataPatch(latestFormMetadata, dirtyFieldsRef.current)
+                : undefined;
+              const latestMetadataForResolve =
+                latestFormPatch && latestFile.metadata
+                  ? applyMetadataPatch(latestFile.metadata, latestFormPatch)
+                  : latestFormMetadata;
+              const latestFileForResolve = latestFormPatch
+                ? withMergedPendingMetadataPatch(
+                    {
+                      ...latestFile,
+                      filename: getFilenameFromPatch(latestFile, latestFormPatch),
+                      metadata: latestMetadataForResolve,
+                    },
+                    latestFormPatch,
+                  )
+                : latestFile;
+              if (Exit.isSuccess(writeResult)) {
                 return resolveDownloadedTrackHydrationWrite(
                   currentFileWithPendingPatch,
-                  latestFormPatch
-                    ? withMergedPendingMetadataPatch(latestFile, latestFormPatch)
-                    : latestFile,
+                  latestFileForResolve,
                   parsedFile,
                   hydratedFile,
                   writeResult.value,
@@ -413,7 +488,7 @@ export const useTrackEditorSession = ({
                   : "downloaded, but metadata could not be applied.";
               return resolveDownloadedTrackHydrationWriteError(
                 currentFileWithPendingPatch,
-                latestFile,
+                latestFileForResolve,
                 parsedFile,
                 hydratedFile,
                 message,
@@ -440,14 +515,14 @@ export const useTrackEditorSession = ({
           });
         }),
       ),
-    [getSubmittedMetadata, getValues, library],
+    [createCurrentMetadataPatch, getSubmittedMetadata, getValues, library],
   );
 
   return {
     selectedFile,
     selectedFileAlbum,
     isCoverProcessing,
-    form: { register, control, handleSubmit, reset },
+    form: { register, control, getValues, setError, clearErrors, setFocus, reset },
     commands: {
       flush,
       preview,

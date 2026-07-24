@@ -67,10 +67,11 @@ export type AnalyticsEvent =
     }
   | {
       type: "settings_changed";
-      syncTrackNumbers: boolean;
       syncFilenames: boolean;
       audioBitrate: "320" | "256" | "128" | "96" | "64";
       applySoundCloudCover: boolean;
+      advancedMetadata: boolean;
+      metadataLinks: MetadataLinkState;
     }
   | {
       type: "album_created" | "album_edited";
@@ -225,6 +226,8 @@ const CUSTOM_EVENT_PROPERTIES: Record<string, ReadonlySet<string>> = {
     "sync_filenames",
     "audio_bitrate",
     "apply_soundcloud_cover",
+    "advanced_metadata",
+    ...METADATA_LINK_DESCRIPTORS.map((descriptor) => descriptor.analyticsProperty),
   ]),
   album_created: new Set([...COMMON_CUSTOM_PROPERTIES, "track_count", "has_cover"]),
   album_edited: new Set([...COMMON_CUSTOM_PROPERTIES, "track_count", "has_cover"]),
@@ -402,10 +405,11 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
         name: event.type,
         properties: {
           ...commonProperties,
-          sync_track_numbers: event.syncTrackNumbers,
           sync_filenames: event.syncFilenames,
           audio_bitrate: event.audioBitrate,
           apply_soundcloud_cover: event.applySoundCloudCover,
+          advanced_metadata: event.advancedMetadata,
+          ...serializeMetadataLinkAnalytics(event.metadataLinks),
         },
       };
     case "album_created":
@@ -557,3 +561,8 @@ export const analytics = createAnalytics(
 );
 
 export const initializeAnalytics = analytics.initialize;
+import {
+  METADATA_LINK_DESCRIPTORS,
+  serializeMetadataLinkAnalytics,
+  type MetadataLinkState,
+} from "@/features/library/metadataLinks";

@@ -8,6 +8,7 @@ import { resolveSoundCloudSet } from "@/features/import/soundcloudSet";
 import { startSoundCloudSetImport } from "@/features/import/soundcloudSetImport";
 import type { SoundCloudSet } from "@/features/import/soundcloudSet";
 import type { AlbumGroup, AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
+import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -41,6 +42,7 @@ const cover: AudioMetadata["picture"] = [
 ];
 
 const defaultSettings: AppSettings = {
+  ...DEFAULT_APP_SETTINGS,
   audioBitrate: "320",
   syncFilenames: false,
   syncTrackNumbers: false,

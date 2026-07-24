@@ -9,9 +9,13 @@ import {
   readUint32LE,
   synchsafeToNumber,
   uint32BE,
+  uint32LE,
 } from "@/features/audio/metadataEngine/binary";
 import type { ByteSource } from "@/features/audio/metadataEngine/byteSource";
-import type { FormatDriver } from "@/features/audio/metadataEngine/driver";
+import {
+  rejectUnsupportedMetadataChanges,
+  type FormatDriver,
+} from "@/features/audio/metadataEngine/driver";
 import type { ArtworkEntry, MetadataChanges } from "@/features/audio/metadataEngine/types";
 
 const format = { kind: "mp3", extension: "mp3", mime: "audio/mpeg" } as const;
@@ -252,11 +256,14 @@ const ids = {
   year: ["TDRC", "TYER", "TYE"],
   genre: ["TCON", "TCO"],
   trackNumber: ["TRCK", "TRK"],
+  discNumber: ["TPOS", "TPA"],
+  bpm: ["TBPM", "TBP"],
   picture: ["APIC", "PIC"],
   dateText: ["TDRC", "TYER", "TYE"],
   trackText: ["TRCK", "TRK"],
   albumArtist: ["TPE2", "TP2"],
   composer: ["TCOM", "TCM"],
+  comment: ["COMM", "COM"],
   copyright: ["TCOP", "TCR"],
   language: ["TLAN", "TLA"],
 } as const;
@@ -268,11 +275,14 @@ const idSets = {
   year: new Set(ids.year),
   genre: new Set(ids.genre),
   trackNumber: new Set(ids.trackNumber),
+  discNumber: new Set(ids.discNumber),
+  bpm: new Set(ids.bpm),
   picture: new Set<string>(ids.picture),
   dateText: new Set(ids.dateText),
   trackText: new Set(ids.trackText),
   albumArtist: new Set(ids.albumArtist),
   composer: new Set(ids.composer),
+  comment: new Set<string>(ids.comment),
   copyright: new Set(ids.copyright),
   language: new Set(ids.language),
 } as const;
@@ -293,6 +303,26 @@ const splitTerminated = (bytes: Uint8Array, encoding: number) => {
     }
   }
   return [bytes, bytes.subarray(bytes.length)] as const;
+};
+
+const parseComment = (frame: RawFrame, version: Id3Version) => {
+  const payload = payloadOf(frame, version);
+  if (payload.length < 4) return { language: "", description: "", value: "" };
+  const encoding = payload[0] ?? 0;
+  const [descriptionBytes, valueBytes] = splitTerminated(payload.subarray(4), encoding);
+  return {
+    language: ascii(payload, 1, 3).toLowerCase(),
+    description: decodeText(concatBytes(Uint8Array.of(encoding), descriptionBytes), version),
+    value: decodeText(concatBytes(Uint8Array.of(encoding), valueBytes), version),
+  };
+};
+
+const primaryCommentFrame = (tag: ParsedTag | undefined) => {
+  const comments = tag?.frames.filter((frame) => idSets.comment.has(frame.id)) ?? [];
+  return comments.find((frame) => {
+    const comment = parseComment(frame, tag!.version);
+    return comment.language === "eng" && comment.description.length === 0;
+  });
 };
 
 const parsePicture = (frame: RawFrame, version: Id3Version): ArtworkEntry | undefined => {
@@ -331,19 +361,60 @@ const parseId3v1 = (tail: Uint8Array) => {
   };
 };
 
-const parseApe = (tail: Uint8Array) => {
+interface ApeItem {
+  key: string;
+  lowerKey: string;
+  bytes: Uint8Array<ArrayBuffer>;
+}
+
+interface ParsedApe {
+  values: Map<string, string>;
+  items: ApeItem[];
+  header: Uint8Array<ArrayBuffer>;
+  footer: Uint8Array<ArrayBuffer>;
+  size: number;
+  start: number;
+  end: number;
+}
+
+const parseApe = (tail: Uint8Array<ArrayBuffer>): ParsedApe => {
   const footerOffset = tail.length - (ascii(tail, tail.length - 128, 3) === "TAG" ? 160 : 32);
   if (footerOffset < 0 || ascii(tail, footerOffset, 8) !== "APETAGEX") {
-    return { values: new Map<string, string>(), size: 0 };
+    return {
+      values: new Map(),
+      items: [],
+      header: new Uint8Array(),
+      footer: new Uint8Array(),
+      size: 0,
+      start: tail.length,
+      end: tail.length,
+    };
   }
   const size = readUint32LE(tail, footerOffset + 12);
   const count = readUint32LE(tail, footerOffset + 16);
-  const start = footerOffset + 32 - size;
-  if (size < 32 || start < 0 || count > 100_000) {
+  const itemStart = footerOffset + 32 - size;
+  const footerFlags = readUint32LE(tail, footerOffset + 20);
+  const hasHeader = footerFlags >>> 31 === 1;
+  const headerOffset = hasHeader ? itemStart - 32 : itemStart;
+  if (size < 32 || headerOffset < 0 || count > 100_000) {
     throw readFailure("APEv2 footer declares an invalid size or item count.");
   }
+  let header = new Uint8Array(new ArrayBuffer(0));
+  if (hasHeader) {
+    if (
+      ascii(tail, headerOffset, 8) !== "APETAGEX" ||
+      readUint32LE(tail, headerOffset + 8) !== readUint32LE(tail, footerOffset + 8) ||
+      readUint32LE(tail, headerOffset + 12) !== size ||
+      readUint32LE(tail, headerOffset + 16) !== count ||
+      ((readUint32LE(tail, headerOffset + 20) >>> 29) & 1) !== 1
+    ) {
+      throw readFailure("APEv2 header does not match its footer.");
+    }
+    header = tail.slice(headerOffset, headerOffset + 32);
+  }
   const values = new Map<string, string>();
-  let offset = start;
+  const items: ApeItem[] = [];
+  let offset = itemStart;
   for (let index = 0; index < count; index++) {
     if (offset + 8 > footerOffset) throw readFailure("APEv2 item table is truncated.");
     const valueSize = readUint32LE(tail, offset);
@@ -351,15 +422,104 @@ const parseApe = (tail: Uint8Array) => {
     if (keyEnd < 0 || keyEnd >= footerOffset || keyEnd + 1 + valueSize > footerOffset) {
       throw readFailure("APEv2 item key or value is truncated.");
     }
-    const key = ascii(tail, offset + 8, keyEnd - offset - 8).toLowerCase();
+    const key = ascii(tail, offset + 8, keyEnd - offset - 8);
+    const lowerKey = key.toLowerCase();
     if (!/^[\x20-\x7e]+$/u.test(key)) throw readFailure("APEv2 item key is invalid.");
-    if (!values.has(key))
-      values.set(key, textDecoder.decode(tail.subarray(keyEnd + 1, keyEnd + 1 + valueSize)));
-    offset = keyEnd + 1 + valueSize;
+    const nextOffset = keyEnd + 1 + valueSize;
+    const flags = readUint32LE(tail, offset + 4);
+    if (((flags >>> 1) & 3) === 0 && !values.has(lowerKey)) {
+      values.set(lowerKey, textDecoder.decode(tail.subarray(keyEnd + 1, nextOffset)));
+    }
+    items.push({ key, lowerKey, bytes: tail.slice(offset, nextOffset) });
+    offset = nextOffset;
   }
   if (offset !== footerOffset)
     throw readFailure("APEv2 item table does not match its declared size.");
-  return { values, size };
+  return {
+    values,
+    items,
+    header,
+    footer: tail.slice(footerOffset, footerOffset + 32),
+    size,
+    start: headerOffset,
+    end: footerOffset + 32,
+  };
+};
+
+const apeKeys = {
+  albumArtist: ["album artist", "albumartist"],
+  composer: ["composer"],
+  comment: ["comment"],
+  discNumber: ["disc", "discnumber"],
+  bpm: ["bpm"],
+} as const;
+
+const firstApeValue = (ape: ParsedApe, keys: readonly string[]) => {
+  for (const key of keys) {
+    const value = ape.values.get(key);
+    if (value !== undefined) return value;
+  }
+};
+
+const encodeApeItem = (key: string, value: string) => {
+  const valueBytes = new TextEncoder().encode(value);
+  return concatBytes(
+    uint32LE(valueBytes.length),
+    uint32LE(0),
+    asciiBytes(key),
+    Uint8Array.of(0),
+    valueBytes,
+  );
+};
+
+const patchApe = (ape: ParsedApe, changes: MetadataChanges) => {
+  if (ape.size === 0) return undefined;
+  const changedFields = (Object.keys(apeKeys) as Array<keyof typeof apeKeys>).filter(
+    (field) => changes[field] !== undefined,
+  );
+  if (changedFields.length === 0) return undefined;
+
+  const changedKeys = new Set<string>(changedFields.flatMap((field) => [...apeKeys[field]]));
+  const items = ape.items
+    .filter((item) => !changedKeys.has(item.lowerKey))
+    .map((item) => item.bytes);
+  for (const field of changedFields) {
+    const change = changes[field];
+    let value: string | undefined;
+    if (field === "discNumber") {
+      if (change !== null) {
+        const existing = firstApeValue(ape, apeKeys.discNumber);
+        const total = existing?.match(/^\s*\d+\s*\/\s*(\d+)\s*$/u)?.[1];
+        value = `${change}${total ? `/${total}` : ""}`;
+      }
+    } else if (field === "bpm") {
+      if (change !== null) value = String(change);
+    } else {
+      const textChange = change as string | undefined;
+      if (textChange && textChange.length > 0) value = textChange;
+    }
+    if (value !== undefined) {
+      const key =
+        field === "albumArtist"
+          ? "Album Artist"
+          : field === "discNumber"
+            ? "Disc"
+            : field === "bpm"
+              ? "BPM"
+              : field[0]!.toUpperCase() + field.slice(1);
+      items.push(encodeApeItem(key, value));
+    }
+  }
+  if (items.length === 0) return new Uint8Array();
+  const footer = ape.footer.slice();
+  const size = items.reduce((total, item) => total + item.length, 32);
+  footer.set(uint32LE(size), 12);
+  footer.set(uint32LE(items.length), 16);
+  if (ape.header.length === 0) return concatBytes(...items, footer);
+  const header = ape.header.slice();
+  header.set(uint32LE(size), 12);
+  header.set(uint32LE(items.length), 16);
+  return concatBytes(header, ...items, footer);
 };
 
 const getFrameInfo = (bytes: Uint8Array, offset: number) => {
@@ -449,17 +609,31 @@ const encodePicture = (picture: ArtworkEntry, version: Id3Version) => {
   );
 };
 
+const encodeComment = (value: string, version: Id3Version) => {
+  const encoding = version === 4 ? 3 : 1;
+  const terminator = encoding === 1 ? Uint8Array.of(0, 0) : Uint8Array.of(0);
+  return concatBytes(
+    Uint8Array.of(encoding),
+    asciiBytes("eng"),
+    terminator,
+    encodeText(value, version).subarray(1),
+  );
+};
+
 const buildTag = (parsed: ParsedTag | undefined, changes: MetadataChanges) => {
   const version = parsed?.version ?? 4;
   const revision = parsed?.revision ?? 0;
   const flags = parsed?.flags ?? 0;
   const changedIds = new Set<string>();
   for (const key of Object.keys(changes) as Array<keyof MetadataChanges>) {
-    if (key in ids) for (const id of ids[key as keyof typeof ids]) changedIds.add(id);
+    if (key !== "comment" && key in ids) {
+      for (const id of ids[key as keyof typeof ids]) changedIds.add(id);
+    }
   }
+  const primaryComment = changes.comment === undefined ? undefined : primaryCommentFrame(parsed);
   const frames: Uint8Array[] = [];
   for (const frame of parsed?.frames ?? []) {
-    if (!changedIds.has(frame.id)) frames.push(frame.bytes);
+    if (!changedIds.has(frame.id) && frame !== primaryComment) frames.push(frame.bytes);
   }
   const addText = (key: Exclude<keyof typeof ids, "picture">, value: string) => {
     if (value.length > 0)
@@ -487,10 +661,24 @@ const buildTag = (parsed: ParsedTag | undefined, changes: MetadataChanges) => {
       changes.trackNumber == null ? "" : `${changes.trackNumber}${total ? `/${total}` : ""}`,
     );
   }
+  if ("discNumber" in changes) {
+    const currentDisc = firstText(parsed, idSets.discNumber);
+    const total = currentDisc?.match(/^\s*\d+\s*\/\s*(\d+)/u)?.[1];
+    addText(
+      "discNumber",
+      changes.discNumber == null ? "" : `${changes.discNumber}${total ? `/${total}` : ""}`,
+    );
+  }
+  if ("bpm" in changes) addText("bpm", changes.bpm == null ? "" : String(changes.bpm));
   if (changes.dateText !== undefined) addText("dateText", changes.dateText);
   if (changes.trackText !== undefined) addText("trackText", changes.trackText);
   if (changes.albumArtist !== undefined) addText("albumArtist", changes.albumArtist);
   if (changes.composer !== undefined) addText("composer", changes.composer);
+  if (changes.comment !== undefined && changes.comment.length > 0) {
+    frames.push(
+      makeFrame(idFor("comment", version), encodeComment(changes.comment, version), version),
+    );
+  }
   if (changes.copyright !== undefined) addText("copyright", changes.copyright);
   if (changes.language !== undefined) addText("language", changes.language);
   if ("picture" in changes) {
@@ -552,14 +740,21 @@ const readTail = (source: ByteSource) =>
     const suffix = yield* source.read(source.size - suffixLength, suffixLength);
     const hasId3v1 = ascii(suffix, suffix.length - 128, 3) === "TAG";
     const footerOffset = suffix.length - (hasId3v1 ? 160 : 32);
-    if (footerOffset < 0 || ascii(suffix, footerOffset, 8) !== "APETAGEX") return suffix;
+    if (footerOffset < 0 || ascii(suffix, footerOffset, 8) !== "APETAGEX") {
+      return { bytes: suffix, offset: source.size - suffix.length };
+    }
     const apeSize = readUint32LE(suffix, footerOffset + 12);
-    if (apeSize < 32) return suffix;
+    if (apeSize < 32) return { bytes: suffix, offset: source.size - suffix.length };
     if (apeSize > 8 * 1024 * 1024) {
       return yield* Effect.fail(readFailure("APEv2 tag exceeds the 8 MiB metadata safety limit."));
     }
-    const total = apeSize + (hasId3v1 ? 128 : 0);
-    return yield* source.read(Math.max(0, source.size - total), Math.min(source.size, total));
+    const hasApeHeader = readUint32LE(suffix, footerOffset + 20) >>> 31 === 1;
+    const total = apeSize + (hasApeHeader ? 32 : 0) + (hasId3v1 ? 128 : 0);
+    const offset = Math.max(0, source.size - total);
+    return {
+      bytes: yield* source.read(offset, Math.min(source.size, total)),
+      offset,
+    };
   });
 
 export const mp3Driver: FormatDriver = {
@@ -568,9 +763,9 @@ export const mp3Driver: FormatDriver = {
     Effect.gen(function* () {
       const { bytes, parsed } = yield* readHead(source);
       const tail = yield* readTail(source);
-      const v1 = parseId3v1(tail);
+      const v1 = parseId3v1(tail.bytes);
       const ape = yield* Effect.try({
-        try: () => parseApe(tail),
+        try: () => parseApe(tail.bytes),
         catch: (cause) =>
           cause instanceof AudioMetadataReadError
             ? cause
@@ -582,6 +777,12 @@ export const mp3Driver: FormatDriver = {
       };
       const yearText = String(get("year", "year") ?? "");
       const trackText = String(get("trackNumber", "track") ?? "");
+      const discText = String(
+        firstText(parsed, idSets.discNumber) ?? firstApeValue(ape, apeKeys.discNumber) ?? "",
+      );
+      const bpmText = String(
+        firstText(parsed, idSets.bpm) ?? firstApeValue(ape, apeKeys.bpm) ?? "",
+      );
       const pictures: ArtworkEntry[] = [];
       if (parsed) {
         for (const frame of parsed.frames) {
@@ -602,8 +803,8 @@ export const mp3Driver: FormatDriver = {
       }
       if (!frameInfo)
         return yield* Effect.fail(readFailure("MP3 contains no valid MPEG audio frame."));
-      const id3v1Size = ascii(tail, tail.length - 128, 3) === "TAG" ? 128 : 0;
-      const audioBytes = Math.max(0, source.size - start - id3v1Size - ape.size);
+      const id3v1Size = ascii(tail.bytes, tail.bytes.length - 128, 3) === "TAG" ? 128 : 0;
+      const audioBytes = Math.max(0, source.size - start - id3v1Size - (ape.end - ape.start));
       const vbrFrames = readVbrFrameCount(bytes, audioFrameOffset);
       if (!vbrFrames) {
         const observedBitrates = new Set<number>();
@@ -633,11 +834,21 @@ export const mp3Driver: FormatDriver = {
       const genreValues = genreText.split("\0").filter(Boolean);
       const genre = genreValues.length > 1 ? genreValues : genreText;
       const trackTotalMatch = trackText.match(/^\s*\d+\s*\/\s*(\d+)/u);
+      const canonicalInteger = (value: string, allowTotal = false) => {
+        const match = value.match(allowTotal ? /^\s*(\d+)(?:\s*\/\s*\d+)?\s*$/u : /^\s*(\d+)\s*$/u);
+        if (!match) return null;
+        const parsedValue = Number(match[1]);
+        return parsedValue >= 1 && parsedValue <= 999 ? parsedValue : null;
+      };
+      const primaryComment = primaryCommentFrame(parsed);
       return {
         format,
         metadata: {
           title,
           artist,
+          albumArtist: String(
+            firstText(parsed, idSets.albumArtist) ?? firstApeValue(ape, apeKeys.albumArtist) ?? "",
+          ),
           album,
           year: /^\s*\d{4}/u.test(yearText) ? Number.parseInt(yearText, 10) : null,
           genre,
@@ -647,6 +858,14 @@ export const mp3Driver: FormatDriver = {
           picture: pictures,
           trackNumber: /^\d+/u.test(trackText) ? Number.parseInt(trackText, 10) : null,
           trackTotal: trackTotalMatch ? Number.parseInt(trackTotalMatch[1]!, 10) : null,
+          composer: String(
+            firstText(parsed, idSets.composer) ?? firstApeValue(ape, apeKeys.composer) ?? "",
+          ),
+          comment: primaryComment
+            ? parseComment(primaryComment, parsed!.version).value
+            : String(firstApeValue(ape, apeKeys.comment) ?? ""),
+          discNumber: canonicalInteger(discText, true),
+          bpm: canonicalInteger(bpmText),
         },
       };
     }).pipe(
@@ -660,6 +879,29 @@ export const mp3Driver: FormatDriver = {
       ),
     ),
   patch: (source, changes) => {
+    const unsupported = rejectUnsupportedMetadataChanges(
+      changes,
+      new Set<keyof MetadataChanges>([
+        "title",
+        "artist",
+        "album",
+        "year",
+        "genre",
+        "trackNumber",
+        "discNumber",
+        "bpm",
+        "picture",
+        "dateText",
+        "trackText",
+        "albumArtist",
+        "composer",
+        "comment",
+        "copyright",
+        "language",
+      ]),
+      format.kind,
+    );
+    if (unsupported) return Effect.fail(unsupported);
     if (Object.keys(changes).length === 0) {
       return Effect.succeed({ parts: [source.slice()], type: format.mime });
     }
@@ -667,11 +909,33 @@ export const mp3Driver: FormatDriver = {
       const { parsed } = yield* readHead(source).pipe(
         Effect.mapError((error) => writeFailure(error.message, error)),
       );
+      const tail = yield* readTail(source).pipe(
+        Effect.mapError((error) => writeFailure(error.message, error)),
+      );
+      const ape = yield* Effect.try({
+        try: () => parseApe(tail.bytes),
+        catch: (cause) =>
+          cause instanceof AudioMetadataReadError
+            ? writeFailure(cause.message, cause)
+            : writeFailure("unable to parse APEv2 metadata.", cause),
+      });
       const tag = yield* Effect.try({
         try: () => buildTag(parsed, changes),
         catch: (cause) => writeFailure("unable to encode ID3 metadata.", cause),
       });
-      return { parts: [tag, source.slice(parsed?.end ?? 0)], type: format.mime };
+      const patchedApe = yield* Effect.try({
+        try: () => patchApe(ape, changes),
+        catch: (cause) => writeFailure("unable to encode APEv2 metadata.", cause),
+      });
+      if (patchedApe === undefined) {
+        return { parts: [tag, source.slice(parsed?.end ?? 0)], type: format.mime };
+      }
+      const apeStart = tail.offset + ape.start;
+      const apeEnd = tail.offset + ape.end;
+      return {
+        parts: [tag, source.slice(parsed?.end ?? 0, apeStart), patchedApe, source.slice(apeEnd)],
+        type: format.mime,
+      };
     }).pipe(
       Effect.mapError((error) =>
         error instanceof AudioMetadataWriteError
