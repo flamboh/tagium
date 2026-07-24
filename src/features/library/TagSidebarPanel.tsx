@@ -23,6 +23,7 @@ export interface TagSidebarPanelProps {
   selectedAlbumId: string | null;
   selectedFileId: string | null;
   selectedFileIds: Set<string>;
+  cleanupSuggestionCountByAlbumId: ReadonlyMap<string, number>;
   settingsOpen: boolean;
   onAudioUpload: (files: File[]) => void;
   onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
@@ -33,6 +34,7 @@ export interface TagSidebarPanelProps {
   onRetryDownload: (fileId: string) => void;
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
+  onReviewAlbumCleanup: (albumId: string, returnFocusTarget: HTMLButtonElement | null) => void;
   onDownloadAlbum: (albumId: string) => void;
   onShareAlbum?: (albumId: string) => void;
   shareAlbumActions?: Readonly<Record<string, ShareAlbumActionState>>;
@@ -68,6 +70,7 @@ export default function TagSidebarPanel({
   selectedAlbumId,
   selectedFileId,
   selectedFileIds,
+  cleanupSuggestionCountByAlbumId,
   settingsOpen,
   onAudioUpload,
   onSelectAlbum,
@@ -78,6 +81,7 @@ export default function TagSidebarPanel({
   onRetryDownload,
   onAddAlbum,
   onEditAlbum,
+  onReviewAlbumCleanup,
   onDownloadAlbum,
   onShareAlbum,
   shareAlbumActions,
@@ -167,6 +171,7 @@ export default function TagSidebarPanel({
         selectedAlbumId={selectedAlbumId}
         selectedFileId={selectedFileId}
         selectedFileIds={selectedFileIds}
+        cleanupSuggestionCountByAlbumId={cleanupSuggestionCountByAlbumId}
         onSelectAlbum={onSelectAlbum}
         onSelectFile={onSelectFile}
         onSelectLooseTrack={onSelectLooseTrack}
@@ -175,6 +180,7 @@ export default function TagSidebarPanel({
         onRetryDownload={onRetryDownload}
         onAddAlbum={onAddAlbum}
         onEditAlbum={onEditAlbum}
+        onReviewAlbumCleanup={onReviewAlbumCleanup}
         onDownloadAlbum={onDownloadAlbum}
         onShareAlbum={onShareAlbum}
         shareAlbumActions={shareAlbumActions}

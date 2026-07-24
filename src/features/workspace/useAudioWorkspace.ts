@@ -29,6 +29,8 @@ type WorkspaceSidebarProps = Pick<
   | "onRemoveFile"
   | "onAddAlbum"
   | "onEditAlbum"
+  | "cleanupSuggestionCountByAlbumId"
+  | "onReviewAlbumCleanup"
   | "onMoveTrackToAlbum"
   | "onMoveTrackToLoose"
   | "onPromptCreateAlbumFromLooseTracks"
@@ -63,7 +65,7 @@ export const useAudioWorkspace = ({
   removeDownloads: (trackIds: string[]) => void;
   busy: boolean;
 }): AudioWorkspace => {
-  const cleanupDialogProps = useWorkspaceCleanup({ library, editor, settings, busy });
+  const cleanup = useWorkspaceCleanup({ library, editor, settings, busy });
   const selection = useWorkspaceSelection({
     library,
     editor,
@@ -81,13 +83,15 @@ export const useAudioWorkspace = ({
   });
 
   return {
-    cleanupDialogProps,
+    cleanupDialogProps: cleanup.dialogProps,
     removalDialogProps: selection.removalDialogProps,
     albumDialogProps: album.dialogProps,
     settingsPageProps,
     sidebarProps: {
       ...selection.sidebarProps,
       ...album.sidebarProps,
+      cleanupSuggestionCountByAlbumId: cleanup.cleanupSuggestionCountByAlbumId,
+      onReviewAlbumCleanup: cleanup.onReviewAlbum,
       settingsOpen: activeView === "settings",
       onOpenSettings: settingsPageProps.onBack,
     },
