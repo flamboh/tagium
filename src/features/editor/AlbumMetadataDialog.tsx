@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ export interface AlbumMetadataDraft {
 }
 
 export interface AlbumMetadataDialogProps {
+  instanceKey?: string;
   open: boolean;
   mode: "create" | "edit";
   draft: AlbumMetadataDraft;
@@ -52,30 +53,73 @@ export default function AlbumMetadataDialog({
   placeholder,
 }: AlbumMetadataDialogProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showErrors, setShowErrors] = useState(false);
+  const [touchedFields, setTouchedFields] = useState({ title: false, artist: false });
   const [isSyncingCover, setIsSyncingCover] = useState(false);
   const [isProcessingCover, setIsProcessingCover] = useState(false);
   const [syncCoverRotation, setSyncCoverRotation] = useState(0);
+  const syncCoverTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+  const syncCoverRunRef = useRef(0);
   const canSyncCoverToTracks =
     mode === "edit" && draft.cover && draft.cover.length > 0 && onSyncCoverToTracks;
   const syncCoverLabel = isSyncingCover ? "syncing cover to tracks" : "sync cover to tracks";
   const placeholderClassName = "placeholder:text-muted-foreground/45";
+  const titleInvalid = !draft.title.trim();
+  const artistInvalid = !draft.artist.trim();
+  const formInvalid = titleInvalid || artistInvalid;
+
+  const cancelSyncCoverFeedback = (resetVisualState: boolean) => {
+    syncCoverRunRef.current += 1;
+    if (syncCoverTimerRef.current !== null) {
+      globalThis.clearTimeout(syncCoverTimerRef.current);
+      syncCoverTimerRef.current = null;
+    }
+    if (resetVisualState) {
+      setIsSyncingCover(false);
+      setSyncCoverRotation(0);
+    }
+  };
+
+  const resetTransientState = () => {
+    cancelSyncCoverFeedback(true);
+    setShowDeleteConfirm(false);
+    setTouchedFields({ title: false, artist: false });
+  };
+
+  const handleClose = () => {
+    if (isProcessingCover) return;
+    resetTransientState();
+    onClose();
+  };
 
   const handleSyncCoverToTracks = () => {
     if (!onSyncCoverToTracks) return;
     if (isSyncingCover || isProcessingCover) return;
 
     const startedAt = performance.now();
+    const syncRun = syncCoverRunRef.current + 1;
+    syncCoverRunRef.current = syncRun;
     setSyncCoverRotation((rotation) => rotation + 360);
     setIsSyncingCover(true);
     const result = onSyncCoverToTracks();
 
     void Promise.resolve(result).finally(() => {
+      if (syncCoverRunRef.current !== syncRun) return;
       const elapsed = performance.now() - startedAt;
       const remaining = Math.max(0, 650 - elapsed);
-      window.setTimeout(() => setIsSyncingCover(false), remaining);
+      syncCoverTimerRef.current = globalThis.setTimeout(() => {
+        if (syncCoverRunRef.current !== syncRun) return;
+        syncCoverTimerRef.current = null;
+        setIsSyncingCover(false);
+      }, remaining);
     });
   };
+
+  useEffect(
+    () => () => {
+      cancelSyncCoverFeedback(false);
+    },
+    [],
+  );
 
   const handleCoverUpload = (cover: NonNullable<AudioMetadata["picture"]>) => {
     onChange((currentDraft) => ({ ...currentDraft, cover }));
@@ -85,11 +129,7 @@ export default function AlbumMetadataDialog({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && !isProcessingCover) {
-          setShowDeleteConfirm(false);
-          setShowErrors(false);
-          onClose();
-        }
+        if (!nextOpen) handleClose();
       }}
     >
       <DialogContent className="max-w-2xl p-0 gap-0 max-h-[85vh] overflow-hidden">
@@ -98,10 +138,8 @@ export default function AlbumMetadataDialog({
           onSubmit={(event) => {
             event.preventDefault();
             if (isProcessingCover) return;
-            if (!draft.title.trim() || !draft.artist.trim()) {
-              setShowErrors(true);
-              return;
-            }
+            if (formInvalid) return;
+            resetTransientState();
             onSave();
           }}
         >
@@ -117,10 +155,16 @@ export default function AlbumMetadataDialog({
                 <div className="flex flex-col gap-0">
                   <div>
                     <label htmlFor="album-title" className="block text-sm font-medium mb-1">
-                      album title:
+                      album title:{" "}
+                      <span className="text-destructive" aria-hidden="true">
+                        *
+                      </span>
+                      <span className="sr-only"> required</span>
                     </label>
                     <Input
                       id="album-title"
+                      required
+                      aria-required="true"
                       value={draft.title}
                       onChange={(event) =>
                         onChange({
@@ -128,9 +172,12 @@ export default function AlbumMetadataDialog({
                           title: event.target.value,
                         })
                       }
+                      onBlur={() => setTouchedFields((current) => ({ ...current, title: true }))}
                       placeholder={placeholder.title}
-                      aria-invalid={showErrors && !draft.title.trim()}
-                      aria-describedby="album-title-error"
+                      aria-invalid={touchedFields.title && titleInvalid}
+                      aria-describedby={
+                        touchedFields.title && titleInvalid ? "album-title-error" : undefined
+                      }
                       className={placeholderClassName}
                     />
                     <p
@@ -138,15 +185,21 @@ export default function AlbumMetadataDialog({
                       className="h-4 text-xs leading-4 text-destructive"
                       aria-live="polite"
                     >
-                      {showErrors && !draft.title.trim() ? "album title is required" : ""}
+                      {touchedFields.title && titleInvalid ? "album title is required" : ""}
                     </p>
                   </div>
                   <div>
                     <label htmlFor="album-artist" className="block text-sm font-medium mb-1">
-                      artist:
+                      artist:{" "}
+                      <span className="text-destructive" aria-hidden="true">
+                        *
+                      </span>
+                      <span className="sr-only"> required</span>
                     </label>
                     <Input
                       id="album-artist"
+                      required
+                      aria-required="true"
                       value={draft.artist}
                       onChange={(event) =>
                         onChange({
@@ -154,9 +207,12 @@ export default function AlbumMetadataDialog({
                           artist: event.target.value,
                         })
                       }
+                      onBlur={() => setTouchedFields((current) => ({ ...current, artist: true }))}
                       placeholder={placeholder.artist}
-                      aria-invalid={showErrors && !draft.artist.trim()}
-                      aria-describedby="album-artist-error"
+                      aria-invalid={touchedFields.artist && artistInvalid}
+                      aria-describedby={
+                        touchedFields.artist && artistInvalid ? "album-artist-error" : undefined
+                      }
                       className={placeholderClassName}
                     />
                     <p
@@ -164,7 +220,7 @@ export default function AlbumMetadataDialog({
                       className="h-4 text-xs leading-4 text-destructive"
                       aria-live="polite"
                     >
-                      {showErrors && !draft.artist.trim() ? "artist is required" : ""}
+                      {touchedFields.artist && artistInvalid ? "artist is required" : ""}
                     </p>
                   </div>
                   <div className="mb-3">
@@ -262,7 +318,7 @@ export default function AlbumMetadataDialog({
                   variant="destructive"
                   disabled={isProcessingCover}
                   onClick={() => {
-                    setShowDeleteConfirm(false);
+                    resetTransientState();
                     onDelete?.();
                   }}
                 >
@@ -286,11 +342,15 @@ export default function AlbumMetadataDialog({
                   type="button"
                   variant="outline"
                   disabled={isProcessingCover}
-                  onClick={onClose}
+                  onClick={handleClose}
                 >
                   cancel
                 </Button>
-                <Button type="submit" disabled={isProcessingCover}>
+                <Button
+                  type="submit"
+                  disabled={isProcessingCover || formInvalid}
+                  aria-busy={isProcessingCover || undefined}
+                >
                   {isProcessingCover
                     ? "processing cover"
                     : mode === "create"
