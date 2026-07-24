@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { toast } from "sonner";
 import {
   applyMetadataCleanupSuggestions,
+  findAlbumMetadataCleanupSuggestions,
   findMetadataCleanupSuggestions,
   undoMetadataCleanupSuggestions,
   type MetadataCleanupSuggestion,
@@ -13,6 +14,28 @@ import type { AppSettings } from "@/features/library/types";
 
 type CleanupEditor = { form: Pick<TrackEditorSession["form"], "reset"> };
 
+type CleanupDialogScope =
+  | { type: "album"; albumId: string; albumTitle: string }
+  | { type: "tracks"; trackIds: ReadonlySet<string> };
+
+export interface WorkspaceCleanup {
+  dialogProps: MetadataCleanupDialogProps;
+  cleanupSuggestionCountByAlbumId: ReadonlyMap<string, number>;
+  onReviewAlbum: (albumId: string, returnFocusTarget: HTMLButtonElement | null) => void;
+}
+
+const suggestionsForScope = (
+  files: LibraryStore["state"]["files"],
+  albums: LibraryStore["state"]["albums"],
+  scope: CleanupDialogScope | null,
+) => {
+  if (!scope) return [];
+  if (scope.type === "album") {
+    return findAlbumMetadataCleanupSuggestions(files, albums, scope.albumId);
+  }
+  return findMetadataCleanupSuggestions(files, albums, scope.trackIds);
+};
+
 export const useWorkspaceCleanup = ({
   library,
   editor,
@@ -23,8 +46,10 @@ export const useWorkspaceCleanup = ({
   editor: CleanupEditor;
   settings: AppSettings;
   busy: boolean;
-}): MetadataCleanupDialogProps => {
-  const [suggestions, setSuggestions] = useState<MetadataCleanupSuggestion[]>([]);
+}): WorkspaceCleanup => {
+  const [dialogScope, setDialogScope] = useState<CleanupDialogScope | null>(null);
+  const [selectionSessionKey, setSelectionSessionKey] = useState(0);
+  const [returnFocusTarget, setReturnFocusTarget] = useState<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
   const offeredKeysRef = useRef(new Set<string>());
   const editorRef = useRef(editor);
@@ -35,11 +60,41 @@ export const useWorkspaceCleanup = ({
   }, [editor, settings]);
 
   const availableSuggestions = useMemo(
-    () => (busy ? [] : findMetadataCleanupSuggestions(library.state.files, library.state.albums)),
-    [busy, library.state.albums, library.state.files],
+    () => findMetadataCleanupSuggestions(library.state.files, library.state.albums),
+    [library.state.albums, library.state.files],
+  );
+
+  const cleanupSuggestionCountByAlbumId = useMemo(() => {
+    const albumIdByTrackId = new Map(
+      library.state.albums.flatMap((album) =>
+        album.trackIds.map((trackId) => [trackId, album.id] as const),
+      ),
+    );
+    const counts = new Map<string, number>();
+    availableSuggestions.forEach((suggestion) => {
+      const albumId = albumIdByTrackId.get(suggestion.trackId);
+      if (albumId) counts.set(albumId, (counts.get(albumId) ?? 0) + 1);
+    });
+    return counts;
+  }, [availableSuggestions, library.state.albums]);
+
+  const suggestions = useMemo(
+    () => suggestionsForScope(library.state.files, library.state.albums, dialogScope),
+    [dialogScope, library.state.albums, library.state.files],
+  );
+
+  const openDialog = useCallback(
+    (scope: CleanupDialogScope, focusTarget: HTMLButtonElement | null = null) => {
+      setDialogScope(scope);
+      setReturnFocusTarget(focusTarget);
+      setSelectionSessionKey((current) => current + 1);
+      setOpen(true);
+    },
+    [],
   );
 
   useEffect(() => {
+    if (busy) return;
     const newSuggestions = availableSuggestions.filter((suggestion) => {
       const key = `${suggestion.trackId}:${suggestion.beforeTitle}:${suggestion.afterTitle}`;
       if (offeredKeysRef.current.has(key)) return false;
@@ -53,18 +108,33 @@ export const useWorkspaceCleanup = ({
       action: {
         label: "review",
         onClick: () => {
-          setSuggestions(newSuggestions);
-          setOpen(true);
+          openDialog({
+            type: "tracks",
+            trackIds: new Set(newSuggestions.map(({ trackId }) => trackId)),
+          });
         },
       },
     });
-  }, [availableSuggestions]);
+  }, [availableSuggestions, busy, openDialog]);
 
   const apply = useCallback(
     (selectedSuggestions: MetadataCleanupSuggestion[]) => {
+      const snapshot = library.getSnapshot();
+      const selectedTrackIds = new Set(selectedSuggestions.map((suggestion) => suggestion.trackId));
+      const currentSelectedSuggestions = suggestionsForScope(
+        snapshot.files,
+        snapshot.albums,
+        dialogScope,
+      ).filter((suggestion) => selectedTrackIds.has(suggestion.trackId));
+
+      if (currentSelectedSuggestions.length === 0) {
+        setOpen(false);
+        return;
+      }
+
       const result = applyMetadataCleanupSuggestions(
-        library.getSnapshot().files,
-        selectedSuggestions,
+        snapshot.files,
+        currentSelectedSuggestions,
         settingsRef.current.syncFilenames,
       );
       library.dispatch({ type: "content-replaced", files: result.files });
@@ -73,8 +143,8 @@ export const useWorkspaceCleanup = ({
         (file) => file.id === library.getSnapshot().selectedFileId,
       );
       if (selected?.metadata) editorRef.current.form.reset(selected.metadata);
-      const noun = selectedSuggestions.length === 1 ? "track" : "tracks";
-      toast.success(`cleaned up ${selectedSuggestions.length} ${noun}`, {
+      const noun = currentSelectedSuggestions.length === 1 ? "track" : "tracks";
+      toast.success(`cleaned up ${currentSelectedSuggestions.length} ${noun}`, {
         description: settingsRef.current.syncFilenames
           ? "titles and synced filenames were updated"
           : "titles were updated",
@@ -94,8 +164,29 @@ export const useWorkspaceCleanup = ({
         },
       });
     },
-    [library],
+    [dialogScope, library],
   );
 
-  return { open, suggestions, onOpenChange: setOpen, onApply: apply };
+  const onReviewAlbum = useCallback(
+    (albumId: string, focusTarget: HTMLButtonElement | null) => {
+      const album = library.getSnapshot().albums.find((candidate) => candidate.id === albumId);
+      if (!album) return;
+      openDialog({ type: "album", albumId, albumTitle: album.title }, focusTarget);
+    },
+    [library, openDialog],
+  );
+
+  return {
+    dialogProps: {
+      open,
+      selectionSessionKey,
+      suggestions,
+      albumTitle: dialogScope?.type === "album" ? dialogScope.albumTitle : undefined,
+      returnFocusTarget,
+      onOpenChange: setOpen,
+      onApply: apply,
+    },
+    cleanupSuggestionCountByAlbumId,
+    onReviewAlbum,
+  };
 };

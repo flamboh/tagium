@@ -171,6 +171,17 @@ export function findMetadataCleanupSuggestions(
   });
 }
 
+export function findAlbumMetadataCleanupSuggestions(
+  files: TagiumFile[],
+  albums: AlbumGroup[],
+  albumId: string,
+): MetadataCleanupSuggestion[] {
+  const album = albums.find((candidate) => candidate.id === albumId);
+  if (!album) return [];
+
+  return findMetadataCleanupSuggestions(files, albums, new Set(album.trackIds));
+}
+
 export function applyMetadataCleanupSuggestions(
   files: TagiumFile[],
   suggestions: MetadataCleanupSuggestion[],

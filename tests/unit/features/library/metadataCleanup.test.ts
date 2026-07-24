@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyMetadataCleanupSuggestions,
+  findAlbumMetadataCleanupSuggestions,
   findMetadataCleanupSuggestions,
   suggestTitleCleanup,
   undoMetadataCleanupSuggestions,
@@ -38,6 +39,22 @@ const album = (title: string, trackId = "track-1"): AlbumGroup => ({
 });
 
 describe("metadata cleanup suggestions", () => {
+  it("derives suggestions only from tracks in the requested album", () => {
+    const first = file("Burial - Archangel (Official Audio)");
+    const second = {
+      ...file("Burial - Near Dark (Official Audio)"),
+      id: "track-2",
+    };
+
+    expect(
+      findAlbumMetadataCleanupSuggestions(
+        [first, second],
+        [album("Untrue"), { ...album("Untrue", "track-2"), id: "album-2" }],
+        "album-1",
+      ).map(({ trackId }) => trackId),
+    ).toEqual(["track-1"]);
+  });
+
   it("removes a matching artist prefix and known trailing video label", () => {
     expect(suggestTitleCleanup("Burial - Archangel (Official Audio)", ["Burial"])).toEqual({
       afterTitle: "Archangel",
