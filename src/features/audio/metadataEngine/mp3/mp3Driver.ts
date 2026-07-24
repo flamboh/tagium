@@ -480,9 +480,10 @@ const patchApe = (ape: ParsedApe, changes: MetadataChanges) => {
   if (changedFields.length === 0) return undefined;
 
   const changedKeys = new Set<string>(changedFields.flatMap((field) => [...apeKeys[field]]));
-  const items = ape.items
-    .filter((item) => !changedKeys.has(item.lowerKey))
-    .map((item) => item.bytes);
+  const items: Uint8Array[] = [];
+  for (const item of ape.items) {
+    if (!changedKeys.has(item.lowerKey)) items.push(item.bytes);
+  }
   for (const field of changedFields) {
     const change = changes[field];
     let value: string | undefined;

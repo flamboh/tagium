@@ -220,16 +220,27 @@ export function applyTrackOrderNumbersToFiles(
   settings: MetadataPolicySettings = defaultMetadataPolicySettings,
 ) {
   const albumIds = new Set(albumIdsToSync);
-  return albums.reduce(
-    (nextFiles, album) =>
-      albumIds.has(album.id)
-        ? applyAlbumMetadataPolicyToFiles(nextFiles, album, settings, {
-            shared: false,
-            trackNumbers: true,
-          })
-        : nextFiles,
-    files,
-  );
+  const trackUpdates = new Map<string, { album: AlbumGroup; trackNumber: number }>();
+  for (const album of albums) {
+    if (!albumIds.has(album.id)) continue;
+    album.trackIds.forEach((trackId, index) => {
+      trackUpdates.set(trackId, { album, trackNumber: index + 1 });
+    });
+  }
+
+  return files.map((file) => {
+    const update = trackUpdates.get(file.id);
+    if (!update || !file.metadata || !settings.syncTrackNumbers) return file;
+    const patch: MetadataPatch = { trackNumber: update.trackNumber };
+    return markPendingMetadataPatch(
+      {
+        ...file,
+        status: file.status === "saved" ? "pending" : file.status,
+        metadata: { ...file.metadata, ...patch },
+      },
+      patch,
+    );
+  });
 }
 
 export function applySyncedFilenamesToFiles(files: TagiumFile[], trackIds?: string[]) {
@@ -290,6 +301,9 @@ export function applyAlbumMetadataPolicyToFiles(
   if (album.trackIds.length === 0) return files;
 
   const trackSet = new Set(album.trackIds);
+  const trackNumbers = options.trackNumbers
+    ? new Map(album.trackIds.map((trackId, index) => [trackId, index + 1]))
+    : undefined;
   const shared = options.shared ?? true;
 
   return files.map((file) => {
@@ -306,7 +320,8 @@ export function applyAlbumMetadataPolicyToFiles(
       patch.picture = album.cover;
     }
     if (options.trackNumbers && settings.syncTrackNumbers) {
-      patch.trackNumber = album.trackIds.indexOf(file.id) + 1;
+      const trackNumber = trackNumbers?.get(file.id);
+      if (trackNumber !== undefined) patch.trackNumber = trackNumber;
     }
 
     const linkedArtist = patch.artist ?? file.metadata.artist;
