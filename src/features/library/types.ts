@@ -34,6 +34,18 @@ export interface AlbumGroup {
   cover?: AudioMetadata["picture"];
   trackIds: string[];
   year?: number;
+  /** Original provider playlist/set URL, when available. */
+  sourceUrl?: string;
+  /** In-memory provenance used to prevent accidental duplicate share-link imports. */
+  sourceManifestSlug?: string;
+  /** The single creator-owned publication associated with this in-memory album. */
+  sharePublication?: {
+    slug: string;
+    url: string;
+    expiresAt: string;
+    publishedFingerprint: string;
+    status: "active" | "stopped";
+  };
 }
 
 export interface AppSettings {

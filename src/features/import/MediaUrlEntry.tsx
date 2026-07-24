@@ -10,6 +10,8 @@ import {
   getSystemFailurePresentation,
   reportSystemFailure,
 } from "@/features/workspace/systemFailure";
+import { SharedAlbumUnavailableError, SharedAlbumVersionError } from "@/features/share/shareClient";
+import { InvalidShareLinkError, ShareLinksDisabledError } from "@/features/share/shareLink";
 
 interface MediaUrlEntryProps {
   layout: "landing" | "editor";
@@ -157,14 +159,24 @@ export default function MediaUrlEntry({
       await onUrlImport(trimmedUrl);
       setSourceUrl("");
     } catch (error) {
-      const presentation = getSystemFailurePresentation(error, "import");
       if (
-        presentation.code === "unsupported_source" ||
-        presentation.code === "private_or_missing"
+        error instanceof InvalidShareLinkError ||
+        error instanceof ShareLinksDisabledError ||
+        error instanceof SharedAlbumUnavailableError
       ) {
-        showValidationError(presentation.description.toLowerCase().replace(/\.$/, ""));
+        showValidationError(error.message);
+      } else if (error instanceof SharedAlbumVersionError) {
+        showValidationError("this link was made by a newer tagium version");
       } else {
-        reportSystemFailure(error, "import");
+        const presentation = getSystemFailurePresentation(error, "import");
+        if (
+          presentation.code === "unsupported_source" ||
+          presentation.code === "private_or_missing"
+        ) {
+          showValidationError(presentation.description.toLowerCase().replace(/\.$/, ""));
+        } else {
+          reportSystemFailure(error, "import");
+        }
       }
     } finally {
       setSubmitting(false);
@@ -213,7 +225,7 @@ export default function MediaUrlEntry({
                     setSourceUrl(event.target.value);
                     setValidationError(null);
                   }}
-                  placeholder="soundcloud or youtube url"
+                  placeholder="soundcloud, youtube, or tagium share link"
                   disabled={submitting}
                   className="h-10 rounded-lg pl-9 placeholder:text-muted-foreground/45"
                 />
@@ -221,7 +233,8 @@ export default function MediaUrlEntry({
               <p
                 id="media-url-error"
                 className={cn(
-                  "h-4 pt-0.5 text-xs leading-4 text-destructive",
+                  "h-4 pt-0.5 text-xs leading-4",
+                  validationError && "text-destructive",
                   layout === "landing" && "text-center",
                 )}
                 aria-live="polite"
@@ -234,6 +247,7 @@ export default function MediaUrlEntry({
               size="icon"
               disabled={!canSubmit}
               aria-label="start media import"
+              aria-busy={submitting}
               className="size-10 rounded-lg"
             >
               {submitting ? <Loader2 className="animate-spin" /> : <ArrowRight />}

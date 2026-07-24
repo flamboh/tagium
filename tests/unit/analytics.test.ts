@@ -449,7 +449,7 @@ describe("analytics", () => {
     });
     analytics.capture({
       type: "import_retry_started",
-      sourceUrls: ["https://youtu.be/private-one", "https://youtube.com/watch?v=private-two"],
+      provider: "youtube",
       retryCount: 2,
       previousFailedCount: 1,
       previousCanceledCount: 1,

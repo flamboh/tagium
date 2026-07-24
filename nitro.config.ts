@@ -13,6 +13,18 @@ const wrangler = {
     COBALT_API_URL: "https://tagium-cobalt.fly.dev/",
     TAGIUM_DEPLOY_ENV: "production",
   },
+  ratelimits: [
+    {
+      name: "COBALT_SESSION_RATE_LIMITER",
+      namespace_id: "1042701",
+      simple: { limit: 20, period: 60 },
+    },
+    {
+      name: "COBALT_CLIENT_RATE_LIMITER",
+      namespace_id: "1042702",
+      simple: { limit: 60, period: 60 },
+    },
+  ],
 };
 
 export default defineNitroConfig({
