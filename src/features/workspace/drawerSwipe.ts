@@ -12,16 +12,17 @@ export const shouldStartDrawerSwipe = (
 ) => {
   if (point.pointerType === "mouse" || point.pointerType === "pen") return false;
   if (point.clientX > MOBILE_DRAWER_EDGE_PX || point.clientX < 0 || point.clientY < 0) return false;
-  if (typeof Element !== "undefined" && target instanceof Element && target.closest("[data-drawer-swipe-optout], input, textarea")) {
+  if (
+    typeof Element !== "undefined" &&
+    target instanceof Element &&
+    target.closest("[data-drawer-swipe-optout], input, textarea")
+  ) {
     return false;
   }
   return viewportWidth > 0;
 };
 
-export const decideDrawerSwipe = (
-  start: SwipePoint,
-  current: SwipePoint,
-): SwipeDecision => {
+export const decideDrawerSwipe = (start: SwipePoint, current: SwipePoint): SwipeDecision => {
   const dx = current.clientX - start.clientX;
   const dy = Math.abs(current.clientY - start.clientY);
   if (Math.abs(dx) < 8 && dy < 8) return "tracking";

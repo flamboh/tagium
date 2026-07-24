@@ -78,14 +78,20 @@ export default function AudioTagger() {
         workspace.sidebarProps.onSelectLooseTrack(fileId, event),
       );
     },
-    onEditAlbum: (albumId: string) => navigation.runAfterDrawerClose(() => workspace.sidebarProps.onEditAlbum(albumId)),
+    onEditAlbum: (albumId: string) =>
+      navigation.runAfterDrawerClose(() => workspace.sidebarProps.onEditAlbum(albumId)),
     onAddAlbum: () => navigation.runAfterDrawerClose(workspace.sidebarProps.onAddAlbum),
-    onRemoveFile: (fileId: string) => navigation.runAfterDrawerClose(() => workspace.sidebarProps.onRemoveFile(fileId)),
-    onPromptCreateAlbumFromLooseTracks: (source: string, target: string) => navigation.runAfterDrawerClose(() => workspace.sidebarProps.onPromptCreateAlbumFromLooseTracks(source, target)),
-    onOpenSettings: () => navigation.runAfterDrawerClose(() => {
-      if (workspace.sidebarProps.settingsOpen) navigation.backWorkspace();
-      else navigation.navigateToView("settings");
-    }),
+    onRemoveFile: (fileId: string) =>
+      navigation.runAfterDrawerClose(() => workspace.sidebarProps.onRemoveFile(fileId)),
+    onPromptCreateAlbumFromLooseTracks: (source: string, target: string) =>
+      navigation.runAfterDrawerClose(() =>
+        workspace.sidebarProps.onPromptCreateAlbumFromLooseTracks(source, target),
+      ),
+    onOpenSettings: () =>
+      navigation.runAfterDrawerClose(() => {
+        if (workspace.sidebarProps.settingsOpen) navigation.backWorkspace();
+        else navigation.navigateToView("settings");
+      }),
   };
   const mobileSettingsProps = {
     ...workspace.settingsPageProps,
@@ -103,10 +109,16 @@ export default function AudioTagger() {
     wasDrawerOpenRef.current = true;
     const drawer = drawerRef.current;
     const selector = "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])";
-    const getItems = () => Array.from(drawer?.querySelectorAll<HTMLElement>(selector) ?? []).filter((item) => {
-      const style = window.getComputedStyle(item);
-      return !item.hasAttribute("disabled") && item.getAttribute("aria-hidden") !== "true" && style.display !== "none" && style.visibility !== "hidden";
-    });
+    const getItems = () =>
+      Array.from(drawer?.querySelectorAll<HTMLElement>(selector) ?? []).filter((item) => {
+        const style = window.getComputedStyle(item);
+        return (
+          !item.hasAttribute("disabled") &&
+          item.getAttribute("aria-hidden") !== "true" &&
+          style.display !== "none" &&
+          style.visibility !== "hidden"
+        );
+      });
     getItems()[0]?.focus();
     const trap = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -118,7 +130,11 @@ export default function AudioTagger() {
       const items = getItems();
       if (!items.length) return;
       const index = items.indexOf(document.activeElement as HTMLElement);
-      const next = event.shiftKey ? (index <= 0 ? items.length - 1 : index - 1) : (index + 1) % items.length;
+      const next = event.shiftKey
+        ? index <= 0
+          ? items.length - 1
+          : index - 1
+        : (index + 1) % items.length;
       event.preventDefault();
       items[next]?.focus();
     };
@@ -129,15 +145,20 @@ export default function AudioTagger() {
     if (!navigation.isMobile) return;
     let start: { clientX: number; clientY: number; pointerType?: string } | null = null;
     const down = (event: PointerEvent) => {
-      if (!navigation.drawerOpen && shouldStartDrawerSwipe(event, window.innerWidth, event.target)) start = event;
+      if (!navigation.drawerOpen && shouldStartDrawerSwipe(event, window.innerWidth, event.target))
+        start = event;
     };
     const move = (event: PointerEvent) => {
       if (!start) return;
       const decision = decideDrawerSwipe(start, event);
-      if (decision === "open") { navigation.openDrawer(); start = null; }
-      else if (decision === "ignore") start = null;
+      if (decision === "open") {
+        navigation.openDrawer();
+        start = null;
+      } else if (decision === "ignore") start = null;
     };
-    const clear = () => { start = null; };
+    const clear = () => {
+      start = null;
+    };
     window.addEventListener("pointerdown", down);
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", clear);
@@ -211,10 +232,21 @@ export default function AudioTagger() {
         {...workspace.albumDialogProps}
       />
       {navigation.isMobile && navigation.drawerOpen && (
-        <div className="fixed inset-0 z-40 bg-black/35 md:hidden" aria-hidden="true" onClick={navigation.closeDrawer} />
+        <div
+          className="fixed inset-0 z-40 bg-black/35 md:hidden"
+          aria-hidden="true"
+          onClick={navigation.closeDrawer}
+        />
       )}
       {navigation.isMobile && !navigation.drawerOpen && (
-        <Button type="button" size="icon" variant="outline" className="fixed left-3 top-3 z-30 size-11 bg-background/95 shadow-sm md:hidden" aria-label="open library" onClick={(event) => navigation.openDrawer(event.currentTarget)}>
+        <Button
+          type="button"
+          size="icon"
+          variant="outline"
+          className="fixed left-3 top-3 z-30 size-11 bg-background/95 shadow-sm md:hidden"
+          aria-label="open library"
+          onClick={(event) => navigation.openDrawer(event.currentTarget)}
+        >
           <Menu />
         </Button>
       )}
@@ -233,8 +265,14 @@ export default function AudioTagger() {
           {...mobileSidebarProps}
           onAudioUpload={importing.commands.upload}
           onRetryDownload={importing.commands.retryTrack}
-          onDownloadAlbum={(albumId) => navigation.runAfterDrawerClose(() => exporting.downloadAlbum(albumId))}
-          onShareAlbum={shareLinksEnabled ? (albumId) => navigation.runAfterDrawerClose(() => sharing.openCreator(albumId)) : undefined}
+          onDownloadAlbum={(albumId) =>
+            navigation.runAfterDrawerClose(() => exporting.downloadAlbum(albumId))
+          }
+          onShareAlbum={
+            shareLinksEnabled
+              ? (albumId) => navigation.runAfterDrawerClose(() => sharing.openCreator(albumId))
+              : undefined
+          }
           shareAlbumActions={shareLinksEnabled ? sharing.shareActions : undefined}
           onUploadToAlbum={(albumId, filesToUpload) =>
             importing.commands.upload(filesToUpload, albumId)
@@ -244,7 +282,10 @@ export default function AudioTagger() {
           onCancelPlaylistDownloadQueue={importing.commands.cancelQueue}
           onRetryPlaylistDownloadQueue={importing.commands.retryQueue}
         />
-        <div className="relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1" inert={navigation.isMobile && navigation.drawerOpen ? true : undefined}>
+        <div
+          className="relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1"
+          inert={navigation.isMobile && navigation.drawerOpen ? true : undefined}
+        >
           <div
             className={
               landingIsActive

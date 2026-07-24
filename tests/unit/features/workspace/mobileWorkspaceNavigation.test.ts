@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { isWorkspaceNavigationState, workspaceHistoryState } from "@/features/workspace/mobileWorkspaceNavigation";
+import {
+  isWorkspaceNavigationState,
+  workspaceHistoryState,
+} from "@/features/workspace/mobileWorkspaceNavigation";
 
 describe("workspace navigation history", () => {
   it("preserves unrelated history state such as share workflow markers", () => {
     const state = { shareSlug: "album-123", other: true };
     const next = workspaceHistoryState(state, "drawer", "open");
-    expect(next).toMatchObject({ shareSlug: "album-123", other: true, workspaceNav: { kind: "drawer", value: "open" } });
+    expect(next).toMatchObject({
+      shareSlug: "album-123",
+      other: true,
+      workspaceNav: { kind: "drawer", value: "open" },
+    });
   });
 
   it("recognizes only tagged workspace entries", () => {

@@ -5,15 +5,13 @@ export type WorkspaceNavigationState = {
   [key: string]: unknown;
 };
 
-export const isWorkspaceNavigationState = (
-  state: unknown,
-): state is WorkspaceNavigationState => {
+export const isWorkspaceNavigationState = (state: unknown): state is WorkspaceNavigationState => {
   if (!state || typeof state !== "object") return false;
   const nav = (state as WorkspaceNavigationState).workspaceNav;
   return Boolean(
     nav &&
-      (nav.kind === "drawer" || nav.kind === "view") &&
-      (nav.value === "open" || nav.value === "editor" || nav.value === "settings"),
+    (nav.kind === "drawer" || nav.kind === "view") &&
+    (nav.value === "open" || nav.value === "editor" || nav.value === "settings"),
   );
 };
 
@@ -51,7 +49,9 @@ export const useMobileWorkspaceNavigation = ({
   useEffect(() => {
     mobileRef.current = isMobile;
     if (!isMobile && drawerOpen) {
-      const state = (history.state && typeof history.state === "object" ? { ...history.state } : {}) as WorkspaceNavigationState;
+      const state = (
+        history.state && typeof history.state === "object" ? { ...history.state } : {}
+      ) as WorkspaceNavigationState;
       delete state.workspaceNav;
       history.replaceState(state, "", location.href);
       currentWorkspaceNavRef.current = undefined;
@@ -85,23 +85,38 @@ export const useMobileWorkspaceNavigation = ({
     return () => window.removeEventListener("popstate", onPopState);
   }, [setActiveView]);
 
-  useEffect(() => () => { pendingActionRef.current = null; }, []);
+  useEffect(
+    () => () => {
+      pendingActionRef.current = null;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!isMobile) setDrawerOpen(false);
   }, [isMobile]);
 
-  const openDrawer = useCallback((opener?: HTMLElement | null) => {
-    openerRef.current = opener ?? (typeof document !== "undefined" && document.activeElement instanceof HTMLElement ? document.activeElement : null);
-    if (drawerOpen) return;
-    history.pushState(workspaceHistoryState(history.state, "drawer", "open"), "", location.href);
-    currentWorkspaceNavRef.current = { kind: "drawer", value: "open" };
-    setDrawerOpen(true);
-  }, [drawerOpen]);
+  const openDrawer = useCallback(
+    (opener?: HTMLElement | null) => {
+      openerRef.current =
+        opener ??
+        (typeof document !== "undefined" && document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null);
+      if (drawerOpen) return;
+      history.pushState(workspaceHistoryState(history.state, "drawer", "open"), "", location.href);
+      currentWorkspaceNavRef.current = { kind: "drawer", value: "open" };
+      setDrawerOpen(true);
+    },
+    [drawerOpen],
+  );
 
   const closeDrawer = useCallback(() => {
     if (!drawerOpen) return;
-    if (isWorkspaceNavigationState(history.state) && history.state.workspaceNav?.kind === "drawer") {
+    if (
+      isWorkspaceNavigationState(history.state) &&
+      history.state.workspaceNav?.kind === "drawer"
+    ) {
       history.back();
     } else {
       currentWorkspaceNavRef.current = undefined;
@@ -112,22 +127,28 @@ export const useMobileWorkspaceNavigation = ({
     }
   }, [drawerOpen]);
 
-  const runAfterDrawerClose = useCallback((action: () => void) => {
-    if (!drawerOpen) {
-      action();
-      return;
-    }
-    openerRef.current = null;
-    pendingActionRef.current = action;
-    closeDrawer();
-  }, [closeDrawer, drawerOpen]);
+  const runAfterDrawerClose = useCallback(
+    (action: () => void) => {
+      if (!drawerOpen) {
+        action();
+        return;
+      }
+      openerRef.current = null;
+      pendingActionRef.current = action;
+      closeDrawer();
+    },
+    [closeDrawer, drawerOpen],
+  );
 
-  const navigateToView = useCallback((view: "editor" | "settings") => {
-    if (activeView === view) return;
-    history.pushState(workspaceHistoryState(history.state, "view", view), "", location.href);
-    currentWorkspaceNavRef.current = { kind: "view", value: view };
-    setActiveView(view);
-  }, [activeView, setActiveView]);
+  const navigateToView = useCallback(
+    (view: "editor" | "settings") => {
+      if (activeView === view) return;
+      history.pushState(workspaceHistoryState(history.state, "view", view), "", location.href);
+      currentWorkspaceNavRef.current = { kind: "view", value: view };
+      setActiveView(view);
+    },
+    [activeView, setActiveView],
+  );
 
   const backWorkspace = useCallback(() => {
     if (isWorkspaceNavigationState(history.state) && history.state.workspaceNav?.kind === "view") {
@@ -137,14 +158,25 @@ export const useMobileWorkspaceNavigation = ({
     }
   }, [setActiveView]);
 
-  return useMemo(() => ({
-    isMobile,
-    drawerOpen,
-    openerRef,
-    openDrawer,
-    closeDrawer,
-    runAfterDrawerClose,
-    navigateToView,
-    backWorkspace,
-  }), [backWorkspace, closeDrawer, drawerOpen, isMobile, navigateToView, openDrawer, runAfterDrawerClose]);
+  return useMemo(
+    () => ({
+      isMobile,
+      drawerOpen,
+      openerRef,
+      openDrawer,
+      closeDrawer,
+      runAfterDrawerClose,
+      navigateToView,
+      backWorkspace,
+    }),
+    [
+      backWorkspace,
+      closeDrawer,
+      drawerOpen,
+      isMobile,
+      navigateToView,
+      openDrawer,
+      runAfterDrawerClose,
+    ],
+  );
 };
