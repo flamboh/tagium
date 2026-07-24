@@ -15,6 +15,14 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   syncFilenames: true,
   audioBitrate: "320",
   applySoundCloudAlbumCoverToTracks: true,
+  advancedMetadata: false,
+  metadataLinks: {
+    artist: true,
+    year: true,
+    genre: true,
+    artwork: true,
+    albumArtist: true,
+  },
 };
 
 export const APP_SETTINGS_STORAGE_KEY = "tagium:app-settings";
@@ -34,6 +42,17 @@ const storedAppSettingsSchema = Schema.Struct({
   ),
   applySoundCloudAlbumCoverToTracks: booleanWithDefault(
     DEFAULT_APP_SETTINGS.applySoundCloudAlbumCoverToTracks,
+  ),
+  advancedMetadata: booleanWithDefault(DEFAULT_APP_SETTINGS.advancedMetadata),
+  metadataLinks: Schema.Struct({
+    artist: booleanWithDefault(DEFAULT_APP_SETTINGS.metadataLinks.artist),
+    year: booleanWithDefault(DEFAULT_APP_SETTINGS.metadataLinks.year),
+    genre: booleanWithDefault(DEFAULT_APP_SETTINGS.metadataLinks.genre),
+    artwork: booleanWithDefault(DEFAULT_APP_SETTINGS.metadataLinks.artwork),
+    albumArtist: booleanWithDefault(DEFAULT_APP_SETTINGS.metadataLinks.albumArtist),
+  }).pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_APP_SETTINGS.metadataLinks))),
+    Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_APP_SETTINGS.metadataLinks)),
   ),
 });
 

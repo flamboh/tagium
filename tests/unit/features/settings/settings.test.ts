@@ -45,6 +45,18 @@ describe("settings", () => {
     });
   });
 
+  it("migrates partial metadata-link settings independently", () => {
+    const storage = storageWith(
+      JSON.stringify({ advancedMetadata: true, metadataLinks: { artist: false } }),
+    );
+
+    expect(loadAppSettings(storage)).toEqual({
+      ...DEFAULT_APP_SETTINGS,
+      advancedMetadata: true,
+      metadataLinks: { ...DEFAULT_APP_SETTINGS.metadataLinks, artist: false },
+    });
+  });
+
   it("ignores invalid stored setting values", () => {
     const storage = storageWith(
       JSON.stringify({
@@ -64,6 +76,7 @@ describe("settings", () => {
   it("saves app settings", () => {
     const storage = storageWith(null);
     const settings: AppSettings = {
+      ...DEFAULT_APP_SETTINGS,
       syncTrackNumbers: false,
       syncFilenames: false,
       audioBitrate: "256",
@@ -83,6 +96,7 @@ describe("settings", () => {
       },
     };
     const settings: AppSettings = {
+      ...DEFAULT_APP_SETTINGS,
       syncTrackNumbers: false,
       syncFilenames: false,
       audioBitrate: "256",

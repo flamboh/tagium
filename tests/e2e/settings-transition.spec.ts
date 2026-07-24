@@ -164,3 +164,50 @@ test("releases the loaded editor immediately when reduced motion is preferred", 
   await expect(page.locator('[data-editor-state="empty-selection"]')).toHaveCSS("opacity", "1");
   await expect(page.getByRole("button", { name: "download track" })).not.toBeAttached();
 });
+
+test("gates advanced fields, retains their values, and reveals hidden validation", async ({
+  page,
+}) => {
+  await uploadTrack(page);
+  await page.locator("#track-title").fill("Advanced track");
+  await page.getByRole("button", { name: "settings" }).click();
+
+  const advancedSetting = page.getByRole("checkbox", { name: "enable advanced metadata" });
+  await expect(advancedSetting).not.toBeChecked();
+  await page.getByText("metadata linking", { exact: true }).click();
+  await expect(page.getByText("link album artist to track artist")).not.toBeAttached();
+
+  await advancedSetting.click();
+  await expect(page.getByText("link album artist to track artist")).toBeVisible();
+  await page.getByRole("button", { name: "back to editor" }).click();
+
+  await expect(page.getByRole("group", { name: "metadata fields" })).toBeVisible();
+  await page.getByRole("button", { name: "advanced" }).click();
+  await page.locator("#track-composer").fill("Retained composer");
+  await page.locator("#track-disc-number").fill("0");
+  await page.getByRole("button", { name: "normal" }).click();
+  await page.getByRole("button", { name: "download track" }).click();
+
+  await expect(page.getByRole("button", { name: "advanced" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator("#track-disc-number")).toBeFocused();
+  await expect(page.locator("#track-disc-number-error")).toBeVisible();
+  await expect(page.locator("#track-composer")).toHaveValue("Retained composer");
+
+  await page.getByRole("button", { name: "settings" }).click();
+  await advancedSetting.click();
+  await page.getByRole("button", { name: "back to editor" }).click();
+  await expect(page.getByRole("group", { name: "metadata fields" })).not.toBeAttached();
+
+  await page.getByRole("button", { name: "settings" }).click();
+  await advancedSetting.click();
+  await page.getByRole("button", { name: "back to editor" }).click();
+  await expect(page.getByRole("button", { name: "normal" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "advanced" }).click();
+  await expect(page.locator("#track-composer")).toHaveValue("Retained composer");
+});

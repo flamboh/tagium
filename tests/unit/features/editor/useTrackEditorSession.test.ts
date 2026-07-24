@@ -6,8 +6,10 @@ import { renderHook } from "../../support/hookTestHarness";
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
+import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 
 const settings: AppSettings = {
+  ...DEFAULT_APP_SETTINGS,
   syncTrackNumbers: false,
   syncFilenames: false,
   audioBitrate: "320",
@@ -17,6 +19,7 @@ const metadata = (title: string): AudioMetadata => ({
   filename: title.toLowerCase().replaceAll(" ", "-"),
   title,
   artist: "Artist",
+  albumArtist: "Artist",
   album: "",
   year: null,
   genre: "",
@@ -25,6 +28,10 @@ const metadata = (title: string): AudioMetadata => ({
   sampleRate: 44_100,
   picture: [],
   trackNumber: null,
+  composer: "",
+  comment: "",
+  discNumber: null,
+  bpm: null,
 });
 const readyFile = (id: string, title: string): TagiumFile => {
   const file = new File([id], `${id}.mp3`);
@@ -143,6 +150,146 @@ describe("track editor session", () => {
       hasBufferedChanges: false,
       metadata: { title: "Edited", duration: 120 },
     });
+    hook.unmount();
+  });
+
+  it.each(["success", "failure"] as const)(
+    "merges dirty form values with the existing sparse pending patch through hydration %s",
+    async (outcome) => {
+      const hook = renderHook(() => {
+        const library = useLibraryStore();
+        return { library, editor: useTrackEditorSession({ library, settings }) };
+      }, undefined);
+      const pendingMetadata = {
+        ...metadata("Pending"),
+        year: 2024,
+        trackNumber: 7,
+        discNumber: 2,
+        composer: "Existing Composer",
+      };
+      const pending: TagiumFile = {
+        id: "remote",
+        filename: "remote.mp3",
+        status: "pending",
+        downloadStatus: "downloading",
+        hasBufferedChanges: true,
+        pendingMetadataPatch: {
+          year: 2024,
+          trackNumber: 7,
+          discNumber: 2,
+          composer: "Existing Composer",
+        },
+        metadata: pendingMetadata,
+      };
+      act(() => {
+        hook.result.library.dispatch({
+          type: "content-replaced",
+          files: [pending],
+          looseTrackIds: [pending.id],
+          selection: { selectedAlbumId: null, selectedFileId: pending.id },
+        });
+      });
+      const title = hook.result.editor.form.register("title");
+      act(() => {
+        void title.onChange({ target: { name: "title", value: "Dirty Title" }, type: "change" });
+      });
+
+      const downloaded = new File(["download"], "downloaded.mp3");
+      const parsedFile: TagiumFile = {
+        ...readyFile("parsed", "Parsed"),
+        file: downloaded,
+        originalFile: downloaded,
+        filename: downloaded.name,
+      };
+      const written = new File(["written"], "written.mp3");
+      const writeTags = vi.fn(() =>
+        outcome === "success" ? Effect.succeed(written) : Effect.fail(new Error("write failed")),
+      );
+      const backend = AudioBackend.of({
+        downloadFromCobalt: () => Effect.fail(new Error("unused")),
+        parseUploads: () =>
+          Effect.succeed([{ file: parsedFile, albumSeed: { title: "", artist: "", genre: "" } }]),
+        writeTags,
+      });
+
+      await act(async () => {
+        await Effect.runPromise(
+          hook.result.editor.commands
+            .hydrateDownloadedTrack(pending.id, downloaded)
+            .pipe(Effect.provideService(AudioBackend, backend)),
+        );
+      });
+
+      expect(writeTags).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          title: "Dirty Title",
+          year: 2024,
+          trackNumber: 7,
+          discNumber: 2,
+          composer: "Existing Composer",
+        }),
+      );
+      expect(hook.result.library.getSnapshot().files[0]).toMatchObject({
+        status: outcome === "success" ? "pending" : "error",
+        metadata: {
+          title: "Dirty Title",
+          year: 2024,
+          trackNumber: 7,
+          discNumber: 2,
+          composer: "Existing Composer",
+        },
+        pendingMetadataPatch: {
+          title: "Dirty Title",
+          year: 2024,
+          trackNumber: 7,
+          discNumber: 2,
+          composer: "Existing Composer",
+        },
+      });
+      hook.unmount();
+    },
+  );
+
+  it("preserves an unlinked album artist while Advanced UI is off", () => {
+    const unlinkedSettings: AppSettings = {
+      ...settings,
+      advancedMetadata: false,
+      metadataLinks: { ...settings.metadataLinks, albumArtist: false },
+    };
+    const hook = renderHook(() => {
+      const library = useLibraryStore();
+      return {
+        library,
+        editor: useTrackEditorSession({ library, settings: unlinkedSettings }),
+      };
+    }, undefined);
+    const file = readyFile("track", "Track");
+    file.metadata = { ...file.metadata!, albumArtist: "Custom Album Artist" };
+    act(() => {
+      hook.result.library.dispatch({
+        type: "content-replaced",
+        files: [file],
+        looseTrackIds: [file.id],
+        selection: { selectedAlbumId: null, selectedFileId: file.id },
+      });
+    });
+
+    const artist = hook.result.editor.form.register("artist");
+    act(() => {
+      void artist.onChange({ target: { name: "artist", value: "New Artist" }, type: "change" });
+    });
+    act(() => {
+      hook.result.editor.commands.flush();
+    });
+
+    expect(hook.result.library.getSnapshot().files[0]).toMatchObject({
+      metadata: { artist: "New Artist", albumArtist: "Custom Album Artist" },
+      pendingMetadataPatch: { artist: "New Artist" },
+    });
+    expect(hook.result.library.getSnapshot().files[0]?.pendingMetadataPatch).not.toHaveProperty(
+      "albumArtist",
+    );
     hook.unmount();
   });
 });

@@ -2,6 +2,7 @@ import { act } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type { AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
+import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 
 const exportMocks = vi.hoisted(() => ({
   createZipBlob: vi.fn(),
@@ -30,6 +31,7 @@ const metadata: AudioMetadata = {
   filename: "track",
   title: "Track",
   artist: "Artist",
+  albumArtist: "Artist",
   album: "Album",
   year: null,
   genre: "",
@@ -38,8 +40,13 @@ const metadata: AudioMetadata = {
   sampleRate: 44_100,
   picture: [],
   trackNumber: null,
+  composer: "",
+  comment: "",
+  discNumber: null,
+  bpm: null,
 };
 const settings: AppSettings = {
+  ...DEFAULT_APP_SETTINGS,
   syncTrackNumbers: false,
   syncFilenames: false,
   audioBitrate: "320",

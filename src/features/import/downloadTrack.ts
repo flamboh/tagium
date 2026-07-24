@@ -144,6 +144,7 @@ export const createDownloadMetadata = ({
   filename: filenameFromTitle(title).replace(/\.mp3$/i, ""),
   title,
   artist,
+  albumArtist: artist,
   album,
   genre,
   duration: duration ?? 0,
@@ -152,6 +153,10 @@ export const createDownloadMetadata = ({
   picture: [],
   year: year ?? null,
   trackNumber: trackNumber ?? null,
+  composer: "",
+  comment: "",
+  discNumber: null,
+  bpm: null,
 });
 
 export const createPendingDownloadTrack = (

@@ -80,7 +80,12 @@ const fixture = () =>
         "TITLE=first title",
         "TITLE=duplicate title",
         "ARTIST=Artist",
+        "ALBUMARTIST=Album Artist",
         "ALBUM=Album",
+        "COMPOSER=Composer",
+        "COMMENT=Primary comment",
+        "DISCNUMBER=2/3",
+        "BPM=128",
         "DATE=2024-03-01",
         "GENRE=Electronic",
         "GENRE=Ambient",
@@ -129,7 +134,12 @@ describe("FLAC metadata driver", () => {
     expect(result.metadata).toMatchObject({
       title: "first title",
       artist: "Artist",
+      albumArtist: "Album Artist",
       album: "Album",
+      composer: "Composer",
+      comment: "Primary comment",
+      discNumber: 2,
+      bpm: 128,
       year: 2024,
       genre: ["Electronic", "Ambient"],
       duration: 2,
@@ -179,6 +189,62 @@ describe("FLAC metadata driver", () => {
     expect(new TextDecoder().decode(patched)).toContain("REPLAYGAIN_TRACK_GAIN=-7.1 dB");
     expect(new TextDecoder().decode(patched)).toContain("X-private=opaque value");
     expect([...patched]).toEqual(expect.arrayContaining([...unknown]));
+  });
+
+  it("patches and clears every advanced field while preserving disc totals and opaque data", async () => {
+    const original = fixture();
+    const patchedPlan = await Effect.runPromise(
+      flacDriver.patch(makeBlobByteSource(new Blob([original])), {
+        albumArtist: "New Album Artist",
+        composer: "New Composer",
+        comment: "New comment",
+        discNumber: 1,
+        bpm: 140,
+      }),
+    );
+    const patched = await outputBytes(patchedPlan.parts);
+    const inspected = await Effect.runPromise(
+      flacDriver.inspect(makeBlobByteSource(new Blob([patched]))),
+    );
+    expect(inspected.metadata).toMatchObject({
+      albumArtist: "New Album Artist",
+      composer: "New Composer",
+      comment: "New comment",
+      discNumber: 1,
+      bpm: 140,
+    });
+    const patchedText = new TextDecoder().decode(patched);
+    expect(patchedText).toContain("DISCNUMBER=1/3");
+    expect(patchedText).toContain("X-private=opaque value");
+    expect([...patched]).toEqual(expect.arrayContaining([...unknown]));
+    expect([...patched.subarray(audioOffset(patched))]).toEqual([
+      ...original.subarray(audioOffset(original)),
+    ]);
+
+    const clearedPlan = await Effect.runPromise(
+      flacDriver.patch(makeBlobByteSource(new Blob([patched])), {
+        albumArtist: "",
+        composer: "",
+        comment: "",
+        discNumber: null,
+        bpm: null,
+      }),
+    );
+    const cleared = await outputBytes(clearedPlan.parts);
+    const clearedInspection = await Effect.runPromise(
+      flacDriver.inspect(makeBlobByteSource(new Blob([cleared]))),
+    );
+    expect(clearedInspection.metadata).toMatchObject({
+      albumArtist: "",
+      composer: "",
+      comment: "",
+      discNumber: null,
+      bpm: null,
+    });
+    expect(new TextDecoder().decode(cleared)).toContain("X-private=opaque value");
+    expect([...cleared.subarray(audioOffset(cleared))]).toEqual([
+      ...original.subarray(audioOffset(original)),
+    ]);
   });
 
   it("only replaces pictures when an explicit picture change is present", async () => {

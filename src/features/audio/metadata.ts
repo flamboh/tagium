@@ -29,11 +29,16 @@ const metadataGenreSchema = Schema.Union([
 ]);
 
 const metadataPictureArraySchema = Schema.mutable(Schema.Array(metadataPictureSchema));
+const advancedNumberSchema = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isBetween({ minimum: 1, maximum: 999 }),
+);
 
 const metadataSnapshotSchema = Schema.Struct({
   filename: Schema.mutableKey(Schema.String),
   title: Schema.mutableKey(Schema.String),
   artist: Schema.mutableKey(Schema.String),
+  albumArtist: Schema.mutableKey(Schema.String),
   album: Schema.mutableKey(Schema.String),
   year: Schema.mutableKey(Schema.NullOr(Schema.Number)),
   genre: Schema.mutableKey(metadataGenreSchema),
@@ -43,20 +48,30 @@ const metadataSnapshotSchema = Schema.Struct({
   picture: Schema.mutableKey(metadataPictureArraySchema),
   trackNumber: Schema.mutableKey(Schema.NullOr(Schema.Number)),
   trackTotal: optionalMutableKey(Schema.NullOr(Schema.Number)),
+  composer: Schema.mutableKey(Schema.String),
+  comment: Schema.mutableKey(Schema.String),
+  discNumber: Schema.mutableKey(Schema.NullOr(advancedNumberSchema)),
+  bpm: Schema.mutableKey(Schema.NullOr(advancedNumberSchema)),
 });
 
 const metadataPatchSchema = Schema.Struct({
   filename: optionalMutableKey(Schema.String),
   title: optionalMutableKey(Schema.String),
   artist: optionalMutableKey(Schema.String),
+  albumArtist: optionalMutableKey(Schema.String),
   album: optionalMutableKey(Schema.String),
   year: optionalMutableKey(Schema.NullOr(Schema.Number)),
   genre: optionalMutableKey(metadataGenreSchema),
   picture: optionalMutableKey(metadataPictureArraySchema),
   trackNumber: optionalMutableKey(Schema.NullOr(Schema.Number)),
+  composer: optionalMutableKey(Schema.String),
+  comment: optionalMutableKey(Schema.String),
+  discNumber: optionalMutableKey(Schema.NullOr(advancedNumberSchema)),
+  bpm: optionalMutableKey(Schema.NullOr(advancedNumberSchema)),
 });
 
 export const audioMetadataSchema = metadataSnapshotSchema;
+export const audioMetadataPatchSchema = metadataPatchSchema;
 
 export type MetadataPatch = Schema.Schema.Type<typeof metadataPatchSchema>;
 export type AudioMetadata = Schema.Schema.Type<typeof metadataSnapshotSchema>;

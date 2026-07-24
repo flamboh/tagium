@@ -1,4 +1,9 @@
 import type { TrackSourceMix } from "@/analytics";
+import {
+  EDITABLE_METADATA_FIELDS,
+  getAdvancedMetadataValidationErrors,
+  validateAdvancedMetadataNumber,
+} from "@/features/audio/metadataFields";
 import { sanitizeFilenameBase } from "@/features/library/filename";
 import type { UploadedTrack } from "@/features/audio/mp3Utils";
 import type { AudioMetadata, MetadataPatch, TagiumFile } from "@/features/library/types";
@@ -6,16 +11,7 @@ import type { AudioMetadata, MetadataPatch, TagiumFile } from "@/features/librar
 type MetadataPatchField = keyof MetadataPatch;
 type DirtyMetadataFields = Partial<Record<keyof AudioMetadata, unknown>>;
 
-const metadataPatchFields = [
-  "filename",
-  "title",
-  "artist",
-  "album",
-  "year",
-  "genre",
-  "picture",
-  "trackNumber",
-] as const satisfies readonly MetadataPatchField[];
+const metadataPatchFields = EDITABLE_METADATA_FIELDS satisfies readonly MetadataPatchField[];
 
 export const getFileImportKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
 
@@ -51,14 +47,37 @@ export const getNullableNumericPatchValue = (
   value: AudioMetadata["year"] | undefined,
 ): MetadataPatch["year"] => (value === undefined || Number.isNaN(value) ? null : value);
 
+export const validateDiscNumber = (value: number | null | undefined) =>
+  validateAdvancedMetadataNumber("discNumber", value) ?? true;
+
+export const validateBpm = (value: number | null | undefined) =>
+  validateAdvancedMetadataNumber("bpm", value) ?? true;
+
+export { getAdvancedMetadataValidationErrors };
+
+export const getProjectableAudioMetadata = (
+  metadata: AudioMetadata,
+  fallback?: AudioMetadata,
+  validationSource: Pick<AudioMetadata, "discNumber" | "bpm"> = metadata,
+): AudioMetadata => ({
+  ...metadata,
+  discNumber:
+    validateDiscNumber(validationSource.discNumber) === true
+      ? metadata.discNumber
+      : (fallback?.discNumber ?? null),
+  bpm: validateBpm(validationSource.bpm) === true ? metadata.bpm : (fallback?.bpm ?? null),
+});
+
 export const getSubmittedAudioMetadata = (
   data: AudioMetadata,
   syncFilenames: boolean,
+  albumArtistLinked = false,
 ): AudioMetadata => ({
   ...data,
   filename: sanitizeFilenameBase(syncFilenames ? data.title : data.filename),
   year: getNullableNumericMetadataValue(data.year),
   trackNumber: getNullableNumericMetadataValue(data.trackNumber),
+  albumArtist: albumArtistLinked ? data.artist : data.albumArtist,
 });
 
 export const createSparseMetadataPatch = (
@@ -85,6 +104,9 @@ export const createSparseMetadataPatch = (
       case "artist":
         patch.artist = metadata.artist;
         break;
+      case "albumArtist":
+        patch.albumArtist = metadata.albumArtist;
+        break;
       case "album":
         patch.album = metadata.album;
         break;
@@ -99,6 +121,22 @@ export const createSparseMetadataPatch = (
         break;
       case "trackNumber":
         patch.trackNumber = getNullableNumericPatchValue(metadata.trackNumber);
+        break;
+      case "discNumber":
+        if (validateDiscNumber(metadata.discNumber) === true) {
+          patch.discNumber = getNullableNumericPatchValue(metadata.discNumber);
+        }
+        break;
+      case "composer":
+        patch.composer = metadata.composer;
+        break;
+      case "bpm":
+        if (validateBpm(metadata.bpm) === true) {
+          patch.bpm = getNullableNumericPatchValue(metadata.bpm);
+        }
+        break;
+      case "comment":
+        patch.comment = metadata.comment;
         break;
     }
   }
