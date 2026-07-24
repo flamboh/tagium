@@ -44,11 +44,3 @@ export const synchsafeToNumber = (bytes: Uint8Array, offset: number) =>
 
 export const numberToSynchsafe = (value: number) =>
   Uint8Array.of((value >>> 21) & 0x7f, (value >>> 14) & 0x7f, (value >>> 7) & 0x7f, value & 0x7f);
-
-export const bytesEqual = (left: Uint8Array, right: Uint8Array) => {
-  if (left.length !== right.length) return false;
-  for (let index = 0; index < left.length; index++) {
-    if (left[index] !== right[index]) return false;
-  }
-  return true;
-};
