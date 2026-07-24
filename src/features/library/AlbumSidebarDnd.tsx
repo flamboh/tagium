@@ -171,7 +171,7 @@ type AlbumCardProps = {
   canDownload: boolean;
   canShare: boolean;
   shareDisabledReason: string;
-  shareLabel: "share album" | "update shared album";
+  shareLabel: "share album" | "view share link" | "update shared album";
   children: ReactNode;
   onSelect: (event: ReactMouseEvent) => void;
   onEdit: () => void;

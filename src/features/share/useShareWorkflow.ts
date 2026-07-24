@@ -288,10 +288,25 @@ export const useShareWorkflow = ({
       }
       setCreatorAlbumId(albumId);
       const preview = buildShareAlbumPreview(album, files);
+      if (publication && action.label === "view share link") {
+        const capability = getPublicationCapability(publication.slug);
+        if (!capability) return;
+        setDialog({
+          status: "published",
+          preview,
+          receipt: {
+            slug: publication.slug,
+            url: publication.url,
+            expiresAt: publication.expiresAt,
+            revocationToken: capability.token,
+          },
+        });
+        return;
+      }
       setDialog({
         status: "confirm",
         preview,
-        intent: album.sharePublication ? "update" : "create",
+        intent: publication ? "update" : "create",
       });
     },
     [albumFingerprints, getPublicationCapability, library],
@@ -324,7 +339,12 @@ export const useShareWorkflow = ({
         albumFingerprints[album.id],
         Boolean(existingPublication && getPublicationCapability(existingPublication.slug)),
       );
-      if (!latestAction.enabled) throw new Error(latestAction.reason);
+      if (
+        !latestAction.enabled ||
+        (existingPublication && latestAction.label !== "update shared album")
+      ) {
+        throw new Error(latestAction.reason);
+      }
       const shareSnapshot = await projectShareSnapshot(album, files);
       let receipt;
       if (existingPublication) {

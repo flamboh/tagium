@@ -84,7 +84,7 @@ describe("shared album publication state", () => {
     });
   });
 
-  it("enables only a changed active publication with its capability", () => {
+  it("opens an unchanged active publication and updates only after changes", () => {
     const published = album({
       sharePublication: {
         slug: "slug",
@@ -94,9 +94,11 @@ describe("shared album publication state", () => {
         status: "active",
       },
     });
-    expect(shareAlbumActionState(published, "published", true, 0).reason).toBe(
-      "album already shared",
-    );
+    expect(shareAlbumActionState(published, "published", true, 0)).toEqual({
+      enabled: true,
+      label: "view share link",
+      reason: "view share link",
+    });
     expect(shareAlbumActionState(published, "edited", true, 0)).toMatchObject({
       enabled: true,
       label: "update shared album",

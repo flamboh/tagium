@@ -72,7 +72,7 @@ export const projectShareSnapshot = async (
 
 export interface ShareAlbumActionState {
   enabled: boolean;
-  label: "share album" | "update shared album";
+  label: "share album" | "view share link" | "update shared album";
   reason: string;
 }
 
@@ -101,7 +101,7 @@ export const shareAlbumActionState = (
     };
   }
   if (!currentFingerprint || currentFingerprint === publication.publishedFingerprint) {
-    return { enabled: false, label: "update shared album", reason: "album already shared" };
+    return { enabled: true, label: "view share link", reason: "view share link" };
   }
   return { enabled: true, label: "update shared album", reason: "update shared album" };
 };
