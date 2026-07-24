@@ -9,9 +9,11 @@ import {
   Check,
   Download,
   FileMusic,
+  Link2,
   Loader2,
   Pencil,
   RefreshCw,
+  Share2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -168,10 +170,14 @@ type AlbumCardProps = {
   album: AlbumGroup;
   selected: boolean;
   canDownload: boolean;
+  canShare: boolean;
+  shareDisabledReason: string;
+  shareLabel: "share album" | "view share link" | "update shared album";
   children: ReactNode;
   onSelect: (event: ReactMouseEvent) => void;
   onEdit: () => void;
   onDownload: () => void;
+  onShare: () => void;
   onFileDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
   onFileDrop: (event: React.DragEvent<HTMLDivElement>) => void;
 };
@@ -180,13 +186,19 @@ export function SortableAlbumCard({
   album,
   selected,
   canDownload,
+  canShare,
+  shareDisabledReason,
+  shareLabel,
   children,
   onSelect,
   onEdit,
   onDownload,
+  onShare,
   onFileDragOver,
   onFileDrop,
 }: AlbumCardProps) {
+  const hasActiveShare = shareLabel !== "share album";
+  const ShareIcon = hasActiveShare ? Link2 : Share2;
   const {
     attributes,
     listeners,
@@ -249,6 +261,24 @@ export function SortableAlbumCard({
           <TooltipContent>
             {canDownload ? "download album" : "album tracks need files, metadata, and filenames"}
           </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={onShare}
+                disabled={!canShare}
+                aria-label={`${shareLabel}: ${album.title}`}
+              >
+                <ShareIcon className="h-3.5 w-3.5" />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{canShare ? shareLabel : shareDisabledReason}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>

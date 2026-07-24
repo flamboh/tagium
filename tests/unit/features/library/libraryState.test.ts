@@ -45,6 +45,29 @@ const importLibrary = (
 });
 
 describe("libraryReducer", () => {
+  it("associates one share publication without replacing album metadata", () => {
+    const original = album("album-1", ["track-1"]);
+    const state = reduce([
+      { type: "content-replaced", files: [file("track-1")], albums: [original] },
+      {
+        type: "album-share-publication-set",
+        albumId: "album-1",
+        publication: {
+          slug: "slug",
+          url: "https://tagium.app/share/slug",
+          expiresAt: "2030-01-01T00:00:00.000Z",
+          publishedFingerprint: "fingerprint",
+          status: "active",
+        },
+      },
+    ]);
+
+    expect(state.albums[0]).toMatchObject({
+      ...original,
+      sharePublication: { slug: "slug", publishedFingerprint: "fingerprint" },
+    });
+  });
+
   it("keeps an explicit manual clear across later content updates", () => {
     const state = reduce([
       importLibrary([file("loose-1")], [], ["loose-1"], "loose-1", null),

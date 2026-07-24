@@ -1,82 +1,59 @@
 # Cobalt audio downloads
 
-Run a self-hosted Cobalt API instance and expose its URL to the Tagium server:
+Tagium sends browser download requests through its own `/api/cobalt/audio` endpoint. The server
+uses Cobalt only as a download proxy; metadata processing stays local in the browser. SoundCloud
+sets are resolved by Tagium and imported track by track as one album.
 
-```sh
-pnpm --dir ../oss/cobalt install
-bun run dev:cobalt
-COBALT_API_URL=http://localhost:9000/ bun dev
-```
+## Production topology
 
-Tagium requests MP3 audio through its own `/api/cobalt/audio` endpoint, which calls Cobalt server-side and streams the file back to the browser.
-SoundCloud set URLs are resolved by Tagium, downloaded track-by-track through Cobalt, then imported as one album.
+`fly.cobalt.toml` deploys the pinned Cobalt image behind `cobalt-machine-proxy.mjs`. The wrapper
+listens publicly on port 9000, runs Cobalt on `127.0.0.1:9001`, and adds
+`X-Cobalt-Machine-Id` when Fly exposes `FLY_MACHINE_ID`.
 
-For production, deploy Cobalt from upstream source and point Tagium at it with `COBALT_API_URL`.
-If the Cobalt instance is private, set `COBALT_API_KEY` on Tagium and configure Cobalt API auth for the same key source.
-Set `COBALT_ALLOWED_ORIGIN` to the public Tagium origin when the request URL origin differs from the browser origin behind your host.
-The Tagium proxy enforces same-origin browser requests and limits each client to 60 download requests per minute.
+Two URLs serve different purposes:
 
-## Fly deploy
+- Cobalt's `API_URL` must be its public Fly URL so generated tunnel URLs are reachable.
+- Tagium's `COBALT_API_URL` points the Cloudflare Worker at that Cobalt deployment.
 
-`fly.cobalt.toml` builds `Dockerfile.cobalt`, which layers `cobalt-machine-proxy.mjs` over the pinned Cobalt image.
-The wrapper listens on Fly's public internal port `9000`, starts upstream Cobalt on `127.0.0.1:9001`, proxies requests to it, and adds `X-Cobalt-Machine-Id` from `FLY_MACHINE_ID` when Fly provides it.
+Store `COBALT_API_KEY` and `COBALT_MACHINE_AFFINITY_SECRET` as Cloudflare secrets. The latter signs
+machine-bound tunnel URLs before Tagium sends them to a browser. Production requests are
+same-origin, so `COBALT_ALLOWED_ORIGIN` should remain unset; this also lets isolated preview URLs
+use the same deployment without pretending to be production.
 
-Deploy Cobalt with:
+Deploy with:
 
 ```sh
 flyctl deploy --config fly.cobalt.toml
 ```
 
-Keep `API_URL` set to the public Cobalt URL in `fly.cobalt.toml`.
-Cobalt uses it when generating tunnel URLs, while the wrapper keeps the upstream process on the private secondary port.
+## Scaling invariant
 
-## Cloudflare deploy env
+Cobalt tunnel URLs are process-local. A resolve response from one Fly Machine can therefore point
+at a tunnel that exists only on that Machine. Do not scale beyond one Machine unless either:
 
-`nitro.config.ts` configures the shared Cobalt API URL in Nitro's generated Wrangler config:
+- the wrapper emits `X-Cobalt-Machine-Id` and Tagium can route tunnel requests with
+  `Fly-Force-Instance-Id`; or
+- tunnel artifacts live in durable shared storage.
 
-```sh
-COBALT_API_URL=https://tagium-cobalt.fly.dev/
-```
+Without one of those guarantees, multiple Machines cause intermittent download failures.
 
-Set the API key as a Cloudflare secret, not in git:
+## Capacity model
 
-```sh
-wrangler secret put COBALT_API_KEY
-```
+Capacity is intentionally controlled at three layers:
 
-If Cobalt emits `X-Cobalt-Machine-Id`, Tagium signs machine-bound tunnel URLs. Set the signing key as a Cloudflare secret:
+1. The browser queue provides progress, ETA, and cancellation for a user's playlist.
+2. The Fly wrapper separately limits resolve and tunnel concurrency, queues short shared bursts,
+   and returns a fast Cobalt-shaped `503` when saturated.
+3. Cobalt's native rate limits remain high abuse backstops.
 
-```sh
-wrangler secret put COBALT_MACHINE_AFFINITY_SECRET
-```
-
-The canonical production origin is `https://tagium.app`. `nitro.config.ts` manages its Cloudflare
-custom domain along with permanent redirects from `https://www.tagium.app` and
-`https://tagium.oli.boo`. Keep `COBALT_ALLOWED_ORIGIN` unset: production requests are already
-same-origin, and the request-origin fallback lets isolated preview URLs use Cobalt without
-masquerading as production.
-
-## Fly scaling
-
-Cobalt tunnel URLs are process-local. On Fly, a Cobalt API response from one Machine can point at a tunnel served only by that same Machine.
-
-The Fly wrapper makes machine affinity deployable by emitting `X-Cobalt-Machine-Id` on Cobalt API responses.
-Tagium can use that value to send follow-up tunnel requests with `Fly-Force-Instance-Id`.
-
-Do not scale Cobalt past one Machine unless one of these is true:
-
-- A Cobalt wrapper or middleware emits `X-Cobalt-Machine-Id` on Cobalt API responses, sourced from Fly's `FLY_MACHINE_ID`, so Tagium can route follow-up tunnel requests back to that Machine.
-- Durable artifact storage exists, so tunnel URLs no longer depend on the originating process.
-
-If the wrapper is absent, keep `tagium-cobalt` to a single Machine.
+Resolve and tunnel limits are separate because one download produces one resolve request plus one
+or two tunnel fetches for audio and cover art. Cobalt's native limits are not per Tagium user:
+requests arrive through shared server infrastructure and may share the same API-key or IP identity.
+Tune the wrapper controls in `fly.cobalt.toml`, not the browser queue, when Machine capacity changes.
 
 ## Load testing
 
-`bun run load-test:cobalt -- --target <cobalt-origin>` (`scripts/load-test-cobalt.ts`) finds the concurrency ceiling of a single Cobalt Machine by requesting real downloads at increasing concurrency and reporting latency/error rate per wave.
-
-By default it cycles through `scripts/load-test-urls.txt`, a curated list of stable, openly-licensed content (Big Buck Bunny, NoCopyrightSounds releases, and similar) chosen to be safe to fetch repeatedly without provider or legal risk. Add more lines there as you find good sources, or point at a different set with `--urls-file <path>` / `--url <url,url,...>`. Prefer diverse sources over hammering one URL — it better matches real traffic and looks less like abuse to the source site.
-
-Never point it at `tagium-cobalt.fly.dev`. Deploy a disposable clone first:
+Run the checked-in load tester only against a disposable Fly clone:
 
 ```sh
 flyctl apps create tagium-cobalt-loadtest
@@ -85,29 +62,5 @@ bun run load-test:cobalt -- --target https://tagium-cobalt-loadtest.fly.dev
 flyctl apps destroy tagium-cobalt-loadtest
 ```
 
-Watch `flyctl machine status` or the Fly dashboard for CPU/memory while a wave runs, and correlate spikes with where latency or error rate climbs in the script's output. Destroy the disposable app when finished; a suspended Machine costs nothing but a running one bills per second.
-
-See `docs/cobalt-load-test-2026-07-07.html` for a full run of this test against a disposable clone, including the concurrency ceiling found and a discovery that Cobalt's own default rate limiter (not Fly Machine hardware) is the actual current bottleneck.
-
-## Cobalt native rate limits
-
-Production sets Cobalt's native request-rate limits above the proxy's expected healthy burst envelope:
-
-- `RATELIMIT_WINDOW=60` / `RATELIMIT_MAX=1000` for `POST /` resolve calls.
-- `TUNNEL_RATELIMIT_WINDOW=60` / `TUNNEL_RATELIMIT_MAX=2000` for `GET /tunnel` calls.
-
-These are not per browser user. Cobalt keys `POST /` by API key/session when present, otherwise by the client IP it sees; `GET /tunnel` is keyed by the client IP it sees. Since Tagium calls Cobalt through server/Worker infrastructure, many browser users can share one Cobalt-observed caller identity. Keep these native limits as abuse backstops and use the proxy concurrency gate below for real Machine capacity control.
-
-## Proxy concurrency gate
-
-`cobalt-machine-proxy.mjs` caps how many requests it will forward to upstream Cobalt at once, separately for `POST /` (resolve) and `GET /tunnel`, since a real download issues one resolve call plus one or two tunnel fetches (audio, and usually cover art) run concurrently - see `src/features/import/localAudioProcessor.ts`. Requests over the cap queue briefly; once the queue is also full (or a queued request waits too long), the proxy returns a fast `503` (Cobalt-shaped error JSON, status `error.api.capacity_exceeded`) instead of letting requests pile up on a single shared vCPU until everything times out.
-
-Defaults, all overridable via env vars on the Fly app:
-
-- `PROXY_MAX_CONCURRENT_RESOLVE` (24) / `PROXY_MAX_CONCURRENT_TUNNEL` (48) - concurrent requests forwarded to Cobalt.
-- `PROXY_MAX_QUEUED_RESOLVE` (96) / `PROXY_MAX_QUEUED_TUNNEL` (192) - how many more can wait before getting an immediate `503`.
-- `PROXY_MAX_QUEUE_WAIT_MS` (30000) - how long a queued request waits before it gets a `503` instead of a slot.
-
-The app already has user-visible queueing for playlist work and browser-local Cobalt download slots. That queue is where ETA and cancel affordances belong. The proxy queue is a hidden Machine backstop for many users or sessions arriving at once; it should absorb short shared bursts, then fail fast before the single Cobalt Machine builds a multi-minute backlog.
-
-These defaults come from `docs/cobalt-load-test-2026-07-07.html`, corrected for the audio+cover tunnel pattern real downloads actually use and expanded to tolerate a longer shared burst. Re-tune them if the Machine's spec changes or a follow-up load test says otherwise.
+Never target the production Cobalt deployment. The script deliberately exercises real provider
+downloads and increasing concurrency; use its curated URL list or an explicitly supplied safe list.

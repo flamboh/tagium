@@ -1,6 +1,30 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { MAX_COVER_ART_UPLOAD_BYTES } from "@/features/editor/coverArtProcessing";
-import { createSingleUrlDownloadPlan, fetchImportedCover } from "@/features/import/downloadTrack";
+import {
+  createPlaylistDownloadPlan,
+  createSingleUrlDownloadPlan,
+  fetchImportedCover,
+} from "@/features/import/downloadTrack";
+import type { Playlist } from "@/features/import/playlist";
+
+describe("playlist download plans", () => {
+  it("retains playlist provenance on the created album", () => {
+    const playlist: Playlist = {
+      title: "Set",
+      artist: "Artist",
+      genre: "Electronic",
+      isAlbum: true,
+      sourceUrl: "https://soundcloud.com/artist/sets/set-name",
+      tracks: [{ title: "Track", url: "https://soundcloud.com/artist/track", trackNumber: 1 }],
+    };
+    const plan = createPlaylistDownloadPlan({
+      playlist,
+      audioBitrate: "320",
+      createId: () => "id",
+    });
+    expect(plan.album.sourceUrl).toBe(playlist.sourceUrl);
+  });
+});
 
 describe("single URL download plans", () => {
   it("seeds pending tracks with metadata resolved before download", () => {

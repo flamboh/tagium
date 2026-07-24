@@ -3,8 +3,7 @@ import { Buffer } from "node:buffer";
 import { readFile } from "node:fs/promises";
 import { deflateSync } from "node:zlib";
 import { Effect } from "effect";
-import { materializeFixture } from "../../scripts/conformance/fixture-generator";
-import { audioPayloadSha256 } from "../../scripts/conformance/structural";
+import { audioPayloadSha256, materializeFixture } from "./support/audioFixtures";
 import { makeBlobByteSource } from "../../src/features/audio/metadataEngine/byteSource";
 import { mp3Driver } from "../../src/features/audio/metadataEngine/mp3/mp3Driver";
 import { flacDriver } from "../../src/features/audio/metadataEngine/flac";
@@ -51,21 +50,19 @@ test("imports, edits, and exports every supported container without changing for
   test.setTimeout(60_000);
   for (const format of formats) {
     await page.goto("/");
-    const fixture = materializeFixture(format.family, 1);
+    const fixture = await materializeFixture(format.family);
     const original = await Effect.runPromise(
-      drivers[format.family].inspect(
-        makeBlobByteSource(new Blob([Uint8Array.from(fixture.bytes)])),
-      ),
+      drivers[format.family].inspect(makeBlobByteSource(new Blob([fixture]))),
     );
     await page
       .locator('input[type="file"]')
       .first()
       .setInputFiles([
-        { name: format.name, mimeType: format.mimeType, buffer: Buffer.from(fixture.bytes) },
+        { name: format.name, mimeType: format.mimeType, buffer: Buffer.from(fixture) },
         {
           name: `second${format.extension}`,
           mimeType: format.mimeType,
-          buffer: Buffer.from(fixture.bytes),
+          buffer: Buffer.from(fixture),
         },
       ]);
 
@@ -96,7 +93,7 @@ test("imports, edits, and exports every supported container without changing for
     expect(firstPath).not.toBeNull();
     const firstBytes = new Uint8Array(await readFile(firstPath!));
     expect(audioPayloadSha256(format.family, firstBytes)).toBe(
-      audioPayloadSha256(format.family, fixture.bytes),
+      audioPayloadSha256(format.family, fixture),
     );
     const inspected = await Effect.runPromise(
       drivers[format.family].inspect(makeBlobByteSource(new Blob([firstBytes]))),
@@ -127,7 +124,7 @@ test("keeps foreground timer latency below 50 ms during bounded background impor
   page,
 }) => {
   await page.goto("/");
-  const fixture = materializeFixture("mp3", 4);
+  const fixture = await materializeFixture("mp3");
   await page.evaluate(() => {
     const delays: number[] = [];
     let expected = performance.now() + 10;
@@ -146,7 +143,7 @@ test("keeps foreground timer latency below 50 ms during bounded background impor
   });
   const files = Array.from({ length: 3 }, (_, index) => {
     const bytes = Buffer.alloc(16 * 1024 * 1024);
-    Buffer.from(fixture.bytes).copy(bytes);
+    Buffer.from(fixture).copy(bytes);
     return { name: `latency-${index}.mp3`, mimeType: "audio/mpeg", buffer: bytes };
   });
   await page.locator('input[type="file"]').first().setInputFiles(files);

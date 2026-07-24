@@ -4,6 +4,6 @@ Local, lossless metadata editing for MP3, FLAC, and M4A music files.
 
 [Open Tagium](https://tagium.app)
 
-## Docs
+## Operations
 
-see `./docs`.
+See [Cobalt audio downloads](./docs/cobalt-audio-downloads.md) for deployment and scaling constraints.

@@ -21,6 +21,15 @@ import { useExportSession } from "@/features/export/useExportSession";
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { AppSettings } from "@/features/library/types";
+import ShareAlbumDialog from "@/features/share/ShareAlbumDialog";
+import SharedAlbumPage from "@/features/share/SharedAlbumPage";
+import {
+  classifyShareLink,
+  InvalidShareLinkError,
+  ShareLinksDisabledError,
+} from "@/features/share/shareLink";
+import { useShareWorkflow } from "@/features/share/useShareWorkflow";
+import { shareLinksEnabled } from "@/features/share/shareFeature";
 
 export default function AudioTagger() {
   const library = useLibraryStore();
@@ -35,6 +44,7 @@ export default function AudioTagger() {
     settings,
     activateEditor,
   });
+  const sharing = useShareWorkflow({ library, editor, importing, enabled: shareLinksEnabled });
   const busy = importing.status.importing || exporting.exporting;
   const workspace = useAudioWorkspace({
     library,
@@ -62,8 +72,43 @@ export default function AudioTagger() {
     }),
   );
 
+  const handleUrlImport = async (sourceUrl: string) => {
+    const classification = classifyShareLink(sourceUrl);
+    if (classification.kind === "invalid-share") throw new InvalidShareLinkError();
+    if (classification.kind === "share" && !shareLinksEnabled) throw new ShareLinksDisabledError();
+    if (classification.kind === "share") {
+      await sharing.importFromInput(classification.slug);
+      return;
+    }
+    await importing.commands.importUrl(sourceUrl);
+  };
+
+  if (shareLinksEnabled && sharing.page) {
+    return (
+      <SharedAlbumPage
+        state={sharing.page}
+        workspaceTrackCount={files.length}
+        anotherTabOpen={sharing.anotherTabOpen}
+        alreadyAddedAlbumId={sharing.alreadyAddedAlbumId}
+        adding={sharing.adding}
+        canStopSharing={sharing.canStopSharing}
+        onBack={sharing.back}
+        onOpenTagium={sharing.openTagium}
+        onAdd={sharing.addSharedAlbum}
+        onViewAlbum={sharing.viewAlreadyAdded}
+        onStopSharing={sharing.stopPageShare}
+      />
+    );
+  }
+
   return (
     <>
+      <ShareAlbumDialog
+        state={sharing.dialog}
+        onClose={sharing.closeDialog}
+        onPublish={sharing.publish}
+        onStopSharing={sharing.stopDialogShare}
+      />
       <MetadataCleanupDialog {...workspace.cleanupDialogProps} />
       <DestructiveActionDialog {...workspace.removalDialogProps} />
       <AlbumMetadataDialog {...workspace.albumDialogProps} />
@@ -80,6 +125,8 @@ export default function AudioTagger() {
           onAudioUpload={importing.commands.upload}
           onRetryDownload={importing.commands.retryTrack}
           onDownloadAlbum={exporting.downloadAlbum}
+          onShareAlbum={shareLinksEnabled ? sharing.openCreator : undefined}
+          shareAlbumActions={shareLinksEnabled ? sharing.shareActions : undefined}
           onUploadToAlbum={(albumId, filesToUpload) =>
             importing.commands.upload(filesToUpload, albumId)
           }
@@ -148,7 +195,7 @@ export default function AudioTagger() {
               layout={mediaUrlEntryPresentation.layout}
               hidden={mediaUrlEntryPresentation.hidden}
               docked={mediaUrlEntryPresentation.docked}
-              onUrlImport={importing.commands.importUrl}
+              onUrlImport={handleUrlImport}
             />
           </LandingScreen>
         </div>

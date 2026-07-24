@@ -320,6 +320,7 @@ export const createPlaylistDownloadPlan = ({
     genre: playlist.genre,
     trackIds: pendingFiles.map((file) => file.id),
     year: playlist.year,
+    ...(playlist.sourceUrl === undefined ? {} : { sourceUrl: playlist.sourceUrl }),
   };
   const firstPendingFileId = pendingFiles[0]?.id ?? null;
 
