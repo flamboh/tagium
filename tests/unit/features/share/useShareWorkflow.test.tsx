@@ -310,7 +310,10 @@ describe("share workflow publication lifecycle", () => {
     const album = creatorAlbum(oldPublication);
     mocks.getRevocationReceipt.mockReturnValue(capability);
     const { hook } = creatorWorkflow(album, creatorFile);
-    mocks.getRevocationReceipt.mockReset().mockReturnValueOnce(capability).mockReturnValueOnce(null);
+    mocks.getRevocationReceipt
+      .mockReset()
+      .mockReturnValueOnce(capability)
+      .mockReturnValueOnce(null);
 
     act(() => hook.result.openCreator(album.id));
 
@@ -329,11 +332,13 @@ describe("share workflow publication lifecycle", () => {
     act(() => hook.result.openCreator(album.id));
     await act(async () => hook.result.publish());
 
-    expect(hook.result.dialog).toMatchObject({
-      status: "error",
-      intent: "create",
-      message: "sharing is unavailable. no link was created.",
-    });
+    await vi.waitFor(() =>
+      expect(hook.result.dialog).toMatchObject({
+        status: "error",
+        intent: "create",
+        message: "the share link could not be created.",
+      }),
+    );
     hook.unmount();
   });
 
@@ -349,12 +354,13 @@ describe("share workflow publication lifecycle", () => {
     act(() => hook.result.openCreator(album.id));
     await act(async () => hook.result.publish());
 
-    expect(hook.result.dialog).toMatchObject({
-      status: "error",
-      intent: "update",
-      message:
-        "the shared album could not be updated. the link still has the previous version.",
-    });
+    await vi.waitFor(() =>
+      expect(hook.result.dialog).toMatchObject({
+        status: "error",
+        intent: "update",
+        message: "the shared album could not be updated. the link still has the previous version.",
+      }),
+    );
     hook.unmount();
   });
 });

@@ -436,6 +436,7 @@ export const useShareWorkflow = ({
         receipt,
       });
     } catch (error) {
+      const createError = sharePublicationErrorMessage(error).replace(/[.!?]+$/, "");
       setDialog({
         status: "error",
         preview: currentDialog.preview,
@@ -443,7 +444,9 @@ export const useShareWorkflow = ({
         message:
           attemptedIntent === "update"
             ? "the shared album could not be updated. the link still has the previous version."
-            : `${sharePublicationErrorMessage(error).replace(/[.!?]+$/, "")}. no link was created.`,
+            : createError === "the share link could not be created"
+              ? `${createError}.`
+              : `${createError}. no link was created.`,
       });
     } finally {
       publicationActionInFlightRef.current = false;
