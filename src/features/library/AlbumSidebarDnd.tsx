@@ -12,12 +12,20 @@ import {
   FileMusic,
   Link2,
   Loader2,
+  MoreVertical,
   Pencil,
   RefreshCw,
   Share2,
+  Sparkles,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { AlbumCoverThumb } from "@/features/library/AlbumCoverThumb";
@@ -28,6 +36,7 @@ import {
   type SidebarDropData,
 } from "@/features/library/sidebarDnd";
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
+import type { AlbumActionItem, AlbumActionItemId } from "@/features/library/albumActionItems";
 
 const artistLabel = (artist: string) => (artist ? artist : "unknown");
 
@@ -209,35 +218,34 @@ type AlbumCardProps = {
   album: AlbumGroup;
   selected: boolean;
   canDownload: boolean;
-  canShare: boolean;
-  shareDisabledReason: string;
-  shareLabel: "share album" | "view share link" | "update shared album";
+  cleanupSuggestionCount: number;
+  actions: AlbumActionItem[];
   children: ReactNode;
   onSelect: (event: ReactMouseEvent) => void;
-  onEdit: () => void;
   onDownload: () => void;
-  onShare: () => void;
   onFileDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
   onFileDrop: (event: React.DragEvent<HTMLDivElement>) => void;
+};
+
+const albumActionIcon = (actionId: AlbumActionItemId, shareLabel: AlbumActionItem["label"]) => {
+  if (actionId === "edit") return Pencil;
+  if (actionId === "cleanup") return Sparkles;
+  return shareLabel === "share album" ? Share2 : Link2;
 };
 
 export function SortableAlbumCard({
   album,
   selected,
   canDownload,
-  canShare,
-  shareDisabledReason,
-  shareLabel,
+  cleanupSuggestionCount,
+  actions,
   children,
   onSelect,
-  onEdit,
   onDownload,
-  onShare,
   onFileDragOver,
   onFileDrop,
 }: AlbumCardProps) {
-  const hasActiveShare = shareLabel !== "share album";
-  const ShareIcon = hasActiveShare ? Link2 : Share2;
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const {
     attributes,
     listeners,
@@ -288,7 +296,7 @@ export function SortableAlbumCard({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className="h-7 w-7 [@media(pointer:coarse)]:size-10"
                 onClick={onDownload}
                 disabled={!canDownload}
                 aria-label={`download ${album.title}`}
@@ -301,39 +309,51 @@ export function SortableAlbumCard({
             {canDownload ? "download album" : "album tracks need files, metadata, and filenames"}
           </TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={onShare}
-                disabled={!canShare}
-                aria-label={`${shareLabel}: ${album.title}`}
-              >
-                <ShareIcon className="h-3.5 w-3.5" />
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{canShare ? shareLabel : shareDisabledReason}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button
+              ref={menuTriggerRef}
               type="button"
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
-              onClick={onEdit}
-              aria-label={`edit ${album.title}`}
+              className="relative h-7 w-7 [@media(pointer:coarse)]:size-10"
+              aria-label={`album actions for ${album.title}${
+                cleanupSuggestionCount > 0 ? ", cleanup suggested" : ""
+              }`}
             >
-              <Pencil className="h-3.5 w-3.5" />
+              <MoreVertical className="h-3.5 w-3.5" />
+              {cleanupSuggestionCount > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-primary"
+                />
+              )}
             </Button>
-          </TooltipTrigger>
-          <TooltipContent>edit album</TooltipContent>
-        </Tooltip>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            {actions.map((action) => {
+              const ActionIcon = albumActionIcon(action.id, action.label);
+              return (
+                <DropdownMenuItem
+                  key={action.id}
+                  disabled={action.disabled}
+                  className="items-start py-2 [@media(pointer:coarse)]:min-h-10"
+                  onSelect={() => action.onSelect({ returnFocusTarget: menuTriggerRef.current })}
+                >
+                  <ActionIcon className={cn("mt-0.5", action.id === "cleanup" && "text-primary")} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block">{action.label}</span>
+                    {action.secondaryText && (
+                      <span className="block text-xs text-muted-foreground">
+                        {action.secondaryText}
+                      </span>
+                    )}
+                  </span>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       {children}
     </div>
