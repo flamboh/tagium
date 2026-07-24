@@ -23,3 +23,13 @@ _Avoid_: Reshare, new share
 **Publication capability**:
 The authority granted when a share publication is created and required to update or stop it. Losing this authority does not make the album eligible for a replacement publication.
 _Avoid_: Revocation token, owner session
+
+## Audio metadata
+
+**Album metadata policy**:
+The rules that determine which album-level values are copied to a track during a future synchronization or write. Changing the policy does not rewrite existing track values.
+_Avoid_: Album defaults
+
+**Metadata link**:
+An album metadata policy setting that controls whether a particular album-level value is synchronized to tracks.
+_Avoid_: Field lock

@@ -82,7 +82,12 @@ export const useWorkspaceSelection = ({
       );
       let nextFiles = snapshot.files.filter((file) => !idSet.has(file.id));
       if (settingsRef.current.syncTrackNumbers && affectedAlbumIds.length > 0) {
-        nextFiles = applyTrackOrderNumbersToFiles(nextFiles, nextAlbums, affectedAlbumIds);
+        nextFiles = applyTrackOrderNumbersToFiles(
+          nextFiles,
+          nextAlbums,
+          affectedAlbumIds,
+          settingsRef.current,
+        );
       }
       library.dispatch({
         type: "tracks-removed",
@@ -177,7 +182,12 @@ export const useWorkspaceSelection = ({
       );
       let finalFiles = snapshot.files;
       if (moved.albumsToSync.length > 0) {
-        finalFiles = applyTrackOrderNumbersToFiles(finalFiles, moved.albums, moved.albumsToSync);
+        finalFiles = applyTrackOrderNumbersToFiles(
+          finalFiles,
+          moved.albums,
+          moved.albumsToSync,
+          settingsRef.current,
+        );
       }
       library.dispatch({
         type: "content-replaced",

@@ -1,7 +1,10 @@
 import { Effect } from "effect";
 import { AudioMetadataReadError, AudioMetadataWriteError } from "@/features/audio/audioErrors";
 import type { ByteSource } from "@/features/audio/metadataEngine/byteSource";
-import type { FormatDriver } from "@/features/audio/metadataEngine/driver";
+import {
+  rejectUnsupportedMetadataChanges,
+  type FormatDriver,
+} from "@/features/audio/metadataEngine/driver";
 import type {
   ArtworkEntry,
   AudioInspection,
@@ -32,6 +35,7 @@ interface ParsedMp4 {
   duration: number;
   sampleRate: number;
   metadata: AudioInspection["metadata"];
+  discTotal: number | null;
 }
 
 const readError = (message: string, cause?: unknown) =>
@@ -362,8 +366,21 @@ const parseMetadata = (
     const pictures: ArtworkEntry[] = [];
     let trackNumber: number | null = null;
     let trackTotal: number | null = null;
+    let discNumber: number | null = null;
+    let discTotal: number | null = null;
+    let bpm: number | null = null;
     let retainedMetadataBytes = 0;
-    const knownTextItems = new Set(["©nam", "©ART", "©alb", "©day", "©gen", "gnre"]);
+    const knownTextItems = new Set([
+      "©nam",
+      "©ART",
+      "aART",
+      "©alb",
+      "©day",
+      "©gen",
+      "gnre",
+      "©wrt",
+      "©cmt",
+    ]);
     const knownFreeformItems = new Set(["TITLE", "ARTIST", "ALBUM", "DATE", "GENRE"]);
     for (const item of ilst?.children ?? []) {
       if (item.type === "----") {
@@ -397,7 +414,13 @@ const parseMetadata = (
         }
         continue;
       }
-      if (item.type !== "covr" && item.type !== "trkn" && !knownTextItems.has(item.type)) {
+      if (
+        item.type !== "covr" &&
+        item.type !== "trkn" &&
+        item.type !== "disk" &&
+        item.type !== "tmpo" &&
+        !knownTextItems.has(item.type)
+      ) {
         continue;
       }
       for (const entry of itemDataAtoms(item)) {
@@ -428,6 +451,17 @@ const parseMetadata = (
             trackNumber ??= u16(payload.bytes, 2) || null;
             trackTotal ??= u16(payload.bytes, 4) || null;
           }
+        } else if (item.type === "disk") {
+          if (payload.bytes.length >= 6) {
+            const value = u16(payload.bytes, 2);
+            discNumber ??= value >= 1 && value <= 999 ? value : null;
+            discTotal ??= u16(payload.bytes, 4) || null;
+          }
+        } else if (item.type === "tmpo") {
+          if (payload.bytes.length >= 2) {
+            const value = u16(payload.bytes, payload.bytes.length - 2);
+            bpm ??= value >= 1 && value <= 999 ? value : null;
+          }
         } else if (item.type === "gnre") {
           if (payload.bytes.length >= 2) {
             const current = values.get("gnre") ?? [];
@@ -454,18 +488,26 @@ const parseMetadata = (
     const date = first("©day", "DATE");
     const audioBytes = mdats.reduce((sum, atom) => sum + atom.size - atom.headerSize, 0);
     return {
-      title: first("©nam", "TITLE"),
-      artist: first("©ART", "ARTIST"),
-      album: first("©alb", "ALBUM"),
-      year: /^\d{4}/.test(date) ? Number(date.slice(0, 4)) : null,
-      genre: genres.length <= 1 ? (genres[0] ?? "") : genres,
-      duration,
-      bitrate: duration > 0 ? Math.round((audioBytes * 8) / duration) : 0,
-      sampleRate,
-      picture: pictures,
-      trackNumber,
-      trackTotal,
-    } satisfies AudioInspection["metadata"];
+      metadata: {
+        title: first("©nam", "TITLE"),
+        artist: first("©ART", "ARTIST"),
+        albumArtist: values.get("aART")?.[0] ?? "",
+        album: first("©alb", "ALBUM"),
+        year: /^\d{4}/.test(date) ? Number(date.slice(0, 4)) : null,
+        genre: genres.length <= 1 ? (genres[0] ?? "") : genres,
+        duration,
+        bitrate: duration > 0 ? Math.round((audioBytes * 8) / duration) : 0,
+        sampleRate,
+        picture: pictures,
+        trackNumber,
+        trackTotal,
+        composer: values.get("©wrt")?.[0] ?? "",
+        comment: values.get("©cmt")?.[0] ?? "",
+        discNumber,
+        bpm,
+      } satisfies AudioInspection["metadata"],
+      discTotal,
+    };
   });
 
 const parse = (source: ByteSource): Effect.Effect<ParsedMp4, AudioMetadataReadError> =>
@@ -487,8 +529,8 @@ const parse = (source: ByteSource): Effect.Effect<ParsedMp4, AudioMetadataReadEr
       return yield* Effect.fail(readError("ftyp atom is truncated."));
     const { duration, sampleRate } = yield* parseAudioTrack(source, moov);
     yield* validateDataReferences(source, moov);
-    const metadata = yield* parseMetadata(source, moov, duration, sampleRate, mdats);
-    return { atoms, moov, mdats, duration, sampleRate, metadata };
+    const { metadata, discTotal } = yield* parseMetadata(source, moov, duration, sampleRate, mdats);
+    return { atoms, moov, mdats, duration, sampleRate, metadata, discTotal };
   });
 
 const atomHeader = (type: string, size: number, extended = false) => {
@@ -512,6 +554,9 @@ const makeTextItem = (type: string, values: string[]) =>
   );
 const makeTrackItem = (value: number, total: number | null | undefined) =>
   makeAtom("trkn", [makeData(concat(put16(0), put16(value), put16(total ?? 0), put16(0)), 0)]);
+const makeDiscItem = (value: number, total: number | null | undefined) =>
+  makeAtom("disk", [makeData(concat(put16(0), put16(value), put16(total ?? 0)), 0)]);
+const makeBpmItem = (value: number) => makeAtom("tmpo", [makeData(put16(value), 21)]);
 const makeArtworkItem = (pictures: ArtworkEntry[]) =>
   makeAtom(
     "covr",
@@ -526,16 +571,25 @@ const makeArtworkItem = (pictures: ArtworkEntry[]) =>
     ),
   );
 
-const replacementEntries = (changes: MetadataChanges, trackTotal?: number | null) => {
+const replacementEntries = (
+  changes: MetadataChanges,
+  trackTotal?: number | null,
+  discTotal?: number | null,
+) => {
   const result = new Map<string, Blob | null>();
   const text = (type: string, value: string | undefined) => {
     if (value !== undefined) result.set(type, value === "" ? null : makeTextItem(type, [value]));
   };
   text("©nam", changes.title);
   text("©ART", changes.artist);
+  text("aART", changes.albumArtist);
   text("©alb", changes.album);
+  text("©wrt", changes.composer);
+  text("©cmt", changes.comment);
   if (changes.year !== undefined)
     result.set("©day", changes.year === null ? null : makeTextItem("©day", [String(changes.year)]));
+  if (changes.dateText !== undefined)
+    result.set("©day", changes.dateText === "" ? null : makeTextItem("©day", [changes.dateText]));
   if (changes.genre !== undefined) {
     const genres = Array.isArray(changes.genre) ? changes.genre : [changes.genre];
     const nonempty = genres.filter(Boolean);
@@ -546,6 +600,22 @@ const replacementEntries = (changes: MetadataChanges, trackTotal?: number | null
       "trkn",
       changes.trackNumber === null ? null : makeTrackItem(changes.trackNumber, trackTotal),
     );
+  }
+  if (changes.trackText !== undefined) {
+    const value = Number.parseInt(changes.trackText, 10);
+    result.set(
+      "trkn",
+      Number.isSafeInteger(value) && value > 0 ? makeTrackItem(value, trackTotal) : null,
+    );
+  }
+  if (changes.discNumber !== undefined) {
+    result.set(
+      "disk",
+      changes.discNumber === null ? null : makeDiscItem(changes.discNumber, discTotal),
+    );
+  }
+  if (changes.bpm !== undefined) {
+    result.set("tmpo", changes.bpm === null ? null : makeBpmItem(changes.bpm));
   }
   if (changes.picture !== undefined)
     result.set("covr", changes.picture.length ? makeArtworkItem(changes.picture) : null);
@@ -711,11 +781,32 @@ const patch = (
   changes: MetadataChanges,
 ): Effect.Effect<PatchPlan, AudioMetadataWriteError> =>
   Effect.gen(function* () {
+    const unsupported = rejectUnsupportedMetadataChanges(
+      changes,
+      new Set<keyof MetadataChanges>([
+        "title",
+        "artist",
+        "albumArtist",
+        "album",
+        "year",
+        "genre",
+        "trackNumber",
+        "discNumber",
+        "composer",
+        "bpm",
+        "comment",
+        "picture",
+        "dateText",
+        "trackText",
+      ]),
+      FORMAT.kind,
+    );
+    if (unsupported) return yield* Effect.fail(unsupported);
     const parsed = yield* parse(source).pipe(
       Effect.mapError((cause) => writeError("cannot patch an invalid container.", cause)),
     );
     if (!hasChanges(changes)) return { parts: [source.slice()], type: FORMAT.mime };
-    const replacements = replacementEntries(changes, parsed.metadata.trackTotal);
+    const replacements = replacementEntries(changes, parsed.metadata.trackTotal, parsed.discTotal);
     let delta = 0;
     let moov = yield* buildMoov(source, parsed, replacements, delta).pipe(
       Effect.mapError((cause) => writeError("unable to plan metadata rewrite.", cause)),

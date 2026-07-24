@@ -24,6 +24,8 @@ const atom = (type: string, ...payload: Uint8Array[]) => {
 };
 const data = (value: Uint8Array, type = 1) => atom("data", u32(type), u32(0), value);
 const textItem = (type: string, value: string) => atom(type, data(new TextEncoder().encode(value)));
+const indexItem = (type: "trkn" | "disk", value: number, total: number) =>
+  atom(type, data(concat(u16(0), u16(value), u16(total), ...(type === "trkn" ? [u16(0)] : [])), 0));
 const pictureItem = (...pictures: { bytes: number[]; type: number }[]) =>
   atom("covr", ...pictures.map((picture) => data(Uint8Array.from(picture.bytes), picture.type)));
 
@@ -101,11 +103,16 @@ const makeFixture = ({
       "ilst",
       textItem("©nam", title),
       textItem("©ART", "Artist"),
+      textItem("aART", "Album Artist"),
       textItem("©alb", "Album"),
+      textItem("©wrt", "Composer"),
+      textItem("©cmt", "Primary comment"),
       textItem("©day", "2024-07-19"),
       textItem("©gen", "Rock"),
       textItem("©gen", "Pop"),
-      atom("trkn", data(concat(u16(0), u16(7), u16(12), u16(0)), 0)),
+      indexItem("trkn", 7, 12),
+      indexItem("disk", 2, 3),
+      atom("tmpo", data(u16(128), 21)),
       pictureItem(
         {
           bytes: Array.from({ length: artworkSize }, (_, index) =>
@@ -199,7 +206,12 @@ describe("mp4Driver", () => {
     expect(result.metadata).toMatchObject({
       title: "Old",
       artist: "Artist",
+      albumArtist: "Album Artist",
       album: "Album",
+      composer: "Composer",
+      comment: "Primary comment",
+      discNumber: 2,
+      bpm: 128,
       year: 2024,
       genre: ["Rock", "Pop"],
       trackNumber: 7,
@@ -261,6 +273,51 @@ describe("mp4Driver", () => {
     expect(outputMdats).toHaveLength(2);
     expect(
       outputMdats.map((entry) => output.slice(entry.start + 8, entry.start + entry.size)),
+    ).toEqual(fixture.media);
+  });
+
+  it("patches and clears every advanced field while preserving disk totals and media", async () => {
+    const fixture = makeFixture();
+    const output = await runPatch(fixture.bytes, {
+      albumArtist: "New Album Artist",
+      composer: "New Composer",
+      comment: "New comment",
+      discNumber: 1,
+      bpm: 140,
+    });
+    const inspected = await runInspect(output);
+    expect(inspected.metadata).toMatchObject({
+      albumArtist: "New Album Artist",
+      composer: "New Composer",
+      comment: "New comment",
+      discNumber: 1,
+      bpm: 140,
+    });
+    expect(includes(output, concat(u16(0), u16(1), u16(3)))).toBe(true);
+    for (const opaque of fixture.opaque) expect(includes(output, opaque)).toBe(true);
+    const outputMdats = topAtoms(output).filter((entry) => entry.type === "mdat");
+    expect(
+      outputMdats.map((entry) => output.slice(entry.start + 8, entry.start + entry.size)),
+    ).toEqual(fixture.media);
+
+    const cleared = await runPatch(output, {
+      albumArtist: "",
+      composer: "",
+      comment: "",
+      discNumber: null,
+      bpm: null,
+    });
+    const clearedInspection = await runInspect(cleared);
+    expect(clearedInspection.metadata).toMatchObject({
+      albumArtist: "",
+      composer: "",
+      comment: "",
+      discNumber: null,
+      bpm: null,
+    });
+    const clearedMdats = topAtoms(cleared).filter((entry) => entry.type === "mdat");
+    expect(
+      clearedMdats.map((entry) => cleared.slice(entry.start + 8, entry.start + entry.size)),
     ).toEqual(fixture.media);
   });
 

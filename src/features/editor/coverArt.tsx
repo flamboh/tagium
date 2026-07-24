@@ -31,6 +31,8 @@ interface CoverArtProps {
   size?: "default" | "compact";
   resetKey?: string | null;
   className?: string;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 export default function CoverArt({
@@ -41,6 +43,8 @@ export default function CoverArt({
   size = "default",
   resetKey,
   className,
+  disabled = false,
+  disabledReason,
 }: CoverArtProps) {
   const [state, dispatch] = useReducer(coverArtReducer, initialCoverArtState);
   const {
@@ -52,6 +56,7 @@ export default function CoverArt({
     isErrorOpen: coverErrorOpen,
   } = state;
   const coverErrorId = useId();
+  const disabledReasonId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverUploadIdRef = useRef(0);
   const processingChangeRef = useRef(onProcessingChange);
@@ -196,7 +201,8 @@ export default function CoverArt({
                     size="sm"
                     variant="secondary"
                     aria-label="crop cover art"
-                    disabled={isProcessing}
+                    disabled={isProcessing || disabled}
+                    aria-describedby={disabled && disabledReason ? disabledReasonId : undefined}
                     className="absolute top-2 right-2 size-10 p-0 max-lg:[@media(max-height:700px)]:top-1.5 max-lg:[@media(max-height:700px)]:right-1.5"
                   >
                     <Crop className="h-4 w-4" />
@@ -233,21 +239,29 @@ export default function CoverArt({
           type="file"
           accept="image/jpeg,image/png"
           onChange={handleCoverUpload}
+          disabled={disabled}
           className="hidden"
           ref={fileInputRef}
         />
         <Tooltip
-          open={Boolean(coverError) && coverErrorOpen}
+          open={Boolean(coverError || (disabled && disabledReason)) && coverErrorOpen}
           onOpenChange={(open) => dispatch({ type: "errorOpenChanged", open })}
         >
           <TooltipTrigger asChild>
             <Button
               type="button"
               variant="outline"
-              disabled={isProcessing}
+              disabled={isProcessing || disabled}
               aria-busy={isProcessing}
               aria-invalid={Boolean(coverError)}
-              aria-describedby={coverError ? coverErrorId : undefined}
+              aria-describedby={
+                [
+                  coverError ? coverErrorId : null,
+                  disabled && disabledReason ? disabledReasonId : null,
+                ]
+                  .filter(Boolean)
+                  .join(" ") || undefined
+              }
               className={
                 isCompact
                   ? "h-24 w-full border-dashed border-2 flex flex-col items-center gap-1 px-2 hover:bg-accent/50 cursor-pointer md:h-full md:min-h-12 md:w-44 md:px-3"
@@ -263,15 +277,22 @@ export default function CoverArt({
                 }
               />
               <span className="text-muted-foreground whitespace-nowrap text-[10px] md:text-xs">
-                {isProcessing ? "processing cover" : "upload cover"}
+                {isProcessing ? "processing cover" : disabled ? "cover linked" : "upload cover"}
               </span>
             </Button>
           </TooltipTrigger>
-          {coverError && <TooltipContent side="bottom">{coverError}</TooltipContent>}
+          {(coverError || (disabled && disabledReason)) && (
+            <TooltipContent side="bottom">{coverError ?? disabledReason}</TooltipContent>
+          )}
         </Tooltip>
         <p id={coverErrorId} className="sr-only" aria-live="polite">
           {coverError ?? ""}
         </p>
+        {disabled && disabledReason && (
+          <p id={disabledReasonId} className="sr-only">
+            {disabledReason}
+          </p>
+        )}
       </div>
     </div>
   );

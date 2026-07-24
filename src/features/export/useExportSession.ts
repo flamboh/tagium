@@ -59,13 +59,14 @@ export const useExportSession = ({
       let syncedFiles = editor.flush(trackIds);
 
       for (const album of albumsToSync) {
-        syncedFiles = applyAlbumSharedTagsToFiles(syncedFiles, album);
+        syncedFiles = applyAlbumSharedTagsToFiles(syncedFiles, album, settingsRef.current);
       }
       if (settingsRef.current.syncTrackNumbers) {
         syncedFiles = applyTrackOrderNumbersToFiles(
           syncedFiles,
           snapshot.albums,
           albumsToSync.map((album) => album.id),
+          settingsRef.current,
         );
       }
       if (settingsRef.current.syncFilenames) {

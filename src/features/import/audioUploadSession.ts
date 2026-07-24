@@ -145,13 +145,18 @@ export const createAudioUploadSession = ({
           const targetAlbum = nextAlbums.find((album) => album.id === targetAlbumId);
           let finalFiles = current.files;
           if (targetAlbum) {
-            finalFiles = applyAlbumSharedTagsToFiles(finalFiles, targetAlbum);
             const settings = getSettings();
+            finalFiles = applyAlbumSharedTagsToFiles(finalFiles, targetAlbum, settings);
             if (settings.syncFilenames) {
               finalFiles = applySyncedFilenamesToFiles(finalFiles, targetAlbum.trackIds);
             }
             if (settings.syncTrackNumbers) {
-              finalFiles = applyTrackOrderNumbersToFiles(finalFiles, nextAlbums, [targetAlbumId]);
+              finalFiles = applyTrackOrderNumbersToFiles(
+                finalFiles,
+                nextAlbums,
+                [targetAlbumId],
+                settings,
+              );
             }
           }
           library.dispatch({
@@ -185,15 +190,18 @@ export const createAudioUploadSession = ({
           };
           const latest = library.getSnapshot();
           const nextAlbums = [...latest.albums, downloadedAlbum];
-          let finalFiles = applyAlbumSharedTagsToFiles(latest.files, downloadedAlbum);
           const settings = getSettings();
+          let finalFiles = applyAlbumSharedTagsToFiles(latest.files, downloadedAlbum, settings);
           if (settings.syncFilenames) {
             finalFiles = applySyncedFilenamesToFiles(finalFiles, downloadedAlbum.trackIds);
           }
           if (settings.syncTrackNumbers) {
-            finalFiles = applyTrackOrderNumbersToFiles(finalFiles, nextAlbums, [
-              downloadedAlbum.id,
-            ]);
+            finalFiles = applyTrackOrderNumbersToFiles(
+              finalFiles,
+              nextAlbums,
+              [downloadedAlbum.id],
+              settings,
+            );
           }
           library.dispatch({
             type: "content-replaced",
@@ -226,6 +234,7 @@ export const createAudioUploadSession = ({
               finalFiles,
               merged.albums,
               merged.albumsToSync,
+              settings,
             );
           }
           const firstTrack = orderedUploads[0];

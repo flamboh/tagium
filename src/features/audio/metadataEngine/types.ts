@@ -34,11 +34,14 @@ export interface MetadataChanges {
   year?: number | null;
   genre?: string | string[];
   trackNumber?: number | null;
+  discNumber?: number | null;
+  bpm?: number | null;
   picture?: ArtworkEntry[];
   dateText?: string;
   trackText?: string;
   albumArtist?: string;
   composer?: string;
+  comment?: string;
   copyright?: string;
   language?: string;
 }
