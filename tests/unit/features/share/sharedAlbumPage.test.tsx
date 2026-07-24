@@ -65,6 +65,21 @@ const props = {
   onViewAlbum: vi.fn(),
   onStopSharing: vi.fn(async () => undefined),
 };
+const artworkState = {
+  ...props.state,
+  manifest: {
+    ...props.state.manifest,
+    album: {
+      ...props.state.manifest.album,
+      artwork: {
+        kind: "stored" as const,
+        format: "image/jpeg" as const,
+        type: 3,
+        description: "album cover",
+      },
+    },
+  },
+};
 
 const buttonText = (button: ReactTestRenderer["root"]) =>
   button
@@ -85,6 +100,47 @@ afterEach(() => {
 });
 
 describe("shared album preview", () => {
+  it("shows a stable cover spinner until artwork loads", async () => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        createElement(SharedAlbumPage, {
+          ...props,
+          state: artworkState,
+        }),
+      );
+    });
+
+    const image = renderer.root.findByType("img");
+    expect(image.parent?.props["aria-busy"]).toBe(true);
+    expect(image.props.className).toContain("opacity-0");
+    expect(buttonText(renderer.root.findByProps({ role: "status" }))).toContain(
+      "loading cover art…",
+    );
+
+    void act(() => image.props.onLoad());
+    const loadedImage = renderer.root.findByType("img");
+    expect(loadedImage.parent?.props["aria-busy"]).toBe(false);
+    expect(loadedImage.props.className).toContain("opacity-100");
+    expect(renderer.root.findAllByProps({ role: "status" })).toHaveLength(0);
+  });
+
+  it("replaces a failed cover with the existing unavailable state", async () => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        createElement(SharedAlbumPage, {
+          ...props,
+          state: artworkState,
+        }),
+      );
+    });
+
+    void act(() => renderer.root.findByType("img").props.onError());
+    expect(renderer.root.findAllByType("img")).toHaveLength(0);
+    expect(buttonText(renderer.root)).toContain("cover art unavailable");
+  });
+
   it("uses a wordmark link and demotes the album source below a plain title", async () => {
     const sourceUrl = "https://www.youtube.com/playlist?list=PL_exact";
     let renderer!: ReactTestRenderer;

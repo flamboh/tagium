@@ -118,21 +118,40 @@ function SharedAlbumSkeleton({ onOpenTagium }: { onOpenTagium: () => void }) {
 }
 
 function Artwork({ slug, title }: { slug: string; title: string }) {
-  const [failed, setFailed] = useState(false);
-  if (failed)
-    return (
-      <div className="flex size-40 shrink-0 flex-col items-center justify-center gap-2 rounded-xl bg-muted text-center text-xs text-muted-foreground max-sm:size-24">
-        <ImageOff className="size-6" aria-hidden="true" />
-        <span className="max-sm:sr-only">cover art unavailable</span>
-      </div>
-    );
+  const [status, setStatus] = useState<"loading" | "loaded" | "failed">("loading");
   return (
-    <img
-      src={sharedArtworkUrl(slug)}
-      alt={`${title} cover`}
-      className="size-40 shrink-0 rounded-xl object-cover ring-1 ring-border/60 max-sm:size-24"
-      onError={() => setFailed(true)}
-    />
+    <div
+      aria-busy={status === "loading"}
+      className="relative flex size-40 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-center text-xs text-muted-foreground ring-1 ring-border/60 max-sm:size-24"
+    >
+      {status === "failed" ? (
+        <div className="flex flex-col items-center justify-center gap-2">
+          <ImageOff className="size-6" aria-hidden="true" />
+          <span className="max-sm:sr-only">cover art unavailable</span>
+        </div>
+      ) : (
+        <>
+          {status === "loading" && (
+            <div role="status">
+              <Loader2
+                className="size-6 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+              <span className="sr-only">loading cover art…</span>
+            </div>
+          )}
+          <img
+            src={sharedArtworkUrl(slug)}
+            alt={`${title} cover`}
+            className={`absolute inset-0 size-full object-cover transition-opacity duration-200 motion-reduce:transition-none ${
+              status === "loaded" ? "opacity-100" : "opacity-0"
+            }`}
+            onLoad={() => setStatus("loaded")}
+            onError={() => setStatus("failed")}
+          />
+        </>
+      )}
+    </div>
   );
 }
 
