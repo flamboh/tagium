@@ -92,6 +92,7 @@ export interface TrackEditorSession {
     "register" | "control" | "handleSubmit" | "reset"
   >;
   commands: {
+    projectFiles: (trackIds?: string[]) => TagiumFile[];
     flush: (trackIds?: string[]) => TagiumFile[];
     preview: (field: PreviewField, value: string) => void;
     uploadCover: (
@@ -197,16 +198,24 @@ export const useTrackEditorSession = ({
     [getSubmittedMetadata, getValues],
   );
 
+  const projectFiles = useCallback(
+    (trackIds?: string[]) => {
+      const currentFiles = library.getSnapshot().files;
+      return applyCurrentFormMetadataToFiles(currentFiles, trackIds);
+    },
+    [applyCurrentFormMetadataToFiles, library],
+  );
+
   const flush = useCallback(
     (trackIds?: string[]) => {
       const currentFiles = library.getSnapshot().files;
-      const nextFiles = applyCurrentFormMetadataToFiles(currentFiles, trackIds);
+      const nextFiles = projectFiles(trackIds);
       if (nextFiles !== currentFiles) {
         library.dispatch({ type: "content-replaced", files: nextFiles });
       }
       return nextFiles;
     },
-    [applyCurrentFormMetadataToFiles, library],
+    [library, projectFiles],
   );
 
   const preview = useCallback(
@@ -449,6 +458,7 @@ export const useTrackEditorSession = ({
     isCoverProcessing,
     form: { register, control, handleSubmit, reset },
     commands: {
+      projectFiles,
       flush,
       preview,
       uploadCover: (picture, sourceFileId) => {

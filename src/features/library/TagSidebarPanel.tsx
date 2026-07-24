@@ -211,6 +211,7 @@ export default function TagSidebarPanel({
         )}
         <Button
           variant="outline"
+          data-export-focus-fallback
           className={cn(
             "h-auto w-full flex-col justify-center gap-1 py-3 text-center",
             settingsOpen &&
