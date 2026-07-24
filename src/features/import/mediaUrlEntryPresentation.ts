@@ -1,16 +1,15 @@
-export type MediaUrlEntryLayout = "landing" | "editor";
+export type MediaUrlEntryLayout = "landing" | "empty-editor" | "editor";
 
-interface MediaUrlEntryPresentation {
+export interface MediaUrlEntryPresentation {
   layout: MediaUrlEntryLayout;
-  hidden: boolean;
-  docked: boolean;
 }
 
 export const getMediaUrlEntryPresentation = (
   libraryIsEmpty: boolean,
   settingsOpen: boolean,
-): MediaUrlEntryPresentation => ({
-  layout: libraryIsEmpty && !settingsOpen ? "landing" : "editor",
-  hidden: settingsOpen && !libraryIsEmpty,
-  docked: libraryIsEmpty && settingsOpen,
-});
+  trackSelected = false,
+): MediaUrlEntryPresentation | null => {
+  if (settingsOpen) return null;
+  if (libraryIsEmpty) return { layout: "landing" };
+  return { layout: trackSelected ? "editor" : "empty-editor" };
+};

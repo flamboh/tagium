@@ -4,11 +4,20 @@ import AlbumMetadataDialog, {
   type AlbumMetadataDraft,
 } from "@/features/editor/AlbumMetadataDialog";
 
-const reactHookMocks = vi.hoisted(() => ({ useRef: vi.fn(), useState: vi.fn() }));
+const reactHookMocks = vi.hoisted(() => ({
+  useEffect: vi.fn(),
+  useRef: vi.fn(),
+  useState: vi.fn(),
+}));
 
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
-  return { ...actual, useRef: reactHookMocks.useRef, useState: reactHookMocks.useState };
+  return {
+    ...actual,
+    useEffect: reactHookMocks.useEffect,
+    useRef: reactHookMocks.useRef,
+    useState: reactHookMocks.useState,
+  };
 });
 
 type TestElement = ReactElement<Record<string, unknown> & { children?: ReactNode }>;
@@ -48,6 +57,7 @@ const textContent = (node: ReactNode): string => {
 const createHookHarness = () => {
   const states: unknown[] = [];
   let cursor = 0;
+  reactHookMocks.useEffect.mockImplementation(() => undefined);
   reactHookMocks.useRef.mockImplementation((initial: unknown) => ({ current: initial }));
   reactHookMocks.useState.mockImplementation((initial: unknown) => {
     const index = cursor++;
@@ -70,7 +80,7 @@ const createHookHarness = () => {
 afterEach(() => vi.clearAllMocks());
 
 describe("album metadata validation layout", () => {
-  it("keeps fixed error rows mounted before and after invalid submission", () => {
+  it("disables invalid submission and shows accessible errors only after blur", () => {
     const hooks = createHookHarness();
     const render = () =>
       hooks.render(() =>
@@ -96,10 +106,10 @@ describe("album metadata validation layout", () => {
     expect(artistRowBefore.props.className).toContain("h-4");
     expect(textContent(titleRowBefore)).toBe("");
 
-    const form = findElement(tree, (element) => element.type === "form");
-    (form.props.onSubmit as (event: { preventDefault: () => void }) => void)({
-      preventDefault: vi.fn(),
-    });
+    const submit = findElement(tree, (element) => element.props.type === "submit");
+    expect(submit.props.disabled).toBe(true);
+    const titleInput = findElement(tree, (element) => element.props.id === "album-title");
+    (titleInput.props.onBlur as () => void)();
 
     tree = render();
     expect(
@@ -107,7 +117,20 @@ describe("album metadata validation layout", () => {
     ).toBe("album title is required");
     expect(
       textContent(findElement(tree, (element) => element.props.id === "album-artist-error")),
-    ).toBe("artist is required");
+    ).toBe("");
+    expect(
+      findElement(tree, (element) => element.props.id === "album-title").props["aria-invalid"],
+    ).toBe(true);
+
+    const dialog = findElement(
+      tree,
+      (element) => element.props.open === true && typeof element.props.onOpenChange === "function",
+    );
+    (dialog.props.onOpenChange as (open: boolean) => void)(false);
+    tree = render();
+    expect(
+      textContent(findElement(tree, (element) => element.props.id === "album-title-error")),
+    ).toBe("");
   });
 
   it("associates every field label with its input", () => {
@@ -131,7 +154,73 @@ describe("album metadata validation layout", () => {
     }
 
     const titleInput = findElement(tree, (element) => element.props.id === "album-title");
-    expect(titleInput.props["aria-describedby"]).toBe("album-title-error");
+    const artistInput = findElement(tree, (element) => element.props.id === "album-artist");
+    expect(titleInput.props["aria-describedby"]).toBeUndefined();
+    expect(titleInput.props.required).toBe(true);
+    expect(titleInput.props["aria-required"]).toBe("true");
+    expect(artistInput.props.required).toBe(true);
+    expect(artistInput.props["aria-required"]).toBe("true");
+    expect(
+      textContent(
+        findElement(
+          tree,
+          (element) => element.type === "label" && element.props.htmlFor === "album-title",
+        ),
+      ),
+    ).toContain("required");
+  });
+
+  it.each([
+    { title: "   ", artist: "Artist" },
+    { title: "Album", artist: "   " },
+  ])("disables whitespace-only required values", (draft) => {
+    const hooks = createHookHarness();
+    const tree = hooks.render(() =>
+      AlbumMetadataDialog({
+        open: true,
+        mode: "create",
+        draft: { ...draft, genre: "" },
+        trackCount: 0,
+        onChange: vi.fn(),
+        onClose: vi.fn(),
+        onSave: vi.fn(),
+        placeholder: { title: "Album", artist: "Artist", genre: "Genre", year: "2026" },
+      }),
+    );
+
+    expect(findElement(tree, (element) => element.props.type === "submit").props.disabled).toBe(
+      true,
+    );
+  });
+
+  it("disables submission and exposes a busy state while cover art is processing", () => {
+    const hooks = createHookHarness();
+    const render = () =>
+      hooks.render(() =>
+        AlbumMetadataDialog({
+          open: true,
+          mode: "edit",
+          draft: { title: "Album", artist: "Artist", genre: "" },
+          trackCount: 1,
+          onChange: vi.fn(),
+          onClose: vi.fn(),
+          onSave: vi.fn(),
+          placeholder: { title: "Album", artist: "Artist", genre: "Genre", year: "2026" },
+        }),
+      );
+
+    let tree = render();
+    const coverArt = findElement(
+      tree,
+      (element) => typeof element.props.onProcessingChange === "function",
+    );
+    (coverArt.props.onProcessingChange as (processing: boolean) => void)(true);
+
+    tree = render();
+    const submit = findElement(tree, (element) => element.props.type === "submit");
+    expect(submit.props.disabled).toBe(true);
+    expect(submit.props["aria-busy"]).toBe(true);
+    expect(textContent(submit)).toBe("processing cover");
   });
 
   it("adds an uploaded cover to the latest draft", () => {

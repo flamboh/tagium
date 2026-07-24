@@ -191,6 +191,7 @@ export const useWorkspaceAlbumDialog = ({
   const editingAlbumId = dialog.mode === "edit" ? dialog.editingAlbumId : null;
   return {
     dialogProps: {
+      instanceKey: dialog.open ? (editingAlbumId ?? `create:${dialog.placeholderSeed}`) : "closed",
       open: dialog.open,
       mode: dialog.mode,
       draft: dialog.draft,

@@ -1,6 +1,8 @@
 import type { AudioFormat } from "@/features/audio/metadataEngine/types";
 import type { TagiumFile } from "@/features/library/types";
 
+export const AUDIO_UPLOAD_ACCEPT = ".mp3,.flac,.m4a,.mp4,audio/mpeg,audio/flac,audio/mp4";
+
 export const MP3_FORMAT = {
   kind: "mp3",
   extension: "mp3",
