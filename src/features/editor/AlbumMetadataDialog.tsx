@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CoverArt from "@/features/editor/coverArt";
+import { useAlbumCoverSync } from "@/features/editor/useAlbumCoverSync";
 import { AudioMetadata } from "@/features/library/types";
 import type { SampleAlbumMetadata } from "@/features/editor/sampleMetadata";
 
@@ -54,33 +55,20 @@ export default function AlbumMetadataDialog({
 }: AlbumMetadataDialogProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [touchedFields, setTouchedFields] = useState({ title: false, artist: false });
-  const [isSyncingCover, setIsSyncingCover] = useState(false);
   const [isProcessingCover, setIsProcessingCover] = useState(false);
-  const [syncCoverRotation, setSyncCoverRotation] = useState(0);
-  const syncCoverTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
-  const syncCoverRunRef = useRef(0);
+  const coverSync = useAlbumCoverSync({
+    disabled: isProcessingCover,
+    onSync: onSyncCoverToTracks,
+  });
   const canSyncCoverToTracks =
     mode === "edit" && draft.cover && draft.cover.length > 0 && onSyncCoverToTracks;
-  const syncCoverLabel = isSyncingCover ? "syncing cover to tracks" : "sync cover to tracks";
   const placeholderClassName = "placeholder:text-muted-foreground/45";
   const titleInvalid = !draft.title.trim();
   const artistInvalid = !draft.artist.trim();
   const formInvalid = titleInvalid || artistInvalid;
 
-  const cancelSyncCoverFeedback = (resetVisualState: boolean) => {
-    syncCoverRunRef.current += 1;
-    if (syncCoverTimerRef.current !== null) {
-      globalThis.clearTimeout(syncCoverTimerRef.current);
-      syncCoverTimerRef.current = null;
-    }
-    if (resetVisualState) {
-      setIsSyncingCover(false);
-      setSyncCoverRotation(0);
-    }
-  };
-
   const resetTransientState = () => {
-    cancelSyncCoverFeedback(true);
+    coverSync.cancel();
     setShowDeleteConfirm(false);
     setTouchedFields({ title: false, artist: false });
   };
@@ -90,36 +78,6 @@ export default function AlbumMetadataDialog({
     resetTransientState();
     onClose();
   };
-
-  const handleSyncCoverToTracks = () => {
-    if (!onSyncCoverToTracks) return;
-    if (isSyncingCover || isProcessingCover) return;
-
-    const startedAt = performance.now();
-    const syncRun = syncCoverRunRef.current + 1;
-    syncCoverRunRef.current = syncRun;
-    setSyncCoverRotation((rotation) => rotation + 360);
-    setIsSyncingCover(true);
-    const result = onSyncCoverToTracks();
-
-    void Promise.resolve(result).finally(() => {
-      if (syncCoverRunRef.current !== syncRun) return;
-      const elapsed = performance.now() - startedAt;
-      const remaining = Math.max(0, 650 - elapsed);
-      syncCoverTimerRef.current = globalThis.setTimeout(() => {
-        if (syncCoverRunRef.current !== syncRun) return;
-        syncCoverTimerRef.current = null;
-        setIsSyncingCover(false);
-      }, remaining);
-    });
-  };
-
-  useEffect(
-    () => () => {
-      cancelSyncCoverFeedback(false);
-    },
-    [],
-  );
 
   const handleCoverUpload = (cover: NonNullable<AudioMetadata["picture"]>) => {
     onChange((currentDraft) => ({ ...currentDraft, cover }));
@@ -277,22 +235,22 @@ export default function AlbumMetadataDialog({
                           type="button"
                           size="sm"
                           variant="secondary"
-                          aria-label={syncCoverLabel}
-                          aria-busy={isSyncingCover}
+                          aria-label={coverSync.label}
+                          aria-busy={coverSync.isSyncing}
                           className="absolute bottom-2 left-2 size-10 p-0 max-lg:[@media(max-height:700px)]:bottom-1.5 max-lg:[@media(max-height:700px)]:left-1.5"
-                          disabled={isSyncingCover || isProcessingCover}
-                          onClick={handleSyncCoverToTracks}
+                          disabled={coverSync.isSyncing || isProcessingCover}
+                          onClick={coverSync.start}
                         >
                           <RefreshCw
                             data-icon="inline-start"
                             style={{
-                              transform: `rotate(${syncCoverRotation}deg)`,
+                              transform: `rotate(${coverSync.rotation}deg)`,
                               transition: "transform 0.6s cubic-bezier(0.87, 0, 0.13, 1)",
                             }}
                           />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent side="bottom">{syncCoverLabel}</TooltipContent>
+                      <TooltipContent side="bottom">{coverSync.label}</TooltipContent>
                     </Tooltip>
                   )
                 }
