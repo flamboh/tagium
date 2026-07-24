@@ -147,7 +147,10 @@ describe("shared album preview", () => {
   it("uses clear unavailable and newer-version recovery copy", async () => {
     for (const [reason, expected] of [
       ["unavailable", "the link may have expired, or sharing was stopped."],
-      ["newer-version", "update tagium, then reload this page. the album has not been added."],
+      [
+        "newer-version",
+        "reload the page to update, then open the link again. the album has not been added.",
+      ],
     ] as const) {
       let renderer!: ReactTestRenderer;
       await act(async () => {
@@ -288,6 +291,22 @@ describe("shared album preview", () => {
     expect(onStopSharing).toHaveBeenCalledOnce();
     expect(buttonText(renderer.root.findByProps({ role: "alert" }))).toContain(
       "sharing could not be stopped",
+    );
+  });
+
+  it("explains that stopping a link does not remove albums already added", async () => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        createElement(SharedAlbumPage, {
+          ...props,
+          canStopSharing: true,
+        }),
+      );
+    });
+    void act(() => findButton(renderer, "stop sharing")?.props.onClick());
+    expect(buttonText(renderer.root)).toContain(
+      "the link will stop working immediately. anyone who already added the album keeps their copy.",
     );
   });
 

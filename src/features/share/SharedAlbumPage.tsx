@@ -304,7 +304,10 @@ function StopSharingDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>stop sharing this album?</DialogTitle>
-          <DialogDescription>the link will stop working immediately.</DialogDescription>
+          <DialogDescription>
+            the link will stop working immediately. anyone who already added the album keeps their
+            copy.
+          </DialogDescription>
           {stopError && (
             <p role="alert" className="text-sm text-destructive">
               {stopError}
@@ -494,7 +497,7 @@ export default function SharedAlbumPage(props: {
             </h1>
             <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
               {newerVersion
-                ? "update tagium, then reload this page. the album has not been added."
+                ? "reload the page to update, then open the link again. the album has not been added."
                 : "the link may have expired, or sharing was stopped."}
             </p>
           </div>
