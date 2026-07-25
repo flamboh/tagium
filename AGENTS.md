@@ -9,6 +9,17 @@ Tagium is a web-based audio metadata editor. We allow users to save the tracks t
 - `.repos/*` contains git subtrees to reference external repositories. Never modify anything in `.repos/*` directly.
 - When instructed to create a "stacked PR", use Graphite `gt` to create said PR.
 
+## Pull Requests
+
+Every PR must include brief, plain-language instructions for human review that provide a fast path to approval. Include:
+
+- The UI flows to exercise, any required setup or test data, and the expected result.
+- Important edge cases or failure states worth checking.
+- Business-logic decisions, assumptions, or tradeoffs that need reviewer consideration.
+- What was verified automatically and anything that still requires manual verification.
+
+Keep this guidance focused on observable behavior and decisions rather than an exhaustive summary of the implementation. Omit items that do not apply.
+
 ## References
 
 - When writing EffectTS code, explore `.repos/effect`
