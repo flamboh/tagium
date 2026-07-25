@@ -171,15 +171,16 @@ export const planExport = (
   const trackIds = groups.flatMap((group) => group.tracks.map((track) => track.id));
   if (trackIds.length === 0) return null;
 
-  const albums = targetAlbums
-    .filter((album) => groups.some((group) => group.id === `album:${album.id}`))
-    .map((album) => {
-      const group = groups.find((entry) => entry.id === `album:${album.id}`);
-      return {
-        ...album,
-        trackIds: group ? group.tracks.map(({ id }) => id) : [],
-      };
+  const groupsById = new Map(groups.map((group) => [group.id, group]));
+  const albums: AlbumGroup[] = [];
+  for (const album of targetAlbums) {
+    const group = groupsById.get(`album:${album.id}`);
+    if (!group) continue;
+    albums.push({
+      ...album,
+      trackIds: group.tracks.map(({ id }) => id),
     });
+  }
   const looseTrackIds =
     groups.find((group) => group.id === "loose")?.tracks.map(({ id }) => id) ?? [];
   const files = trackIds
