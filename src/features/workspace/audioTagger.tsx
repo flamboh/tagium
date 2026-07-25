@@ -41,6 +41,7 @@ export default function AudioTagger() {
   const [settings, setSettings] = useState<AppSettings>(loadAppSettings);
   const navigation = useMobileWorkspaceNavigation({ activeView, setActiveView });
   const drawerRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const wasDrawerOpenRef = useRef(false);
   const activateEditor = useCallback(() => setActiveView("editor"), []);
   const editor = useTrackEditorSession({ library, settings });
@@ -100,8 +101,13 @@ export default function AudioTagger() {
   useEffect(() => {
     if (!navigation.drawerOpen) {
       if (wasDrawerOpenRef.current) {
-        navigation.openerRef.current?.focus();
+        const opener = navigation.openerRef.current ?? menuButtonRef.current;
+        const restore = () => opener?.isConnected && opener.focus();
+        restore();
+        const timer = window.setTimeout(restore, 120);
         navigation.openerRef.current = null;
+        wasDrawerOpenRef.current = false;
+        return () => window.clearTimeout(timer);
       }
       wasDrawerOpenRef.current = false;
       return;
@@ -119,7 +125,7 @@ export default function AudioTagger() {
           style.visibility !== "hidden"
         );
       });
-    getItems()[0]?.focus();
+    drawer?.focus();
     const trap = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -143,21 +149,28 @@ export default function AudioTagger() {
   }, [navigation]);
   useEffect(() => {
     if (!navigation.isMobile) return;
-    let start: { clientX: number; clientY: number; pointerType?: string } | null = null;
+    let start: { clientX: number; clientY: number; pointerType?: string; pointerId?: number } | null = null;
+    let locked = false;
     const down = (event: PointerEvent) => {
-      if (!navigation.drawerOpen && shouldStartDrawerSwipe(event, window.innerWidth, event.target))
+      if (event.isPrimary === false || (event.pointerType === "touch" && event.width > 1 && event.height > 1)) return;
+      if (!navigation.drawerOpen && shouldStartDrawerSwipe(event, window.innerWidth, event.target)) {
         start = event;
+        locked = false;
+      }
     };
     const move = (event: PointerEvent) => {
-      if (!start) return;
+      if (!start || event.pointerId !== start.pointerId || locked) return;
       const decision = decideDrawerSwipe(start, event);
       if (decision === "open") {
         navigation.openDrawer();
-        start = null;
-      } else if (decision === "ignore") start = null;
+        locked = true;
+      } else if (decision === "ignore") {
+        locked = true;
+      }
     };
     const clear = () => {
       start = null;
+      locked = false;
     };
     window.addEventListener("pointerdown", down);
     window.addEventListener("pointermove", move);
@@ -170,6 +183,14 @@ export default function AudioTagger() {
       window.removeEventListener("pointercancel", clear);
     };
   }, [navigation]);
+  useEffect(() => {
+    if (!navigation.isMobile || !navigation.drawerOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [navigation.drawerOpen, navigation.isMobile]);
   const { files, albums, looseTrackIds, selectedFileId, selectedAlbumId, selectedFileIds } =
     library.state;
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
@@ -231,26 +252,21 @@ export default function AudioTagger() {
         key={workspace.albumDialogProps.instanceKey}
         {...workspace.albumDialogProps}
       />
-      {navigation.isMobile && navigation.drawerOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/35 md:hidden"
-          aria-hidden="true"
-          onClick={navigation.closeDrawer}
-        />
-      )}
-      {navigation.isMobile && !navigation.drawerOpen && (
+      {navigation.isMobile && (
         <Button
+          ref={menuButtonRef}
           type="button"
           size="icon"
           variant="outline"
-          className="fixed left-3 top-3 z-30 size-11 bg-background/95 shadow-sm md:hidden"
+          className={`fixed left-3 top-3 z-30 size-11 bg-background/95 shadow-sm md:hidden ${navigation.drawerOpen ? "pointer-events-none opacity-0" : ""}`}
+          tabIndex={navigation.drawerOpen ? -1 : 0}
           aria-label="open library"
           onClick={(event) => navigation.openDrawer(event.currentTarget)}
         >
           <Menu />
         </Button>
       )}
-      <div className="min-h-svh flex flex-col bg-background md:h-svh md:flex-row md:overflow-hidden">
+      <div className="min-h-svh flex flex-col overflow-x-hidden bg-background md:h-svh md:flex-row md:overflow-hidden">
         <TagSidebarPanel
           mobileOpen={navigation.drawerOpen}
           mobileDrawerRef={drawerRef}
@@ -283,15 +299,22 @@ export default function AudioTagger() {
           onRetryPlaylistDownloadQueue={importing.commands.retryQueue}
         />
         <div
-          className="relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1"
-          inert={navigation.isMobile && navigation.drawerOpen ? true : undefined}
+          className={`relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1 ${navigation.isMobile ? "transition-transform motion-reduce:transition-opacity" : ""} ${navigation.isMobile && navigation.drawerOpen ? "translate-x-[min(88vw,22rem)] duration-[230ms] ease-[cubic-bezier(0.05,0.7,0.1,1)]" : navigation.isMobile ? "translate-x-0 duration-[190ms] ease-[cubic-bezier(0.3,0,0.8,0.15)]" : ""}`}
         >
+          {navigation.isMobile && (
+            <div
+              className={`absolute inset-0 z-30 bg-black/25 transition-opacity duration-[230ms] motion-reduce:duration-100 ${navigation.drawerOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+              aria-hidden="true"
+              onClick={navigation.closeDrawer}
+            />
+          )}
           <div
             className={
               landingIsActive
                 ? "contents"
                 : "h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1"
             }
+            inert={navigation.isMobile && navigation.drawerOpen ? true : undefined}
           >
             {!libraryIsEmpty ? (
               <div className="relative min-h-0 flex-1">
@@ -341,7 +364,11 @@ export default function AudioTagger() {
               <SettingsPage {...mobileSettingsProps} />
             ) : null}
           </div>
-          <LandingScreen active={landingIsActive} onAudioUpload={importing.commands.upload}>
+          <LandingScreen
+            active={landingIsActive}
+            inert={navigation.isMobile && navigation.drawerOpen}
+            onAudioUpload={importing.commands.upload}
+          >
             {mediaUrlEntryPresentation?.layout === "landing" && (
               <MediaUrlEntry
                 layout="landing"

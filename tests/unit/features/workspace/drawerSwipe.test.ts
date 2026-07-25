@@ -2,13 +2,11 @@ import { describe, expect, it } from "vitest";
 import { decideDrawerSwipe, shouldStartDrawerSwipe } from "@/features/workspace/drawerSwipe";
 
 describe("drawer swipe recognizer", () => {
-  it("only starts from the left edge for touch input", () => {
+  it("starts from the left 40% for touch input", () => {
     expect(shouldStartDrawerSwipe({ clientX: 20, clientY: 100, pointerType: "touch" }, 390)).toBe(
       true,
     );
-    expect(shouldStartDrawerSwipe({ clientX: 49, clientY: 100, pointerType: "touch" }, 390)).toBe(
-      false,
-    );
+    expect(shouldStartDrawerSwipe({ clientX: 200, clientY: 100, pointerType: "touch" }, 390)).toBe(false);
     expect(shouldStartDrawerSwipe({ clientX: 20, clientY: 100, pointerType: "mouse" }, 390)).toBe(
       false,
     );
@@ -23,7 +21,7 @@ describe("drawer swipe recognizer", () => {
     expect(decideDrawerSwipe({ clientX: 48, clientY: 100 }, { clientX: 112, clientY: 165 })).toBe(
       "ignore",
     );
-    expect(decideDrawerSwipe({ clientX: 48, clientY: 100 }, { clientX: 112, clientY: 163 })).toBe(
+    expect(decideDrawerSwipe({ clientX: 48, clientY: 100 }, { clientX: 112, clientY: 140 })).toBe(
       "open",
     );
   });

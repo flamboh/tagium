@@ -147,14 +147,17 @@ export default function TagSidebarPanel({
   return (
     <div
       ref={mobileDrawerRef}
+      tabIndex={mobileOpen ? -1 : undefined}
       role={mobileOpen ? "dialog" : undefined}
       aria-modal={mobileOpen ? "true" : undefined}
       aria-label={mobileOpen ? "library" : undefined}
       className={cn(
-        "order-2 h-svh w-full flex-shrink-0 flex flex-col border-t bg-card overflow-hidden transition-colors duration-200 md:order-none md:h-auto md:min-h-0 md:w-72 md:border-t-0 md:border-r",
-        mobileOpen &&
-          "fixed inset-y-0 left-0 z-50 w-[min(88vw,22rem)] border-r shadow-xl md:static md:w-72 md:shadow-none",
-        !mobileOpen && "hidden md:flex",
+        "order-2 h-svh w-full flex-shrink-0 flex flex-col border-t bg-card overflow-hidden transition-[transform,visibility,opacity] md:order-none md:h-auto md:min-h-0 md:w-72 md:border-t-0 md:border-r md:transform-none",
+        "fixed inset-y-0 left-0 z-50 w-[min(88vw,22rem)] border-r shadow-xl md:static md:shadow-none",
+        mobileOpen
+          ? "translate-x-0 visible opacity-100 duration-[230ms] ease-[cubic-bezier(0.05,0.7,0.1,1)]"
+          : "-translate-x-full invisible opacity-0 duration-[190ms] ease-[cubic-bezier(0.3,0,0.8,0.15)]",
+        "motion-reduce:duration-100 motion-reduce:transition-opacity motion-reduce:translate-x-0",
         isDraggingFile && "bg-primary/5 shadow-[inset_0_0_0_2px_var(--primary)]",
       )}
       onDragEnter={handleSidebarDragEnter}
