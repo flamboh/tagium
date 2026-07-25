@@ -9,7 +9,8 @@ export interface AlbumActionInvocation {
 export interface AlbumActionItem {
   id: AlbumActionItemId;
   label: string;
-  secondaryText?: string;
+  trailingText?: string;
+  description?: string;
   disabled: boolean;
   onSelect: (invocation: AlbumActionInvocation) => void;
 }
@@ -40,18 +41,19 @@ export function createAlbumActionItems({
     },
     {
       id: "cleanup",
-      label: "clean up titles…",
-      secondaryText:
+      label: "clean up tracks",
+      trailingText:
         cleanupSuggestionCount === 0
           ? "none needed"
-          : `${cleanupSuggestionCount} suggestion${cleanupSuggestionCount === 1 ? "" : "s"}`,
+          : `${cleanupSuggestionCount} track${cleanupSuggestionCount === 1 ? "" : "s"}`,
       disabled: cleanupSuggestionCount === 0,
       onSelect: onReviewCleanup,
     },
     {
       id: "share",
       label: shareLabel,
-      secondaryText: canShare ? undefined : shareDisabledReason,
+      trailingText: canShare ? undefined : "unavailable",
+      description: canShare ? undefined : shareDisabledReason,
       disabled: !canShare,
       onSelect: onShare,
     },

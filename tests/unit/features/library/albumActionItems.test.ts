@@ -15,14 +15,14 @@ describe("album action items", () => {
 
     expect(items.map(({ id }) => id)).toEqual(["edit", "cleanup", "share"]);
     expect(items[1]).toMatchObject({
-      label: "clean up titles…",
-      secondaryText: "2 suggestions",
+      label: "clean up tracks",
+      trailingText: "2 tracks",
       disabled: false,
     });
     expect(items[2]).toMatchObject({ label: "update shared album", disabled: false });
   });
 
-  it("always includes cleanup and carries disabled reasons as secondary text", () => {
+  it("always includes cleanup and carries disabled reasons without changing row height", () => {
     const items = createAlbumActionItems({
       cleanupSuggestionCount: 0,
       canShare: false,
@@ -33,10 +33,25 @@ describe("album action items", () => {
       onShare: vi.fn(),
     });
 
-    expect(items[1]).toMatchObject({ secondaryText: "none needed", disabled: true });
+    expect(items[1]).toMatchObject({ trailingText: "none needed", disabled: true });
     expect(items[2]).toMatchObject({
-      secondaryText: "albums with local tracks cannot be shared",
+      trailingText: "unavailable",
+      description: "albums with local tracks cannot be shared",
       disabled: true,
     });
+  });
+
+  it("uses singular trailing metadata for one cleanup suggestion", () => {
+    const items = createAlbumActionItems({
+      cleanupSuggestionCount: 1,
+      canShare: true,
+      shareDisabledReason: "",
+      shareLabel: "share album",
+      onEdit: vi.fn(),
+      onReviewCleanup: vi.fn(),
+      onShare: vi.fn(),
+    });
+
+    expect(items[1]).toMatchObject({ trailingText: "1 track", disabled: false });
   });
 });

@@ -15,7 +15,7 @@ vi.mock("@dnd-kit/sortable", () => ({
   }),
 }));
 
-import { SortableAlbumCard } from "@/features/library/AlbumSidebarDnd";
+import { AlbumActionItemContent, SortableAlbumCard } from "@/features/library/AlbumSidebarDnd";
 
 const noOp = () => {};
 const album = {
@@ -68,5 +68,24 @@ describe("SortableAlbumCard action menu", () => {
 
     expect(markup).toContain('aria-label="album actions for Signal, cleanup suggested"');
     expect(markup).toContain("rounded-full bg-primary");
+  });
+
+  it("renders cleanup as a single-line brush action with trailing track metadata", () => {
+    const cleanupAction = createAlbumActionItems({
+      cleanupSuggestionCount: 2,
+      canShare: true,
+      shareDisabledReason: "",
+      shareLabel: "share album",
+      onEdit: noOp,
+      onReviewCleanup: noOp,
+      onShare: noOp,
+    })[1];
+    const markup = renderToStaticMarkup(<AlbumActionItemContent action={cleanupAction} />);
+
+    expect(markup).toContain("lucide-brush-cleaning");
+    expect(markup).toContain("clean up tracks");
+    expect(markup).toContain("tabular-nums");
+    expect(markup).toContain(">2 tracks</span>");
+    expect(markup).not.toContain("flex-col");
   });
 });

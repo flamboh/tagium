@@ -7,6 +7,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import {
   AlertCircle,
   Ban,
+  BrushCleaning,
   Check,
   Download,
   FileMusic,
@@ -16,7 +17,6 @@ import {
   Pencil,
   RefreshCw,
   Share2,
-  Sparkles,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -229,9 +229,32 @@ type AlbumCardProps = {
 
 const albumActionIcon = (actionId: AlbumActionItemId, shareLabel: AlbumActionItem["label"]) => {
   if (actionId === "edit") return Pencil;
-  if (actionId === "cleanup") return Sparkles;
+  if (actionId === "cleanup") return BrushCleaning;
   return shareLabel === "share album" ? Share2 : Link2;
 };
+
+export function AlbumActionItemContent({ action }: { action: AlbumActionItem }) {
+  const ActionIcon = albumActionIcon(action.id, action.label);
+
+  return (
+    <>
+      <ActionIcon aria-hidden="true" className={cn(action.id === "cleanup" && "text-primary")} />
+      <span className="min-w-0 flex-1 truncate">{action.label}</span>
+      {action.trailingText && (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "shrink-0 text-xs text-muted-foreground",
+            action.id === "cleanup" && "tabular-nums",
+          )}
+        >
+          {action.trailingText}
+        </span>
+      )}
+      {action.description && <span className="sr-only">{action.description}</span>}
+    </>
+  );
+}
 
 export function SortableAlbumCard({
   album,
@@ -330,25 +353,21 @@ export function SortableAlbumCard({
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-64">
             {actions.map((action) => {
-              const ActionIcon = albumActionIcon(action.id, action.label);
+              const accessibleLabel = [action.label, action.trailingText, action.description]
+                .filter(Boolean)
+                .join(", ");
               return (
                 <DropdownMenuItem
                   key={action.id}
                   disabled={action.disabled}
-                  className="items-start py-2 [@media(pointer:coarse)]:min-h-10"
+                  aria-label={accessibleLabel}
+                  title={action.description}
+                  className="[@media(pointer:coarse)]:min-h-10"
                   onSelect={() => action.onSelect({ returnFocusTarget: menuTriggerRef.current })}
                 >
-                  <ActionIcon className={cn("mt-0.5", action.id === "cleanup" && "text-primary")} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block">{action.label}</span>
-                    {action.secondaryText && (
-                      <span className="block text-xs text-muted-foreground">
-                        {action.secondaryText}
-                      </span>
-                    )}
-                  </span>
+                  <AlbumActionItemContent action={action} />
                 </DropdownMenuItem>
               );
             })}
