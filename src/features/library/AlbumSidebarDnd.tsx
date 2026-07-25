@@ -1,22 +1,31 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import {
   AlertCircle,
   Ban,
+  BrushCleaning,
   Check,
   Download,
   FileMusic,
   Link2,
   Loader2,
+  MoreVertical,
   Pencil,
   RefreshCw,
   Share2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { AlbumCoverThumb } from "@/features/library/AlbumCoverThumb";
@@ -27,6 +36,7 @@ import {
   type SidebarDropData,
 } from "@/features/library/sidebarDnd";
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
+import type { AlbumActionItem, AlbumActionItemId } from "@/features/library/albumActionItems";
 
 const artistLabel = (artist: string) => (artist ? artist : "unknown");
 
@@ -66,6 +76,9 @@ export function SortableTrackRow({
   onRemove,
   onRetry,
 }: TrackRowProps) {
+  const previousStatusRef = useRef(track.status);
+  const successTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+  const [showSavedCheck, setShowSavedCheck] = useState(false);
   const {
     attributes,
     listeners,
@@ -81,6 +94,33 @@ export function SortableTrackRow({
         ? ({ type: "track", trackId: track.id, container, albumId } satisfies SidebarDragData)
         : ({ type: "track", trackId: track.id, container } satisfies SidebarDragData),
   });
+
+  useEffect(() => {
+    const transitionedToSaved = previousStatusRef.current !== "saved" && track.status === "saved";
+    previousStatusRef.current = track.status;
+
+    if (successTimerRef.current !== null) {
+      globalThis.clearTimeout(successTimerRef.current);
+      successTimerRef.current = null;
+    }
+
+    if (transitionedToSaved) {
+      setShowSavedCheck(true);
+      successTimerRef.current = globalThis.setTimeout(() => {
+        setShowSavedCheck(false);
+        successTimerRef.current = null;
+      }, 3_000);
+    } else if (track.status !== "saved") {
+      setShowSavedCheck(false);
+    }
+
+    return () => {
+      if (successTimerRef.current !== null) {
+        globalThis.clearTimeout(successTimerRef.current);
+        successTimerRef.current = null;
+      }
+    };
+  }, [track.status]);
 
   return (
     <div
@@ -110,22 +150,25 @@ export function SortableTrackRow({
         <div className="flex flex-col gap-1 w-full min-w-0">
           <div className="flex items-center gap-1.5 w-full overflow-hidden">
             {container === "loose" ? (
-              <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+              <FileMusic className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             ) : (
               <span className="min-w-3 text-[11px] text-muted-foreground">{index}</span>
             )}
             <span className="truncate text-sm flex-1">{track.filename}</span>
             {track.downloadStatus === "downloading" && (
-              <Loader2 className="h-3 w-3 text-muted-foreground flex-shrink-0 animate-spin" />
+              <Loader2 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground" />
             )}
-            {track.downloadStatus !== "downloading" && track.status === "saved" && (
-              <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+            {track.downloadStatus !== "downloading" && showSavedCheck && (
+              <Check
+                aria-hidden="true"
+                className="h-3 w-3 shrink-0 animate-in fade-in text-green-500 motion-reduce:animate-none"
+              />
             )}
             {(track.downloadStatus === "error" || track.status === "error") && (
               <AlertCircle
                 aria-label="track has an error"
                 className={cn(
-                  "h-3 w-3 text-red-500 flex-shrink-0",
+                  "h-3 w-3 shrink-0 text-red-500",
                   retryable ? "group-hover:opacity-0" : "",
                 )}
               />
@@ -136,6 +179,11 @@ export function SortableTrackRow({
           </div>
         </div>
       </Button>
+      {showSavedCheck && (
+        <span role="status" aria-live="polite" className="sr-only">
+          track saved
+        </span>
+      )}
       {retryable && (
         <button
           type="button"
@@ -170,35 +218,57 @@ type AlbumCardProps = {
   album: AlbumGroup;
   selected: boolean;
   canDownload: boolean;
-  canShare: boolean;
-  shareDisabledReason: string;
-  shareLabel: "share album" | "view share link" | "update shared album";
+  cleanupSuggestionCount: number;
+  actions: AlbumActionItem[];
   children: ReactNode;
   onSelect: (event: ReactMouseEvent) => void;
-  onEdit: () => void;
   onDownload: () => void;
-  onShare: () => void;
   onFileDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
   onFileDrop: (event: React.DragEvent<HTMLDivElement>) => void;
 };
+
+const albumActionIcon = (actionId: AlbumActionItemId, shareLabel: AlbumActionItem["label"]) => {
+  if (actionId === "edit") return Pencil;
+  if (actionId === "cleanup") return BrushCleaning;
+  return shareLabel === "share album" ? Share2 : Link2;
+};
+
+export function AlbumActionItemContent({ action }: { action: AlbumActionItem }) {
+  const ActionIcon = albumActionIcon(action.id, action.label);
+
+  return (
+    <>
+      <ActionIcon aria-hidden="true" className={cn(action.id === "cleanup" && "text-primary")} />
+      <span className="min-w-0 flex-1 truncate">{action.label}</span>
+      {action.trailingText && (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "shrink-0 text-xs text-muted-foreground",
+            action.id === "cleanup" && "tabular-nums",
+          )}
+        >
+          {action.trailingText}
+        </span>
+      )}
+      {action.description && <span className="sr-only">{action.description}</span>}
+    </>
+  );
+}
 
 export function SortableAlbumCard({
   album,
   selected,
   canDownload,
-  canShare,
-  shareDisabledReason,
-  shareLabel,
+  cleanupSuggestionCount,
+  actions,
   children,
   onSelect,
-  onEdit,
   onDownload,
-  onShare,
   onFileDragOver,
   onFileDrop,
 }: AlbumCardProps) {
-  const hasActiveShare = shareLabel !== "share album";
-  const ShareIcon = hasActiveShare ? Link2 : Share2;
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const {
     attributes,
     listeners,
@@ -249,7 +319,7 @@ export function SortableAlbumCard({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className="h-7 w-7 [@media(pointer:coarse)]:size-10"
                 onClick={onDownload}
                 disabled={!canDownload}
                 aria-label={`download ${album.title}`}
@@ -262,39 +332,47 @@ export function SortableAlbumCard({
             {canDownload ? "download album" : "album tracks need files, metadata, and filenames"}
           </TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={onShare}
-                disabled={!canShare}
-                aria-label={`${shareLabel}: ${album.title}`}
-              >
-                <ShareIcon className="h-3.5 w-3.5" />
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{canShare ? shareLabel : shareDisabledReason}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button
+              ref={menuTriggerRef}
               type="button"
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
-              onClick={onEdit}
-              aria-label={`edit ${album.title}`}
+              className="relative h-7 w-7 [@media(pointer:coarse)]:size-10"
+              aria-label={`album actions for ${album.title}${
+                cleanupSuggestionCount > 0 ? ", cleanup suggested" : ""
+              }`}
             >
-              <Pencil className="h-3.5 w-3.5" />
+              <MoreVertical className="h-3.5 w-3.5" />
+              {cleanupSuggestionCount > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-primary"
+                />
+              )}
             </Button>
-          </TooltipTrigger>
-          <TooltipContent>edit album</TooltipContent>
-        </Tooltip>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            {actions.map((action) => {
+              const accessibleLabel = [action.label, action.trailingText, action.description]
+                .filter(Boolean)
+                .join(", ");
+              return (
+                <DropdownMenuItem
+                  key={action.id}
+                  disabled={action.disabled}
+                  aria-label={accessibleLabel}
+                  title={action.description}
+                  className="[@media(pointer:coarse)]:min-h-10"
+                  onSelect={() => action.onSelect({ returnFocusTarget: menuTriggerRef.current })}
+                >
+                  <AlbumActionItemContent action={action} />
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       {children}
     </div>

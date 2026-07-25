@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import AlbumMetadataDialog from "@/features/editor/AlbumMetadataDialog";
 import DestructiveActionDialog from "@/features/workspace/DestructiveActionDialog";
 import LandingScreen from "@/features/import/LandingScreen";
-import MediaUrlEntry from "@/features/import/MediaUrlEntry";
+import MediaUrlEntry, { useMediaUrlEntryController } from "@/features/import/MediaUrlEntry";
 import MetadataCleanupDialog from "@/features/library/MetadataCleanupDialog";
 import SettingsPage from "@/features/settings/SettingsPage";
 import TagSidebarPanel from "@/features/library/TagSidebarPanel";
@@ -60,10 +60,6 @@ export default function AudioTagger() {
     library.state;
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
   const landingIsActive = libraryIsEmpty && activeView === "editor";
-  const mediaUrlEntryPresentation = getMediaUrlEntryPresentation(
-    libraryIsEmpty,
-    activeView === "settings",
-  );
   useBeforeUnloadProtection(
     hasRecoverableSessionWork({
       fileCount: files.length,
@@ -82,6 +78,12 @@ export default function AudioTagger() {
     }
     await importing.commands.importUrl(sourceUrl);
   };
+  const mediaUrlEntryController = useMediaUrlEntryController(handleUrlImport);
+  const mediaUrlEntryPresentation = getMediaUrlEntryPresentation(
+    libraryIsEmpty,
+    activeView === "settings",
+    Boolean(editor.selectedFile),
+  );
 
   if (shareLinksEnabled && sharing.page) {
     return (
@@ -111,7 +113,10 @@ export default function AudioTagger() {
       />
       <MetadataCleanupDialog {...workspace.cleanupDialogProps} />
       <DestructiveActionDialog {...workspace.removalDialogProps} />
-      <AlbumMetadataDialog {...workspace.albumDialogProps} />
+      <AlbumMetadataDialog
+        key={workspace.albumDialogProps.instanceKey}
+        {...workspace.albumDialogProps}
+      />
       <div className="min-h-svh flex flex-col bg-background md:h-svh md:flex-row md:overflow-hidden">
         <TagSidebarPanel
           loading={busy}
@@ -171,6 +176,7 @@ export default function AudioTagger() {
                     onPreviewMetadataChange={(field, event) =>
                       editor.commands.preview(field, event.target.value)
                     }
+                    onAudioUpload={importing.commands.upload}
                   />
                 </div>
                 <div
@@ -191,13 +197,21 @@ export default function AudioTagger() {
             ) : null}
           </div>
           <LandingScreen active={landingIsActive} onAudioUpload={importing.commands.upload}>
+            {mediaUrlEntryPresentation?.layout === "landing" && (
+              <MediaUrlEntry
+                layout="landing"
+                controller={mediaUrlEntryController}
+                onUrlImport={handleUrlImport}
+              />
+            )}
+          </LandingScreen>
+          {mediaUrlEntryPresentation && mediaUrlEntryPresentation.layout !== "landing" && (
             <MediaUrlEntry
               layout={mediaUrlEntryPresentation.layout}
-              hidden={mediaUrlEntryPresentation.hidden}
-              docked={mediaUrlEntryPresentation.docked}
+              controller={mediaUrlEntryController}
               onUrlImport={handleUrlImport}
             />
-          </LandingScreen>
+          )}
         </div>
       </div>
     </>
