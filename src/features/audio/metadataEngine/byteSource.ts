@@ -56,14 +56,3 @@ export const makeBlobByteSource = (blob: Blob): ByteSource => {
     slice: (start, end) => blob.slice(start, end),
   };
 };
-
-export const readExactly = (source: ByteSource, offset: number, length: number, context: string) =>
-  source.read(offset, length).pipe(
-    Effect.mapError(
-      (error) =>
-        new AudioMetadataReadError({
-          message: `${context}: ${error.message}`,
-          cause: error,
-        }),
-    ),
-  );
