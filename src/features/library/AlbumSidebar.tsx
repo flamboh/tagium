@@ -23,6 +23,7 @@ import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import { isTrackReadyForDownload } from "@/features/export/downloadLibrary";
 import { useAlbumSidebarDragController } from "@/features/library/useAlbumSidebarDragController";
 import type { ShareAlbumActionState } from "@/features/share/sharePublication";
+import { createAlbumActionItems } from "@/features/library/albumActionItems";
 
 interface AlbumSidebarProps {
   albums: AlbumGroup[];
@@ -31,6 +32,7 @@ interface AlbumSidebarProps {
   selectedAlbumId: string | null;
   selectedFileId: string | null;
   selectedFileIds: Set<string>;
+  cleanupSuggestionCountByAlbumId: ReadonlyMap<string, number>;
   onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
   onSelectFile: (albumId: string, fileId: string, event?: ReactMouseEvent) => void;
   onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
@@ -39,6 +41,7 @@ interface AlbumSidebarProps {
   onRetryDownload: (fileId: string) => void;
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
+  onReviewAlbumCleanup: (albumId: string, returnFocusTarget: HTMLButtonElement | null) => void;
   onDownloadAlbum: (albumId: string) => void;
   onShareAlbum?: (albumId: string) => void;
   shareAlbumActions?: Readonly<Record<string, ShareAlbumActionState>>;
@@ -72,6 +75,7 @@ export default function AlbumSidebar({
   selectedAlbumId,
   selectedFileId,
   selectedFileIds,
+  cleanupSuggestionCountByAlbumId,
   onSelectAlbum,
   onSelectFile,
   onSelectLooseTrack,
@@ -80,6 +84,7 @@ export default function AlbumSidebar({
   onRetryDownload,
   onAddAlbum,
   onEditAlbum,
+  onReviewAlbumCleanup,
   onDownloadAlbum,
   onShareAlbum,
   shareAlbumActions = {},
@@ -188,6 +193,17 @@ export default function AlbumSidebar({
                 (retrievesExistingLink || contentCanShare) &&
                 (shareAction?.enabled ?? true);
               const shareDisabledReason = shareAction?.reason ?? contentDisabledReason;
+              const cleanupSuggestionCount = cleanupSuggestionCountByAlbumId.get(album.id) ?? 0;
+              const actions = createAlbumActionItems({
+                cleanupSuggestionCount,
+                canShare: canShareAlbum,
+                shareDisabledReason,
+                shareLabel: shareAction?.label ?? "share album",
+                onEdit: () => onEditAlbum(album.id),
+                onReviewCleanup: ({ returnFocusTarget }) =>
+                  onReviewAlbumCleanup(album.id, returnFocusTarget),
+                onShare: () => onShareAlbum?.(album.id),
+              });
               const fileDropProps = albumFileDropProps(album.id);
               return (
                 <SortableAlbumCard
@@ -195,13 +211,10 @@ export default function AlbumSidebar({
                   album={album}
                   selected={selectedAlbumId === album.id}
                   canDownload={canDownloadAlbum}
-                  canShare={canShareAlbum}
-                  shareDisabledReason={shareDisabledReason}
-                  shareLabel={shareAction?.label ?? "share album"}
+                  cleanupSuggestionCount={cleanupSuggestionCount}
+                  actions={actions}
                   onSelect={(event) => onSelectAlbum(album.id, event)}
-                  onEdit={() => onEditAlbum(album.id)}
                   onDownload={() => onDownloadAlbum(album.id)}
-                  onShare={() => onShareAlbum?.(album.id)}
                   {...fileDropProps}
                 >
                   <SortableContext
