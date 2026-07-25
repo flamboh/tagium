@@ -9,6 +9,7 @@ import {
   prepareDownloadedTrackHydration,
   resolveDownloadedTrackHydrationWrite,
   resolveDownloadedTrackHydrationWriteError,
+  sanitizePendingMetadataPatch,
 } from "@/features/library/fileMetadataOps";
 import { AudioMetadata, TagiumFile } from "@/features/library/types";
 import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
@@ -46,6 +47,26 @@ const readyFile = (overrides: Partial<TagiumFile> = {}): TagiumFile => ({
 });
 
 describe("fileMetadataOps", () => {
+  it("sanitizes sparse numeric metadata patches without losing explicit clears", () => {
+    expect(
+      sanitizePendingMetadataPatch({
+        title: undefined,
+        discNumber: null,
+        bpm: 140,
+      }),
+    ).toEqual({
+      discNumber: null,
+      bpm: 140,
+    });
+    expect(sanitizePendingMetadataPatch({ discNumber: null, bpm: 140 }, true)).toBeUndefined();
+    expect(
+      sanitizePendingMetadataPatch({
+        discNumber: Number.NaN,
+        bpm: 0,
+      }),
+    ).toBeUndefined();
+  });
+
   it("applies synced track numbers and resets saved files to pending", () => {
     const files = [
       {

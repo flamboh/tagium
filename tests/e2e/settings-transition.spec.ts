@@ -165,6 +165,24 @@ test("releases the loaded editor immediately when reduced motion is preferred", 
   await expect(page.getByRole("button", { name: "download track" })).not.toBeAttached();
 });
 
+test("toggles advanced metadata from the entire setting row exactly once", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "settings" }).click();
+
+  const advancedSetting = page.getByRole("checkbox", { name: "enable advanced metadata" });
+  const advancedSettingRow = page.locator("label").filter({ hasText: "enable advanced metadata" });
+  const bounds = await advancedSettingRow.boundingBox();
+  if (!bounds) throw new Error("advanced metadata setting row bounds were not found");
+
+  await advancedSettingRow.click({
+    position: { x: bounds.width - 4, y: bounds.height - 4 },
+  });
+  await expect(advancedSetting).toBeChecked();
+
+  await advancedSetting.click();
+  await expect(advancedSetting).not.toBeChecked();
+});
+
 test("gates advanced fields, retains their values, and reveals hidden validation", async ({
   page,
 }) => {
@@ -182,13 +200,13 @@ test("gates advanced fields, retains their values, and reveals hidden validation
   await page.getByRole("button", { name: "back to editor" }).click();
 
   await expect(page.getByRole("group", { name: "metadata fields" })).toBeVisible();
-  await page.getByRole("button", { name: "advanced" }).click();
+  await page.getByRole("button", { name: "advanced", exact: true }).click();
   await page.locator("#track-composer").fill("Retained composer");
   await page.locator("#track-disc-number").fill("0");
-  await page.getByRole("button", { name: "normal" }).click();
+  await page.getByRole("button", { name: "normal", exact: true }).click();
   await page.getByRole("button", { name: "download track" }).click();
 
-  await expect(page.getByRole("button", { name: "advanced" })).toHaveAttribute(
+  await expect(page.getByRole("button", { name: "advanced", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
@@ -204,10 +222,9 @@ test("gates advanced fields, retains their values, and reveals hidden validation
   await page.getByRole("button", { name: "settings" }).click();
   await advancedSetting.click();
   await page.getByRole("button", { name: "back to editor" }).click();
-  await expect(page.getByRole("button", { name: "normal" })).toHaveAttribute(
+  await expect(page.getByRole("button", { name: "advanced", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await page.getByRole("button", { name: "advanced" }).click();
   await expect(page.locator("#track-composer")).toHaveValue("Retained composer");
 });

@@ -4,7 +4,7 @@ import { useMetadataEditorMode } from "@/features/editor/useMetadataEditorMode";
 import { renderHook } from "../../support/hookTestHarness";
 
 describe("metadata editor mode", () => {
-  it("retains advanced mode until the setting is disabled", () => {
+  it("temporarily hides and then restores the requested advanced mode", () => {
     const hook = renderHook(({ enabled }: { enabled: boolean }) => useMetadataEditorMode(enabled), {
       enabled: true,
     });
@@ -17,7 +17,7 @@ describe("metadata editor mode", () => {
     expect(hook.result.mode).toBe("normal");
 
     hook.rerender({ enabled: true });
-    expect(hook.result.mode).toBe("normal");
+    expect(hook.result.mode).toBe("advanced");
     hook.unmount();
   });
 });

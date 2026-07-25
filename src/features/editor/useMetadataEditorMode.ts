@@ -1,16 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export type MetadataEditorMode = "normal" | "advanced";
 
 export const useMetadataEditorMode = (advancedMetadataEnabled: boolean) => {
-  const [mode, setMode] = useState<MetadataEditorMode>("normal");
-
-  useEffect(() => {
-    if (!advancedMetadataEnabled) setMode("normal");
-  }, [advancedMetadataEnabled]);
+  const [requestedMode, setRequestedMode] = useState<MetadataEditorMode>("normal");
 
   return {
-    mode: advancedMetadataEnabled ? mode : "normal",
-    setMode,
+    mode: advancedMetadataEnabled ? requestedMode : "normal",
+    setMode: setRequestedMode,
   };
 };

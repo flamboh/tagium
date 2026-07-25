@@ -32,7 +32,9 @@ interface ReconciledDownloadedTrackMetadata {
 const patchFields =
   EDITABLE_METADATA_FIELDS satisfies readonly DownloadedTrackWritableMetadataField[];
 
-const nullableNumericPatchFields = NULLABLE_NUMERIC_METADATA_FIELDS;
+const nullableNumericPatchFields = new Set<DownloadedTrackWritableMetadataField>(
+  NULLABLE_NUMERIC_METADATA_FIELDS,
+);
 
 const hasOwn = <Key extends PropertyKey>(object: object, key: Key) =>
   Object.prototype.hasOwnProperty.call(object, key);
@@ -41,22 +43,24 @@ export const sanitizePendingMetadataPatch = (
   patch: DownloadedTrackMetadataPatch,
   dropLegacyNumericFields = false,
 ): DownloadedTrackMetadataPatch | undefined => {
-  const sanitized = patchFields.reduce<DownloadedTrackMetadataPatch>((nextPatch, field) => {
-    if (!hasOwn(patch, field) || patch[field] === undefined) return nextPatch;
+  const sanitized: DownloadedTrackMetadataPatch = {};
+  const writableSanitized = sanitized as Record<
+    DownloadedTrackWritableMetadataField,
+    MetadataPatch[DownloadedTrackWritableMetadataField]
+  >;
+
+  for (const field of patchFields) {
+    if (!hasOwn(patch, field) || patch[field] === undefined) continue;
     if (
       (field === "discNumber" || field === "bpm") &&
       validateAdvancedMetadataNumber(field, patch[field] as number | null | undefined)
     ) {
-      return nextPatch;
+      continue;
     }
-    if (
-      dropLegacyNumericFields &&
-      nullableNumericPatchFields.includes(field as (typeof nullableNumericPatchFields)[number])
-    ) {
-      return nextPatch;
-    }
-    return { ...nextPatch, [field]: patch[field] };
-  }, {});
+    if (dropLegacyNumericFields && nullableNumericPatchFields.has(field)) continue;
+    writableSanitized[field] = patch[field];
+  }
+
   return Object.keys(sanitized).length > 0 ? sanitized : undefined;
 };
 

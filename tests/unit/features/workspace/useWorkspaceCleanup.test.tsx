@@ -23,6 +23,7 @@ const metadata = (title: string): AudioMetadata => ({
   filename: title,
   title,
   artist: "Burial",
+  albumArtist: "Burial",
   album: "Untrue",
   year: 2007,
   genre: "Electronic",
@@ -31,6 +32,10 @@ const metadata = (title: string): AudioMetadata => ({
   sampleRate: 44_100,
   picture: [],
   trackNumber: 1,
+  composer: "",
+  comment: "",
+  discNumber: null,
+  bpm: null,
 });
 
 const file = (id: string, title: string): TagiumFile => ({
