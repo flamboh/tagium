@@ -34,12 +34,17 @@ import { useShareWorkflow } from "@/features/share/useShareWorkflow";
 import { shareLinksEnabled } from "@/features/share/shareFeature";
 import { useMobileWorkspaceNavigation } from "@/features/workspace/mobileWorkspaceNavigation";
 import { shouldStartDrawerSwipe, decideDrawerSwipe } from "@/features/workspace/drawerSwipe";
+import {
+  DrawerMotionPrototypeSwitcher,
+  useDrawerMotionPrototype,
+} from "@/features/workspace/DrawerMotionPrototype";
 
 export default function AudioTagger() {
   const library = useLibraryStore();
   const [activeView, setActiveView] = useState<ActiveView>("editor");
   const [settings, setSettings] = useState<AppSettings>(loadAppSettings);
   const navigation = useMobileWorkspaceNavigation({ activeView, setActiveView });
+  const drawerMotionPrototype = useDrawerMotionPrototype(navigation.drawerOpen);
   const drawerRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const wasDrawerOpenRef = useRef(false);
@@ -252,6 +257,10 @@ export default function AudioTagger() {
         key={workspace.albumDialogProps.instanceKey}
         {...workspace.albumDialogProps}
       />
+      <DrawerMotionPrototypeSwitcher
+        variant={drawerMotionPrototype.variant}
+        onCycle={drawerMotionPrototype.cycleVariant}
+      />
       {navigation.isMobile && (
         <Button
           ref={menuButtonRef}
@@ -270,6 +279,7 @@ export default function AudioTagger() {
         <TagSidebarPanel
           mobileOpen={navigation.drawerOpen}
           mobileDrawerRef={drawerRef}
+          mobileTransitionStyle={drawerMotionPrototype.transitionStyle}
           onMobileClose={navigation.closeDrawer}
           loading={busy}
           files={files}
@@ -300,10 +310,12 @@ export default function AudioTagger() {
         />
         <div
           className={`relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1 ${navigation.isMobile ? "transition-transform motion-reduce:transition-opacity" : ""} ${navigation.isMobile && navigation.drawerOpen ? "translate-x-[min(88vw,22rem)] duration-[230ms] ease-[cubic-bezier(0.05,0.7,0.1,1)]" : navigation.isMobile ? "translate-x-0 duration-[190ms] ease-[cubic-bezier(0.3,0,0.8,0.15)]" : ""}`}
+          style={drawerMotionPrototype.transitionStyle}
         >
           {navigation.isMobile && (
             <div
               className={`absolute inset-0 z-30 bg-black/25 transition-opacity duration-[230ms] motion-reduce:duration-100 ${navigation.drawerOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+              style={drawerMotionPrototype.transitionStyle}
               aria-hidden="true"
               onClick={navigation.closeDrawer}
             />

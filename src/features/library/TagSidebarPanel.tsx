@@ -1,6 +1,6 @@
 "use client";
 
-import type { MouseEvent as ReactMouseEvent, RefObject } from "react";
+import type { CSSProperties, MouseEvent as ReactMouseEvent, RefObject } from "react";
 import { useRef, useState } from "react";
 import { Settings, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import type { ShareAlbumActionState } from "@/features/share/sharePublication";
 export interface TagSidebarPanelProps {
   mobileOpen?: boolean;
   mobileDrawerRef?: RefObject<HTMLDivElement | null>;
+  mobileTransitionStyle?: CSSProperties;
   onMobileClose?: () => void;
   loading: boolean;
   files: TagiumFile[];
@@ -70,6 +71,7 @@ const isFileDrag = (event: React.DragEvent<HTMLDivElement>) =>
 export default function TagSidebarPanel({
   mobileOpen = false,
   mobileDrawerRef,
+  mobileTransitionStyle,
   onMobileClose,
   loading,
   files,
@@ -149,6 +151,7 @@ export default function TagSidebarPanel({
   return (
     <div
       ref={mobileDrawerRef}
+      style={mobileTransitionStyle}
       tabIndex={mobileOpen ? -1 : undefined}
       role={mobileOpen ? "dialog" : undefined}
       aria-modal={mobileOpen ? "true" : undefined}
