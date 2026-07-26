@@ -62,6 +62,8 @@ export interface TagSidebarPanelProps {
   onRetryPlaylistDownloadQueue?: () => void;
 }
 
+export const MOBILE_DRAWER_TRANSITION_CLASSES = "transition-[translate,visibility,opacity]";
+
 const isFileDrag = (event: React.DragEvent<HTMLDivElement>) =>
   event.dataTransfer.types.includes("Files");
 
@@ -152,7 +154,7 @@ export default function TagSidebarPanel({
       aria-modal={mobileOpen ? "true" : undefined}
       aria-label={mobileOpen ? "library" : undefined}
       className={cn(
-        "order-2 h-svh w-full flex-shrink-0 flex flex-col border-t bg-card overflow-hidden transition-[transform,visibility,opacity] md:order-none md:h-auto md:min-h-0 md:w-72 md:border-t-0 md:border-r md:transform-none",
+        `order-2 h-svh w-full flex-shrink-0 flex flex-col border-t bg-card overflow-hidden ${MOBILE_DRAWER_TRANSITION_CLASSES} md:order-none md:h-auto md:min-h-0 md:w-72 md:border-t-0 md:border-r md:transform-none`,
         "fixed inset-y-0 left-0 z-50 w-[min(88vw,22rem)] border-r shadow-xl md:static md:shadow-none",
         mobileOpen
           ? "translate-x-0 visible opacity-100 duration-[230ms] ease-[cubic-bezier(0.05,0.7,0.1,1)]"

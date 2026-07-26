@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideDrawerSwipe, shouldStartDrawerSwipe } from "@/features/workspace/drawerSwipe";
+import { decideDrawerSwipe, shouldStartDrawerSwipe, isDrawerSwipeOptOut, isDrawerSwipeScrollOptOut } from "@/features/workspace/drawerSwipe";
 
 describe("drawer swipe recognizer", () => {
   it("starts from the left 40% for touch input", () => {
@@ -10,6 +10,26 @@ describe("drawer swipe recognizer", () => {
     expect(shouldStartDrawerSwipe({ clientX: 20, clientY: 100, pointerType: "mouse" }, 390)).toBe(
       false,
     );
+  });
+
+  it("allows a deliberate swipe beginning on ordinary buttons and links", () => {
+    expect(isDrawerSwipeOptOut("button")).toBe(false);
+    expect(isDrawerSwipeOptOut("a")).toBe(false);
+    expect(shouldStartDrawerSwipe({ clientX: 20, clientY: 100, pointerType: "touch" }, 390)).toBe(true);
+  });
+
+  it("keeps protected controls opted out", () => {
+    expect(isDrawerSwipeOptOut("input")).toBe(true);
+    expect(isDrawerSwipeOptOut("textarea")).toBe(true);
+    expect(isDrawerSwipeOptOut("select")).toBe(true);
+    expect(isDrawerSwipeOptOut("contenteditable")).toBe(true);
+    expect(isDrawerSwipeOptOut("data-drawer-swipe-optout")).toBe(true);
+  });
+
+  it("keeps genuinely horizontally scrollable ancestors opted out", () => {
+    expect(isDrawerSwipeScrollOptOut("auto", 400, 300)).toBe(true);
+    expect(isDrawerSwipeScrollOptOut("scroll", 400, 400)).toBe(false);
+    expect(isDrawerSwipeScrollOptOut("hidden", 400, 300)).toBe(false);
   });
 
   it("rejects vertical and reverse movement and settles after 64px", () => {

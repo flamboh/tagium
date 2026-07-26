@@ -5,6 +5,17 @@ export const MOBILE_DRAWER_SETTLE_PX = 64;
 
 export type SwipeDecision = "open" | "ignore" | "tracking";
 
+export const isDrawerSwipeOptOut = (tagName: string) =>
+  ["input", "textarea", "select", "contenteditable", "data-drawer-swipe-optout"].includes(
+    tagName.toLowerCase(),
+  );
+
+export const isDrawerSwipeScrollOptOut = (
+  overflowX: string,
+  scrollWidth: number,
+  clientWidth: number,
+) => (overflowX === "auto" || overflowX === "scroll") && scrollWidth > clientWidth;
+
 export const shouldStartDrawerSwipe = (
   point: SwipePoint,
   viewportWidth: number,
@@ -15,12 +26,12 @@ export const shouldStartDrawerSwipe = (
   if (
     typeof Element !== "undefined" &&
     target instanceof Element &&
-    (target.closest("[data-drawer-swipe-optout], input, textarea, select, button, a, [contenteditable='true']") ||
+    (target.closest("[data-drawer-swipe-optout], input, textarea, select, [contenteditable='true']") ||
       (() => {
         let node: Element | null = target;
         while (node) {
           const style = window.getComputedStyle(node);
-          if ((style.overflowX === "auto" || style.overflowX === "scroll") && node.scrollWidth > node.clientWidth) return true;
+          if (isDrawerSwipeScrollOptOut(style.overflowX, node.scrollWidth, node.clientWidth)) return true;
           node = node.parentElement;
         }
         return false;
