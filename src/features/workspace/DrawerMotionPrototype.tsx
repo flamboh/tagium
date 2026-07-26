@@ -7,19 +7,19 @@ import { Button } from "@/components/ui/button";
 // PROTOTYPE: Three drawer easing profiles, switchable with ?drawerMotion=A|B|C.
 const variants = {
   A: {
-    label: "balanced",
-    open: "cubic-bezier(0.25, 1, 0.5, 1)",
-    close: "cubic-bezier(0.5, 0, 0.75, 0)",
+    label: "constant",
+    open: "linear",
+    close: "linear",
   },
   B: {
-    label: "relaxed",
-    open: "cubic-bezier(0.16, 1, 0.3, 1)",
-    close: "cubic-bezier(0.7, 0, 0.84, 0)",
+    label: "smooth start",
+    open: "cubic-bezier(0.2, 0, 0.8, 0.8)",
+    close: "cubic-bezier(0.2, 0, 0.8, 0.8)",
   },
   C: {
-    label: "crisp",
-    open: "cubic-bezier(0.33, 1, 0.68, 1)",
-    close: "cubic-bezier(0.32, 0, 0.67, 0)",
+    label: "accelerating",
+    open: "cubic-bezier(0.3, 0, 0.8, 0.6)",
+    close: "cubic-bezier(0.3, 0, 0.8, 0.6)",
   },
 } as const;
 
