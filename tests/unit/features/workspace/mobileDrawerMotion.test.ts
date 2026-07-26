@@ -6,4 +6,11 @@ describe("mobile drawer motion", () => {
     expect(MOBILE_DRAWER_TRANSITION_CLASSES).toContain("transition-[translate,");
     expect(MOBILE_DRAWER_TRANSITION_CLASSES).not.toContain("transition-[transform,");
   });
+
+  it("uses the motion timing from the superseded drawer PR", () => {
+    expect(MOBILE_DRAWER_TRANSITION_CLASSES).toContain("duration-200");
+    expect(MOBILE_DRAWER_TRANSITION_CLASSES).toContain(
+      "ease-[cubic-bezier(0.22,1,0.36,1)]",
+    );
+  });
 });
