@@ -30,6 +30,8 @@ type TunnelObservabilityContext = {
 };
 
 const COBALT_TUNNEL_TIMEOUT_MS = 300_000;
+const EMPTY_BODY_RETRY_DELAYS_MS = [100, 250, 500] as const;
+const EMPTY_BODY_RETRY_ATTEMPTS = EMPTY_BODY_RETRY_DELAYS_MS.length + 1;
 
 const createTunnelRequestId = () => `tagium-tunnel-${crypto.randomUUID()}`;
 
@@ -51,9 +53,15 @@ const streamNonEmptyBody = async (response: Response) => {
   if (!reader) {
     return undefined;
   }
-
-  const firstChunk = await reader.read();
+  let firstChunk: ReadableStreamReadResult<Uint8Array>;
+  try {
+    firstChunk = await reader.read();
+  } catch (error) {
+    reader.releaseLock();
+    throw error;
+  }
   if (firstChunk.done) {
+    reader.releaseLock();
     return undefined;
   }
 
@@ -62,16 +70,29 @@ const streamNonEmptyBody = async (response: Response) => {
       controller.enqueue(firstChunk.value);
     },
     async pull(controller) {
-      const chunk = await reader.read();
-      if (chunk.done) {
-        controller.close();
-        return;
+      try {
+        const chunk = await reader.read();
+        if (chunk.done) {
+          controller.close();
+          reader.releaseLock();
+          return;
+        }
+        controller.enqueue(chunk.value);
+      } catch (error) {
+        try {
+          await reader.cancel(error);
+        } finally {
+          reader.releaseLock();
+        }
+        controller.error(error);
       }
-
-      controller.enqueue(chunk.value);
     },
     async cancel(reason) {
-      await reader.cancel(reason);
+      try {
+        await reader.cancel(reason);
+      } finally {
+        reader.releaseLock();
+      }
     },
   });
 };
@@ -275,10 +296,36 @@ export default defineHandler(async (event) => {
       requestHeaders.set("Fly-Force-Instance-Id", tunnelRequest.machineId);
     }
 
-    const response = await fetch(tunnelRequest.tunnelUrl, {
-      headers: requestHeaders,
-      signal: AbortSignal.timeout(COBALT_TUNNEL_TIMEOUT_MS),
-    });
+    const fetchSignal = AbortSignal.timeout(COBALT_TUNNEL_TIMEOUT_MS);
+    let response: Response | undefined;
+    let body: ReadableStream<Uint8Array> | undefined;
+    for (let attempt = 1; attempt <= EMPTY_BODY_RETRY_ATTEMPTS; attempt++) {
+      response = await fetch(tunnelRequest.tunnelUrl, {
+        headers: requestHeaders,
+        signal: fetchSignal,
+      });
+      if (!response.ok) break;
+      body = await streamNonEmptyBody(response);
+      if (body || attempt === EMPTY_BODY_RETRY_ATTEMPTS) break;
+      await new Promise<void>((resolve, reject) => {
+        const onAbort = () => {
+          clearTimeout(timer);
+          done(fetchSignal.reason);
+        };
+        const done = (error?: unknown) => {
+          fetchSignal.removeEventListener("abort", onAbort);
+          if (error === undefined) resolve();
+          else reject(error);
+        };
+        const timer = setTimeout(() => done(), EMPTY_BODY_RETRY_DELAYS_MS[attempt - 1]);
+        if (fetchSignal.aborted) {
+          onAbort();
+          return;
+        }
+        fetchSignal.addEventListener("abort", onAbort, { once: true });
+      });
+    }
+    if (!response) throw new Error("tunnel.fetch_missing");
 
     if (!response.ok) {
       const responseText = await response.text();
@@ -304,7 +351,6 @@ export default defineHandler(async (event) => {
       return new Response(`Cobalt tunnel request failed (${response.status}).`, { status: 502 });
     }
 
-    const body = await streamNonEmptyBody(response);
     if (!body) {
       logTunnelFailure("upstream empty body", {
         ...getTunnelLogContext(requestId, tunnelUrl, machineId, observability),

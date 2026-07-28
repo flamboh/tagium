@@ -87,6 +87,54 @@ describe("cobalt tunnel endpoint", () => {
     expect(await response.text()).toBe("audio-bytes");
   });
 
+  it("retries a bounded empty 200 tunnel response", async () => {
+    let attempt = 0;
+    const fetchMock = vi.fn(async () => {
+      attempt++;
+      return attempt < 4 ? new Response(null, { status: 200 }) : new Response("audio-bytes");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await handler(makeEvent(makeTunnelRequest()));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("audio-bytes");
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("stops after four empty responses", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await handler(makeEvent(makeTunnelRequest()));
+    expect(response.status).toBe(502);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("does not retry non-ok responses", async () => {
+    const fetchMock = vi.fn(async () => new Response("missing", { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await handler(makeEvent(makeTunnelRequest()));
+    expect(response.status).toBe(502);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels an upstream stream when a later read fails", async () => {
+    let reads = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        reads++;
+        if (reads === 1) controller.enqueue(new TextEncoder().encode("first"));
+        else controller.error(new Error("upstream read failed"));
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(stream)),
+    );
+    const response = await handler(makeEvent(makeTunnelRequest()));
+    expect(response.status).toBe(200);
+    await expect(response.arrayBuffer()).rejects.toThrow();
+    expect(reads).toBeGreaterThanOrEqual(2);
+  });
+
   it("forwards Fly machine affinity when machine param is present", async () => {
     const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => {
       return new Response("audio-bytes", {

@@ -4,6 +4,7 @@ import { resolveSoundCloudShortLink } from "../../../server/utils/soundcloud-lin
 
 describe("media link contract", () => {
   it.each([
+    ["https://youtu.be/qEIbFhBzfvA", "https://www.youtube.com/watch?v=qEIbFhBzfvA", "track"],
     ["https://youtu.be/dQw4w9WgXcQ?si=x", "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "track"],
     [
       "https://m.youtube.com/shorts/dQw4w9WgXcQ",
