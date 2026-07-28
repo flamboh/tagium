@@ -123,17 +123,30 @@ export interface Analytics {
 
 const providerFromUrl = (sourceUrl: string) => {
   try {
-    const hostname = new URL(sourceUrl).hostname.toLowerCase();
+    const url = new URL(sourceUrl);
+    const host = url.hostname.toLowerCase();
     if (
-      hostname === "youtube.com" ||
-      hostname.endsWith(".youtube.com") ||
-      hostname === "youtu.be"
-    ) {
-      return "youtube" as const;
-    }
-    if (hostname === "soundcloud.com" || hostname.endsWith(".soundcloud.com")) {
-      return "soundcloud" as const;
-    }
+      [
+        "youtube.com",
+        "www.youtube.com",
+        "m.youtube.com",
+        "music.youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com",
+        "www.youtube-nocookie.com",
+      ].includes(host)
+    )
+      return "youtube";
+    if (
+      [
+        "soundcloud.com",
+        "www.soundcloud.com",
+        "m.soundcloud.com",
+        "on.soundcloud.com",
+        "snd.sc",
+      ].includes(host)
+    )
+      return "soundcloud";
   } catch {
     // Invalid and non-web URLs are intentionally grouped with other providers.
   }

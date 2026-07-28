@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { parseMediaLink } from "@/lib/media-link";
 
 /** The largest persisted JSON manifest. Artwork bytes are deliberately not part of it. */
 export const MAX_MANIFEST_PAYLOAD_BYTES = 256 * 1024;
@@ -23,16 +24,10 @@ const positiveInteger = (minimum: number, maximum: number) =>
 const isSupportedSourceUrl = (value: string) => {
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || url.username || url.password || url.hash) return false;
+    if (url.protocol !== "https:" || url.username || url.password) return false;
 
-    const hostname = url.hostname.toLowerCase();
-    return (
-      hostname === "youtu.be" ||
-      hostname === "youtube.com" ||
-      hostname.endsWith(".youtube.com") ||
-      hostname === "soundcloud.com" ||
-      hostname.endsWith(".soundcloud.com")
-    );
+    const parsed = parseMediaLink(value);
+    return parsed.kind !== "unsupported";
   } catch {
     return false;
   }
@@ -193,7 +188,7 @@ export interface ManifestAlbumProjection {
 
 const supportedProvenance = (value: string | undefined) =>
   value !== undefined && value.length > 0 && value.length <= 2_048 && isSupportedSourceUrl(value)
-    ? value
+    ? parseMediaLink(value).canonicalUrl
     : undefined;
 
 export interface ManifestTrackProjection {
@@ -247,7 +242,8 @@ export const projectAlbumManifest = (
       }
       const metadata = { ...file.metadata, ...file.pendingMetadataPatch };
       return {
-        sourceUrl: file.downloadRequest.sourceUrl,
+        sourceUrl:
+          supportedProvenance(file.downloadRequest.sourceUrl) ?? file.downloadRequest.sourceUrl,
         audioBitrate: file.downloadRequest.audioBitrate,
         metadata: {
           filename: metadata.filename || file.filename.replace(/\.mp3$/i, ""),
