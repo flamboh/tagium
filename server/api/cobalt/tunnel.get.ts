@@ -32,6 +32,16 @@ type TunnelObservabilityContext = {
 const COBALT_TUNNEL_TIMEOUT_MS = 300_000;
 const EMPTY_BODY_RETRY_DELAYS_MS = [100, 250, 500] as const;
 const EMPTY_BODY_RETRY_ATTEMPTS = EMPTY_BODY_RETRY_DELAYS_MS.length + 1;
+type TunnelOutcome = "ready" | "recovered" | "exhausted" | "non_retryable";
+
+const withTunnelTelemetry = (headers: Headers, outcome: TunnelOutcome, attempts: number) => {
+  headers.set("X-Tagium-Tunnel-Outcome", outcome);
+  headers.set("X-Tagium-Tunnel-Attempts", String(attempts));
+  return headers;
+};
+
+const tunnelTelemetryHeaders = (outcome: TunnelOutcome, attempts: number) =>
+  withTunnelTelemetry(new Headers(), outcome, attempts);
 
 const createTunnelRequestId = () => `tagium-tunnel-${crypto.randomUUID()}`;
 
@@ -168,10 +178,17 @@ const tryParseCobaltCapacityError = (responseText: string) => {
   return undefined;
 };
 
-const cobaltCapacityErrorResponse = (body: unknown, retryAfter: string | null) => {
+const cobaltCapacityErrorResponse = (
+  body: unknown,
+  retryAfter: string | null,
+  attempts?: number,
+) => {
   const headers = new Headers({ "Content-Type": "application/json" });
   if (retryAfter) {
     headers.set("Retry-After", retryAfter);
+  }
+  if (attempts !== undefined) {
+    withTunnelTelemetry(headers, "non_retryable", attempts);
   }
 
   return new Response(JSON.stringify(body), {
@@ -182,7 +199,10 @@ const cobaltCapacityErrorResponse = (body: unknown, retryAfter: string | null) =
 
 const cobaltDevTunnelFaultResponse = (fault: ReturnType<typeof consumeTunnelDevFault>) => {
   if (fault === "rate-limit") {
-    return new Response("Cobalt tunnel request failed (429).", { status: 502 });
+    return new Response("Cobalt tunnel request failed (429).", {
+      status: 502,
+      headers: tunnelTelemetryHeaders("non_retryable", 1),
+    });
   }
 
   if (fault === "capacity") {
@@ -192,15 +212,24 @@ const cobaltDevTunnelFaultResponse = (fault: ReturnType<typeof consumeTunnelDevF
         error: { code: "error.api.capacity_exceeded" },
       },
       "2",
+      1,
     );
   }
 
   if (fault === "timeout") {
-    return new Response("Cobalt tunnel request timed out.", { status: 502 });
+    // Dev faults happen before an upstream fetch. Use one synthetic attempt so
+    // their telemetry has the same bounded shape as real tunnel responses.
+    return new Response("Cobalt tunnel request timed out.", {
+      status: 502,
+      headers: tunnelTelemetryHeaders("non_retryable", 1),
+    });
   }
 
   if (fault === "empty-body") {
-    return new Response("Cobalt tunnel response was empty.", { status: 502 });
+    return new Response("Cobalt tunnel response was empty.", {
+      status: 502,
+      headers: tunnelTelemetryHeaders("exhausted", EMPTY_BODY_RETRY_ATTEMPTS),
+    });
   }
 
   return undefined;
@@ -260,6 +289,7 @@ export default defineHandler(async (event) => {
   let tunnelUrl: URL | undefined;
   let machineId: string | null | undefined;
   let observability: TunnelObservabilityContext = {};
+  let upstreamAttempts = 0;
 
   try {
     const runtimeEnv = getRuntimeEnv(event.req);
@@ -300,6 +330,7 @@ export default defineHandler(async (event) => {
     let response: Response | undefined;
     let body: ReadableStream<Uint8Array> | undefined;
     for (let attempt = 1; attempt <= EMPTY_BODY_RETRY_ATTEMPTS; attempt++) {
+      upstreamAttempts = attempt;
       response = await fetch(tunnelRequest.tunnelUrl, {
         headers: requestHeaders,
         signal: fetchSignal,
@@ -338,7 +369,11 @@ export default defineHandler(async (event) => {
           status: response.status,
           retryAfter: response.headers.get("Retry-After") ?? undefined,
         });
-        return cobaltCapacityErrorResponse(capacityError, response.headers.get("Retry-After"));
+        return cobaltCapacityErrorResponse(
+          capacityError,
+          response.headers.get("Retry-After"),
+          upstreamAttempts,
+        );
       }
 
       logTunnelFailure("upstream non-ok", {
@@ -348,7 +383,10 @@ export default defineHandler(async (event) => {
         responseBytes: new TextEncoder().encode(responseText).byteLength,
         contentType: response.headers.get("content-type") ?? undefined,
       });
-      return new Response(`Cobalt tunnel request failed (${response.status}).`, { status: 502 });
+      return new Response(`Cobalt tunnel request failed (${response.status}).`, {
+        status: 502,
+        headers: tunnelTelemetryHeaders("non_retryable", upstreamAttempts),
+      });
     }
 
     if (!body) {
@@ -358,7 +396,10 @@ export default defineHandler(async (event) => {
         status: response.status,
         contentLength: response.headers.get("content-length") ?? undefined,
       });
-      return new Response("Cobalt tunnel response was empty.", { status: 502 });
+      return new Response("Cobalt tunnel response was empty.", {
+        status: 502,
+        headers: tunnelTelemetryHeaders("exhausted", upstreamAttempts),
+      });
     }
 
     const responseHeaders = new Headers();
@@ -367,6 +408,11 @@ export default defineHandler(async (event) => {
       responseHeaders.set("Content-Type", contentType);
     }
 
+    withTunnelTelemetry(
+      responseHeaders,
+      upstreamAttempts > 1 ? "recovered" : "ready",
+      upstreamAttempts,
+    );
     return new Response(body, { headers: responseHeaders });
   } catch (error) {
     if (error instanceof Error) {
@@ -376,15 +422,30 @@ export default defineHandler(async (event) => {
         errorName: error.name,
       });
       if (error.name === "TimeoutError" || error.name === "AbortError") {
-        return new Response("Cobalt tunnel request timed out.", { status: 502 });
+        return new Response("Cobalt tunnel request timed out.", {
+          status: 502,
+          ...(upstreamAttempts > 0
+            ? { headers: tunnelTelemetryHeaders("non_retryable", upstreamAttempts) }
+            : {}),
+        });
       }
-      return new Response(error.message, { status: 502 });
+      return new Response(error.message, {
+        status: 502,
+        ...(upstreamAttempts > 0
+          ? { headers: tunnelTelemetryHeaders("non_retryable", upstreamAttempts) }
+          : {}),
+      });
     }
 
     logTunnelFailure("fetch threw non-error", {
       ...getTunnelLogContext(requestId, tunnelUrl, machineId, observability),
       elapsedMs: Date.now() - startedAt,
     });
-    return new Response("Cobalt tunnel request failed.", { status: 502 });
+    return new Response("Cobalt tunnel request failed.", {
+      status: 502,
+      ...(upstreamAttempts > 0
+        ? { headers: tunnelTelemetryHeaders("non_retryable", upstreamAttempts) }
+        : {}),
+    });
   }
 });

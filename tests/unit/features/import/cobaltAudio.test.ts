@@ -108,6 +108,112 @@ describe("CobaltAudio download", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    {
+      outcome: "recovered",
+      attempts: "3",
+      status: 200,
+      expectedError: undefined,
+    },
+    {
+      outcome: "exhausted",
+      attempts: "4",
+      status: 502,
+      expectedError: "Cobalt tunnel response was empty.",
+    },
+    {
+      outcome: "non_retryable",
+      attempts: "1",
+      status: 502,
+      expectedError: "Cobalt tunnel request timed out.",
+    },
+    {
+      outcome: "non_retryable",
+      attempts: "2",
+      status: 502,
+      expectedError: "upstream fetch failed.",
+    },
+  ] as const)(
+    "reports $outcome tunnel readiness without tunnel details",
+    async ({ outcome, attempts, status, expectedError }) => {
+      const onLifecycle = vi.fn();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          if (url === "/api/cobalt/audio") {
+            return Response.json({
+              status: "tunnel",
+              url: "/api/cobalt/tunnel?private=signature",
+              filename: "private-title.mp3",
+            });
+          }
+
+          return new Response(status === 200 ? "audio-bytes" : expectedError, {
+            status,
+            headers: {
+              "Content-Type": "audio/mpeg",
+              "X-Tagium-Tunnel-Outcome": outcome,
+              "X-Tagium-Tunnel-Attempts": attempts,
+            },
+          });
+        }),
+      );
+
+      const download = runCobaltDownload({
+        sourceUrl: "https://soundcloud.com/private-artist/private-track",
+        audioBitrate: "128",
+        onLifecycle,
+      });
+
+      if (expectedError) {
+        await expect(download).rejects.toThrow(expectedError);
+      } else {
+        await download;
+      }
+
+      expect(onLifecycle).toHaveBeenCalledWith({
+        type: "tunnel-readiness",
+        outcome,
+        attempts: Number(attempts),
+        elapsedBucket: "under_1_second",
+      });
+      expect(JSON.stringify(onLifecycle.mock.calls)).not.toContain("private");
+      expect(JSON.stringify(onLifecycle.mock.calls)).not.toContain("signature");
+    },
+  );
+
+  it("ignores malformed tunnel telemetry headers", async () => {
+    const onLifecycle = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === "/api/cobalt/audio") {
+          return Response.json({
+            status: "tunnel",
+            url: "/api/cobalt/tunnel",
+            filename: "track.mp3",
+          });
+        }
+        return new Response("audio-bytes", {
+          headers: {
+            "X-Tagium-Tunnel-Outcome": "recovered",
+            "X-Tagium-Tunnel-Attempts": "999",
+          },
+        });
+      }),
+    );
+
+    await runCobaltDownload({
+      sourceUrl: "https://soundcloud.com/artist/track",
+      audioBitrate: "128",
+      onLifecycle,
+    });
+
+    expect(onLifecycle).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "tunnel-readiness" }),
+    );
+  });
+
   it("paces Cobalt tunnel download starts", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
@@ -147,7 +253,8 @@ describe("CobaltAudio download", () => {
     await vi.advanceTimersByTimeAsync(7_000);
     await downloads;
 
-    expect(tunnelStartTimes).toEqual([0, 1_600, 3_200, 4_800]);
+    const firstStart = tunnelStartTimes[0] ?? 0;
+    expect(tunnelStartTimes.map((time) => time - firstStart)).toEqual([0, 1_600, 3_200, 4_800]);
   });
 
   it("reports Cobalt tunnel budget waits", async () => {

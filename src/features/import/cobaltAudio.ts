@@ -5,6 +5,7 @@ import {
   LocalAudioProcessor,
   LocalAudioProcessorLive,
 } from "@/features/import/localAudioProcessor";
+import type { CobaltTunnelElapsedBucket, CobaltTunnelOutcome } from "@/analytics";
 
 export type AudioDownloadBitrate = "320" | "256" | "128" | "96" | "64";
 
@@ -14,6 +15,12 @@ export type CobaltAudioDownloadLifecycleEvent =
     }
   | {
       type: "tunnel-budget-wait-ended";
+    }
+  | {
+      type: "tunnel-readiness";
+      outcome: CobaltTunnelOutcome;
+      attempts: number;
+      elapsedBucket: CobaltTunnelElapsedBucket;
     };
 
 export type CobaltAudioDownloadLifecycleCallback = (
@@ -32,6 +39,7 @@ export interface CobaltAudioDownloadRequest {
 
 const MAX_CONCURRENT_COBALT_DOWNLOADS = 4;
 const COBALT_TUNNEL_START_INTERVAL_MS = 1_600;
+const MAX_TUNNEL_ATTEMPTS = 4;
 let activeCobaltDownloads = 0;
 const pendingCobaltDownloads: (() => void)[] = [];
 let nextCobaltTunnelStartAt = 0;
@@ -180,6 +188,42 @@ const getStableLastModified = (sourceUrl: string) =>
     return (hash * 31 + character.charCodeAt(0)) % 2_147_483_647;
   }, 1);
 
+const tunnelElapsedBucket = (elapsedMs: number): CobaltTunnelElapsedBucket => {
+  if (elapsedMs < 1_000) return "under_1_second";
+  if (elapsedMs < 5_000) return "1_to_5_seconds";
+  if (elapsedMs < 15_000) return "5_to_15_seconds";
+  return "15_seconds_or_more";
+};
+
+const tunnelReadinessFromResponse = (
+  response: Response,
+  elapsedMs: number,
+): Extract<CobaltAudioDownloadLifecycleEvent, { type: "tunnel-readiness" }> | undefined => {
+  const outcome = response.headers.get("X-Tagium-Tunnel-Outcome");
+  const rawAttempts = response.headers.get("X-Tagium-Tunnel-Attempts");
+  if (
+    outcome !== "ready" &&
+    outcome !== "recovered" &&
+    outcome !== "exhausted" &&
+    outcome !== "non_retryable"
+  ) {
+    return undefined;
+  }
+  if (!rawAttempts || !/^\d+$/.test(rawAttempts)) return undefined;
+
+  const attempts = Number(rawAttempts);
+  if (!Number.isInteger(attempts) || attempts < 1 || attempts > MAX_TUNNEL_ATTEMPTS) {
+    return undefined;
+  }
+
+  return {
+    type: "tunnel-readiness",
+    outcome,
+    attempts,
+    elapsedBucket: tunnelElapsedBucket(elapsedMs),
+  };
+};
+
 const decodeCobaltDownloadPlan = Effect.fn("decodeCobaltDownloadPlan")(function* (input: unknown) {
   return yield* decodeCobaltDownloadPlanEffect(input).pipe(
     Effect.mapError(
@@ -243,7 +287,12 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
       try: async () => {
         await waitForCobaltTunnelStart(onLifecycle, signal);
 
+        const startedAt = Date.now();
         const response = await fetch(url, { signal });
+        const readiness = tunnelReadinessFromResponse(response, Date.now() - startedAt);
+        if (readiness) {
+          onLifecycle?.(readiness);
+        }
         if (!response.ok) {
           throw new Error(await response.text());
         }

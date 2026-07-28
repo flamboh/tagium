@@ -120,6 +120,129 @@ describe("analytics", () => {
     expect(JSON.stringify(capture.mock.calls)).not.toContain("internal.example");
   });
 
+  it("serializes URL shape and tunnel readiness as privacy-safe categories", async () => {
+    const init = vi.fn();
+    const capture = vi.fn();
+    const analytics = createAnalytics(
+      { key: "public-test-key", deployEnv: "production" },
+      {
+        loadClient: async () => ({ init, capture }),
+        schedule: (load) => load(),
+      },
+    );
+    analytics.initialize();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const linkCases = [
+      ["https://youtube.com/watch?v=private-id", "youtube", "canonical"],
+      ["https://youtu.be/private-id", "youtube", "short"],
+      ["https://music.youtube.com/watch?v=private-id", "youtube", "mobile"],
+      ["https://www.youtube-nocookie.com/embed/private-id", "youtube", "nocookie"],
+      ["https://on.soundcloud.com/private-token", "soundcloud", "short"],
+      ["https://foo.youtube.com/private-id", "other", "other"],
+      ["https://youtube.com.evil/private-id", "other", "other"],
+    ] as const;
+
+    for (const [sourceUrl, provider, shape] of linkCases) {
+      analytics.capture({
+        type: "media_link_processed",
+        sourceUrl,
+        mediaKind: "track",
+        shape,
+        normalized: shape !== "canonical",
+        redirected: shape === "short",
+        outcome: "accepted",
+      });
+      expect(capture.mock.calls.at(-1)).toEqual([
+        "media_link_processed",
+        expect.objectContaining({
+          provider,
+          media_kind: "track",
+          shape,
+          normalized: shape !== "canonical",
+          redirected: shape === "short",
+          outcome: "accepted",
+        }),
+      ]);
+    }
+
+    analytics.capture({
+      type: "media_link_processed",
+      sourceUrl: "https://on.soundcloud.com/private-token",
+      mediaKind: "unsupported",
+      shape: "short",
+      normalized: false,
+      redirected: false,
+      outcome: "rejected",
+      failureReason: "resolution_failed",
+    });
+    analytics.capture({
+      type: "cobalt_tunnel_readiness",
+      sourceUrl: "https://soundcloud.com/private-artist/private-track?secret=query",
+      outcome: "recovered",
+      attempts: 3,
+      elapsedBucket: "1_to_5_seconds",
+    });
+
+    expect(capture.mock.calls.at(-2)?.[1]).toEqual(
+      expect.objectContaining({
+        provider: "soundcloud",
+        failure_reason: "resolution_failed",
+      }),
+    );
+    expect(capture.mock.calls.at(-1)).toEqual([
+      "cobalt_tunnel_readiness",
+      expect.objectContaining({
+        provider: "soundcloud",
+        outcome: "recovered",
+        attempts: 3,
+        elapsed_bucket: "1_to_5_seconds",
+      }),
+    ]);
+
+    const serialized = JSON.stringify(capture.mock.calls);
+    for (const sensitiveValue of [
+      "private-id",
+      "private-token",
+      "private-artist",
+      "private-track",
+      "secret",
+      "query",
+      "youtube.com.evil",
+      "foo.youtube.com",
+    ]) {
+      expect(serialized).not.toContain(sensitiveValue);
+    }
+
+    const options = init.mock.calls[0]?.[1] as {
+      before_send: (event: {
+        event: string;
+        properties: Record<string, unknown>;
+      }) => { properties: Record<string, unknown> } | null;
+    };
+    const redacted = options.before_send({
+      event: "cobalt_tunnel_readiness",
+      properties: {
+        event_version: 1,
+        deploy_env: "production",
+        provider: "https://soundcloud.com/private-track",
+        outcome: "private-title",
+        attempts: 999,
+        elapsed_bucket: "request-signature",
+        source_url: "https://soundcloud.com/private-track",
+        request_id: "private-request-id",
+        machine_id: "private-machine-id",
+        tunnel_signature: "private-signature",
+      },
+    });
+
+    expect(redacted?.properties).toEqual({
+      event_version: 1,
+      deploy_env: "production",
+    });
+  });
+
   it("maps import failures to stable codes without serializing exception details", async () => {
     const capture = vi.fn();
     const analytics = createAnalytics(
