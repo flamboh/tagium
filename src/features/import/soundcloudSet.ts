@@ -1,17 +1,10 @@
 import { decodePlaylist, type Playlist } from "@/features/import/playlist";
+import { parseMediaLink } from "@/lib/media-link";
 
 export type SoundCloudSet = Playlist;
 
-export const isSoundCloudSetUrl = (url: string) => {
-  try {
-    const parsedUrl = new URL(url);
-    const isSoundCloudHost =
-      parsedUrl.hostname === "soundcloud.com" || parsedUrl.hostname.endsWith(".soundcloud.com");
-    return isSoundCloudHost && parsedUrl.pathname.includes("/sets/");
-  } catch {
-    return false;
-  }
-};
+export const isSoundCloudSetUrl = (url: string) =>
+  parseMediaLink(url).provider === "soundcloud" && parseMediaLink(url).kind === "playlist";
 
 export const resolveSoundCloudSet = async (url: string, importId?: string) => {
   const endpoint = new URL("/api/soundcloud-set", window.location.origin);

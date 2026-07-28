@@ -144,7 +144,12 @@ export const getYouTubeVideoId = (sourceUrl: string) => {
     if (url.hostname === "youtu.be") {
       videoId = pathParts[0];
     } else {
-      const isYouTubeHost = url.hostname === "youtube.com" || url.hostname.endsWith(".youtube.com");
+      const isYouTubeHost = [
+        "youtube.com",
+        "www.youtube.com",
+        "m.youtube.com",
+        "music.youtube.com",
+      ].includes(url.hostname.toLowerCase());
       if (!isYouTubeHost) return undefined;
 
       if (pathParts[0] === "watch") {
