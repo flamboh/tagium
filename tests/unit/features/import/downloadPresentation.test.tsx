@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { Check } from "lucide-react";
 import { SortableTrackRow } from "@/features/library/AlbumSidebarDnd";
 import PlaylistDownloadQueuePanel from "@/features/import/PlaylistDownloadQueuePanel";
 import type { TagiumFile } from "@/features/library/types";
@@ -13,6 +14,21 @@ afterEach(() => {
 });
 
 describe("download presentation", () => {
+  const renderTrackRow = (track: TagiumFile) => (
+    <SortableTrackRow
+      track={track}
+      index={1}
+      container="album"
+      albumId="album-1"
+      selectedTone={null}
+      muted={false}
+      retryable={false}
+      onSelect={() => {}}
+      onRemove={() => {}}
+      onRetry={() => {}}
+    />
+  );
+
   it("describes admission waits without exposing Cobalt implementation details", () => {
     const markup = renderToStaticMarkup(
       <PlaylistDownloadQueuePanel
@@ -95,6 +111,70 @@ describe("download presentation", () => {
       vi.advanceTimersByTime(1);
     });
     expect(renderer!.toJSON()).toBeNull();
+    act(() => renderer!.unmount());
+  });
+
+  it("shows saved feedback for three seconds after a status transition and cleans timers up", () => {
+    vi.useFakeTimers();
+    const pendingTrack = {
+      id: "track-saved-feedback",
+      filename: "Saved Track.mp3",
+      status: "pending",
+      downloadStatus: "ready",
+    } as TagiumFile;
+    let renderer: ReactTestRenderer;
+
+    act(() => {
+      renderer = create(renderTrackRow(pendingTrack));
+    });
+    expect(renderer!.root.findAllByType(Check)).toHaveLength(0);
+
+    act(() => {
+      renderer!.update(renderTrackRow({ ...pendingTrack, status: "saved" }));
+    });
+    expect(renderer!.root.findAllByType(Check)).toHaveLength(1);
+    expect(renderer!.root.findAllByProps({ role: "status", "aria-live": "polite" })).toHaveLength(
+      1,
+    );
+    expect(renderer!.root.findByType(Check).props["aria-hidden"]).toBe("true");
+
+    act(() => {
+      vi.advanceTimersByTime(2_999);
+    });
+    expect(renderer!.root.findAllByType(Check)).toHaveLength(1);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(renderer!.root.findAllByType(Check)).toHaveLength(0);
+
+    act(() => {
+      renderer!.update(renderTrackRow({ ...pendingTrack, status: "pending" }));
+    });
+    act(() => {
+      renderer!.update(renderTrackRow({ ...pendingTrack, status: "saved" }));
+    });
+    expect(vi.getTimerCount()).toBe(1);
+    act(() => renderer!.unmount());
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("does not announce an initially saved track", () => {
+    vi.useFakeTimers();
+    const savedTrack = {
+      id: "already-saved-track",
+      filename: "Already Saved.mp3",
+      status: "saved",
+      downloadStatus: "ready",
+    } as TagiumFile;
+    let renderer: ReactTestRenderer;
+
+    act(() => {
+      renderer = create(renderTrackRow(savedTrack));
+    });
+
+    expect(renderer!.root.findAllByType(Check)).toHaveLength(0);
+    expect(renderer!.root.findAllByProps({ role: "status" })).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
     act(() => renderer!.unmount());
   });
 });

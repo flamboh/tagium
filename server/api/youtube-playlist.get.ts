@@ -9,6 +9,7 @@ import {
   YOUTUBE_USER_AGENT,
 } from "../utils/youtube";
 import { urlStringSchema } from "../utils/schema";
+import { parseMediaLink } from "../../src/lib/media-link";
 
 const MAX_CONTINUATION_REQUESTS = 100;
 
@@ -249,14 +250,11 @@ const fetchContinuation = async (token: string, config: JsonRecord, signal: Abor
 };
 
 const parseSourceUrl = (sourceUrl: string) => {
-  const parsed = new URL(sourceUrl);
-  const isYouTubeHost =
-    parsed.hostname === "youtube.com" || parsed.hostname.endsWith(".youtube.com");
-  const playlistId = parsed.searchParams.get("list");
-  if (!isYouTubeHost || parsed.pathname.replace(/\/+$/, "") !== "/playlist" || !playlistId) {
+  const parsed = parseMediaLink(sourceUrl);
+  if (parsed.provider !== "youtube" || parsed.kind !== "playlist") {
     throw new Error("youtube.playlist_url_required");
   }
-  return playlistId;
+  return parsed.playlistId;
 };
 
 export default defineHandler(async (event) => {

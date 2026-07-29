@@ -2,6 +2,7 @@ import { Effect, Schema } from "effect";
 import { defineHandler } from "nitro";
 import { getSoundCloudClientId } from "../utils/soundcloud";
 import { urlStringSchema } from "../utils/schema";
+import { parseMediaLink } from "../../src/lib/media-link";
 
 const nonEmptyStringSchema = Schema.String.check(Schema.isNonEmpty());
 
@@ -16,8 +17,10 @@ const soundCloudTrackSchema = Schema.Struct({
   user: Schema.optionalKey(Schema.Struct({ username: Schema.optionalKey(Schema.String) })),
 });
 
-const isSoundCloudUrl = (url: URL) =>
-  url.hostname === "soundcloud.com" || url.hostname.endsWith(".soundcloud.com");
+const isSoundCloudUrl = (url: URL) => {
+  const parsed = parseMediaLink(url.toString());
+  return parsed.provider === "soundcloud" && parsed.kind === "track";
+};
 
 export const resolveSoundCloudTrackMetadata = async (
   sourceUrl: string,
@@ -45,12 +48,9 @@ export const resolveSoundCloudTrackMetadata = async (
 };
 
 export const getTrackMetadataEndpoint = (sourceUrl: string) => {
-  const url = new URL(sourceUrl);
-  const isYouTube =
-    url.hostname === "youtu.be" ||
-    url.hostname === "youtube.com" ||
-    url.hostname.endsWith(".youtube.com");
-  if (isYouTube) {
+  const parsed = parseMediaLink(sourceUrl);
+  if (parsed.provider !== "youtube" || parsed.kind !== "track") return undefined;
+  if (parsed.provider === "youtube") {
     const endpoint = new URL("https://www.youtube.com/oembed");
     endpoint.searchParams.set("url", sourceUrl);
     endpoint.searchParams.set("format", "json");

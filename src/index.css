@@ -209,6 +209,10 @@
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
   }
+
+  label:has([data-slot="checkbox"]) {
+    @apply select-none;
+  }
 }
 
 @layer components {

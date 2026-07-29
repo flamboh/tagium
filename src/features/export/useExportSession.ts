@@ -43,6 +43,14 @@ export interface ExportSession {
 
 type ExportEditor = Pick<TrackEditorSession["commands"], "projectFiles" | "flush" | "updateTags">;
 type ExecutionResult = "success" | "unavailable" | "error";
+type ConfirmationFocusTarget = {
+  focus: () => void;
+  isConnected?: boolean;
+  checkVisibility?: () => boolean;
+};
+
+const canRestoreFocus = (target: ConfirmationFocusTarget) =>
+  target.isConnected !== false && (target.checkVisibility?.() ?? true);
 
 const planTrackIds = (plan: ExportPlan) =>
   plan.groups.flatMap((group) => group.tracks.map((track) => track.id));
@@ -62,7 +70,7 @@ export const useExportSession = ({
     "ready",
   );
   const confirmingRef = useRef(false);
-  const confirmationTriggerRef = useRef<{ focus: () => void; isConnected?: boolean } | null>(null);
+  const confirmationTriggerRef = useRef<ConfirmationFocusTarget | null>(null);
   const settingsRef = useRef(settings);
   useLayoutEffect(() => {
     settingsRef.current = settings;
@@ -272,22 +280,22 @@ export const useExportSession = ({
     if (typeof document === "undefined") return;
     const activeElement = document.activeElement;
     if (activeElement && "focus" in activeElement && typeof activeElement.focus === "function") {
-      confirmationTriggerRef.current = activeElement as {
-        focus: () => void;
-        isConnected?: boolean;
-      };
+      confirmationTriggerRef.current = activeElement as ConfirmationFocusTarget;
     }
   }, []);
 
   const restoreConfirmationFocus = useCallback(() => {
     const trigger = confirmationTriggerRef.current;
     confirmationTriggerRef.current = null;
-    if (trigger && trigger.isConnected !== false) {
+    if (trigger && canRestoreFocus(trigger)) {
       trigger.focus();
       return;
     }
     if (typeof document !== "undefined") {
-      document.querySelector<HTMLElement>("[data-export-focus-fallback]")?.focus();
+      const fallback = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-export-focus-fallback]"),
+      ).find(canRestoreFocus);
+      fallback?.focus();
     }
   }, []);
 

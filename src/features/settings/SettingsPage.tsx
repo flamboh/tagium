@@ -135,24 +135,18 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
               <p className="text-sm leading-6 text-muted-foreground">
                 tagium exists to make device-local music more accessible to everyone.
               </p>
-              <p className="text-sm leading-6 text-muted-foreground">
-                listening guide: tagium imports, edits, and downloads MP3, FLAC, and unencrypted
-                M4A/MP4 audio locally in your browser.
-              </p>
             </div>
 
             <div className="flex flex-col gap-2">
               <h3 className="text-base font-semibold">ethics</h3>
               <p className="text-sm leading-6 text-muted-foreground">
                 tagium is not a piracy tool and cannot be used as one. it only works with free,
-                publicly accessible audio — the same content anyone can already save with the dev
-                tools in any modern browser. it cannot be used to bypass paywalls or access private
+                publicly accessible audio. It cannot be used to bypass paywalls or access private
                 content.
               </p>
               <p className="text-sm leading-6 text-muted-foreground">
                 you are responsible for the content you download and how you use it. credit original
-                creators, support artists, don't violate any terms or licenses, and share the
-                love.{" "}
+                creators, support artists, and don't violate any terms or licenses.
               </p>
             </div>
 

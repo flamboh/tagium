@@ -15,6 +15,10 @@
       {
         "files": ["server/api/track-metadata.get.ts"],
         "rules": ["deslop/unused-export"]
+      },
+      {
+        "files": ["cobalt-soundcloud.mjs"],
+        "rules": ["deslop/unused-file"]
       }
     ]
   }

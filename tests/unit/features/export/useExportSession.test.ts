@@ -121,11 +121,18 @@ describe("export session", () => {
   });
 
   it("restores the initiating control or a safe fallback", () => {
-    const trigger = { focus: vi.fn(), isConnected: true };
-    const fallback = { focus: vi.fn() };
+    const trigger: {
+      focus: ReturnType<typeof vi.fn>;
+      isConnected: boolean;
+      checkVisibility?: () => boolean;
+    } = { focus: vi.fn(), isConnected: true };
+    const fallback = {
+      focus: vi.fn(),
+      checkVisibility: () => true,
+    };
     vi.stubGlobal("document", {
       activeElement: trigger,
-      querySelector: vi.fn(() => fallback),
+      querySelectorAll: vi.fn(() => [fallback]),
     });
     const { hook } = createHarness();
 
@@ -139,6 +146,13 @@ describe("export session", () => {
     act(() => hook.result.cancelConfirmation());
     act(() => hook.result.restoreConfirmationFocus());
     expect(fallback.focus).toHaveBeenCalledOnce();
+
+    trigger.isConnected = true;
+    trigger.checkVisibility = () => false;
+    act(() => hook.result.downloadAll());
+    act(() => hook.result.cancelConfirmation());
+    act(() => hook.result.restoreConfirmationFocus());
+    expect(fallback.focus).toHaveBeenCalledTimes(2);
     hook.unmount();
   });
 

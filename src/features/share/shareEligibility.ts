@@ -1,20 +1,9 @@
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
+import { parseMediaLink } from "@/lib/media-link";
 
 const supportedSource = (value: string) => {
   try {
-    const url = new URL(value);
-    const host = url.hostname.toLowerCase();
-    return (
-      url.protocol === "https:" &&
-      !url.username &&
-      !url.password &&
-      !url.hash &&
-      (host === "youtu.be" ||
-        host === "youtube.com" ||
-        host.endsWith(".youtube.com") ||
-        host === "soundcloud.com" ||
-        host.endsWith(".soundcloud.com"))
-    );
+    return parseMediaLink(value).kind !== "unsupported";
   } catch {
     return false;
   }

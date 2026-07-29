@@ -3,6 +3,14 @@ export type ImportKind = "single" | "set";
 export type ImportOutcome = "completed" | "partial" | "failed" | "canceled";
 export type ExportKind = "track" | "album" | "library";
 export type TrackSourceMix = "local" | "imported" | "mixed" | "unknown";
+export type AnalyticsProvider = "youtube" | "soundcloud" | "other";
+export type MediaLinkShape = "canonical" | "short" | "mobile" | "nocookie" | "other";
+export type CobaltTunnelOutcome = "ready" | "recovered" | "exhausted" | "non_retryable";
+export type CobaltTunnelElapsedBucket =
+  | "under_1_second"
+  | "1_to_5_seconds"
+  | "5_to_15_seconds"
+  | "15_seconds_or_more";
 export type AnalyticsErrorCode =
   | "capacity"
   | "rate_limited"
@@ -21,6 +29,23 @@ export type AnalyticsEvent =
       duplicateCount: number;
       parseRejectedCount: number;
       targetKind: AudioUploadTargetKind;
+    }
+  | {
+      type: "media_link_processed";
+      sourceUrl: string;
+      mediaKind: "track" | "playlist" | "unsupported";
+      shape: MediaLinkShape;
+      normalized: boolean;
+      redirected: boolean;
+      outcome: "accepted" | "rejected";
+      failureReason?: "invalid" | "unsupported" | "resolution_failed";
+    }
+  | {
+      type: "cobalt_tunnel_readiness";
+      sourceUrl: string;
+      outcome: CobaltTunnelOutcome;
+      attempts: number;
+      elapsedBucket: CobaltTunnelElapsedBucket;
     }
   | {
       type: "import_started";
@@ -121,23 +146,36 @@ export interface Analytics {
   capture: (event: AnalyticsEvent) => void;
 }
 
-const providerFromUrl = (sourceUrl: string) => {
+export const analyticsProviderFromUrl = (sourceUrl: string): AnalyticsProvider => {
   try {
-    const hostname = new URL(sourceUrl).hostname.toLowerCase();
+    const url = new URL(sourceUrl);
+    const host = url.hostname.toLowerCase();
     if (
-      hostname === "youtube.com" ||
-      hostname.endsWith(".youtube.com") ||
-      hostname === "youtu.be"
-    ) {
-      return "youtube" as const;
-    }
-    if (hostname === "soundcloud.com" || hostname.endsWith(".soundcloud.com")) {
-      return "soundcloud" as const;
-    }
+      [
+        "youtube.com",
+        "www.youtube.com",
+        "m.youtube.com",
+        "music.youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com",
+        "www.youtube-nocookie.com",
+      ].includes(host)
+    )
+      return "youtube";
+    if (
+      [
+        "soundcloud.com",
+        "www.soundcloud.com",
+        "m.soundcloud.com",
+        "on.soundcloud.com",
+        "snd.sc",
+      ].includes(host)
+    )
+      return "soundcloud";
   } catch {
     // Invalid and non-web URLs are intentionally grouped with other providers.
   }
-  return "other" as const;
+  return "other";
 };
 
 const errorCodeFrom = (
@@ -177,6 +215,23 @@ type BeforeSendEvent = {
 
 const COMMON_CUSTOM_PROPERTIES = ["event_version", "deploy_env", "release_sha"];
 const CUSTOM_EVENT_PROPERTIES: Record<string, ReadonlySet<string>> = {
+  media_link_processed: new Set([
+    ...COMMON_CUSTOM_PROPERTIES,
+    "provider",
+    "media_kind",
+    "shape",
+    "normalized",
+    "redirected",
+    "outcome",
+    "failure_reason",
+  ]),
+  cobalt_tunnel_readiness: new Set([
+    ...COMMON_CUSTOM_PROPERTIES,
+    "provider",
+    "outcome",
+    "attempts",
+    "elapsed_bucket",
+  ]),
   audio_upload_completed: new Set([
     ...COMMON_CUSTOM_PROPERTIES,
     "requested_count",
@@ -276,9 +331,55 @@ const SAFE_SDK_PROPERTIES = new Set([
 const SENSITIVE_PROPERTY_NAME =
   /(?:url|href|referrer|pathname|host|filename|artist|album|artwork|message|response|body|tunnel|text|elements)/i;
 const URL_VALUE = /https?:\/\//i;
+const isOneOf =
+  <Value extends string>(values: readonly Value[]) =>
+  (value: unknown): value is Value =>
+    typeof value === "string" && values.includes(value as Value);
+const isBoolean = (value: unknown) => typeof value === "boolean";
+const isBoundedTunnelAttempt = (value: unknown) =>
+  typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 4;
+const isAnalyticsProvider = isOneOf(["youtube", "soundcloud", "other"] as const);
+const isMediaKind = isOneOf(["track", "playlist", "unsupported"] as const);
+const isMediaLinkShape = isOneOf(["canonical", "short", "mobile", "nocookie", "other"] as const);
+const isMediaLinkOutcome = isOneOf(["accepted", "rejected"] as const);
+const isMediaLinkFailure = isOneOf(["invalid", "unsupported", "resolution_failed"] as const);
+const isCobaltTunnelOutcome = isOneOf([
+  "ready",
+  "recovered",
+  "exhausted",
+  "non_retryable",
+] as const);
+const isCobaltTunnelElapsedBucket = isOneOf([
+  "under_1_second",
+  "1_to_5_seconds",
+  "5_to_15_seconds",
+  "15_seconds_or_more",
+] as const);
+
+const CUSTOM_PROPERTY_VALIDATORS: Record<
+  string,
+  Readonly<Record<string, (value: unknown) => boolean>>
+> = {
+  media_link_processed: {
+    provider: isAnalyticsProvider,
+    media_kind: isMediaKind,
+    shape: isMediaLinkShape,
+    normalized: isBoolean,
+    redirected: isBoolean,
+    outcome: isMediaLinkOutcome,
+    failure_reason: isMediaLinkFailure,
+  },
+  cobalt_tunnel_readiness: {
+    provider: isAnalyticsProvider,
+    outcome: isCobaltTunnelOutcome,
+    attempts: isBoundedTunnelAttempt,
+    elapsed_bucket: isCobaltTunnelElapsedBucket,
+  },
+};
 
 const redactAndValidateEvent = (event: BeforeSendEvent): BeforeSendEvent | null => {
   const customAllowedProperties = CUSTOM_EVENT_PROPERTIES[event.event];
+  const customPropertyValidators = CUSTOM_PROPERTY_VALIDATORS[event.event];
   const isSdkEvent = SAFE_SDK_EVENTS.has(event.event);
   if (!customAllowedProperties && !isSdkEvent) return null;
 
@@ -287,6 +388,8 @@ const redactAndValidateEvent = (event: BeforeSendEvent): BeforeSendEvent | null 
     const isAllowedCustomProperty = customAllowedProperties?.has(property) ?? false;
     const isAllowedSdkProperty = SAFE_SDK_PROPERTIES.has(property);
     if (!isAllowedCustomProperty && !isAllowedSdkProperty) continue;
+    const customValidator = customPropertyValidators?.[property];
+    if (customValidator && !customValidator(value)) continue;
     if (!isAllowedCustomProperty && SENSITIVE_PROPERTY_NAME.test(property)) continue;
     if (!isAllowedCustomProperty && typeof value === "string" && URL_VALUE.test(value)) continue;
     properties[property] = value;
@@ -317,6 +420,33 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
   };
 
   switch (event.type) {
+    case "media_link_processed": {
+      return {
+        name: event.type,
+        properties: {
+          ...commonProperties,
+          provider: analyticsProviderFromUrl(event.sourceUrl),
+          media_kind: event.mediaKind,
+          shape: event.shape,
+          normalized: event.normalized,
+          redirected: event.redirected,
+          outcome: event.outcome,
+          ...(event.failureReason ? { failure_reason: event.failureReason } : {}),
+        },
+      };
+    }
+    case "cobalt_tunnel_readiness": {
+      return {
+        name: event.type,
+        properties: {
+          ...commonProperties,
+          provider: analyticsProviderFromUrl(event.sourceUrl),
+          outcome: event.outcome,
+          attempts: Math.max(1, Math.min(4, Math.trunc(event.attempts))),
+          elapsed_bucket: event.elapsedBucket,
+        },
+      };
+    }
     case "audio_upload_completed":
       return {
         name: event.type,
@@ -334,7 +464,7 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
         name: event.type,
         properties: {
           ...commonProperties,
-          provider: providerFromUrl(event.sourceUrl),
+          provider: analyticsProviderFromUrl(event.sourceUrl),
           import_kind: event.importKind,
         },
       };
@@ -343,7 +473,7 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
         name: event.type,
         properties: {
           ...commonProperties,
-          provider: providerFromUrl(event.sourceUrl),
+          provider: analyticsProviderFromUrl(event.sourceUrl),
           import_kind: event.importKind,
           resolved_count: event.resolvedCount,
           has_cover: event.hasCover,
@@ -354,7 +484,7 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
         name: event.type,
         properties: {
           ...commonProperties,
-          provider: providerFromUrl(event.sourceUrl),
+          provider: analyticsProviderFromUrl(event.sourceUrl),
           import_kind: event.importKind,
           outcome: event.outcome,
           total_count: event.totalCount,
