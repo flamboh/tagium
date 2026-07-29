@@ -30,6 +30,7 @@ describe("TagSidebarPanel", () => {
         selectedAlbumId={null}
         selectedFileId={null}
         selectedFileIds={new Set()}
+        cleanupSuggestionCountByAlbumId={new Map()}
         settingsOpen={false}
         onAudioUpload={noOp}
         onSelectAlbum={noOp}
@@ -40,6 +41,7 @@ describe("TagSidebarPanel", () => {
         onRetryDownload={noOp}
         onAddAlbum={noOp}
         onEditAlbum={noOp}
+        onReviewAlbumCleanup={noOp}
         onDownloadAlbum={noOp}
         onUploadToAlbum={noOp}
         onMoveTrackToAlbum={noOp}
@@ -53,5 +55,6 @@ describe("TagSidebarPanel", () => {
 
     expect(markup).toContain("md:visible");
     expect(markup).toContain("md:opacity-100");
+    expect(markup).toContain("md:translate-x-0");
   });
 });
