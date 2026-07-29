@@ -1,0 +1,57 @@
+import type { ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vite-plus/test";
+import TagSidebarPanel from "@/features/library/TagSidebarPanel";
+
+vi.mock("@/features/library/AlbumSidebar", () => ({
+  default: () => <div data-testid="album-sidebar" />,
+}));
+
+vi.mock("@/features/import/PlaylistDownloadQueuePanel", () => ({
+  default: () => null,
+}));
+
+vi.mock("@/components/ui/tooltip", () => ({
+  Tooltip: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  TooltipTrigger: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  TooltipContent: ({ children }: { children?: ReactNode }) => <>{children}</>,
+}));
+
+const noOp = () => {};
+
+describe("TagSidebarPanel", () => {
+  it("remains visible when the closed mobile drawer is rendered at desktop widths", () => {
+    const markup = renderToStaticMarkup(
+      <TagSidebarPanel
+        loading={false}
+        files={[]}
+        albums={[]}
+        looseTrackIds={[]}
+        selectedAlbumId={null}
+        selectedFileId={null}
+        selectedFileIds={new Set()}
+        settingsOpen={false}
+        onAudioUpload={noOp}
+        onSelectAlbum={noOp}
+        onSelectFile={noOp}
+        onSelectLooseTrack={noOp}
+        onClearSelection={noOp}
+        onRemoveFile={noOp}
+        onRetryDownload={noOp}
+        onAddAlbum={noOp}
+        onEditAlbum={noOp}
+        onDownloadAlbum={noOp}
+        onUploadToAlbum={noOp}
+        onMoveTrackToAlbum={noOp}
+        onMoveTrackToLoose={noOp}
+        onPromptCreateAlbumFromLooseTracks={noOp}
+        onReorderAlbums={noOp}
+        onDownloadAll={noOp}
+        onOpenSettings={noOp}
+      />,
+    );
+
+    expect(markup).toContain("md:visible");
+    expect(markup).toContain("md:opacity-100");
+  });
+});
