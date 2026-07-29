@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { decideDrawerSwipe, shouldStartDrawerSwipe, isDrawerSwipeOptOut, isDrawerSwipeScrollOptOut } from "@/features/workspace/drawerSwipe";
+import {
+  decideDrawerSwipe,
+  shouldStartDrawerSwipe,
+  isDrawerSwipeOptOut,
+  isDrawerSwipeScrollOptOut,
+} from "@/features/workspace/drawerSwipe";
 
 describe("drawer swipe recognizer", () => {
   it("starts from the left 40% for touch input", () => {
     expect(shouldStartDrawerSwipe({ clientX: 20, clientY: 100, pointerType: "touch" }, 390)).toBe(
       true,
     );
-    expect(shouldStartDrawerSwipe({ clientX: 200, clientY: 100, pointerType: "touch" }, 390)).toBe(false);
+    expect(shouldStartDrawerSwipe({ clientX: 200, clientY: 100, pointerType: "touch" }, 390)).toBe(
+      false,
+    );
     expect(shouldStartDrawerSwipe({ clientX: 20, clientY: 100, pointerType: "mouse" }, 390)).toBe(
       false,
     );
@@ -15,7 +22,9 @@ describe("drawer swipe recognizer", () => {
   it("allows a deliberate swipe beginning on ordinary buttons and links", () => {
     expect(isDrawerSwipeOptOut("button")).toBe(false);
     expect(isDrawerSwipeOptOut("a")).toBe(false);
-    expect(shouldStartDrawerSwipe({ clientX: 20, clientY: 100, pointerType: "touch" }, 390)).toBe(true);
+    expect(shouldStartDrawerSwipe({ clientX: 20, clientY: 100, pointerType: "touch" }, 390)).toBe(
+      true,
+    );
   });
 
   it("keeps protected controls opted out", () => {

@@ -149,11 +149,23 @@ export default function AudioTagger() {
   }, [navigation]);
   useEffect(() => {
     if (!navigation.isMobile) return;
-    let start: { clientX: number; clientY: number; pointerType?: string; pointerId?: number } | null = null;
+    let start: {
+      clientX: number;
+      clientY: number;
+      pointerType?: string;
+      pointerId?: number;
+    } | null = null;
     let locked = false;
     const down = (event: PointerEvent) => {
-      if (event.isPrimary === false || (event.pointerType === "touch" && event.width > 1 && event.height > 1)) return;
-      if (!navigation.drawerOpen && shouldStartDrawerSwipe(event, window.innerWidth, event.target)) {
+      if (
+        event.isPrimary === false ||
+        (event.pointerType === "touch" && event.width > 1 && event.height > 1)
+      )
+        return;
+      if (
+        !navigation.drawerOpen &&
+        shouldStartDrawerSwipe(event, window.innerWidth, event.target)
+      ) {
         start = event;
         locked = false;
       }

@@ -1,4 +1,9 @@
-export type SwipePoint = { clientX: number; clientY: number; pointerType?: string; pointerId?: number };
+export type SwipePoint = {
+  clientX: number;
+  clientY: number;
+  pointerType?: string;
+  pointerId?: number;
+};
 
 export const MOBILE_DRAWER_EDGE_FRACTION = 0.4;
 export const MOBILE_DRAWER_SETTLE_PX = 64;
@@ -22,16 +27,24 @@ export const shouldStartDrawerSwipe = (
   target?: EventTarget | null,
 ) => {
   if (point.pointerType === "mouse" || point.pointerType === "pen") return false;
-  if (point.clientX > viewportWidth * MOBILE_DRAWER_EDGE_FRACTION || point.clientX < 0 || point.clientY < 0) return false;
+  if (
+    point.clientX > viewportWidth * MOBILE_DRAWER_EDGE_FRACTION ||
+    point.clientX < 0 ||
+    point.clientY < 0
+  )
+    return false;
   if (
     typeof Element !== "undefined" &&
     target instanceof Element &&
-    (target.closest("[data-drawer-swipe-optout], input, textarea, select, [contenteditable='true']") ||
+    (target.closest(
+      "[data-drawer-swipe-optout], input, textarea, select, [contenteditable='true']",
+    ) ||
       (() => {
         let node: Element | null = target;
         while (node) {
           const style = window.getComputedStyle(node);
-          if (isDrawerSwipeScrollOptOut(style.overflowX, node.scrollWidth, node.clientWidth)) return true;
+          if (isDrawerSwipeScrollOptOut(style.overflowX, node.scrollWidth, node.clientWidth))
+            return true;
           node = node.parentElement;
         }
         return false;
