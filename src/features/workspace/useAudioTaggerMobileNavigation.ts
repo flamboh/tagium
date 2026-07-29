@@ -114,11 +114,6 @@ export const useAudioTaggerMobileNavigation = ({
     let locked = false;
     const down = (event: PointerEvent) => {
       if (
-        event.isPrimary === false ||
-        (event.pointerType === "touch" && event.width > 1 && event.height > 1)
-      )
-        return;
-      if (
         !navigation.drawerOpen &&
         shouldStartDrawerSwipe(event, window.innerWidth, event.target)
       ) {

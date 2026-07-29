@@ -7,6 +7,35 @@ import {
 } from "@/features/workspace/drawerSwipe";
 
 describe("drawer swipe recognizer", () => {
+  it("accepts a primary finger contact regardless of its reported size", () => {
+    expect(
+      shouldStartDrawerSwipe(
+        {
+          clientX: 20,
+          clientY: 100,
+          isPrimary: true,
+          pointerType: "touch",
+          width: 18,
+          height: 18,
+        },
+        390,
+      ),
+    ).toBe(true);
+    expect(
+      shouldStartDrawerSwipe(
+        {
+          clientX: 20,
+          clientY: 100,
+          isPrimary: false,
+          pointerType: "touch",
+          width: 18,
+          height: 18,
+        },
+        390,
+      ),
+    ).toBe(false);
+  });
+
   it("starts from the left 40% for touch input", () => {
     expect(shouldStartDrawerSwipe({ clientX: 20, clientY: 100, pointerType: "touch" }, 390)).toBe(
       true,

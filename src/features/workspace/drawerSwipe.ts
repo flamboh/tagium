@@ -1,8 +1,11 @@
 export type SwipePoint = {
   clientX: number;
   clientY: number;
+  height?: number;
+  isPrimary?: boolean;
   pointerType?: string;
   pointerId?: number;
+  width?: number;
 };
 
 export const MOBILE_DRAWER_EDGE_FRACTION = 0.4;
@@ -26,7 +29,8 @@ export const shouldStartDrawerSwipe = (
   viewportWidth: number,
   target?: EventTarget | null,
 ) => {
-  if (point.pointerType === "mouse" || point.pointerType === "pen") return false;
+  if (point.isPrimary === false || point.pointerType === "mouse" || point.pointerType === "pen")
+    return false;
   if (
     point.clientX > viewportWidth * MOBILE_DRAWER_EDGE_FRACTION ||
     point.clientX < 0 ||
