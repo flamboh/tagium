@@ -7,12 +7,19 @@ interface LandingScreenProps {
   active: boolean;
   children?: ReactNode;
   onAudioUpload: (files: File[]) => void | Promise<void>;
+  inert?: boolean;
 }
 
-export default function LandingScreen({ active, children, onAudioUpload }: LandingScreenProps) {
+export default function LandingScreen({
+  active,
+  children,
+  onAudioUpload,
+  inert,
+}: LandingScreenProps) {
   return (
     <div
       data-view={active ? "landing" : undefined}
+      inert={inert ? true : undefined}
       className={
         active
           ? "flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 max-lg:[@media(max-height:700px)]:p-4 md:h-auto md:flex-1"

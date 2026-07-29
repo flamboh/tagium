@@ -1,8 +1,8 @@
 "use client";
 
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type { MouseEvent as ReactMouseEvent, RefObject } from "react";
 import { useRef, useState } from "react";
-import { Settings } from "lucide-react";
+import { Settings, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AlbumSidebar from "@/features/library/AlbumSidebar";
 import PlaylistDownloadQueuePanel, {
@@ -16,6 +16,9 @@ import { isValidFilenameBase } from "@/features/library/filename";
 import type { ShareAlbumActionState } from "@/features/share/sharePublication";
 
 export interface TagSidebarPanelProps {
+  mobileOpen?: boolean;
+  mobileDrawerRef?: RefObject<HTMLDivElement | null>;
+  onMobileClose?: () => void;
   loading: boolean;
   files: TagiumFile[];
   albums: AlbumGroup[];
@@ -59,10 +62,16 @@ export interface TagSidebarPanelProps {
   onRetryPlaylistDownloadQueue?: () => void;
 }
 
+export const MOBILE_DRAWER_TRANSITION_CLASSES =
+  "transition-[translate,visibility,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]";
+
 const isFileDrag = (event: React.DragEvent<HTMLDivElement>) =>
   event.dataTransfer.types.includes("Files");
 
 export default function TagSidebarPanel({
+  mobileOpen = false,
+  mobileDrawerRef,
+  onMobileClose,
   loading,
   files,
   albums,
@@ -140,8 +149,16 @@ export default function TagSidebarPanel({
 
   return (
     <div
+      ref={mobileDrawerRef}
+      tabIndex={mobileOpen ? -1 : undefined}
+      role={mobileOpen ? "dialog" : undefined}
+      aria-modal={mobileOpen ? "true" : undefined}
+      aria-label={mobileOpen ? "library" : undefined}
       className={cn(
-        "order-2 h-svh w-full flex-shrink-0 flex flex-col border-t bg-card overflow-hidden transition-colors duration-200 md:order-none md:h-auto md:min-h-0 md:w-72 md:border-t-0 md:border-r",
+        `order-2 h-svh w-full flex-shrink-0 flex flex-col border-t bg-card overflow-hidden ${MOBILE_DRAWER_TRANSITION_CLASSES} md:order-none md:h-auto md:min-h-0 md:w-72 md:translate-x-0 md:border-t-0 md:border-r`,
+        "fixed inset-y-0 left-0 z-50 w-[min(88vw,22rem)] border-r shadow-xl md:static md:visible md:opacity-100 md:shadow-none",
+        mobileOpen ? "translate-x-0 visible opacity-100" : "-translate-x-full invisible opacity-0",
+        "motion-reduce:duration-100 motion-reduce:transition-opacity motion-reduce:translate-x-0",
         isDraggingFile && "bg-primary/5 shadow-[inset_0_0_0_2px_var(--primary)]",
       )}
       onDragEnter={handleSidebarDragEnter}
@@ -162,6 +179,18 @@ export default function TagSidebarPanel({
     >
       <div className="h-14 flex items-center px-5 border-b flex-shrink-0">
         <span className="font-bold text-xl tracking-tight select-none">tagium</span>
+        {mobileOpen && onMobileClose ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="ml-auto size-11 md:hidden"
+            aria-label="close library"
+            onClick={onMobileClose}
+          >
+            <X />
+          </Button>
+        ) : null}
       </div>
 
       <AlbumSidebar
@@ -200,14 +229,18 @@ export default function TagSidebarPanel({
 
       <div className="px-3 py-3 border-t flex-shrink-0 flex flex-col gap-2">
         {canDownloadAll && !loading ? (
-          <Button className="w-full" onClick={onDownloadAll}>
+          <Button className="w-full [@media(pointer:coarse)]:min-h-11" onClick={onDownloadAll}>
             download all
           </Button>
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="block">
-                <Button className="w-full" onClick={onDownloadAll} disabled>
+                <Button
+                  className="w-full [@media(pointer:coarse)]:min-h-11"
+                  onClick={onDownloadAll}
+                  disabled
+                >
                   {loading ? "downloading..." : "download all"}
                 </Button>
               </span>
