@@ -11,7 +11,11 @@ export type SwipePoint = {
 export const MOBILE_DRAWER_EDGE_FRACTION = 0.4;
 export const MOBILE_DRAWER_SETTLE_PX = 64;
 
-export type SwipeDecision = "open" | "ignore" | "tracking";
+export type SwipeDirection = "open" | "close";
+export type SwipeDecision = SwipeDirection | "ignore" | "tracking";
+
+const isEligibleDrawerSwipePointer = (point: SwipePoint) =>
+  point.isPrimary !== false && point.pointerType !== "mouse" && point.pointerType !== "pen";
 
 export const isDrawerSwipeOptOut = (tagName: string) =>
   ["input", "textarea", "select", "contenteditable", "data-drawer-swipe-optout"].includes(
@@ -29,8 +33,7 @@ export const shouldStartDrawerSwipe = (
   viewportWidth: number,
   target?: EventTarget | null,
 ) => {
-  if (point.isPrimary === false || point.pointerType === "mouse" || point.pointerType === "pen")
-    return false;
+  if (!isEligibleDrawerSwipePointer(point)) return false;
   if (
     point.clientX > viewportWidth * MOBILE_DRAWER_EDGE_FRACTION ||
     point.clientX < 0 ||
@@ -59,11 +62,27 @@ export const shouldStartDrawerSwipe = (
   return viewportWidth > 0;
 };
 
-export const decideDrawerSwipe = (start: SwipePoint, current: SwipePoint): SwipeDecision => {
-  const dx = current.clientX - start.clientX;
+export const getDrawerSwipeDirection = (
+  point: SwipePoint,
+  viewportWidth: number,
+  drawerOpen: boolean,
+  target?: EventTarget | null,
+): SwipeDirection | null => {
+  if (!isEligibleDrawerSwipePointer(point)) return null;
+  if (drawerOpen) return "close";
+  return shouldStartDrawerSwipe(point, viewportWidth, target) ? "open" : null;
+};
+
+export const decideDrawerSwipe = (
+  start: SwipePoint,
+  current: SwipePoint,
+  direction: SwipeDirection,
+): SwipeDecision => {
+  const rawDx = current.clientX - start.clientX;
+  const dx = direction === "open" ? rawDx : -rawDx;
   const dy = Math.abs(current.clientY - start.clientY);
   if (dx < 0) return "ignore";
-  if (Math.abs(dx) < 12 && dy < 12) return "tracking";
-  if (dx <= 0 || Math.abs(dx) < dy * 1.5) return "ignore";
-  return dx >= MOBILE_DRAWER_SETTLE_PX ? "open" : "tracking";
+  if (dx < 12 && dy < 12) return "tracking";
+  if (dx <= 0 || dx < dy * 1.5) return "ignore";
+  return dx >= MOBILE_DRAWER_SETTLE_PX ? direction : "tracking";
 };

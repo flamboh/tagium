@@ -141,7 +141,7 @@ export default function AudioTagger() {
           <Menu />
         </Button>
       )}
-      <div className="min-h-svh flex flex-col overflow-x-hidden bg-background md:h-svh md:flex-row md:overflow-hidden">
+      <div className="min-h-svh touch-pan-y flex flex-col overflow-x-hidden bg-background md:h-svh md:touch-auto md:flex-row md:overflow-hidden">
         <TagSidebarPanel
           mobileOpen={navigation.drawerOpen}
           mobileDrawerRef={drawerRef}

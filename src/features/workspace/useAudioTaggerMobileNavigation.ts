@@ -1,6 +1,10 @@
 import { useEffect, useRef } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { decideDrawerSwipe, shouldStartDrawerSwipe } from "@/features/workspace/drawerSwipe";
+import {
+  decideDrawerSwipe,
+  getDrawerSwipeDirection,
+  type SwipeDirection,
+} from "@/features/workspace/drawerSwipe";
 import { useMobileWorkspaceNavigation } from "@/features/workspace/mobileWorkspaceNavigation";
 import type { ActiveView, SetActiveView } from "@/features/workspace/audioWorkspaceTypes";
 import type { AudioWorkspace } from "@/features/workspace/useAudioWorkspace";
@@ -111,21 +115,27 @@ export const useAudioTaggerMobileNavigation = ({
       pointerType?: string;
       pointerId?: number;
     } | null = null;
+    let direction: SwipeDirection | null = null;
     let locked = false;
     const down = (event: PointerEvent) => {
-      if (
-        !navigation.drawerOpen &&
-        shouldStartDrawerSwipe(event, window.innerWidth, event.target)
-      ) {
-        start = event;
-        locked = false;
-      }
+      direction = getDrawerSwipeDirection(
+        event,
+        window.innerWidth,
+        navigation.drawerOpen,
+        event.target,
+      );
+      if (!direction) return;
+      start = event;
+      locked = false;
     };
     const move = (event: PointerEvent) => {
-      if (!start || event.pointerId !== start.pointerId || locked) return;
-      const decision = decideDrawerSwipe(start, event);
+      if (!start || !direction || event.pointerId !== start.pointerId || locked) return;
+      const decision = decideDrawerSwipe(start, event, direction);
       if (decision === "open") {
         navigation.openDrawer();
+        locked = true;
+      } else if (decision === "close") {
+        navigation.closeDrawer();
         locked = true;
       } else if (decision === "ignore") {
         locked = true;
@@ -133,6 +143,7 @@ export const useAudioTaggerMobileNavigation = ({
     };
     const clear = () => {
       start = null;
+      direction = null;
       locked = false;
     };
     window.addEventListener("pointerdown", down);
