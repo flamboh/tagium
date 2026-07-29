@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AlbumMetadataDialog from "@/features/editor/AlbumMetadataDialog";
@@ -32,17 +32,12 @@ import {
 } from "@/features/share/shareLink";
 import { useShareWorkflow } from "@/features/share/useShareWorkflow";
 import { shareLinksEnabled } from "@/features/share/shareFeature";
-import { useMobileWorkspaceNavigation } from "@/features/workspace/mobileWorkspaceNavigation";
-import { shouldStartDrawerSwipe, decideDrawerSwipe } from "@/features/workspace/drawerSwipe";
+import { useAudioTaggerMobileNavigation } from "@/features/workspace/useAudioTaggerMobileNavigation";
 
 export default function AudioTagger() {
   const library = useLibraryStore();
   const [activeView, setActiveView] = useState<ActiveView>("editor");
   const [settings, setSettings] = useState<AppSettings>(loadAppSettings);
-  const navigation = useMobileWorkspaceNavigation({ activeView, setActiveView });
-  const drawerRef = useRef<HTMLDivElement>(null);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const wasDrawerOpenRef = useRef(false);
   const activateEditor = useCallback(() => setActiveView("editor"), []);
   const editor = useTrackEditorSession({ library, settings });
   const exporting = useExportSession({ library, editor: editor.commands, settings });
@@ -64,145 +59,13 @@ export default function AudioTagger() {
     removeDownloads: importing.commands.removeTracks,
     busy,
   });
-  const mobileSidebarProps = {
-    ...workspace.sidebarProps,
-    onSelectAlbum: (albumId: string, event?: React.MouseEvent) => {
-      navigation.runAfterDrawerClose(() => workspace.sidebarProps.onSelectAlbum(albumId, event));
-    },
-    onSelectFile: (albumId: string, fileId: string, event?: React.MouseEvent) => {
-      navigation.runAfterDrawerClose(() =>
-        workspace.sidebarProps.onSelectFile(albumId, fileId, event),
-      );
-    },
-    onSelectLooseTrack: (fileId: string, event?: React.MouseEvent) => {
-      navigation.runAfterDrawerClose(() =>
-        workspace.sidebarProps.onSelectLooseTrack(fileId, event),
-      );
-    },
-    onEditAlbum: (albumId: string) =>
-      navigation.runAfterDrawerClose(() => workspace.sidebarProps.onEditAlbum(albumId)),
-    onAddAlbum: () => navigation.runAfterDrawerClose(workspace.sidebarProps.onAddAlbum),
-    onRemoveFile: (fileId: string) =>
-      navigation.runAfterDrawerClose(() => workspace.sidebarProps.onRemoveFile(fileId)),
-    onPromptCreateAlbumFromLooseTracks: (source: string, target: string) =>
-      navigation.runAfterDrawerClose(() =>
-        workspace.sidebarProps.onPromptCreateAlbumFromLooseTracks(source, target),
-      ),
-    onOpenSettings: () =>
-      navigation.runAfterDrawerClose(() => {
-        if (workspace.sidebarProps.settingsOpen) navigation.backWorkspace();
-        else navigation.navigateToView("settings");
-      }),
-  };
-  const mobileSettingsProps = {
-    ...workspace.settingsPageProps,
-    onBack: () => navigation.runAfterDrawerClose(navigation.backWorkspace),
-  };
-  useEffect(() => {
-    if (!navigation.drawerOpen) {
-      if (wasDrawerOpenRef.current) {
-        const opener = navigation.openerRef.current ?? menuButtonRef.current;
-        const restore = () => opener?.isConnected && opener.focus();
-        restore();
-        const timer = window.setTimeout(restore, 120);
-        navigation.openerRef.current = null;
-        wasDrawerOpenRef.current = false;
-        return () => window.clearTimeout(timer);
-      }
-      wasDrawerOpenRef.current = false;
-      return;
-    }
-    wasDrawerOpenRef.current = true;
-    const drawer = drawerRef.current;
-    const selector = "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])";
-    const getItems = () =>
-      Array.from(drawer?.querySelectorAll<HTMLElement>(selector) ?? []).filter((item) => {
-        const style = window.getComputedStyle(item);
-        return (
-          !item.hasAttribute("disabled") &&
-          item.getAttribute("aria-hidden") !== "true" &&
-          style.display !== "none" &&
-          style.visibility !== "hidden"
-        );
-      });
-    drawer?.focus();
-    const trap = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        navigation.closeDrawer();
-        return;
-      }
-      if (event.key !== "Tab" || !drawer) return;
-      const items = getItems();
-      if (!items.length) return;
-      const index = items.indexOf(document.activeElement as HTMLElement);
-      const next = event.shiftKey
-        ? index <= 0
-          ? items.length - 1
-          : index - 1
-        : (index + 1) % items.length;
-      event.preventDefault();
-      items[next]?.focus();
-    };
-    document.addEventListener("keydown", trap);
-    return () => document.removeEventListener("keydown", trap);
-  }, [navigation]);
-  useEffect(() => {
-    if (!navigation.isMobile) return;
-    let start: {
-      clientX: number;
-      clientY: number;
-      pointerType?: string;
-      pointerId?: number;
-    } | null = null;
-    let locked = false;
-    const down = (event: PointerEvent) => {
-      if (
-        event.isPrimary === false ||
-        (event.pointerType === "touch" && event.width > 1 && event.height > 1)
-      )
-        return;
-      if (
-        !navigation.drawerOpen &&
-        shouldStartDrawerSwipe(event, window.innerWidth, event.target)
-      ) {
-        start = event;
-        locked = false;
-      }
-    };
-    const move = (event: PointerEvent) => {
-      if (!start || event.pointerId !== start.pointerId || locked) return;
-      const decision = decideDrawerSwipe(start, event);
-      if (decision === "open") {
-        navigation.openDrawer();
-        locked = true;
-      } else if (decision === "ignore") {
-        locked = true;
-      }
-    };
-    const clear = () => {
-      start = null;
-      locked = false;
-    };
-    window.addEventListener("pointerdown", down);
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", clear);
-    window.addEventListener("pointercancel", clear);
-    return () => {
-      window.removeEventListener("pointerdown", down);
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", clear);
-      window.removeEventListener("pointercancel", clear);
-    };
-  }, [navigation]);
-  useEffect(() => {
-    if (!navigation.isMobile || !navigation.drawerOpen) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [navigation.drawerOpen, navigation.isMobile]);
+  const {
+    navigation,
+    drawerRef,
+    menuButtonRef,
+    sidebarProps: mobileSidebarProps,
+    settingsPageProps: mobileSettingsProps,
+  } = useAudioTaggerMobileNavigation({ activeView, setActiveView, workspace });
   const { files, albums, looseTrackIds, selectedFileId, selectedAlbumId, selectedFileIds } =
     library.state;
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
