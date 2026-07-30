@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowRight, Link2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { MediaUrlEntryLayout } from "@/features/import/mediaUrlEntryPresentation";
+import { getMediaUrlEntryMotionKeyframes } from "@/features/import/mediaUrlEntryMotion";
 import {
   getSystemFailurePresentation,
   reportSystemFailure,
@@ -41,6 +42,17 @@ const validateMediaUrl = (value: string) => {
 const prefersReducedMotion = () =>
   typeof window !== "undefined" &&
   (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
+
+const clearMotionStyles = (anchor: HTMLDivElement | null, motion: HTMLDivElement | null) => {
+  if (anchor) anchor.style.height = "";
+  if (!motion) return;
+
+  motion.style.position = "";
+  motion.style.left = "";
+  motion.style.top = "";
+  motion.style.width = "";
+  motion.style.zIndex = "";
+};
 
 export function useMediaUrlEntryController(
   onUrlImport: (sourceUrl: string) => void | Promise<void>,
@@ -111,10 +123,76 @@ export default function MediaUrlEntry({
 }: MediaUrlEntryProps) {
   const internalController = useMediaUrlEntryController(onUrlImport);
   const controller = controlledController ?? internalController;
-  const feedbackRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const motionRef = useRef<HTMLDivElement>(null);
+  const previousRectRef = useRef<DOMRect | null>(null);
+  const previousLayoutRef = useRef(layout);
+  const animationRef = useRef<Animation | null>(null);
+
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current;
+    const motion = motionRef.current;
+    if (!anchor || !motion) return;
+
+    const runningAnimation = animationRef.current;
+    const previousRect = runningAnimation
+      ? motion.getBoundingClientRect()
+      : previousRectRef.current;
+    const layoutChanged = previousLayoutRef.current !== layout;
+    runningAnimation?.cancel();
+    animationRef.current = null;
+    clearMotionStyles(anchor, motion);
+
+    const nextRect = motion.getBoundingClientRect();
+    if (
+      previousRect &&
+      layoutChanged &&
+      !prefersReducedMotion() &&
+      typeof motion.animate === "function"
+    ) {
+      anchor.style.height = `${nextRect.height}px`;
+      motion.style.position = "fixed";
+      motion.style.left = `${previousRect.left}px`;
+      motion.style.top = `${previousRect.top}px`;
+      motion.style.width = `${previousRect.width}px`;
+      motion.style.zIndex = "30";
+
+      const animation = motion.animate(getMediaUrlEntryMotionKeyframes(previousRect, nextRect), {
+        duration: 420,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      });
+      animationRef.current = animation;
+      animation.onfinish = () => {
+        if (animationRef.current !== animation) return;
+        animationRef.current = null;
+        clearMotionStyles(anchorRef.current, motionRef.current);
+        previousRectRef.current = motion.getBoundingClientRect();
+      };
+    }
+
+    previousRectRef.current = nextRect;
+    previousLayoutRef.current = layout;
+  }, [layout]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const settleMotion = () => {
+      animationRef.current?.cancel();
+      animationRef.current = null;
+      clearMotionStyles(anchorRef.current, motionRef.current);
+      previousRectRef.current = motionRef.current?.getBoundingClientRect() ?? null;
+    };
+
+    window.addEventListener("resize", settleMotion);
+    return () => {
+      window.removeEventListener("resize", settleMotion);
+      settleMotion();
+    };
+  }, []);
 
   const showValidationFeedback = () => {
-    const feedback = feedbackRef.current;
+    const feedback = motionRef.current;
     if (!feedback || prefersReducedMotion() || typeof feedback.animate !== "function") return;
     feedback.animate(
       [
@@ -142,15 +220,18 @@ export default function MediaUrlEntry({
           "pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center border-t bg-background/95 p-3 lg:bottom-4 lg:border-t-0 lg:bg-transparent lg:px-4 lg:p-0",
       )}
     >
-      {layout !== "editor" && (
+      {layout === "landing" && (
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <div className="h-px flex-1 bg-border" />
           <span>or import from a url</span>
           <div className="h-px flex-1 bg-border" />
         </div>
       )}
-      <div className={cn("w-full", layout === "editor" ? "max-w-3xl" : "max-w-md")}>
-        <div ref={feedbackRef} className="pointer-events-auto w-full bg-background">
+      <div
+        ref={anchorRef}
+        className={cn("w-full", layout === "landing" ? "max-w-md" : "max-w-3xl")}
+      >
+        <div ref={motionRef} className="pointer-events-auto w-full bg-background">
           <form
             noValidate
             onSubmit={async (event) => {

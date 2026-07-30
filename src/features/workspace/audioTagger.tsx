@@ -254,21 +254,14 @@ export default function AudioTagger() {
             inert={navigation.isMobile && navigation.drawerOpen}
             onAudioUpload={importing.commands.upload}
           >
-            {mediaUrlEntryPresentation?.layout === "landing" && (
+            {mediaUrlEntryPresentation && (
               <MediaUrlEntry
-                layout="landing"
+                layout={mediaUrlEntryPresentation.layout}
                 controller={mediaUrlEntryController}
                 onUrlImport={handleUrlImport}
               />
             )}
           </LandingScreen>
-          {mediaUrlEntryPresentation && mediaUrlEntryPresentation.layout !== "landing" && (
-            <MediaUrlEntry
-              layout={mediaUrlEntryPresentation.layout}
-              controller={mediaUrlEntryController}
-              onUrlImport={handleUrlImport}
-            />
-          )}
         </div>
       </div>
     </>
