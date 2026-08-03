@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -68,6 +68,8 @@ export function GeneralSettingsSection({ settings, onChange }: SettingsSectionPr
 }
 
 export function MetadataSettingsSection({ settings, onChange }: SettingsSectionProps) {
+  const [metadataLinksOpen, setMetadataLinksOpen] = useState(false);
+  const metadataLinksContentId = useId();
   const visibleMetadataLinks = METADATA_LINK_SETTINGS_DESCRIPTORS.filter((descriptor) =>
     isMetadataLinkVisible(descriptor, settings),
   );
@@ -100,38 +102,60 @@ export function MetadataSettingsSection({ settings, onChange }: SettingsSectionP
         </span>
       </label>
 
-      <details className="group mt-1 border-t pt-3">
-        <summary className="flex cursor-pointer select-none list-none items-center justify-between rounded-md py-1 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+      <div
+        className="group/metadata-linking mt-1 border-t pt-3"
+        data-state={metadataLinksOpen ? "open" : "closed"}
+      >
+        <button
+          type="button"
+          className="flex w-full cursor-pointer select-none items-center justify-between rounded-md py-1 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          aria-expanded={metadataLinksOpen}
+          aria-controls={metadataLinksContentId}
+          onClick={() => setMetadataLinksOpen((open) => !open)}
+        >
           <span>metadata linking</span>
-          <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" />
-        </summary>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">
-          linked tags follow album changes. unlink a tag to edit it per track without changing the
-          rest of the album.
-        </p>
-        <div className="mt-3 flex flex-col gap-2">
-          {visibleMetadataLinks.map((descriptor) => (
-            <label key={descriptor.id} className={checkboxRowClassName}>
-              <Checkbox
-                checked={isMetadataLinkEnabled(settings, descriptor)}
-                onCheckedChange={(checked) =>
-                  onChange(withMetadataLinkEnabled(settings, descriptor, checked === true))
-                }
-                className="mt-0.5"
-              />
-              <span className="space-y-0.5">
-                <span className="block text-sm font-medium leading-5">{descriptor.label}</span>
-                <span className="block text-xs leading-5 text-muted-foreground">
-                  {descriptor.relation}
-                </span>
-              </span>
-            </label>
-          ))}
-          <p className="text-xs leading-5 text-muted-foreground">
-            album title always follows the album and cannot be unlinked.
-          </p>
+          <ChevronDown
+            className="size-4 text-muted-foreground transition-transform duration-200 ease-out group-data-[state=open]/metadata-linking:rotate-180 motion-reduce:transition-none"
+            aria-hidden="true"
+          />
+        </button>
+        <div
+          id={metadataLinksContentId}
+          aria-hidden={!metadataLinksOpen}
+          inert={!metadataLinksOpen}
+          data-metadata-linking-content
+          className="grid grid-rows-[0fr] opacity-0 transition-[grid-template-rows,opacity] duration-200 ease-out group-data-[state=open]/metadata-linking:grid-rows-[1fr] group-data-[state=open]/metadata-linking:opacity-100 motion-reduce:transition-none"
+        >
+          <div className="min-h-0 overflow-hidden">
+            <p className="pt-2 text-xs leading-5 text-muted-foreground">
+              linked tags follow album changes. unlink a tag to edit it per track without changing
+              the rest of the album.
+            </p>
+            <div className="mt-3 flex flex-col gap-2">
+              {visibleMetadataLinks.map((descriptor) => (
+                <label key={descriptor.id} className={checkboxRowClassName}>
+                  <Checkbox
+                    checked={isMetadataLinkEnabled(settings, descriptor)}
+                    onCheckedChange={(checked) =>
+                      onChange(withMetadataLinkEnabled(settings, descriptor, checked === true))
+                    }
+                    className="mt-0.5"
+                  />
+                  <span className="space-y-0.5">
+                    <span className="block text-sm font-medium leading-5">{descriptor.label}</span>
+                    <span className="block text-xs leading-5 text-muted-foreground">
+                      {descriptor.relation}
+                    </span>
+                  </span>
+                </label>
+              ))}
+              <p className="text-xs leading-5 text-muted-foreground">
+                album title always follows the album and cannot be unlinked.
+              </p>
+            </div>
+          </div>
         </div>
-      </details>
+      </div>
     </section>
   );
 }
