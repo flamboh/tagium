@@ -251,7 +251,7 @@ export function AboutSettingsSection() {
                 href="https://cobalt.tools/"
                 target="_blank"
                 rel="noreferrer"
-                className="cursor-pointer text-primary underline-offset-4 hover:underline"
+                className="cursor-pointer text-brand underline-offset-4 hover:underline"
               >
                 cobalt
               </a>{" "}
@@ -260,7 +260,7 @@ export function AboutSettingsSection() {
                 href="https://imput.net/"
                 target="_blank"
                 rel="noreferrer"
-                className="cursor-pointer text-primary underline-offset-4 hover:underline"
+                className="cursor-pointer text-brand underline-offset-4 hover:underline"
               >
                 imput
               </a>

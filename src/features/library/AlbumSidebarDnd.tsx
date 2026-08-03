@@ -162,14 +162,14 @@ export function SortableTrackRow({
             {track.downloadStatus !== "downloading" && showSavedCheck && (
               <Check
                 aria-hidden="true"
-                className="h-3 w-3 shrink-0 animate-in fade-in text-green-500 motion-reduce:animate-none"
+                className="h-3 w-3 shrink-0 animate-in fade-in text-success motion-reduce:animate-none"
               />
             )}
             {(track.downloadStatus === "error" || track.status === "error") && (
               <AlertCircle
                 aria-label="track has an error"
                 className={cn(
-                  "h-3 w-3 shrink-0 text-red-500",
+                  "h-3 w-3 shrink-0 text-destructive",
                   retryable ? "group-hover:opacity-0" : "",
                 )}
               />
@@ -196,7 +196,7 @@ export function SortableTrackRow({
           title="retry download"
           aria-label={`retry download for ${track.filename}`}
         >
-          <RefreshCw className="h-3 w-3 text-muted-foreground hover:text-primary" />
+          <RefreshCw className="h-3 w-3 text-muted-foreground hover:text-brand" />
         </button>
       )}
       <button
@@ -239,7 +239,7 @@ export function AlbumActionItemContent({ action }: { action: AlbumActionItem }) 
 
   return (
     <>
-      <ActionIcon aria-hidden="true" className={cn(action.id === "cleanup" && "text-primary")} />
+      <ActionIcon aria-hidden="true" className={cn(action.id === "cleanup" && "text-brand")} />
       <span className="min-w-0 flex-1 truncate">{action.label}</span>
       {action.trailingText && (
         <span
@@ -289,7 +289,7 @@ export function SortableAlbumCard({
       data-drawer-swipe-optout="true"
       className={cn(
         "border-b transition-all shrink-0",
-        selected ? "bg-primary/5" : "",
+        selected ? "bg-brand/5" : "",
         isDragging ? "z-10 opacity-60" : "",
       )}
       style={sortableStyle(transform, transition)}
@@ -399,7 +399,7 @@ export function DroppableTrackContainer({
       ref={setNodeRef}
       className={cn(
         "flex flex-col transition-shadow",
-        isOver ? "shadow-[inset_0_0_0_2px_var(--primary)]" : "",
+        isOver ? "shadow-[inset_0_0_0_2px_var(--brand)]" : "",
         className,
       )}
     >

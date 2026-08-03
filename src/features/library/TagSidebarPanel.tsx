@@ -2,7 +2,7 @@
 
 import type { MouseEvent as ReactMouseEvent, RefObject } from "react";
 import { useRef, useState } from "react";
-import { Settings, X } from "lucide-react";
+import { Moon, Settings, Sun, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AlbumSidebar from "@/features/library/AlbumSidebar";
 import PlaylistDownloadQueuePanel, {
@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { allTracksReadyForDownload } from "@/features/export/downloadLibrary";
 import { isValidFilenameBase } from "@/features/library/filename";
 import type { ShareAlbumActionState } from "@/features/share/sharePublication";
+import { useTheme } from "@/features/theme/useTheme";
 
 export interface TagSidebarPanelProps {
   mobileOpen?: boolean;
@@ -107,6 +108,7 @@ export default function TagSidebarPanel({
 }: TagSidebarPanelProps) {
   const dragCounterRef = useRef(0);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   const canDownloadAll = files.length > 0 && allTracksReadyForDownload(files);
   const hasInvalidFilename = files.some(
     (file) => file.metadata && !isValidFilenameBase(file.metadata.filename),
@@ -149,17 +151,18 @@ export default function TagSidebarPanel({
 
   return (
     <div
+      data-slot="sidebar-panel"
       ref={mobileDrawerRef}
       tabIndex={mobileOpen ? -1 : undefined}
       role={mobileOpen ? "dialog" : undefined}
       aria-modal={mobileOpen ? "true" : undefined}
       aria-label={mobileOpen ? "library" : undefined}
       className={cn(
-        `order-2 h-svh w-full flex-shrink-0 flex flex-col border-t bg-card overflow-hidden ${MOBILE_DRAWER_TRANSITION_CLASSES} md:order-none md:h-auto md:min-h-0 md:w-72 md:translate-x-0 md:border-t-0 md:border-r`,
+        `order-2 h-svh w-full flex-shrink-0 flex flex-col border-t bg-background text-foreground overflow-hidden ${MOBILE_DRAWER_TRANSITION_CLASSES} md:order-none md:h-auto md:min-h-0 md:w-72 md:translate-x-0 md:border-t-0 md:border-r`,
         "fixed inset-y-0 left-0 z-50 w-[min(88vw,22rem)] border-r shadow-xl md:static md:visible md:opacity-100 md:shadow-none",
         mobileOpen ? "translate-x-0 visible opacity-100" : "-translate-x-full invisible opacity-0",
         "motion-reduce:duration-100 motion-reduce:transition-opacity motion-reduce:translate-x-0",
-        isDraggingFile && "bg-primary/5 shadow-[inset_0_0_0_2px_var(--primary)]",
+        isDraggingFile && "bg-brand/5 shadow-[inset_0_0_0_2px_var(--brand)]",
       )}
       onDragEnter={handleSidebarDragEnter}
       onDragLeave={handleSidebarDragLeave}
@@ -179,12 +182,22 @@ export default function TagSidebarPanel({
     >
       <div className="h-14 flex items-center px-5 border-b flex-shrink-0">
         <span className="font-bold text-xl tracking-tight select-none">tagium</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="ml-auto size-11"
+          aria-label={`switch to ${theme === "light" ? "dark" : "light"} mode`}
+          onClick={toggleTheme}
+        >
+          {theme === "light" ? <Moon /> : <Sun />}
+        </Button>
         {mobileOpen && onMobileClose ? (
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="ml-auto size-11 md:hidden"
+            className="size-11 md:hidden"
             aria-label="close library"
             onClick={onMobileClose}
           >

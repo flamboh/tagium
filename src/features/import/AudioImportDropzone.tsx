@@ -102,16 +102,16 @@ export default function AudioImportDropzone({
           importFiles(event.dataTransfer.files);
         }}
         className={cn(
-          "flex w-full cursor-pointer flex-col items-center justify-center gap-5 rounded-3xl border-2 border-dashed px-8 py-16 outline-none transition-[border-color,background-color,box-shadow,transform] duration-200 motion-reduce:transition-none max-lg:[@media(max-height:700px)]:gap-3 max-lg:[@media(max-height:700px)]:py-8",
+          "flex w-full cursor-pointer flex-col items-center justify-center gap-5 rounded-(--radius-hero) border-2 border-dashed px-8 py-16 outline-none transition-[border-color,background-color,box-shadow,transform] duration-200 motion-reduce:transition-none max-lg:[@media(max-height:700px)]:gap-3 max-lg:[@media(max-height:700px)]:py-8",
           isDragging
-            ? "scale-[1.015] border-primary bg-primary/10 shadow-lg shadow-primary/10 motion-reduce:scale-100"
-            : "border-border hover:border-primary/50 hover:bg-accent/20 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            ? "scale-[1.015] border-brand bg-brand/10 shadow-lg shadow-brand/10 motion-reduce:scale-100"
+            : "border-border hover:border-brand/50 hover:bg-accent/20 focus-visible:border-brand/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         )}
       >
         {isDragging ? (
-          <Music4 aria-hidden="true" className="size-14 text-primary" />
+          <Music4 aria-hidden="true" className="size-14 text-brand" />
         ) : (
-          <div className="flex size-16 items-center justify-center rounded-2xl bg-muted">
+          <div className="flex size-16 items-center justify-center rounded-(--radius-hero-inner) bg-muted">
             <Upload aria-hidden="true" className="size-7 text-muted-foreground" />
           </div>
         )}
