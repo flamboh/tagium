@@ -1,5 +1,4 @@
 import { useCallback, useLayoutEffect, useMemo, useReducer, useRef } from "react";
-import { flushSync } from "react-dom";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type { ActiveView } from "@/features/workspace/audioWorkspaceTypes";
@@ -74,13 +73,8 @@ export const useWorkspaceNavigation = ({
 
   const goHome = useCallback(() => {
     if (editorRef.current.isCoverProcessing) return;
-    const clearSelection = () => {
-      editorRef.current.commands.flush();
-      libraryRef.current.dispatch({ type: "selection-cleared" });
-    };
-
-    if (destinationRef.current.kind === "settings") flushSync(clearSelection);
-    else clearSelection();
+    editorRef.current.commands.flush();
+    libraryRef.current.dispatch({ type: "selection-cleared" });
     dispatch({ type: "go-home" });
   }, []);
 
