@@ -10,7 +10,7 @@ import { useWorkspaceAlbumDialog } from "@/features/workspace/useWorkspaceAlbumD
 import { useWorkspaceCleanup } from "@/features/workspace/useWorkspaceCleanup";
 import { useWorkspaceSelection } from "@/features/workspace/useWorkspaceSelection";
 import { useWorkspaceSettings } from "@/features/settings/useWorkspaceSettings";
-import type { ActiveView, SetActiveView } from "@/features/workspace/audioWorkspaceTypes";
+import type { WorkspaceNavigation } from "@/features/workspace/workspaceNavigation";
 
 export type { ActiveView } from "@/features/workspace/audioWorkspaceTypes";
 
@@ -36,6 +36,7 @@ type WorkspaceSidebarProps = Pick<
   | "onPromptCreateAlbumFromLooseTracks"
   | "onReorderAlbums"
   | "onOpenSettings"
+  | "onGoHome"
 >;
 
 export interface AudioWorkspace {
@@ -51,8 +52,7 @@ export const useAudioWorkspace = ({
   editor,
   settings,
   setSettings,
-  activeView,
-  setActiveView,
+  navigation,
   removeDownloads,
   busy,
 }: {
@@ -60,8 +60,7 @@ export const useAudioWorkspace = ({
   editor: WorkspaceEditor;
   settings: AppSettings;
   setSettings: (settings: AppSettings) => void;
-  activeView: ActiveView;
-  setActiveView: SetActiveView;
+  navigation: WorkspaceNavigation;
   removeDownloads: (trackIds: string[]) => void;
   busy: boolean;
 }): AudioWorkspace => {
@@ -70,16 +69,14 @@ export const useAudioWorkspace = ({
     library,
     editor,
     settings,
-    setActiveView,
+    navigation,
     removeDownloads,
   });
   const album = useWorkspaceAlbumDialog({ library, editor, settings, removeDownloads });
   const settingsPageProps = useWorkspaceSettings({
-    library,
-    editor,
     settings,
     setSettings,
-    setActiveView,
+    navigation,
   });
 
   return {
@@ -92,8 +89,10 @@ export const useAudioWorkspace = ({
       ...album.sidebarProps,
       cleanupSuggestionCountByAlbumId: cleanup.cleanupSuggestionCountByAlbumId,
       onReviewAlbumCleanup: cleanup.onReviewAlbum,
-      settingsOpen: activeView === "settings",
-      onOpenSettings: settingsPageProps.onBack,
+      settingsOpen: navigation.destination.kind === "settings",
+      onOpenSettings:
+        navigation.destination.kind === "settings" ? navigation.goBack : navigation.openSettings,
+      onGoHome: navigation.goHome,
     },
   };
 };

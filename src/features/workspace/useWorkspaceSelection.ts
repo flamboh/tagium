@@ -17,7 +17,7 @@ import type { TagSidebarPanelProps } from "@/features/library/TagSidebarPanel";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type { AppSettings } from "@/features/library/types";
-import type { SetActiveView } from "@/features/workspace/audioWorkspaceTypes";
+import type { WorkspaceNavigation } from "@/features/workspace/workspaceNavigation";
 
 type SelectionEditor = Pick<TrackEditorSession, "isCoverProcessing"> & {
   commands: Pick<TrackEditorSession["commands"], "flush">;
@@ -39,13 +39,13 @@ export const useWorkspaceSelection = ({
   library,
   editor,
   settings,
-  setActiveView,
+  navigation,
   removeDownloads,
 }: {
   library: LibraryStore;
   editor: SelectionEditor;
   settings: AppSettings;
-  setActiveView: SetActiveView;
+  navigation: Pick<WorkspaceNavigation, "destination" | "showEditor" | "goHome">;
   removeDownloads: (trackIds: string[]) => void;
 }): {
   removalDialogProps: DestructiveActionDialogProps;
@@ -107,11 +107,8 @@ export const useWorkspaceSelection = ({
   );
 
   const clearSelection = useCallback(() => {
-    if (editorRef.current.isCoverProcessing) return;
-    setActiveView("editor");
-    editorRef.current.commands.flush();
-    library.dispatch({ type: "selection-cleared" });
-  }, [library, setActiveView]);
+    navigation.goHome();
+  }, [navigation]);
 
   const requestRemoveSelected = useCallback(() => {
     const snapshot = library.getSnapshot();
@@ -122,10 +119,12 @@ export const useWorkspaceSelection = ({
   const selectAll = useCallback(() => {
     if (editorRef.current.isCoverProcessing) return;
     editorRef.current.commands.flush();
+    navigation.showEditor();
     library.dispatch({ type: "all-tracks-selected" });
-  }, [library]);
+  }, [library, navigation]);
 
   const keyboardActionsRef = useRef<EditorKeyboardShortcutActions>({
+    enabled: navigation.destination.kind !== "settings",
     selectedFileCount: library.state.selectedFileIds.size,
     isTrackCoverProcessing: editor.isCoverProcessing,
     selectAllFiles: selectAll,
@@ -134,6 +133,7 @@ export const useWorkspaceSelection = ({
   });
   useLayoutEffect(() => {
     keyboardActionsRef.current = {
+      enabled: navigation.destination.kind !== "settings",
       selectedFileCount: library.state.selectedFileIds.size,
       isTrackCoverProcessing: editor.isCoverProcessing,
       selectAllFiles: selectAll,
@@ -144,6 +144,7 @@ export const useWorkspaceSelection = ({
     clearSelection,
     editor.isCoverProcessing,
     library.state.selectedFileIds.size,
+    navigation.destination.kind,
     requestRemoveSelected,
     selectAll,
   ]);
@@ -157,8 +158,8 @@ export const useWorkspaceSelection = ({
       referenceTrackId?: string,
     ) => {
       if (editorRef.current.isCoverProcessing) return;
-      setActiveView("editor");
       editorRef.current.commands.flush();
+      navigation.showEditor();
       const snapshot = library.getSnapshot();
       const target =
         destination.type === "loose"
@@ -200,14 +201,14 @@ export const useWorkspaceSelection = ({
         },
       });
     },
-    [library, setActiveView],
+    [library, navigation],
   );
 
   const selectTrack = useCallback(
     (albumId: string | null, fileId: string, event?: ReactMouseEvent) => {
       if (editorRef.current.isCoverProcessing) return;
-      setActiveView("editor");
       editorRef.current.commands.flush();
+      navigation.showEditor();
       const rangeSelection = Boolean(event?.shiftKey && library.getSnapshot().rangeAnchorFileId);
       library.dispatch({
         type: "track-selected",
@@ -216,7 +217,7 @@ export const useWorkspaceSelection = ({
         mode: rangeSelection ? "range" : event?.ctrlKey || event?.metaKey ? "toggle" : "replace",
       });
     },
-    [library, setActiveView],
+    [library, navigation],
   );
 
   return {
@@ -234,8 +235,8 @@ export const useWorkspaceSelection = ({
       onClearSelection: clearSelection,
       onSelectAlbum: (albumId, event) => {
         if (editorRef.current.isCoverProcessing) return;
-        setActiveView("editor");
         editorRef.current.commands.flush();
+        navigation.showEditor();
         library.dispatch({
           type: "album-selected",
           albumId,

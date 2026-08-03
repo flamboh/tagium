@@ -15,6 +15,7 @@ import { renderHook } from "../../support/hookTestHarness";
 import { useAudioWorkspace } from "@/features/workspace/useAudioWorkspace";
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
+import { useWorkspaceNavigation } from "@/features/workspace/workspaceNavigation";
 
 const initialSettings: AppSettings = {
   ...DEFAULT_APP_SETTINGS,
@@ -79,19 +80,18 @@ describe("audio workspace", () => {
     const hook = renderHook(() => {
       const library = useLibraryStore();
       const [settings, setSettings] = useState(initialSettings);
-      const [activeView, setActiveView] = useState<"editor" | "settings">("editor");
       const editor = useTrackEditorSession({ library, settings });
+      const navigation = useWorkspaceNavigation({ library, editor });
       const workspace = useAudioWorkspace({
         library,
         editor,
         settings,
         setSettings,
-        activeView,
-        setActiveView,
+        navigation,
         removeDownloads,
         busy: false,
       });
-      return { library, settings, activeView, workspace };
+      return { library, settings, activeView: navigation.activeView, workspace };
     }, undefined);
     const first = readyFile("first", "Artist - First (Official Audio)");
     const second = readyFile("second", "Second");

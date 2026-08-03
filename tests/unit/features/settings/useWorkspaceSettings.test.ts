@@ -45,11 +45,9 @@ describe("workspace settings", () => {
       const library = useLibraryStore();
       const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
       const controls = useWorkspaceSettings({
-        library,
-        editor: { isCoverProcessing: false },
         settings,
         setSettings,
-        setActiveView: vi.fn(),
+        navigation: { goBack: vi.fn() },
       });
       return { library, settings, controls };
     }, undefined);

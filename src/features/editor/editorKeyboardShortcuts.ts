@@ -1,4 +1,5 @@
 export type EditorKeyboardShortcutActions = {
+  enabled?: boolean;
   selectedFileCount: number;
   isTrackCoverProcessing: boolean;
   selectAllFiles: () => void;
@@ -24,6 +25,7 @@ const handleEditorKeyboardShortcut = (
   event: KeyboardEvent,
   actions: EditorKeyboardShortcutActions,
 ) => {
+  if (actions.enabled === false) return;
   if (isEditableTarget(event.target)) return;
 
   if ((event.ctrlKey || event.metaKey) && event.key === "a") {

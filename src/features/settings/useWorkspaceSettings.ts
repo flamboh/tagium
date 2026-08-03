@@ -4,31 +4,22 @@ import { saveAppSettings } from "@/features/settings/settings";
 import { getMetadataLinkState } from "@/features/library/metadataLinks";
 import type { SettingsPageProps } from "@/features/settings/SettingsPage";
 import { reportSystemFailure } from "@/features/workspace/systemFailure";
-import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
-import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type { AppSettings } from "@/features/library/types";
-import type { SetActiveView } from "@/features/workspace/audioWorkspaceTypes";
-
-type SettingsEditor = Pick<TrackEditorSession, "isCoverProcessing">;
+import type { WorkspaceNavigation } from "@/features/workspace/workspaceNavigation";
 
 export const useWorkspaceSettings = ({
-  editor,
   settings,
   setSettings,
-  setActiveView,
+  navigation,
 }: {
-  library: LibraryStore;
-  editor: SettingsEditor;
   settings: AppSettings;
   setSettings: (settings: AppSettings) => void;
-  setActiveView: SetActiveView;
+  navigation: Pick<WorkspaceNavigation, "goBack">;
 }): SettingsPageProps => {
-  const editorRef = useRef(editor);
   const settingsRef = useRef(settings);
   useLayoutEffect(() => {
-    editorRef.current = editor;
     settingsRef.current = settings;
-  }, [editor, settings]);
+  }, [settings]);
 
   const onChange = useCallback(
     (nextSettings: AppSettings) => {
@@ -65,11 +56,5 @@ export const useWorkspaceSettings = ({
     [setSettings],
   );
 
-  const onBack = useCallback(() => {
-    if (!editorRef.current.isCoverProcessing) {
-      setActiveView((current) => (current === "settings" ? "editor" : "settings"));
-    }
-  }, [setActiveView]);
-
-  return { settings, onChange, onBack };
+  return { settings, onChange, onBack: navigation.goBack };
 };

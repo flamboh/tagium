@@ -58,6 +58,7 @@ export interface TagSidebarPanelProps {
   playlistDownloadQueue?: PlaylistDownloadQueuePanelState | null;
   onDownloadAll: () => void;
   onOpenSettings: () => void;
+  onGoHome: () => void;
   onCancelPlaylistDownloadQueue?: () => void;
   onRetryPlaylistDownloadQueue?: () => void;
 }
@@ -102,6 +103,7 @@ export default function TagSidebarPanel({
   playlistDownloadQueue = null,
   onDownloadAll,
   onOpenSettings,
+  onGoHome,
   onCancelPlaylistDownloadQueue,
   onRetryPlaylistDownloadQueue,
 }: TagSidebarPanelProps) {
@@ -178,7 +180,14 @@ export default function TagSidebarPanel({
       onDrop={handleSidebarFileDrop}
     >
       <div className="h-14 flex items-center px-5 border-b flex-shrink-0">
-        <span className="font-bold text-xl tracking-tight select-none">tagium</span>
+        <button
+          type="button"
+          aria-label="tagium, go to workspace home"
+          onClick={onGoHome}
+          className="font-bold text-xl tracking-tight select-none rounded-sm transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          tagium
+        </button>
         {mobileOpen && onMobileClose ? (
           <Button
             type="button"

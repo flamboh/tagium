@@ -50,11 +50,13 @@ describe("TagSidebarPanel", () => {
         onReorderAlbums={noOp}
         onDownloadAll={noOp}
         onOpenSettings={noOp}
+        onGoHome={noOp}
       />,
     );
 
     expect(markup).toContain("md:visible");
     expect(markup).toContain("md:opacity-100");
     expect(markup).toContain("md:translate-x-0");
+    expect(markup).toContain('aria-label="tagium, go to workspace home"');
   });
 });

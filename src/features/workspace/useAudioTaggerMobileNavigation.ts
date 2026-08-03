@@ -6,37 +6,42 @@ import {
   type SwipeDirection,
 } from "@/features/workspace/drawerSwipe";
 import { useMobileWorkspaceNavigation } from "@/features/workspace/mobileWorkspaceNavigation";
-import type { ActiveView, SetActiveView } from "@/features/workspace/audioWorkspaceTypes";
 import type { AudioWorkspace } from "@/features/workspace/useAudioWorkspace";
+import type { WorkspaceNavigation } from "@/features/workspace/workspaceNavigation";
 
 export const useAudioTaggerMobileNavigation = ({
-  activeView,
-  setActiveView,
+  navigation: workspaceNavigation,
   workspace,
 }: {
-  activeView: ActiveView;
-  setActiveView: SetActiveView;
+  navigation: WorkspaceNavigation;
   workspace: Pick<AudioWorkspace, "sidebarProps" | "settingsPageProps">;
 }) => {
-  const navigation = useMobileWorkspaceNavigation({ activeView, setActiveView });
+  const navigation = useMobileWorkspaceNavigation({
+    activeView: workspaceNavigation.activeView,
+    setActiveView: workspaceNavigation.syncView,
+  });
   const drawerRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const wasDrawerOpenRef = useRef(false);
+  const runPrimaryAction = (action: () => void) => {
+    navigation.runAfterDrawerClose(() => {
+      if (workspace.sidebarProps.settingsOpen) navigation.backWorkspace(action);
+      else action();
+    });
+  };
   const sidebarProps = {
     ...workspace.sidebarProps,
     onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => {
-      navigation.runAfterDrawerClose(() => workspace.sidebarProps.onSelectAlbum(albumId, event));
+      runPrimaryAction(() => workspace.sidebarProps.onSelectAlbum(albumId, event));
     },
     onSelectFile: (albumId: string, fileId: string, event?: ReactMouseEvent) => {
-      navigation.runAfterDrawerClose(() =>
-        workspace.sidebarProps.onSelectFile(albumId, fileId, event),
-      );
+      runPrimaryAction(() => workspace.sidebarProps.onSelectFile(albumId, fileId, event));
     },
     onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => {
-      navigation.runAfterDrawerClose(() =>
-        workspace.sidebarProps.onSelectLooseTrack(fileId, event),
-      );
+      runPrimaryAction(() => workspace.sidebarProps.onSelectLooseTrack(fileId, event));
     },
+    onClearSelection: () => runPrimaryAction(workspace.sidebarProps.onClearSelection),
+    onGoHome: () => runPrimaryAction(workspace.sidebarProps.onGoHome),
     onEditAlbum: (albumId: string) =>
       navigation.runAfterDrawerClose(() => workspace.sidebarProps.onEditAlbum(albumId)),
     onAddAlbum: () => navigation.runAfterDrawerClose(workspace.sidebarProps.onAddAlbum),
@@ -172,6 +177,7 @@ export const useAudioTaggerMobileNavigation = ({
 
   return {
     navigation,
+    runPrimaryAction,
     drawerRef,
     menuButtonRef,
     sidebarProps,
