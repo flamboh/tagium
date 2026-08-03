@@ -55,8 +55,8 @@ describe("ExportConfirmationDialog", () => {
   it("shows only the locked manifest and approximate download copy", () => {
     const tree = render();
     const text = textContent(tree);
-    expect(text).toContain("Download 1 track");
-    expect(text).toContain("Download ~0.00 MB");
+    expect(text).toContain("download 1 track");
+    expect(text).toContain("download ~0.00 mb");
     expect(text).not.toMatch(/\bbytes?\b/i);
     expect(text).not.toMatch(/filename|format|artwork|path|setting/i);
     const disclosures = findAll(tree, (element) => element.type === ExportPlanDisclosure);
@@ -86,8 +86,8 @@ describe("ExportConfirmationDialog", () => {
     const onConfirm = vi.fn();
     const ready = render({ onCancel, onConfirm });
     const buttons = findAll(ready, (element) => element.type === Button);
-    const cancel = buttons.find((button) => textContent(button) === "Cancel");
-    const confirm = buttons.find((button) => textContent(button).startsWith("Download"));
+    const cancel = buttons.find((button) => textContent(button) === "cancel");
+    const confirm = buttons.find((button) => textContent(button).startsWith("download"));
     (cancel?.props.onClick as (() => void) | undefined)?.();
     (confirm?.props.onClick as (() => void) | undefined)?.();
     expect(onCancel).toHaveBeenCalledOnce();
@@ -96,7 +96,7 @@ describe("ExportConfirmationDialog", () => {
     const busy = render({ busy: true });
     const busyButtons = findAll(busy, (element) => element.type === Button);
     expect(busyButtons.every((button) => button.props.disabled === true)).toBe(true);
-    expect(textContent(busy)).toContain("Preparing…");
+    expect(textContent(busy)).toContain("preparing…");
     const content = findAll(busy, (element) => element.props["aria-busy"] === true)[0]!;
     const escapePrevent = vi.fn();
     const outsidePrevent = vi.fn();
@@ -113,7 +113,7 @@ describe("ExportConfirmationDialog", () => {
   it("announces changed and unavailable states and disables stale confirmation", () => {
     const changed = render({ status: "changed" });
     expect(textContent(findAll(changed, (element) => element.props.role === "alert")[0])).toBe(
-      "The download changed. Confirm the updated download again.",
+      "the download changed. confirm the updated download again.",
     );
 
     const unavailable = render({ status: "unavailable" });
@@ -121,12 +121,12 @@ describe("ExportConfirmationDialog", () => {
       textContent(findAll(unavailable, (element) => element.props.role === "alert")[0]),
     ).toContain("no longer available");
     const confirm = findAll(unavailable, (element) => element.type === Button).find((button) =>
-      textContent(button).startsWith("Download"),
+      textContent(button).startsWith("download"),
     );
     expect(confirm?.props.disabled).toBe(true);
   });
 
-  it("focuses Cancel, restores focus, and confines mobile scrolling to the manifest", () => {
+  it("focuses cancel, restores focus, and confines mobile scrolling to the manifest", () => {
     const onRestoreFocus = vi.fn();
     const tree = render({ onRestoreFocus });
     const content = findAll(

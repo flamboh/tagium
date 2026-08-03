@@ -162,7 +162,7 @@ export const planExport = (
     if (looseTracks.length > 0) {
       groups.push({
         id: "loose",
-        title: "Loose tracks",
+        title: "singles",
         tracks: looseTracks.map(planTrack),
       });
     }
@@ -281,5 +281,5 @@ export const formatMegabyteSize = (sizeBytes: number) => {
         : megabytes < 100
           ? fractionalMegabyteFormatter.format(megabytes)
           : wholeMegabyteFormatter.format(megabytes);
-  return `${formatted} MB`;
+  return `${formatted.toLowerCase()} mb`;
 };

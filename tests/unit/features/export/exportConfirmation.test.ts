@@ -89,7 +89,7 @@ describe("export confirmation planning", () => {
       },
       {
         id: "loose",
-        title: "Loose tracks",
+        title: "singles",
         tracks: [{ id: "orphan", title: "Orphan" }],
       },
     ]);
@@ -116,7 +116,7 @@ describe("export confirmation planning", () => {
       albums: [album("empty", "Empty", [])],
       looseTrackIds: ["ready"],
     });
-    expect(plan(looseOnly).groups.map(({ title }) => title)).toEqual(["Loose tracks"]);
+    expect(plan(looseOnly).groups.map(({ title }) => title)).toEqual(["singles"]);
   });
 
   it("invalidates every export-relevant file, path, metadata, patch, and setting change", () => {
@@ -216,9 +216,9 @@ describe("export confirmation planning", () => {
   });
 
   it("formats a compact MB-only estimate", () => {
-    expect(formatMegabyteSize(1)).toBe("0.00 MB");
-    expect(formatMegabyteSize(1_234_567)).toBe("1.2 MB");
-    expect(formatMegabyteSize(99_950_000)).toBe("100 MB");
-    expect(formatMegabyteSize(1_000_000_000)).toBe("1K MB");
+    expect(formatMegabyteSize(1)).toBe("0.00 mb");
+    expect(formatMegabyteSize(1_234_567)).toBe("1.2 mb");
+    expect(formatMegabyteSize(99_950_000)).toBe("100 mb");
+    expect(formatMegabyteSize(1_000_000_000)).toBe("1k mb");
   });
 });

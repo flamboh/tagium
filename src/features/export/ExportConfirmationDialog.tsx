@@ -78,7 +78,7 @@ export default function ExportConfirmationDialog({
   onRestoreFocus,
 }: ExportConfirmationDialogProps) {
   const noun = plan?.trackCount === 1 ? "track" : "tracks";
-  const downloadLabel = plan ? `Download ~${formatMegabyteSize(plan.totalSizeBytes)}` : "Download";
+  const downloadLabel = plan ? `download ~${formatMegabyteSize(plan.totalSizeBytes)}` : "download";
 
   return (
     <Dialog open={Boolean(plan)} onOpenChange={(open) => !open && !busy && onCancel()}>
@@ -101,7 +101,7 @@ export default function ExportConfirmationDialog({
       >
         <DialogHeader>
           <DialogTitle>
-            Download {plan?.trackCount ?? 0} {noun}
+            download {plan?.trackCount ?? 0} {noun}
           </DialogTitle>
           {status !== "ready" && (
             <p
@@ -109,8 +109,8 @@ export default function ExportConfirmationDialog({
               className="rounded-md bg-accent px-3 py-2 text-sm text-accent-foreground"
             >
               {status === "changed"
-                ? "The download changed. Confirm the updated download again."
-                : "This download is no longer available. Cancel and try again when every track is ready."}
+                ? "the download changed. confirm the updated download again."
+                : "this download is no longer available. cancel and try again when every track is ready."}
             </p>
           )}
         </DialogHeader>
@@ -136,7 +136,7 @@ export default function ExportConfirmationDialog({
             disabled={busy}
             data-export-cancel
           >
-            Cancel
+            cancel
           </Button>
           <Button
             type="button"
@@ -145,7 +145,7 @@ export default function ExportConfirmationDialog({
             aria-busy={busy}
             className="min-w-44 justify-center tabular-nums"
           >
-            {busy ? "Preparing…" : downloadLabel}
+            {busy ? "preparing…" : downloadLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

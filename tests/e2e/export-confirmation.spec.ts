@@ -20,9 +20,9 @@ test("bulk download confirmation owns focus, dismisses safely, and restores its 
   await expect(trigger).toBeEnabled();
 
   await trigger.click();
-  const dialog = page.getByRole("dialog", { name: "Download 1 track" });
+  const dialog = page.getByRole("dialog", { name: "download 1 track" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await expect(dialog.getByRole("button", { name: "cancel" })).toBeFocused();
 
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
@@ -46,9 +46,9 @@ test("only the manifest scrolls in a constrained mobile dialog", async ({ page }
   await expect(drawer).toBeVisible();
   await downloadAllButton(page).click();
   await expect(drawer).toBeHidden();
-  const dialog = page.getByRole("dialog", { name: "Download 18 tracks" });
-  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
-  await dialog.getByRole("button", { name: "Loose tracks 18 tracks" }).click();
+  const dialog = page.getByRole("dialog", { name: "download 18 tracks" });
+  await expect(dialog.getByRole("button", { name: "cancel" })).toBeFocused();
+  await dialog.getByRole("button", { name: "singles 18 tracks" }).click();
 
   const manifest = dialog.getByTestId("export-manifest");
   const metrics = await manifest.evaluate((element) => ({
@@ -57,8 +57,8 @@ test("only the manifest scrolls in a constrained mobile dialog", async ({ page }
   }));
   expect(metrics.clientHeight).toBeGreaterThan(0);
   expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
-  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeVisible();
-  await expect(dialog.getByRole("button", { name: /^Download ~/ })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "cancel" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /^download ~/ })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(menuButton).toBeFocused();
