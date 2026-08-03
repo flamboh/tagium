@@ -97,7 +97,7 @@ export function MetadataSettingsSection({ settings, onChange }: SettingsSectionP
         <span className="space-y-0.5">
           <span className="block text-sm font-medium leading-5">enable advanced metadata</span>
           <span className="block text-xs leading-5 text-muted-foreground">
-            adds album artist, disc number, composer, BPM, and comments to the track editor.
+            adds album artist, disc number, composer, bpm, and comments to the track editor.
           </span>
         </span>
       </label>
@@ -127,11 +127,7 @@ export function MetadataSettingsSection({ settings, onChange }: SettingsSectionP
           className="grid grid-rows-[0fr] opacity-0 transition-[grid-template-rows,opacity] duration-200 ease-out group-data-[state=open]/metadata-linking:grid-rows-[1fr] group-data-[state=open]/metadata-linking:opacity-100 motion-reduce:transition-none"
         >
           <div className="min-h-0 overflow-hidden">
-            <p className="pt-2 text-xs leading-5 text-muted-foreground">
-              linked tags follow album changes. unlink a tag to edit it per track without changing
-              the rest of the album.
-            </p>
-            <div className="mt-3 flex flex-col gap-2">
+            <div className="flex flex-col gap-2 pt-2">
               {visibleMetadataLinks.map((descriptor) => (
                 <label key={descriptor.id} className={checkboxRowClassName}>
                   <Checkbox
@@ -141,17 +137,9 @@ export function MetadataSettingsSection({ settings, onChange }: SettingsSectionP
                     }
                     className="mt-0.5"
                   />
-                  <span className="space-y-0.5">
-                    <span className="block text-sm font-medium leading-5">{descriptor.label}</span>
-                    <span className="block text-xs leading-5 text-muted-foreground">
-                      {descriptor.relation}
-                    </span>
-                  </span>
+                  <span className="text-sm font-medium leading-5">{descriptor.label}</span>
                 </label>
               ))}
-              <p className="text-xs leading-5 text-muted-foreground">
-                album title always follows the album and cannot be unlinked.
-              </p>
             </div>
           </div>
         </div>

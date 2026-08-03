@@ -9,11 +9,10 @@ import {
 import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 
 describe("metadata link descriptors", () => {
-  it("keeps stable labels, relations, disabled reasons, and analytics-facing ids", () => {
+  it("keeps stable labels, disabled reasons, and analytics-facing ids", () => {
     expect(getMetadataLinkDescriptor("albumArtist")).toMatchObject({
       label: "link album artist to track artist",
-      relation: "album artist follows track artist",
-      disabledReason: "Album artist is synced with the album.",
+      disabledReason: "album artist is synced with the album.",
       analyticsProperty: "link_album_artist",
       requiresAdvancedMetadata: true,
     });

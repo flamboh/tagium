@@ -281,10 +281,10 @@ describe("album metadata validation layout", () => {
 
     expect(
       findElement(tree, (element) => element.props.id === "album-title").props.placeholder,
-    ).toBe("Placeholder Album");
+    ).toBe("placeholder album");
     expect(
       findElement(tree, (element) => element.props.id === "album-artist").props.placeholder,
-    ).toBe("Placeholder Artist");
+    ).toBe("placeholder artist");
     expect(textContent(tree)).toContain("create album");
 
     const form = findElement(tree, (element) => element.type === "form");

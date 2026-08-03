@@ -27,6 +27,16 @@ describe("settings page advanced metadata controls", () => {
     for (const id of ["artist", "year", "genre", "artwork"] as const) {
       expect(normalMarkup).toContain(getMetadataLinkDescriptor(id).label);
     }
+    for (const removedSubtitle of [
+      "artist follows the album artist",
+      "year follows the album year",
+      "genre follows the album genre",
+      "artwork follows the album cover",
+    ]) {
+      expect(normalMarkup).not.toContain(removedSubtitle);
+    }
+    expect(normalMarkup).not.toContain("linked tags follow album changes");
+    expect(normalMarkup).not.toContain("album title always follows the album");
   });
 
   it("transitions the metadata linking disclosure while keeping its controls inaccessible closed", async () => {

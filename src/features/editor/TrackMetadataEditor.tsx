@@ -414,12 +414,12 @@ function AdvancedTrackDetailsFields({
             disabled={albumArtistLinked}
             readOnly={albumArtistLinked}
             value={albumArtistLinked ? linkedArtistValue : undefined}
-            placeholder="Album artist"
+            placeholder="album artist"
             className={`${placeholderClassName} ${syncedInputClassName}`}
           />
         </DisabledReason>
         {albumArtistLinked && (
-          <p id={albumArtistReasonId} className="mt-1 text-xs leading-5 text-muted-foreground">
+          <p id={albumArtistReasonId} className="sr-only">
             {albumArtistReason}
           </p>
         )}
@@ -454,7 +454,7 @@ function AdvancedTrackDetailsFields({
         </div>
         <div>
           <label htmlFor="track-bpm" className={fieldLabelClassName}>
-            BPM:
+            bpm:
           </label>
           <Input
             type="number"
@@ -487,7 +487,7 @@ function AdvancedTrackDetailsFields({
         <Input
           {...registrations.composer}
           id="track-composer"
-          placeholder="Composer"
+          placeholder="composer"
           className={placeholderClassName}
         />
       </div>
@@ -499,7 +499,7 @@ function AdvancedTrackDetailsFields({
           {...registrations.comment}
           id="track-comment"
           rows={2}
-          placeholder="Add a comment"
+          placeholder="add a comment"
           className="border-input placeholder:text-muted-foreground/45 selection:bg-primary selection:text-primary-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 flex min-h-16 w-full resize-y rounded-md border bg-transparent px-3 py-2 text-base shadow-xs outline-none focus-visible:ring-[3px] md:text-sm"
         />
       </div>
@@ -591,20 +591,25 @@ export function MetadataEditorModeToggle({
 }) {
   return (
     <div
-      className="inline-grid h-7 w-[8.5rem] shrink-0 grid-cols-2 rounded-md bg-muted p-0.5"
+      className="relative isolate inline-grid h-7 w-[8.5rem] shrink-0 grid-cols-2 rounded-md bg-muted p-0.5"
       role="group"
       aria-label="metadata fields"
     >
+      <span
+        data-metadata-mode-indicator
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-y-0.5 left-0.5 z-0 w-[calc(50%-0.125rem)] rounded-sm bg-background shadow-xs transition-transform duration-200 ease-out motion-reduce:transition-none ${
+          mode === "advanced" ? "translate-x-full" : "translate-x-0"
+        }`}
+      />
       {(["normal", "advanced"] as const).map((option) => (
         <button
           key={option}
           type="button"
           aria-pressed={mode === option}
           onClick={() => onChange(option)}
-          className={`h-6 min-w-0 cursor-pointer rounded-sm px-1.5 text-xs font-medium capitalize outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-muted ${
-            mode === option
-              ? "bg-background text-foreground shadow-xs"
-              : "text-muted-foreground hover:text-foreground"
+          className={`relative z-10 h-6 min-w-0 cursor-pointer rounded-sm px-1.5 text-xs font-medium outline-none transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-muted motion-reduce:transition-none ${
+            mode === option ? "text-foreground" : "text-muted-foreground hover:text-foreground"
           }`}
         >
           {option}
@@ -755,7 +760,7 @@ function LoadedTrackMetadataEditor({
           syncFilenames={syncFilenames}
           watchedFilename={watchedFilename}
           sanitizedFilename={sanitizeFilenameBase(filenameValue)}
-          filenamePlaceholder={placeholder.filename}
+          filenamePlaceholder={placeholder.filename.toLowerCase()}
           filenameInvalid={filenameInvalid}
           filenameRegistration={filenameRegistration}
           failure={failure}
@@ -799,7 +804,15 @@ function LoadedTrackMetadataEditor({
                     selectedFileId={selectedFileId}
                     focusedTitleFileIdRef={focusedTitleFileIdRef}
                     register={register}
-                    placeholder={placeholder}
+                    placeholder={{
+                      filename: placeholder.filename.toLowerCase(),
+                      title: placeholder.title.toLowerCase(),
+                      artist: placeholder.artist.toLowerCase(),
+                      album: placeholder.album.toLowerCase(),
+                      year: placeholder.year.toLowerCase(),
+                      genre: placeholder.genre.toLowerCase(),
+                      trackNumber: placeholder.trackNumber.toLowerCase(),
+                    }}
                     inAlbum={Boolean(selectedFileAlbum)}
                     syncFilenames={syncFilenames}
                     metadataLinks={metadataLinks}

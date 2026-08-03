@@ -2,7 +2,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { useForm } from "react-hook-form";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import TrackMetadataEditor from "@/features/editor/TrackMetadataEditor";
+import TrackMetadataEditor, {
+  MetadataEditorModeToggle,
+} from "@/features/editor/TrackMetadataEditor";
 import { getMetadataLinkDescriptor } from "@/features/library/metadataLinks";
 import type { AudioMetadata, TagiumFile } from "@/features/library/types";
 
@@ -130,6 +132,20 @@ describe("track metadata editor form seam", () => {
     expect(markup).toMatch(/data-editor-pane="advanced"[^>]*aria-hidden="true"[^>]*inert/);
   });
 
+  it("slides one switch indicator between normal and advanced modes", () => {
+    const normal = renderToStaticMarkup(
+      <MetadataEditorModeToggle mode="normal" onChange={vi.fn()} />,
+    );
+    const advanced = renderToStaticMarkup(
+      <MetadataEditorModeToggle mode="advanced" onChange={vi.fn()} />,
+    );
+
+    expect(normal).toMatch(/data-metadata-mode-indicator="true"[^>]*translate-x-0/);
+    expect(advanced).toMatch(/data-metadata-mode-indicator="true"[^>]*translate-x-full/);
+    expect(advanced).toContain("transition-transform");
+    expect(advanced).toContain("motion-reduce:transition-none");
+  });
+
   it("provides a persistent accessible reason for a linked album artist", () => {
     const markup = renderToStaticMarkup(<EditorHarness />);
 
@@ -137,7 +153,17 @@ describe("track metadata editor form seam", () => {
       /id="track-album-artist"[^>]*aria-describedby="track-album-artist-sync-reason"/,
     );
     expect(markup).toContain('id="track-album-artist-sync-reason"');
+    expect(markup).toMatch(/id="track-album-artist-sync-reason" class="sr-only"/);
     expect(markup).toContain(getMetadataLinkDescriptor("albumArtist").disabledReason);
+  });
+
+  it("lowercases metadata placeholders", () => {
+    const markup = renderToStaticMarkup(<EditorHarness />);
+
+    expect(markup).toContain('placeholder="album artist"');
+    expect(markup).toContain('placeholder="composer"');
+    expect(markup).toContain('placeholder="add a comment"');
+    expect(markup).not.toMatch(/placeholder="[A-Z]/);
   });
 
   it("describes a synced filename error from the title field", () => {

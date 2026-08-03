@@ -6,7 +6,6 @@ export type MetadataLinkState = Record<MetadataLinkId, boolean>;
 export interface MetadataLinkDescriptor {
   id: MetadataLinkId;
   label: string;
-  relation: string;
   disabledReason: string;
   analyticsProperty:
     | "link_artist"
@@ -23,48 +22,42 @@ const descriptorById = {
   artist: {
     id: "artist",
     label: "link artist to album",
-    relation: "artist follows the album artist",
-    disabledReason: "Artist is synced with the album.",
+    disabledReason: "artist is synced with the album.",
     analyticsProperty: "link_artist",
     setting: { kind: "metadataLink", key: "artist" },
   },
   year: {
     id: "year",
     label: "link year to album",
-    relation: "year follows the album year",
-    disabledReason: "Year is synced with the album.",
+    disabledReason: "year is synced with the album.",
     analyticsProperty: "link_year",
     setting: { kind: "metadataLink", key: "year" },
   },
   genre: {
     id: "genre",
     label: "link genre to album",
-    relation: "genre follows the album genre",
-    disabledReason: "Genre is synced with the album.",
+    disabledReason: "genre is synced with the album.",
     analyticsProperty: "link_genre",
     setting: { kind: "metadataLink", key: "genre" },
   },
   artwork: {
     id: "artwork",
     label: "link artwork to album",
-    relation: "artwork follows the album cover",
-    disabledReason: "Artwork is synced with the album.",
+    disabledReason: "artwork is synced with the album.",
     analyticsProperty: "link_artwork",
     setting: { kind: "metadataLink", key: "artwork" },
   },
   trackNumber: {
     id: "trackNumber",
     label: "link track number to album order",
-    relation: "track number follows album order",
-    disabledReason: "Track number is synced with the album.",
+    disabledReason: "track number is synced with the album.",
     analyticsProperty: "sync_track_numbers",
     setting: { kind: "trackNumbers" },
   },
   albumArtist: {
     id: "albumArtist",
     label: "link album artist to track artist",
-    relation: "album artist follows track artist",
-    disabledReason: "Album artist is synced with the album.",
+    disabledReason: "album artist is synced with the album.",
     analyticsProperty: "link_album_artist",
     setting: { kind: "metadataLink", key: "albumArtist" },
     requiresAdvancedMetadata: true,
