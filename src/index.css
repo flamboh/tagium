@@ -62,7 +62,8 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-brand: var(--brand);
-  --color-primary-border: var(--primary-border);
+  --color-primary-hover-foreground: var(--primary-hover-foreground);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
   --color-popover-foreground: var(--popover-foreground);
@@ -86,9 +87,10 @@
   --card-foreground: oklch(0.205 0.012 25);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.205 0.012 25);
-  --primary: var(--background);
-  --primary-foreground: oklch(0.205 0.012 25);
-  --primary-border: var(--crimson);
+  --primary: var(--crimson);
+  --primary-foreground: oklch(0.982 0.003 25);
+  --primary-hover: oklch(0.55 0.19 25);
+  --primary-hover-foreground: oklch(0.982 0.003 25);
   --brand: var(--crimson);
   --secondary: color-mix(in oklab, var(--crimson) 10%, var(--background));
   --secondary-foreground: oklch(0.35 0.14 25);
@@ -137,9 +139,12 @@
   --card-foreground: var(--foreground);
   --popover: oklch(0.233 0.01 285.6);
   --popover-foreground: var(--foreground);
-  --primary: var(--background);
+  --primary: oklch(0.55 0.19 25);
   --primary-foreground: oklch(0.962 0.003 286.3);
-  --primary-border: var(--muted-foreground);
+  /* Hover jumps to the same coral the crimson chrome uses. The label deliberately
+     flips near-white -> near-dark, because the fill goes mid-crimson -> bright coral. */
+  --primary-hover: oklch(0.7 0.16 28);
+  --primary-hover-foreground: oklch(0.205 0.012 25);
   --brand: oklch(0.72 0.17 25);
   --secondary: color-mix(in oklab, var(--crimson) 30%, var(--background));
   --secondary-foreground: oklch(0.93 0.02 25);
@@ -156,6 +161,7 @@
   --sidebar: oklch(0.4 0.155 25);
 }
 
+/* Crimson chrome inverts primary actions to near-white in both modes; hover shifts to coral. */
 [data-slot="sidebar-panel"],
 [data-slot="dialog-content"],
 [data-slot="popover-content"],
@@ -174,7 +180,10 @@
   --accent-foreground: var(--foreground);
   --secondary: color-mix(in oklab, white 12%, var(--sidebar));
   --secondary-foreground: var(--foreground);
-  --primary-border: var(--foreground);
+  --primary: oklch(0.982 0.003 25);
+  --primary-foreground: oklch(0.205 0.012 25);
+  --primary-hover: oklch(0.7 0.16 28);
+  --primary-hover-foreground: oklch(0.205 0.012 25);
   --brand: oklch(0.98 0.005 25);
   --ring: oklch(0.98 0.005 25);
   --destructive: oklch(0.86 0.11 42);
