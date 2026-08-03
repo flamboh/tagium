@@ -11,6 +11,11 @@ describe("local error presentation", () => {
       "track-year",
       "track-genre",
       "track-number",
+      "track-album-artist",
+      "track-disc-number",
+      "track-bpm",
+      "track-composer",
+      "track-comment",
     ]) {
       expect(trackMetadataEditorSource).toContain(`<label htmlFor="${id}"`);
       expect(trackMetadataEditorSource).toContain(`id="${id}"`);
@@ -30,7 +35,9 @@ describe("local error presentation", () => {
   });
 
   it("centers the filename independently from the fixed error margin", () => {
-    expect(trackMetadataEditorSource).toContain('className="flex h-full min-w-0 items-center"');
+    expect(trackMetadataEditorSource).toContain(
+      'className="flex h-full min-w-0 items-center justify-between gap-3"',
+    );
     expect(trackMetadataEditorSource).toContain(
       'className="absolute inset-x-4 bottom-1 h-4 min-w-0 overflow-hidden',
     );
@@ -40,6 +47,7 @@ describe("local error presentation", () => {
     expect(coverArtSource).toContain(
       'onOpenChange={(open) => dispatch({ type: "errorOpenChanged", open })}',
     );
-    expect(coverArtSource).toContain("aria-describedby={coverError ? coverErrorId : undefined}");
+    expect(coverArtSource).toContain("coverError ? coverErrorId : null");
+    expect(coverArtSource).toContain("disabled && disabledReason ? disabledReasonId : null");
   });
 });

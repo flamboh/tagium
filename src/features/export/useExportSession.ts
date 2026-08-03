@@ -100,13 +100,14 @@ export const useExportSession = ({
     (files: TagiumFile[], albums: AlbumGroup[], allAlbums: AlbumGroup[], trackIds?: string[]) => {
       let projectedFiles = files;
       for (const album of albums) {
-        projectedFiles = applyAlbumSharedTagsToFiles(projectedFiles, album);
+        projectedFiles = applyAlbumSharedTagsToFiles(projectedFiles, album, settingsRef.current);
       }
       if (settingsRef.current.syncTrackNumbers) {
         projectedFiles = applyTrackOrderNumbersToFiles(
           projectedFiles,
           allAlbums,
           albums.map((album) => album.id),
+          settingsRef.current,
         );
       }
       if (settingsRef.current.syncFilenames) {

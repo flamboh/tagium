@@ -19,6 +19,7 @@ const metadata = (title: string): AudioMetadata => ({
   filename: title,
   title,
   artist: "",
+  albumArtist: "",
   album: "",
   year: null,
   genre: "",
@@ -27,6 +28,10 @@ const metadata = (title: string): AudioMetadata => ({
   sampleRate: 0,
   picture: [],
   trackNumber: null,
+  discNumber: null,
+  composer: "",
+  bpm: null,
+  comment: "",
 });
 
 const track = (id: string, title: string, bytes: number): TagiumFile => ({

@@ -1,10 +1,7 @@
 import { useCallback, useLayoutEffect, useRef } from "react";
 import { analytics } from "@/analytics";
-import {
-  applySyncedFilenamesToFiles,
-  applyTrackOrderNumbersToFiles,
-} from "@/features/library/fileMetadataOps";
 import { saveAppSettings } from "@/features/settings/settings";
+import { getMetadataLinkState } from "@/features/library/metadataLinks";
 import type { SettingsPageProps } from "@/features/settings/SettingsPage";
 import { reportSystemFailure } from "@/features/workspace/systemFailure";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
@@ -15,7 +12,6 @@ import type { SetActiveView } from "@/features/workspace/audioWorkspaceTypes";
 type SettingsEditor = Pick<TrackEditorSession, "isCoverProcessing">;
 
 export const useWorkspaceSettings = ({
-  library,
   editor,
   settings,
   setSettings,
@@ -42,7 +38,13 @@ export const useWorkspaceSettings = ({
         previous.syncFilenames !== nextSettings.syncFilenames ||
         previous.audioBitrate !== nextSettings.audioBitrate ||
         previous.applySoundCloudAlbumCoverToTracks !==
-          nextSettings.applySoundCloudAlbumCoverToTracks;
+          nextSettings.applySoundCloudAlbumCoverToTracks ||
+        previous.advancedMetadata !== nextSettings.advancedMetadata ||
+        Object.keys(previous.metadataLinks).some(
+          (key) =>
+            previous.metadataLinks[key as keyof typeof previous.metadataLinks] !==
+            nextSettings.metadataLinks[key as keyof typeof nextSettings.metadataLinks],
+        );
       const saved = saveAppSettings(nextSettings);
       setSettings(nextSettings);
       settingsRef.current = nextSettings;
@@ -52,29 +54,15 @@ export const useWorkspaceSettings = ({
       if (saved && changed) {
         analytics.capture({
           type: "settings_changed",
-          syncTrackNumbers: nextSettings.syncTrackNumbers,
           syncFilenames: nextSettings.syncFilenames,
           audioBitrate: nextSettings.audioBitrate,
           applySoundCloudCover: nextSettings.applySoundCloudAlbumCoverToTracks,
+          advancedMetadata: nextSettings.advancedMetadata,
+          metadataLinks: getMetadataLinkState(nextSettings),
         });
       }
-      const snapshot = library.getSnapshot();
-      let syncedFiles = snapshot.files;
-      if (!previous.syncTrackNumbers && nextSettings.syncTrackNumbers) {
-        syncedFiles = applyTrackOrderNumbersToFiles(
-          syncedFiles,
-          snapshot.albums,
-          snapshot.albums.map((album) => album.id),
-        );
-      }
-      if (!previous.syncFilenames && nextSettings.syncFilenames) {
-        syncedFiles = applySyncedFilenamesToFiles(syncedFiles);
-      }
-      if (syncedFiles !== snapshot.files) {
-        library.dispatch({ type: "content-replaced", files: syncedFiles });
-      }
     },
-    [library, setSettings],
+    [setSettings],
   );
 
   const onBack = useCallback(() => {

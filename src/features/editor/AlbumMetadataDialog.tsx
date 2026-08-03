@@ -131,7 +131,7 @@ export default function AlbumMetadataDialog({
                         })
                       }
                       onBlur={() => setTouchedFields((current) => ({ ...current, title: true }))}
-                      placeholder={placeholder.title}
+                      placeholder={placeholder.title.toLowerCase()}
                       aria-invalid={touchedFields.title && titleInvalid}
                       aria-describedby={
                         touchedFields.title && titleInvalid ? "album-title-error" : undefined
@@ -166,7 +166,7 @@ export default function AlbumMetadataDialog({
                         })
                       }
                       onBlur={() => setTouchedFields((current) => ({ ...current, artist: true }))}
-                      placeholder={placeholder.artist}
+                      placeholder={placeholder.artist.toLowerCase()}
                       aria-invalid={touchedFields.artist && artistInvalid}
                       aria-describedby={
                         touchedFields.artist && artistInvalid ? "album-artist-error" : undefined
@@ -194,7 +194,7 @@ export default function AlbumMetadataDialog({
                           genre: event.target.value,
                         })
                       }
-                      placeholder={placeholder.genre}
+                      placeholder={placeholder.genre.toLowerCase()}
                       className={placeholderClassName}
                     />
                   </div>
@@ -215,7 +215,7 @@ export default function AlbumMetadataDialog({
                           year: event.target.value ? Number(event.target.value) : undefined,
                         })
                       }
-                      placeholder={placeholder.year}
+                      placeholder={placeholder.year.toLowerCase()}
                       className={`${placeholderClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                     />
                   </div>

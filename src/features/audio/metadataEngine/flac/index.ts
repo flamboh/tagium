@@ -13,7 +13,10 @@ import {
   MAX_METADATA_READ_BYTES,
   type ByteSource,
 } from "@/features/audio/metadataEngine/byteSource";
-import type { FormatDriver } from "@/features/audio/metadataEngine/driver";
+import {
+  rejectUnsupportedMetadataChanges,
+  type FormatDriver,
+} from "@/features/audio/metadataEngine/driver";
 import type {
   ArtworkEntry,
   AudioInspection,
@@ -259,6 +262,11 @@ const yearValue = (value: string | undefined) => {
   return match ? Number(match[1]) : null;
 };
 
+const canonicalInteger = (value: string | undefined) => {
+  const number = positiveInteger(value);
+  return number !== null && number <= 999 ? number : null;
+};
+
 const inspect = (source: ByteSource) =>
   Effect.gen(function* () {
     const parsed = yield* parseStructure(source);
@@ -295,6 +303,7 @@ const inspect = (source: ByteSource) =>
     const metadata: AudioInspection["metadata"] = {
       title: firstValue(comments, "TITLE") ?? "",
       artist: firstValue(comments, "ARTIST") ?? "",
+      albumArtist: firstValue(comments, "ALBUMARTIST") ?? "",
       album: firstValue(comments, "ALBUM") ?? "",
       year: yearValue(firstValue(comments, "DATE", "YEAR")),
       genre: genres.length > 1 ? genres : (genres[0] ?? ""),
@@ -304,6 +313,10 @@ const inspect = (source: ByteSource) =>
       picture: pictures,
       trackNumber: positiveInteger(trackText),
       trackTotal: trackTotalMatch ? Number.parseInt(trackTotalMatch[1]!, 10) : null,
+      composer: firstValue(comments, "COMPOSER") ?? "",
+      comment: firstValue(comments, "COMMENT") ?? "",
+      discNumber: canonicalInteger(firstValue(comments, "DISCNUMBER")),
+      bpm: canonicalInteger(firstValue(comments, "BPM")),
     };
     return { format, metadata } satisfies AudioInspection;
   });
@@ -316,23 +329,30 @@ const encodeVorbis = (
   includeReplacementValues = true,
 ) => {
   const replacements = new Map<string, Uint8Array<ArrayBuffer>[]>();
-  if (changes.title !== undefined) {
+  const replaceText = (key: string, value: string | undefined) => {
+    if (value === undefined) return;
     replacements.set(
-      "TITLE",
-      includeReplacementValues ? [encodeComment("TITLE", changes.title)] : [],
+      key,
+      value.length > 0 && includeReplacementValues ? [encodeComment(key, value)] : [],
     );
+  };
+  if (changes.title !== undefined) {
+    replaceText("TITLE", changes.title);
   }
   if (changes.artist !== undefined) {
-    replacements.set(
-      "ARTIST",
-      includeReplacementValues ? [encodeComment("ARTIST", changes.artist)] : [],
-    );
+    replaceText("ARTIST", changes.artist);
+  }
+  if (changes.albumArtist !== undefined) {
+    replaceText("ALBUMARTIST", changes.albumArtist);
   }
   if (changes.album !== undefined) {
-    replacements.set(
-      "ALBUM",
-      includeReplacementValues ? [encodeComment("ALBUM", changes.album)] : [],
-    );
+    replaceText("ALBUM", changes.album);
+  }
+  if (changes.composer !== undefined) {
+    replaceText("COMPOSER", changes.composer);
+  }
+  if (changes.comment !== undefined) {
+    replaceText("COMMENT", changes.comment);
   }
   if (changes.year !== undefined) {
     replacements.set(
@@ -343,8 +363,14 @@ const encodeVorbis = (
     );
     replacements.set("YEAR", []);
   }
+  if (changes.dateText !== undefined) {
+    replaceText("DATE", changes.dateText);
+    replacements.set("YEAR", []);
+  }
   if (changes.genre !== undefined) {
-    const values = Array.isArray(changes.genre) ? changes.genre : [changes.genre];
+    const values = (Array.isArray(changes.genre) ? changes.genre : [changes.genre]).filter(
+      (value) => value.length > 0,
+    );
     replacements.set(
       "GENRE",
       includeReplacementValues ? values.map((value) => encodeComment("GENRE", value)) : [],
@@ -364,6 +390,30 @@ const encodeVorbis = (
         : [encodeComment("TRACKNUMBER", value)],
     );
     replacements.set("TRACK", []);
+  }
+  if (changes.trackText !== undefined) {
+    replaceText("TRACKNUMBER", changes.trackText);
+    replacements.set("TRACK", []);
+  }
+  if (changes.discNumber !== undefined) {
+    const existingDisc = firstValue(block.comments, "DISCNUMBER");
+    const total = existingDisc?.match(/^\s*\d+\s*\/\s*(\d+)/u)?.[1];
+    const value =
+      changes.discNumber === null ? "" : `${changes.discNumber}${total ? `/${total}` : ""}`;
+    replacements.set(
+      "DISCNUMBER",
+      changes.discNumber === null || !includeReplacementValues
+        ? []
+        : [encodeComment("DISCNUMBER", value)],
+    );
+  }
+  if (changes.bpm !== undefined) {
+    replacements.set(
+      "BPM",
+      changes.bpm === null || !includeReplacementValues
+        ? []
+        : [encodeComment("BPM", String(changes.bpm))],
+    );
   }
 
   const output: Uint8Array<ArrayBuffer>[] = [];
@@ -412,6 +462,27 @@ const blockHeader = (type: number, length: number, last: boolean) => {
 };
 
 const patch = (source: ByteSource, changes: MetadataChanges) => {
+  const unsupported = rejectUnsupportedMetadataChanges(
+    changes,
+    new Set<keyof MetadataChanges>([
+      "title",
+      "artist",
+      "albumArtist",
+      "album",
+      "year",
+      "genre",
+      "trackNumber",
+      "discNumber",
+      "composer",
+      "bpm",
+      "comment",
+      "picture",
+      "dateText",
+      "trackText",
+    ]),
+    format.kind,
+  );
+  if (unsupported) return Effect.fail(unsupported);
   if (Object.values(changes).every((value) => value === undefined)) {
     return Effect.succeed({ parts: [source.slice()], type: format.mime } satisfies PatchPlan);
   }
@@ -420,10 +491,17 @@ const patch = (source: ByteSource, changes: MetadataChanges) => {
     const editsComments =
       changes.title !== undefined ||
       changes.artist !== undefined ||
+      changes.albumArtist !== undefined ||
       changes.album !== undefined ||
+      changes.composer !== undefined ||
+      changes.comment !== undefined ||
       changes.year !== undefined ||
+      changes.dateText !== undefined ||
       changes.genre !== undefined ||
-      changes.trackNumber !== undefined;
+      changes.trackNumber !== undefined ||
+      changes.trackText !== undefined ||
+      changes.discNumber !== undefined ||
+      changes.bpm !== undefined;
     const replacementPictures = changes.picture?.map(
       (picture) => picture.opaqueData ?? encodePicture(picture),
     );

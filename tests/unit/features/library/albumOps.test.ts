@@ -11,6 +11,7 @@ const metadata = (trackNumber?: number): AudioMetadata => ({
   filename: "track",
   title: "Track",
   artist: "Artist",
+  albumArtist: "Artist",
   album: "Album",
   year: 2024,
   genre: "",
@@ -19,6 +20,10 @@ const metadata = (trackNumber?: number): AudioMetadata => ({
   sampleRate: 0,
   picture: [],
   trackNumber: trackNumber ?? null,
+  composer: "",
+  comment: "",
+  discNumber: null,
+  bpm: null,
 });
 
 const upload = (

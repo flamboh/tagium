@@ -9,7 +9,10 @@ import type { SoundCloudSet } from "@/features/import/soundcloudSet";
 import type { AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
 
 interface SoundCloudSetImportDeps extends SoundCloudSetDownloadWorkflowDeps {
-  settings: Pick<AppSettings, "audioBitrate" | "applySoundCloudAlbumCoverToTracks">;
+  settings: Pick<
+    AppSettings,
+    "audioBitrate" | "applySoundCloudAlbumCoverToTracks" | "metadataLinks" | "syncTrackNumbers"
+  >;
   createId: () => string;
   fetchImportedCover: (coverUrl: string) => Promise<AudioMetadata["picture"]>;
   updateTags: (file: TagiumFile, metadata: AudioMetadata) => Promise<void>;

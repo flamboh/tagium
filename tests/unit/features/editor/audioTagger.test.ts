@@ -15,6 +15,7 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   filename: "old-title",
   title: "Old Title",
   artist: "Artist",
+  albumArtist: "Artist",
   album: "Album",
   year: 2024,
   genre: "Genre",
@@ -23,6 +24,10 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   sampleRate: 44_100,
   picture: [],
   trackNumber: 7,
+  composer: "",
+  comment: "",
+  discNumber: null,
+  bpm: null,
   ...overrides,
 });
 
@@ -177,6 +182,16 @@ describe("audioTagger metadata patches", () => {
     );
 
     expect(patch).toEqual({ title: "New Title" });
+  });
+
+  it("keeps invalid advanced form artifacts out of sparse patches", () => {
+    expect(
+      createDirtyMetadataPatch(
+        metadata({ discNumber: Number.NaN, bpm: 1.5, composer: "New Composer" }),
+        { discNumber: true, bpm: true, composer: true },
+        false,
+      ),
+    ).toEqual({ composer: "New Composer" });
   });
 
   it("summarizes removed track sources without exposing their URLs", () => {
