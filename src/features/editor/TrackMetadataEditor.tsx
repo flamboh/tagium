@@ -796,8 +796,10 @@ function LoadedTrackMetadataEditor({
                   data-editor-pane="normal"
                   aria-hidden={editorMode !== "normal"}
                   inert={editorMode !== "normal"}
-                  className={`flex min-w-0 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3 ${
-                    editorMode === "normal" ? "" : "invisible"
+                  className={`flex min-w-0 flex-col gap-2 bg-background transition-opacity duration-200 motion-reduce:transition-none max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3 ${
+                    editorMode === "normal"
+                      ? "z-10 opacity-100"
+                      : "pointer-events-none z-0 opacity-0"
                   }`}
                 >
                   <TrackDetailsFields
@@ -826,8 +828,10 @@ function LoadedTrackMetadataEditor({
                     data-editor-pane="advanced"
                     aria-hidden={editorMode !== "advanced"}
                     inert={editorMode !== "advanced"}
-                    className={`flex min-w-0 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3 ${
-                      editorMode === "advanced" ? "" : "invisible"
+                    className={`flex min-w-0 flex-col gap-2 bg-background transition-opacity duration-200 motion-reduce:transition-none max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3 ${
+                      editorMode === "advanced"
+                        ? "z-10 opacity-100"
+                        : "pointer-events-none z-0 opacity-0"
                     }`}
                   >
                     <AdvancedTrackDetailsFields

@@ -130,6 +130,9 @@ describe("track metadata editor form seam", () => {
     expect(markup.match(/aria-label="metadata fields"/g)).toHaveLength(1);
     expect(markup).toContain('data-editor-pane="advanced"');
     expect(markup).toMatch(/data-editor-pane="advanced"[^>]*aria-hidden="true"[^>]*inert/);
+    expect(markup).toMatch(/data-editor-pane="normal"[^>]*transition-opacity[^>]*opacity-100/);
+    expect(markup).toMatch(/data-editor-pane="advanced"[^>]*transition-opacity[^>]*opacity-0/);
+    expect(markup.match(/motion-reduce:transition-none/g)?.length).toBeGreaterThanOrEqual(3);
   });
 
   it("slides one switch indicator between normal and advanced modes", () => {
