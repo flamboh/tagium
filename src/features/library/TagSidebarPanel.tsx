@@ -184,7 +184,7 @@ export default function TagSidebarPanel({
           type="button"
           aria-label="tagium, go to workspace home"
           onClick={onGoHome}
-          className="font-bold text-xl tracking-tight select-none rounded-sm transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="cursor-pointer font-bold text-xl tracking-tight select-none rounded-sm transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           tagium
         </button>
