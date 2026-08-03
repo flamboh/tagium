@@ -125,6 +125,7 @@ export function SortableTrackRow({
   return (
     <div
       ref={setNodeRef}
+      data-drawer-swipe-optout="true"
       className={cn(
         "relative group border-t first:border-t-0",
         container === "loose" ? "border-b border-t-0 first:border-t-0" : "",
@@ -137,7 +138,7 @@ export function SortableTrackRow({
         ref={setActivatorNodeRef}
         variant="ghost"
         className={cn(
-          "justify-start h-auto py-2.5 px-4 pr-8 w-full text-left font-normal rounded-none hover:bg-accent/30",
+          "justify-start h-auto py-2.5 px-4 pr-8 w-full text-left font-normal rounded-none hover:bg-accent/30 [@media(pointer:coarse)]:min-h-11",
           container === "loose" ? "py-3" : "",
           muted ? "opacity-65" : "",
           selectedTone === "primary" ? "bg-accent text-accent-foreground" : "",
@@ -191,7 +192,7 @@ export function SortableTrackRow({
             event.stopPropagation();
             onRetry();
           }}
-          className="absolute right-7 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-full cursor-pointer"
+          className="absolute right-7 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-full cursor-pointer [@media(pointer:coarse)]:right-11 [@media(pointer:coarse)]:top-0 [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:flex [@media(pointer:coarse)]:items-center [@media(pointer:coarse)]:justify-center [@media(pointer:coarse)]:p-0 [@media(pointer:coarse)]:opacity-100"
           title="retry download"
           aria-label={`retry download for ${track.filename}`}
         >
@@ -205,7 +206,7 @@ export function SortableTrackRow({
           event.stopPropagation();
           onRemove();
         }}
-        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer"
+        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer [@media(pointer:coarse)]:right-0 [@media(pointer:coarse)]:top-0 [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:translate-y-0 [@media(pointer:coarse)]:flex [@media(pointer:coarse)]:items-center [@media(pointer:coarse)]:justify-center [@media(pointer:coarse)]:p-0 [@media(pointer:coarse)]:opacity-100"
         title="remove track"
       >
         <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
@@ -285,6 +286,7 @@ export function SortableAlbumCard({
   return (
     <div
       ref={setNodeRef}
+      data-drawer-swipe-optout="true"
       className={cn(
         "border-b transition-all shrink-0",
         selected ? "bg-primary/5" : "",
@@ -319,7 +321,7 @@ export function SortableAlbumCard({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 [@media(pointer:coarse)]:size-10"
+                className="h-7 w-7 [@media(pointer:coarse)]:size-11"
                 onClick={onDownload}
                 disabled={!canDownload}
                 aria-label={`download ${album.title}`}
@@ -339,7 +341,7 @@ export function SortableAlbumCard({
               type="button"
               variant="ghost"
               size="icon"
-              className="relative h-7 w-7 [@media(pointer:coarse)]:size-10"
+              className="relative h-7 w-7 [@media(pointer:coarse)]:size-11"
               aria-label={`album actions for ${album.title}${
                 cleanupSuggestionCount > 0 ? ", cleanup suggested" : ""
               }`}

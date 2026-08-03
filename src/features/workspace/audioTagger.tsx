@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import AlbumMetadataDialog from "@/features/editor/AlbumMetadataDialog";
 import DestructiveActionDialog from "@/features/workspace/DestructiveActionDialog";
 import LandingScreen from "@/features/import/LandingScreen";
@@ -19,6 +21,7 @@ import { loadAppSettings } from "@/features/settings/settings";
 import { useAudioImportSession } from "@/features/workspace/useAudioImportSession";
 import { useAudioWorkspace, type ActiveView } from "@/features/workspace/useAudioWorkspace";
 import { useExportSession } from "@/features/export/useExportSession";
+import ExportConfirmationDialog from "@/features/export/ExportConfirmationDialog";
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { AppSettings } from "@/features/library/types";
@@ -31,6 +34,7 @@ import {
 } from "@/features/share/shareLink";
 import { useShareWorkflow } from "@/features/share/useShareWorkflow";
 import { shareLinksEnabled } from "@/features/share/shareFeature";
+import { useAudioTaggerMobileNavigation } from "@/features/workspace/useAudioTaggerMobileNavigation";
 
 export default function AudioTagger() {
   const library = useLibraryStore();
@@ -57,6 +61,13 @@ export default function AudioTagger() {
     removeDownloads: importing.commands.removeTracks,
     busy,
   });
+  const {
+    navigation,
+    drawerRef,
+    menuButtonRef,
+    sidebarProps: mobileSidebarProps,
+    settingsPageProps: mobileSettingsProps,
+  } = useAudioTaggerMobileNavigation({ activeView, setActiveView, workspace });
   const { files, albums, looseTrackIds, selectedFileId, selectedAlbumId, selectedFileIds } =
     library.state;
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
@@ -118,8 +129,34 @@ export default function AudioTagger() {
         key={workspace.albumDialogProps.instanceKey}
         {...workspace.albumDialogProps}
       />
-      <div className="min-h-svh flex flex-col bg-background md:h-svh md:flex-row md:overflow-hidden">
+      <ExportConfirmationDialog
+        plan={exporting.confirmation}
+        status={exporting.confirmationStatus}
+        busy={exporting.exporting}
+        onCancel={exporting.cancelConfirmation}
+        onConfirm={() => void exporting.confirmDownload()}
+        onRestoreFocus={exporting.restoreConfirmationFocus}
+      />
+      {navigation.isMobile && (
+        <Button
+          ref={menuButtonRef}
+          type="button"
+          size="icon"
+          variant="outline"
+          className={`fixed left-3 top-3 z-30 size-11 bg-background/95 shadow-sm md:hidden ${navigation.drawerOpen ? "pointer-events-none opacity-0" : ""}`}
+          tabIndex={navigation.drawerOpen ? -1 : 0}
+          aria-label="open library"
+          data-export-focus-fallback
+          onClick={(event) => navigation.openDrawer(event.currentTarget)}
+        >
+          <Menu />
+        </Button>
+      )}
+      <div className="min-h-svh touch-pan-y flex flex-col overflow-x-hidden bg-background md:h-svh md:touch-auto md:flex-row md:overflow-hidden">
         <TagSidebarPanel
+          mobileOpen={navigation.drawerOpen}
+          mobileDrawerRef={drawerRef}
+          onMobileClose={navigation.closeDrawer}
           loading={busy}
           files={files}
           albums={albums}
@@ -127,27 +164,43 @@ export default function AudioTagger() {
           selectedAlbumId={selectedAlbumId}
           selectedFileId={selectedFileId}
           selectedFileIds={selectedFileIds}
-          {...workspace.sidebarProps}
+          {...mobileSidebarProps}
           onAudioUpload={importing.commands.upload}
           onRetryDownload={importing.commands.retryTrack}
-          onDownloadAlbum={exporting.downloadAlbum}
-          onShareAlbum={shareLinksEnabled ? sharing.openCreator : undefined}
+          onDownloadAlbum={(albumId) =>
+            navigation.runAfterDrawerClose(() => exporting.downloadAlbum(albumId))
+          }
+          onShareAlbum={
+            shareLinksEnabled
+              ? (albumId) => navigation.runAfterDrawerClose(() => sharing.openCreator(albumId))
+              : undefined
+          }
           shareAlbumActions={shareLinksEnabled ? sharing.shareActions : undefined}
           onUploadToAlbum={(albumId, filesToUpload) =>
             importing.commands.upload(filesToUpload, albumId)
           }
           playlistDownloadQueue={importing.queue}
-          onDownloadAll={exporting.downloadAll}
+          onDownloadAll={() => navigation.runAfterDrawerClose(exporting.downloadAll)}
           onCancelPlaylistDownloadQueue={importing.commands.cancelQueue}
           onRetryPlaylistDownloadQueue={importing.commands.retryQueue}
         />
-        <div className="relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1">
+        <div
+          className={`relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1 ${navigation.isMobile ? "transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-opacity" : ""} ${navigation.isMobile && navigation.drawerOpen ? "translate-x-[min(88vw,22rem)]" : navigation.isMobile ? "translate-x-0" : ""}`}
+        >
+          {navigation.isMobile && (
+            <div
+              className={`absolute inset-0 z-30 bg-black/25 transition-opacity duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:duration-100 ${navigation.drawerOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+              aria-hidden="true"
+              onClick={navigation.closeDrawer}
+            />
+          )}
           <div
             className={
               landingIsActive
                 ? "contents"
                 : "h-svh min-h-0 flex flex-col overflow-hidden md:h-auto md:min-h-0 md:flex-1"
             }
+            inert={navigation.isMobile && navigation.drawerOpen ? true : undefined}
           >
             {!libraryIsEmpty ? (
               <div className="relative min-h-0 flex-1">
@@ -194,14 +247,18 @@ export default function AudioTagger() {
                       : "pointer-events-none z-0 opacity-0"
                   }`}
                 >
-                  <SettingsPage {...workspace.settingsPageProps} />
+                  <SettingsPage {...mobileSettingsProps} />
                 </div>
               </div>
             ) : activeView === "settings" ? (
-              <SettingsPage {...workspace.settingsPageProps} />
+              <SettingsPage {...mobileSettingsProps} />
             ) : null}
           </div>
-          <LandingScreen active={landingIsActive} onAudioUpload={importing.commands.upload}>
+          <LandingScreen
+            active={landingIsActive}
+            inert={navigation.isMobile && navigation.drawerOpen}
+            onAudioUpload={importing.commands.upload}
+          >
             {mediaUrlEntryPresentation?.layout === "landing" && (
               <MediaUrlEntry
                 layout="landing"

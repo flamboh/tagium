@@ -1,17 +1,24 @@
 import { Effect } from "effect";
 import { act } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import type { CobaltAudioDownloadRequest } from "@/features/import/cobaltAudio";
 import type { AppSettings } from "@/features/library/types";
 import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 
 const mocks = vi.hoisted(() => ({
+  capture: vi.fn(),
+  downloadFromCobalt: vi.fn((_request: CobaltAudioDownloadRequest) => Effect.never),
   resolveTrackMetadata: vi.fn(),
   resolveSoundCloudSet: vi.fn(),
   resolveYouTubePlaylist: vi.fn(),
 }));
 
+vi.mock("@/analytics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/analytics")>()),
+  analytics: { capture: mocks.capture },
+}));
 vi.mock("@/features/audio/audioBackend", () => ({
-  downloadFromCobalt: () => Effect.never,
+  downloadFromCobalt: mocks.downloadFromCobalt,
   provideAudioBackend: (operation: unknown) => operation,
   parseUploads: vi.fn(),
   runAudioBackendEffect: vi.fn(),
@@ -42,9 +49,161 @@ const settings = (audioBitrate: AppSettings["audioBitrate"]): AppSettings => ({
   applySoundCloudAlbumCoverToTracks: false,
 });
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.clearAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("audio URL import session", () => {
+  it("records accepted and rejected URL processing after resolution", async () => {
+    mocks.resolveTrackMetadata.mockResolvedValue(undefined);
+    const hook = renderHook(() => {
+      const library = useLibraryStore();
+      const editor = useTrackEditorSession({ library, settings: settings("320") });
+      const importing = useAudioImportSession({
+        library,
+        editor,
+        settings: settings("320"),
+        activateEditor: vi.fn(),
+      });
+      return { library, importing };
+    }, undefined);
+
+    await act(async () => {
+      await hook.result.importing.commands.importUrl("https://www.youtube.com/watch?v=abcdefghijk");
+    });
+    expect(mocks.capture).toHaveBeenCalledWith({
+      type: "media_link_processed",
+      sourceUrl: "https://www.youtube.com/watch?v=abcdefghijk",
+      mediaKind: "track",
+      shape: "canonical",
+      normalized: false,
+      redirected: false,
+      outcome: "accepted",
+    });
+
+    await expect(
+      hook.result.importing.commands.importUrl("https://soundcloud.com/discover"),
+    ).rejects.toThrow("unsupported_media_link");
+    expect(mocks.capture).toHaveBeenCalledWith({
+      type: "media_link_processed",
+      sourceUrl: "https://soundcloud.com/discover",
+      mediaKind: "unsupported",
+      shape: "canonical",
+      normalized: false,
+      redirected: false,
+      outcome: "rejected",
+      failureReason: "unsupported",
+    });
+    hook.unmount();
+  });
+
+  it("records failed short-link resolution as rejected", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("unavailable", { status: 503 })),
+    );
+    const hook = renderHook(() => {
+      const library = useLibraryStore();
+      const editor = useTrackEditorSession({ library, settings: settings("320") });
+      const importing = useAudioImportSession({
+        library,
+        editor,
+        settings: settings("320"),
+        activateEditor: vi.fn(),
+      });
+      return importing;
+    }, undefined);
+
+    await expect(
+      hook.result.commands.importUrl("https://on.soundcloud.com/private-token"),
+    ).rejects.toThrow("unsupported_media_link");
+
+    expect(mocks.capture).toHaveBeenCalledWith({
+      type: "media_link_processed",
+      sourceUrl: "https://on.soundcloud.com/private-token",
+      mediaKind: "unsupported",
+      shape: "short",
+      normalized: false,
+      redirected: false,
+      outcome: "rejected",
+      failureReason: "resolution_failed",
+    });
+    expect(
+      mocks.capture.mock.calls.some(
+        ([event]) =>
+          event.type === "media_link_processed" &&
+          "sourceUrl" in event &&
+          event.sourceUrl === "https://on.soundcloud.com/private-token" &&
+          event.outcome === "accepted",
+      ),
+    ).toBe(false);
+    hook.unmount();
+  });
+
+  it("wires recovery and exhaustion lifecycle events to tunnel analytics", async () => {
+    mocks.resolveTrackMetadata.mockResolvedValue(undefined);
+    const hook = renderHook(() => {
+      const library = useLibraryStore();
+      const editor = useTrackEditorSession({ library, settings: settings("320") });
+      const importing = useAudioImportSession({
+        library,
+        editor,
+        settings: settings("320"),
+        activateEditor: vi.fn(),
+      });
+      return importing;
+    }, undefined);
+
+    await act(async () => {
+      await hook.result.commands.importUrl("https://youtu.be/abcdefghijk");
+    });
+    await vi.waitFor(() => expect(mocks.downloadFromCobalt).toHaveBeenCalled());
+    const request = mocks.downloadFromCobalt.mock.calls[0]?.[0];
+
+    request?.onLifecycle?.({
+      type: "tunnel-readiness",
+      outcome: "recovered",
+      attempts: 3,
+      elapsedBucket: "under_1_second",
+    });
+    request?.onLifecycle?.({
+      type: "tunnel-readiness",
+      outcome: "exhausted",
+      attempts: 4,
+      elapsedBucket: "1_to_5_seconds",
+    });
+    request?.onLifecycle?.({
+      type: "tunnel-readiness",
+      outcome: "non_retryable",
+      attempts: 1,
+      elapsedBucket: "5_to_15_seconds",
+    });
+
+    expect(mocks.capture).toHaveBeenCalledWith({
+      type: "cobalt_tunnel_readiness",
+      sourceUrl: "https://www.youtube.com/watch?v=abcdefghijk",
+      outcome: "recovered",
+      attempts: 3,
+      elapsedBucket: "under_1_second",
+    });
+    expect(mocks.capture).toHaveBeenCalledWith({
+      type: "cobalt_tunnel_readiness",
+      sourceUrl: "https://www.youtube.com/watch?v=abcdefghijk",
+      outcome: "exhausted",
+      attempts: 4,
+      elapsedBucket: "1_to_5_seconds",
+    });
+    expect(mocks.capture).toHaveBeenCalledWith({
+      type: "cobalt_tunnel_readiness",
+      sourceUrl: "https://www.youtube.com/watch?v=abcdefghijk",
+      outcome: "non_retryable",
+      attempts: 1,
+      elapsedBucket: "5_to_15_seconds",
+    });
+    hook.unmount();
+  });
+
   it.each([
     ["https://soundcloud.com/artist/sets/exact-set", "resolveSoundCloudSet"],
     ["https://www.youtube.com/playlist?list=PL_exact", "resolveYouTubePlaylist"],

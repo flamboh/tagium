@@ -12,6 +12,7 @@ import {
   type SoundCloudLogContext,
 } from "../utils/soundcloud-observability";
 import { urlStringSchema } from "../utils/schema";
+import { parseMediaLink } from "../../src/lib/media-link";
 
 const TRACK_RESOLVE_CONCURRENCY = 4;
 
@@ -208,11 +209,15 @@ export default defineHandler(async (event) => {
   if (!sourceUrl) {
     throw new Error("soundcloud.url_required");
   }
+  const parsedSource = parseMediaLink(sourceUrl);
+  if (parsedSource.provider !== "soundcloud" || parsedSource.kind !== "playlist") {
+    throw new Error("soundcloud.set_url_required");
+  }
 
   const context = getSoundCloudLogContext(event.req, sourceUrl ?? undefined);
   const clientId = await getSoundCloudClientId(globalThis.fetch, context);
   const resolveUrl = new URL("https://api-v2.soundcloud.com/resolve");
-  resolveUrl.searchParams.set("url", sourceUrl);
+  resolveUrl.searchParams.set("url", parsedSource.canonicalUrl);
   resolveUrl.searchParams.set("client_id", clientId);
 
   const playlistStartedAt = Date.now();

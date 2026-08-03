@@ -132,7 +132,14 @@ export default function AlbumSidebar({
         <span className="font-semibold text-sm leading-none text-muted-foreground">
           library ({files.length})
         </span>
-        <Button type="button" variant="ghost" size="icon" className="size-8" onClick={onAddAlbum}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-8 [@media(pointer:coarse)]:size-11"
+          onClick={onAddAlbum}
+          aria-label="add album"
+        >
           <Plus className="h-4 w-4" />
         </Button>
       </div>
