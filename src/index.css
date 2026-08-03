@@ -62,6 +62,7 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-brand: var(--brand);
+  --color-primary-border: var(--primary-border);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
   --color-popover-foreground: var(--popover-foreground);
@@ -85,8 +86,9 @@
   --card-foreground: oklch(0.205 0.012 25);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.205 0.012 25);
-  --primary: oklch(0.985 0.001 25);
+  --primary: var(--background);
   --primary-foreground: oklch(0.205 0.012 25);
+  --primary-border: var(--crimson);
   --brand: var(--crimson);
   --secondary: color-mix(in oklab, var(--crimson) 10%, var(--background));
   --secondary-foreground: oklch(0.35 0.14 25);
@@ -129,23 +131,24 @@
 }
 
 .dark {
-  --background: oklch(0.165 0.008 25);
-  --foreground: oklch(0.955 0.003 25);
-  --card: oklch(0.205 0.01 25);
-  --card-foreground: oklch(0.955 0.003 25);
-  --popover: oklch(0.205 0.01 25);
-  --popover-foreground: oklch(0.955 0.003 25);
-  --primary: oklch(0.155 0.008 25);
-  --primary-foreground: oklch(0.965 0.002 25);
+  --background: oklch(0.202 0.008 285.7);
+  --foreground: oklch(0.962 0.003 286.3);
+  --card: oklch(0.233 0.01 285.6);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.233 0.01 285.6);
+  --popover-foreground: var(--foreground);
+  --primary: var(--background);
+  --primary-foreground: oklch(0.962 0.003 286.3);
+  --primary-border: var(--muted-foreground);
   --brand: oklch(0.72 0.17 25);
   --secondary: color-mix(in oklab, var(--crimson) 30%, var(--background));
   --secondary-foreground: oklch(0.93 0.02 25);
-  --muted: oklch(0.255 0.012 25);
-  --muted-foreground: oklch(0.72 0.015 25);
+  --muted: oklch(0.272 0.013 285.5);
+  --muted-foreground: oklch(0.719 0.014 286);
   --accent: color-mix(in oklab, var(--crimson) 22%, var(--background));
-  --accent-foreground: oklch(0.955 0.003 25);
-  --border: oklch(0.285 0.012 25);
-  --input: oklch(0.255 0.012 25);
+  --accent-foreground: var(--foreground);
+  --border: oklch(0.304 0.014 285.5);
+  --input: oklch(0.272 0.013 285.5);
   --ring: color-mix(in oklab, var(--crimson) 70%, white);
   --destructive: oklch(0.62 0.21 30);
   --destructive-foreground: oklch(0.99 0 0);
@@ -171,6 +174,7 @@
   --accent-foreground: var(--foreground);
   --secondary: color-mix(in oklab, white 12%, var(--sidebar));
   --secondary-foreground: var(--foreground);
+  --primary-border: var(--foreground);
   --brand: oklch(0.98 0.005 25);
   --ring: oklch(0.98 0.005 25);
   --destructive: oklch(0.86 0.11 42);

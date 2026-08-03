@@ -182,16 +182,21 @@ export default function TagSidebarPanel({
     >
       <div className="h-14 flex items-center px-5 border-b flex-shrink-0">
         <span className="font-bold text-xl tracking-tight select-none">tagium</span>
-        <Button
+        <button
           type="button"
-          variant="ghost"
-          size="icon"
-          className="ml-auto size-11"
+          className={cn(
+            "group ml-auto inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+            !(mobileOpen && onMobileClose) && "-mr-3",
+          )}
           aria-label={`switch to ${theme === "light" ? "dark" : "light"} mode`}
           onClick={toggleTheme}
         >
-          {theme === "light" ? <Moon /> : <Sun />}
-        </Button>
+          {theme === "light" ? (
+            <Moon className="size-4 origin-center transition-transform duration-150 ease-out group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
+          ) : (
+            <Sun className="size-4 origin-center transition-transform duration-150 ease-out group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
+          )}
+        </button>
         {mobileOpen && onMobileClose ? (
           <Button
             type="button"
