@@ -113,6 +113,19 @@ const uniquePath = (path: string, usedPaths: Set<string>) => {
   return nextPath;
 };
 
+export const getAlbumCoverDownload = (album: AlbumGroup) => {
+  const cover = album.cover?.[0];
+  if (!cover) return null;
+  const format = cover.format.split(";")[0]?.trim().toLowerCase();
+  if (format === "image/jpeg" || format === "image/jpg") {
+    return { filename: "cover.jpg", format, data: cover.data };
+  }
+  if (format === "image/png") {
+    return { filename: "cover.png", format, data: cover.data };
+  }
+  return null;
+};
+
 const addTrackEntry = (
   entries: DownloadZipEntry[],
   usedPaths: Set<string>,
@@ -168,22 +181,12 @@ export function getLibraryDownloadEntries({
       addTrackEntry(entries, usedPaths, albumFolder, track);
     }
 
-    const albumCover = album.cover?.[0];
+    const albumCover = getAlbumCoverDownload(album);
     if (albumCover) {
-      const coverFormat = albumCover.format.split(";")[0]?.trim().toLowerCase();
-      let coverFilename = "";
-      if (coverFormat === "image/jpeg" || coverFormat === "image/jpg") {
-        coverFilename = "cover.jpg";
-      }
-      if (coverFormat === "image/png") {
-        coverFilename = "cover.png";
-      }
-      if (coverFilename) {
-        entries.push({
-          path: uniquePath(`${albumFolder}/${coverFilename}`, usedPaths),
-          file: new File([albumCover.data], coverFilename, { type: coverFormat }),
-        });
-      }
+      entries.push({
+        path: uniquePath(`${albumFolder}/${albumCover.filename}`, usedPaths),
+        file: new File([albumCover.data], albumCover.filename, { type: albumCover.format }),
+      });
     }
   }
 

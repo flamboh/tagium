@@ -61,7 +61,10 @@ export const useAudioTaggerMobileNavigation = ({
     if (!navigation.drawerOpen) {
       if (wasDrawerOpenRef.current) {
         const opener = navigation.openerRef.current ?? menuButtonRef.current;
-        const restore = () => opener?.isConnected && opener.focus();
+        const restore = () => {
+          if (document.querySelector("[data-slot='dialog-content'][data-state='open']")) return;
+          if (opener?.isConnected) opener.focus();
+        };
         restore();
         const timer = window.setTimeout(restore, 120);
         navigation.openerRef.current = null;

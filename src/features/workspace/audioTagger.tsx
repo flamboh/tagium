@@ -20,6 +20,7 @@ import { loadAppSettings } from "@/features/settings/settings";
 import { useAudioImportSession } from "@/features/workspace/useAudioImportSession";
 import { useAudioWorkspace, type ActiveView } from "@/features/workspace/useAudioWorkspace";
 import { useExportSession } from "@/features/export/useExportSession";
+import ExportConfirmationDialog from "@/features/export/ExportConfirmationDialog";
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { AppSettings } from "@/features/library/types";
@@ -127,6 +128,14 @@ export default function AudioTagger() {
         key={workspace.albumDialogProps.instanceKey}
         {...workspace.albumDialogProps}
       />
+      <ExportConfirmationDialog
+        plan={exporting.confirmation}
+        status={exporting.confirmationStatus}
+        busy={exporting.exporting}
+        onCancel={exporting.cancelConfirmation}
+        onConfirm={() => void exporting.confirmDownload()}
+        onRestoreFocus={exporting.restoreConfirmationFocus}
+      />
       {navigation.isMobile && (
         <Button
           ref={menuButtonRef}
@@ -136,6 +145,7 @@ export default function AudioTagger() {
           className={`fixed left-3 top-3 z-30 size-11 bg-background/95 shadow-sm md:hidden ${navigation.drawerOpen ? "pointer-events-none opacity-0" : ""}`}
           tabIndex={navigation.drawerOpen ? -1 : 0}
           aria-label="open library"
+          data-export-focus-fallback
           onClick={(event) => navigation.openDrawer(event.currentTarget)}
         >
           <Menu />
