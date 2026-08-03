@@ -109,7 +109,7 @@ test("unmounts the media entry in settings and restores its source URL", async (
   await page.getByRole("button", { name: "settings" }).click();
   await expect(mediaUrl).not.toBeAttached();
 
-  await page.getByRole("button", { name: "back to editor" }).click();
+  await page.getByRole("button", { name: "back to workspace" }).click();
   await expect(mediaUrl).toHaveValue(shareLink);
 });
 
@@ -144,14 +144,142 @@ test("switches the metadata editor and settings without unmounting either panel"
   await expect(settings).toHaveCSS("opacity", "1");
 });
 
+test("treats settings as an exclusive destination and Back restores the selected track", async ({
+  page,
+}) => {
+  await uploadTrack(page);
+  const editor = page.locator('[data-view="metadata-editor"]');
+  const settings = page.locator('[data-view="settings"]');
+  const track = getPopulatedTrackList(page).getByRole("button").first();
+  await page.locator("#track-title").fill("Restored after settings");
+
+  expect(await track.evaluate((element) => element.classList.contains("bg-accent"))).toBe(true);
+  await page.getByRole("button", { name: "settings" }).click();
+
+  await expect(settings).toHaveAttribute("aria-hidden", "false");
+  await expect(editor).toHaveAttribute("aria-hidden", "true");
+  await expect(editor).toHaveAttribute("inert", "");
+  expect(await track.evaluate((element) => element.classList.contains("bg-accent"))).toBe(false);
+
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Control+a");
+  await page.keyboard.press("Delete");
+  await expect(settings).toHaveAttribute("aria-hidden", "false");
+
+  await page.getByRole("button", { name: "back to workspace" }).click();
+
+  await expect(settings).toHaveAttribute("aria-hidden", "true");
+  await expect(editor).toHaveAttribute("aria-hidden", "false");
+  await expect(page.locator("#track-title")).toHaveValue("Restored after settings");
+  expect(await track.evaluate((element) => element.classList.contains("bg-accent"))).toBe(true);
+});
+
+test("uses the tagium nameplate as Home without discarding library work", async ({ page }) => {
+  await uploadTrack(page);
+  const title = page.locator("#track-title");
+  await title.fill("Preserved by Home");
+
+  await page.getByRole("button", { name: "tagium, go to workspace home" }).click();
+
+  await expect(page.getByText("library (1)", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-editor-state="empty-selection"]')).toHaveCSS("opacity", "1");
+  await expect(page.getByRole("button", { name: "download track" })).not.toBeAttached();
+
+  await getPopulatedTrackList(page).getByRole("button").first().click();
+  await expect(title).toHaveValue("Preserved by Home");
+});
+
+test("goes directly from settings Home to the neutral editor without a nested track fade", async ({
+  page,
+}) => {
+  await uploadTrack(page);
+  await page.getByRole("button", { name: "settings" }).click();
+
+  await page.getByRole("button", { name: "tagium, go to workspace home" }).click();
+  await expect(page.locator('[data-view="settings"]')).toHaveAttribute("aria-hidden", "true");
+  await expect(page.locator('[data-view="metadata-editor"]')).toHaveAttribute(
+    "aria-hidden",
+    "false",
+  );
+  const animatedEditorStates = await page
+    .locator('[data-editor-state="empty-selection"], [data-editor-state="loaded-track"]')
+    .evaluateAll((elements) =>
+      elements
+        .filter((element) => element.getAnimations().length > 0)
+        .map((element) => element.getAttribute("data-editor-state")),
+    );
+
+  expect(animatedEditorStates).toEqual([]);
+  await expect(page.locator('[data-editor-state="empty-selection"]')).toHaveCSS("opacity", "1");
+});
+
+test("selecting a track from settings activates that editor destination", async ({ page }) => {
+  await uploadTrack(page);
+  await page.getByRole("button", { name: "settings" }).click();
+
+  await getPopulatedTrackList(page).getByRole("button").first().click();
+
+  await expect(page.locator('[data-view="settings"]')).toHaveAttribute("aria-hidden", "true");
+  await expect(page.locator('[data-view="metadata-editor"]')).toHaveAttribute(
+    "aria-hidden",
+    "false",
+  );
+  await expect(page.getByRole("button", { name: "download track" })).toBeVisible();
+});
+
+test("mobile sidebar actions leave settings and its history entry before navigating", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 700 });
+  await uploadTrack(page);
+
+  const openLibrary = page.getByRole("button", { name: "open library" });
+  await openLibrary.click();
+  await page
+    .getByRole("dialog", { name: "library" })
+    .getByRole("button", { name: "settings" })
+    .click();
+  await expect(page.locator('[data-view="settings"]')).toHaveAttribute("aria-hidden", "false");
+
+  await openLibrary.click();
+  await getPopulatedTrackList(page).getByRole("button").first().click();
+  await expect(page.locator('[data-view="metadata-editor"]')).toHaveAttribute(
+    "aria-hidden",
+    "false",
+  );
+  expect(
+    await page.evaluate(
+      () =>
+        (history.state as { workspaceNav?: { kind?: string } } | null)?.workspaceNav?.kind ?? null,
+    ),
+  ).toBeNull();
+
+  await openLibrary.click();
+  await page
+    .getByRole("dialog", { name: "library" })
+    .getByRole("button", { name: "settings" })
+    .click();
+  await expect(page.locator('[data-view="settings"]')).toHaveAttribute("aria-hidden", "false");
+
+  await openLibrary.click();
+  await page.getByRole("button", { name: "tagium, go to workspace home" }).click();
+  await expect(page.locator('[data-editor-state="empty-selection"]')).toHaveCSS("opacity", "1");
+  expect(
+    await page.evaluate(
+      () =>
+        (history.state as { workspaceNav?: { kind?: string } } | null)?.workspaceNav?.kind ?? null,
+    ),
+  ).toBeNull();
+});
+
 test("clicking blank space in the empty library closes settings", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "settings" }).click();
-  await expect(page.getByRole("button", { name: "back to editor" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "back to workspace" })).toBeVisible();
 
   await page.getByRole("button", { name: "clear track selection and return to editor" }).click();
 
-  await expect(page.getByRole("button", { name: "back to editor" })).not.toBeAttached();
+  await expect(page.getByRole("button", { name: "back to workspace" })).not.toBeAttached();
   await expect(page.locator('[data-view="landing"]')).toBeVisible();
 });
 
@@ -279,7 +407,7 @@ test("gates advanced fields, retains their values, and reveals hidden validation
 
   await advancedSetting.click();
   await expect(page.getByText("link album artist to track artist")).toBeVisible();
-  await page.getByRole("button", { name: "back to editor" }).click();
+  await page.getByRole("button", { name: "back to workspace" }).click();
 
   await expect(page.getByRole("group", { name: "metadata fields" })).toBeVisible();
   await page.getByRole("button", { name: "advanced", exact: true }).click();
@@ -298,12 +426,12 @@ test("gates advanced fields, retains their values, and reveals hidden validation
 
   await page.getByRole("button", { name: "settings" }).click();
   await advancedSetting.click();
-  await page.getByRole("button", { name: "back to editor" }).click();
+  await page.getByRole("button", { name: "back to workspace" }).click();
   await expect(page.getByRole("group", { name: "metadata fields" })).not.toBeAttached();
 
   await page.getByRole("button", { name: "settings" }).click();
   await advancedSetting.click();
-  await page.getByRole("button", { name: "back to editor" }).click();
+  await page.getByRole("button", { name: "back to workspace" }).click();
   await expect(page.getByRole("button", { name: "advanced", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",

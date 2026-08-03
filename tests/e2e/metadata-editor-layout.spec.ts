@@ -18,7 +18,7 @@ const uploadTrack = async (page: Page) => {
 const enableAdvancedMetadata = async (page: Page) => {
   await page.getByRole("button", { name: "settings" }).click();
   await page.getByRole("checkbox", { name: "enable advanced metadata" }).click();
-  await page.getByRole("button", { name: "back to editor" }).click();
+  await page.getByRole("button", { name: "back to workspace" }).click();
   await expect(page.getByRole("button", { name: "advanced" })).toBeVisible();
 };
 

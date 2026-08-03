@@ -36,6 +36,7 @@ export const useMobileWorkspaceNavigation = ({
   const openerRef = useRef<HTMLElement | null>(null);
   const mobileRef = useRef(false);
   const pendingActionRef = useRef<(() => void) | null>(null);
+  const popPendingRef = useRef(false);
   const currentWorkspaceNavRef = useRef<WorkspaceNavigationState["workspaceNav"]>(undefined);
 
   useEffect(() => {
@@ -55,6 +56,7 @@ export const useMobileWorkspaceNavigation = ({
       delete state.workspaceNav;
       history.replaceState(state, "", location.href);
       currentWorkspaceNavRef.current = undefined;
+      popPendingRef.current = false;
       setDrawerOpen(false);
       pendingActionRef.current = null;
     }
@@ -62,6 +64,7 @@ export const useMobileWorkspaceNavigation = ({
 
   useEffect(() => {
     const onPopState = (event: PopStateEvent) => {
+      popPendingRef.current = false;
       const nav = isWorkspaceNavigationState(event.state) ? event.state.workspaceNav : undefined;
       const previousNav = currentWorkspaceNavRef.current;
       currentWorkspaceNavRef.current = nav;
@@ -112,11 +115,12 @@ export const useMobileWorkspaceNavigation = ({
   );
 
   const closeDrawer = useCallback(() => {
-    if (!drawerOpen) return;
+    if (!drawerOpen || popPendingRef.current) return;
     if (
       isWorkspaceNavigationState(history.state) &&
       history.state.workspaceNav?.kind === "drawer"
     ) {
+      popPendingRef.current = true;
       history.back();
     } else {
       currentWorkspaceNavRef.current = undefined;
@@ -133,6 +137,7 @@ export const useMobileWorkspaceNavigation = ({
         action();
         return;
       }
+      if (popPendingRef.current) return;
       openerRef.current = null;
       pendingActionRef.current = action;
       closeDrawer();
@@ -150,13 +155,23 @@ export const useMobileWorkspaceNavigation = ({
     [activeView, setActiveView],
   );
 
-  const backWorkspace = useCallback(() => {
-    if (isWorkspaceNavigationState(history.state) && history.state.workspaceNav?.kind === "view") {
-      history.back();
-    } else {
-      setActiveView("editor");
-    }
-  }, [setActiveView]);
+  const backWorkspace = useCallback(
+    (afterBack?: () => void) => {
+      if (popPendingRef.current) return;
+      if (
+        isWorkspaceNavigationState(history.state) &&
+        history.state.workspaceNav?.kind === "view"
+      ) {
+        pendingActionRef.current = afterBack ?? null;
+        popPendingRef.current = true;
+        history.back();
+      } else {
+        setActiveView("editor");
+        afterBack?.();
+      }
+    },
+    [setActiveView],
+  );
 
   return useMemo(
     () => ({
