@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import url("https://api.fontshare.com/v2/css?f%5B%5D=satoshi@1&display=swap");
 
 /* Satoshi is loaded from the Fontshare CDN via <link> in index.html, not self-hosted.
    Their EULA permits web use but restricts redistribution, and committing the binary to
