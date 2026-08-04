@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -69,19 +69,22 @@ export function ExportPlanDisclosure({ group }: { group: ExportPlanGroup }) {
   );
 }
 
-export default function ExportConfirmationDialog({
+type ExportConfirmationDialogViewProps = ExportConfirmationDialogProps & { open: boolean };
+
+export function ExportConfirmationDialogView({
   plan,
   status,
   busy,
   onCancel,
   onConfirm,
   onRestoreFocus,
-}: ExportConfirmationDialogProps) {
+  open,
+}: ExportConfirmationDialogViewProps) {
   const noun = plan?.trackCount === 1 ? "track" : "tracks";
   const downloadLabel = plan ? `download ~${formatMegabyteSize(plan.totalSizeBytes)}` : "download";
 
   return (
-    <Dialog open={Boolean(plan)} onOpenChange={(open) => !open && !busy && onCancel()}>
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && !busy && onCancel()}>
       <DialogContent
         showCloseButton={false}
         aria-describedby={undefined}
@@ -150,5 +153,18 @@ export default function ExportConfirmationDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export default function ExportConfirmationDialog(props: ExportConfirmationDialogProps) {
+  const visiblePlanRef = useRef(props.plan);
+  if (props.plan) visiblePlanRef.current = props.plan;
+
+  return (
+    <ExportConfirmationDialogView
+      {...props}
+      open={Boolean(props.plan)}
+      plan={props.plan ?? visiblePlanRef.current}
+    />
   );
 }

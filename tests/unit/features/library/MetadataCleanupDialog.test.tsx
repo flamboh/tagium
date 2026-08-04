@@ -45,6 +45,29 @@ const textContent = (node: ReactTestInstance): string =>
   node.children.map((child) => (typeof child === "string" ? child : textContent(child))).join("");
 
 describe("MetadataCleanupDialog", () => {
+  it("keeps populated suggestions rendered while the dialog closes", () => {
+    const props = {
+      open: true,
+      selectionSessionKey: 1,
+      suggestions: [suggestion("one"), suggestion("two")],
+      returnFocusTarget: null,
+      onOpenChange: vi.fn(),
+      onApply: vi.fn(),
+    };
+    let renderer: ReturnType<typeof create>;
+    act(() => {
+      renderer = create(<MetadataCleanupDialog {...props} />);
+    });
+
+    act(() => {
+      renderer!.update(<MetadataCleanupDialog {...props} open={false} suggestions={[]} />);
+    });
+
+    expect(textContent(renderer!.root)).toContain("apply 2 changes");
+    expect(textContent(renderer!.root)).not.toContain("nothing left to clean up");
+    act(() => renderer!.unmount());
+  });
+
   it("preserves equivalent unchecked choices live and resets them on a new session", () => {
     const onApply = vi.fn();
     const props = {
