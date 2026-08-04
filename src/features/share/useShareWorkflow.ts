@@ -597,7 +597,7 @@ export const useShareWorkflow = ({
     shareActions,
     importFromInput,
     openCreator,
-    publish: () => void publish(),
+    publish,
     closeDialog: () => setDialog({ status: "closed" }),
     stopDialogShare,
     stopPageShare,

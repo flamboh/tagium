@@ -233,7 +233,7 @@ describe("share creator preview state", () => {
     });
 
     await act(async () => {
-      hook.result.publish();
+      void hook.result.publish();
       await Promise.resolve();
     });
     await vi.waitFor(() => expect(publishSharedAlbum).toHaveBeenCalledTimes(1));
