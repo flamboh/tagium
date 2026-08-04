@@ -1,15 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@font-face {
-  font-family: "Satoshi";
-  src:
-    url("./assets/fonts/Satoshi-Variable.woff2") format("woff2-variations"),
-    url("./assets/fonts/Satoshi-Variable.woff2") format("woff2");
-  font-weight: 300 900;
-  font-style: normal;
-  font-display: swap;
-}
+/* Satoshi is loaded from the Fontshare CDN via <link> in index.html, not self-hosted.
+   Their EULA permits web use but restricts redistribution, and committing the binary to
+   a public repo would make it obtainable by cloning. */
 
 @custom-variant dark (&:is(.dark *));
 
