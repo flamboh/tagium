@@ -13,6 +13,7 @@ Tagium is a web-based audio metadata editor. We allow users to save the tracks t
 - Grow the system in layers. Start from the smallest version that works end to end, and add each new capability on top of a product that already works. Never trade a working product for unfinished complexity.
 - Keep components modular and concerns clearly separated.
 - Prefer established, well-maintained libraries when they reduce overall complexity or improve reliability. Do not reimplement common functionality without a clear reason. e.g. modify shadcn components instead of creating custom solutions.
+- Keep all UI copy lowercase, including accessibility text, brands, acronyms, and units. Preserve placeholder casing and user/provider content; don't fake casing with CSS.
 
 ## Pull Requests
 

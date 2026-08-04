@@ -148,7 +148,7 @@ export const derivePlaylistDownloadQueueSummary = (
   const failedCount = queue.items.filter((item) => item.status === "failed").length;
   const canceledCount = queue.items.filter((item) => item.status === "canceled").length;
   return {
-    label: `Downloading ${completedCount}/${queue.items.length}`,
+    label: `downloading ${completedCount}/${queue.items.length}`,
     totalCount: queue.items.length,
     completedCount,
     activeCount: activeItems.length,

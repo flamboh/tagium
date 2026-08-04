@@ -118,7 +118,7 @@ test("prevents checkbox label text selection", async ({ page }) => {
   await page.getByRole("button", { name: "settings" }).click();
 
   const checkboxLabel = page
-    .getByText("automatically apply SoundCloud album cover to all tracks", {
+    .getByText("automatically apply soundcloud album cover to all tracks", {
       exact: true,
     })
     .locator("..");

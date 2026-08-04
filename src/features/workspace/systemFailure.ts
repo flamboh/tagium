@@ -38,7 +38,7 @@ const KNOWN_FAILURES = {
   capacity: {
     code: "capacity",
     title: "downloads are busy",
-    description: "Too many downloads are running right now. Try again in a moment.",
+    description: "too many downloads are running right now. try again in a moment.",
     trackDescription: "downloads are busy. try again in a moment.",
     retryable: true,
     dedupeKey: "system-download-capacity",
@@ -46,7 +46,7 @@ const KNOWN_FAILURES = {
   rate_limited: {
     code: "rate_limited",
     title: "too many download requests",
-    description: "Wait a moment, then try the download again.",
+    description: "wait a moment, then try the download again.",
     trackDescription: "too many download requests. try again shortly.",
     retryable: true,
     dedupeKey: "system-download-rate-limited",
@@ -54,7 +54,7 @@ const KNOWN_FAILURES = {
   timeout: {
     code: "timeout",
     title: "the download took too long",
-    description: "Try again. If it keeps failing, try another link.",
+    description: "try again. if it keeps failing, try another link.",
     trackDescription: "download timed out. try again.",
     retryable: true,
     dedupeKey: "system-download-timeout",
@@ -62,7 +62,7 @@ const KNOWN_FAILURES = {
   service_unavailable: {
     code: "service_unavailable",
     title: "downloads are temporarily unavailable",
-    description: "tagium could not reach the download service. Try again soon.",
+    description: "tagium could not reach the download service. try again soon.",
     trackDescription: "audio downloads are temporarily unavailable.",
     retryable: true,
     dedupeKey: "system-download-service-unavailable",
@@ -70,7 +70,7 @@ const KNOWN_FAILURES = {
   unsupported_source: {
     code: "unsupported_source",
     title: "this link is not supported",
-    description: "Try a public SoundCloud or YouTube track URL.",
+    description: "try a public soundcloud or youtube track url.",
     trackDescription: "this link is not supported.",
     retryable: false,
     dedupeKey: "system-download-unsupported-source",
@@ -78,7 +78,7 @@ const KNOWN_FAILURES = {
   private_or_missing: {
     code: "private_or_missing",
     title: "we could not access this media",
-    description: "Check that the link is public and still available, then try again.",
+    description: "check that the link is public and still available, then try again.",
     trackDescription: "media is private, unavailable, or no longer exists.",
     retryable: false,
     dedupeKey: "system-download-private-or-missing",
@@ -86,7 +86,7 @@ const KNOWN_FAILURES = {
   invalid_response: {
     code: "invalid_response",
     title: "we could not read this media",
-    description: "The provider returned an unexpected response. Try again or use another link.",
+    description: "the provider returned an unexpected response. try again or use another link.",
     trackDescription: "the media provider returned an unexpected response.",
     retryable: true,
     dedupeKey: "system-download-invalid-response",
@@ -96,43 +96,43 @@ const KNOWN_FAILURES = {
 const FALLBACKS = {
   download: {
     title: "download failed",
-    description: "tagium could not download this track. Try again or use another link.",
+    description: "tagium could not download this track. try again or use another link.",
     trackDescription: "download failed. try again or use another link.",
   },
   import: {
     title: "import failed",
-    description: "tagium could not import this media. Try again in a moment.",
+    description: "tagium could not import this media. try again in a moment.",
     trackDescription: "import failed. try again.",
   },
   upload: {
     title: "some files could not be imported",
     description:
-      "tagium could not read one or more audio files. Try a valid MP3, FLAC, or M4A file.",
+      "tagium could not read one or more audio files. try a valid mp3, flac, or m4a file.",
     trackDescription: "one or more audio files could not be read.",
   },
   export: {
     title: "export failed",
-    description: "tagium could not prepare your download. Your tracks are still in the library.",
+    description: "tagium could not prepare your download. your tracks are still in the library.",
     trackDescription: "export failed. your tracks are still in the library.",
   },
   "cover-art": {
     title: "cover art failed",
-    description: "tagium could not process this cover image. Try another jpeg or png.",
+    description: "tagium could not process this cover image. try another jpeg or png.",
     trackDescription: "cover art could not be processed.",
   },
   "cover-import": {
     title: "cover art was not imported",
-    description: "The tracks were imported without cover art. Upload a jpeg or png manually.",
+    description: "the tracks were imported without cover art. upload a jpeg or png manually.",
     trackDescription: "cover art was not imported. upload an image manually.",
   },
   metadata: {
     title: "metadata could not be saved",
-    description: "Your edits are still visible. Try the action again.",
+    description: "your edits are still visible. try the action again.",
     trackDescription: "metadata could not be saved. try again.",
   },
   storage: {
     title: "settings could not be saved",
-    description: "Your browser did not allow tagium to store these settings.",
+    description: "your browser did not allow tagium to store these settings.",
     trackDescription: "settings could not be saved.",
   },
 } as const satisfies Record<

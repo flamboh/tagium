@@ -36,7 +36,10 @@ export const getAcceptedUploadParseResult = (uploads: UploadedTrack[]) => {
 
 export const getUploadRejectionMessage = (rejectedUploads: UploadedTrack[]) =>
   rejectedUploads
-    .map((upload) => upload.file.downloadError ?? `${upload.file.filename} could not be imported.`)
+    .map(
+      (upload) =>
+        `${upload.file.filename} could not be imported. try a valid mp3, flac, or unencrypted m4a/mp4 file.`,
+    )
     .join("\n");
 
 export const getNullableNumericMetadataValue = (

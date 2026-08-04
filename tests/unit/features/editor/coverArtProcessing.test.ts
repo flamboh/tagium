@@ -31,7 +31,7 @@ describe("cover art processing", () => {
           type: "image/jpeg",
         }),
       ),
-    ).toThrow("25 MB");
+    ).toThrow("25 mb");
     expect(() =>
       validateCoverArtUpload(new File(["text"], "cover.txt", { type: "text/plain" })),
     ).toThrow("image");

@@ -37,7 +37,7 @@ export const validateCoverArtUpload = (file: File) => {
     throw new Error("cover art image must be a jpeg or png.");
   }
   if (file.size > MAX_COVER_ART_UPLOAD_BYTES) {
-    throw new Error("cover art must be 25 MB or smaller.");
+    throw new Error("cover art must be 25 mb or smaller.");
   }
 };
 

@@ -50,7 +50,7 @@ export function mergeUploadedTracksIntoAlbums(
     const firstSeed =
       albumSeedUploads.find((upload) => upload.albumSeed.title.trim())?.albumSeed ??
       albumSeedUploads[0].albumSeed;
-    const albumTitle = firstSeed.title || `Album ${nextAlbums.length + 1}`;
+    const albumTitle = firstSeed.title || `album ${nextAlbums.length + 1}`;
 
     const createdAlbum: AlbumGroup = {
       id: crypto.randomUUID(),

@@ -29,7 +29,7 @@ export type AdvancedNumericMetadataField = "discNumber" | "bpm";
 
 const advancedNumberLabels = {
   discNumber: "disc number",
-  bpm: "BPM",
+  bpm: "bpm",
 } as const satisfies Record<AdvancedNumericMetadataField, string>;
 
 export const validateAdvancedMetadataNumber = (

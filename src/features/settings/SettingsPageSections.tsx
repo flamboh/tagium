@@ -213,7 +213,7 @@ export function DownloadsSettingsSection({ settings, onChange }: SettingsSection
           className="mt-0.5"
         />
         <span className="text-sm font-medium">
-          automatically apply SoundCloud album cover to all tracks
+          automatically apply soundcloud album cover to all tracks
         </span>
       </label>
     </section>
@@ -235,7 +235,7 @@ export function AboutSettingsSection() {
           <h3 className="text-base font-semibold">ethics</h3>
           <p className="text-sm leading-6 text-muted-foreground">
             tagium is not a piracy tool and cannot be used as one. it only works with free, publicly
-            accessible audio. It cannot be used to bypass paywalls or access private content.
+            accessible audio. it cannot be used to bypass paywalls or access private content.
           </p>
           <p className="text-sm leading-6 text-muted-foreground">
             you are responsible for the content you download and how you use it. credit original
@@ -276,7 +276,7 @@ export function AboutSettingsSection() {
           href="https://github.com/flamboh/tagium"
           target="_blank"
           rel="noreferrer"
-          aria-label="GitHub"
+          aria-label="github"
           className="inline-flex size-12 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
         >
           <svg
@@ -298,7 +298,7 @@ export function AboutSettingsSection() {
           href="https://x.com/flambohh"
           target="_blank"
           rel="noreferrer"
-          aria-label="Twitter"
+          aria-label="twitter"
           className="inline-flex size-12 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
         >
           <svg

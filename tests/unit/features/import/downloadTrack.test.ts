@@ -73,7 +73,7 @@ describe("imported cover downloads", () => {
 
     await expect(
       fetchImportedCover("https://example.com/cover", { fetch, optimize }),
-    ).rejects.toThrow("25 MB");
+    ).rejects.toThrow("25 mb");
     expect(optimize).not.toHaveBeenCalled();
   });
 

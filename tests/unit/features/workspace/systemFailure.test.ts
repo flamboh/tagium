@@ -38,7 +38,7 @@ describe("system failure reporting", () => {
     expect(presentation).toMatchObject({
       code: "unknown",
       title: "export failed",
-      description: "tagium could not prepare your download. Your tracks are still in the library.",
+      description: "tagium could not prepare your download. your tracks are still in the library.",
     });
     expect(JSON.stringify(presentation)).not.toContain("private upstream");
   });
@@ -49,7 +49,7 @@ describe("system failure reporting", () => {
 
     expect(toastMocks.error).toHaveBeenCalledTimes(2);
     expect(toastMocks.error).toHaveBeenLastCalledWith("export failed", {
-      description: "tagium could not prepare your download. Your tracks are still in the library.",
+      description: "tagium could not prepare your download. your tracks are still in the library.",
     });
   });
 
@@ -91,7 +91,7 @@ describe("system failure reporting", () => {
     ).toMatchObject({
       code: "unknown",
       title: "metadata could not be saved",
-      description: "Your edits are still visible. Try the action again.",
+      description: "your edits are still visible. try the action again.",
     });
 
     expect(
@@ -108,7 +108,7 @@ describe("system failure reporting", () => {
     ).toMatchObject({
       code: "unknown",
       title: "cover art was not imported",
-      description: "The tracks were imported without cover art. Upload a jpeg or png manually.",
+      description: "the tracks were imported without cover art. upload a jpeg or png manually.",
     });
   });
 });
