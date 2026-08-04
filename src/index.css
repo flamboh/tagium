@@ -210,6 +210,8 @@
   body {
     @apply bg-background text-foreground;
     font-weight: 500;
+    /* Satoshi ss01: single-storey "a". Also swaps uppercase G to its alternate. */
+    font-feature-settings: "ss01" 1;
     letter-spacing: var(--tracking-normal);
   }
 
