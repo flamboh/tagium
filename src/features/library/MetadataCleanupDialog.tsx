@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -32,11 +32,16 @@ function MetadataCleanupDialogSession({
   onOpenChange,
   onApply,
 }: MetadataCleanupDialogSessionProps) {
+  const visibleSuggestionsRef = useRef(suggestions);
+  useLayoutEffect(() => {
+    if (open) visibleSuggestionsRef.current = suggestions;
+  }, [open, suggestions]);
+  const visibleSuggestions = open ? suggestions : visibleSuggestionsRef.current;
   const [selectedIds, setSelectedIds] = useState(
     () => new Set(suggestions.map((suggestion) => suggestion.trackId)),
   );
 
-  const selectedSuggestions = suggestions.filter((suggestion) =>
+  const selectedSuggestions = visibleSuggestions.filter((suggestion) =>
     selectedIds.has(suggestion.trackId),
   );
 
@@ -62,13 +67,13 @@ function MetadataCleanupDialogSession({
           </DialogDescription>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto border-y px-6">
-          {suggestions.length === 0 ? (
+          {visibleSuggestions.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               nothing left to clean up
             </p>
           ) : (
             <div className="divide-y">
-              {suggestions.map((suggestion) => (
+              {visibleSuggestions.map((suggestion) => (
                 <label
                   key={suggestion.trackId}
                   className="flex cursor-pointer select-none items-start gap-3 py-4"

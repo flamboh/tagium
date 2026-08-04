@@ -1,7 +1,19 @@
 import type { ReactElement, ReactNode } from "react";
-import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import { act, create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it, vi } from "vite-plus/test";
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+vi.mock("@/components/ui/dialog", () => ({
+  Dialog: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DialogContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DialogFooter: ({ children }: { children?: ReactNode }) => <footer>{children}</footer>,
+  DialogHeader: ({ children }: { children?: ReactNode }) => <header>{children}</header>,
+  DialogTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
+}));
+
 import ExportConfirmationDialog, {
+  ExportConfirmationDialogView,
   ExportPlanDisclosure,
 } from "@/features/export/ExportConfirmationDialog";
 import { Button } from "@/components/ui/button";
@@ -26,6 +38,8 @@ const textContent = (node: ReactNode): string => {
   if (!isElement(node)) return "";
   return childrenOf(node).map(textContent).join("");
 };
+const renderedText = (node: ReactTestInstance): string =>
+  node.children.map((child) => (typeof child === "string" ? child : renderedText(child))).join("");
 
 const plan = {
   target: { kind: "library" as const },
@@ -41,17 +55,39 @@ const plan = {
 };
 
 const render = (overrides: Partial<Parameters<typeof ExportConfirmationDialog>[0]> = {}) =>
-  ExportConfirmationDialog({
+  ExportConfirmationDialogView({
     plan,
     status: "ready",
     busy: false,
     onCancel: vi.fn(),
     onConfirm: vi.fn(),
     onRestoreFocus: vi.fn(),
+    open: true,
     ...overrides,
   });
 
 describe("ExportConfirmationDialog", () => {
+  it("keeps the populated plan rendered while the dialog closes", () => {
+    const props = {
+      plan,
+      status: "ready" as const,
+      busy: false,
+      onCancel: vi.fn(),
+      onConfirm: vi.fn(),
+      onRestoreFocus: vi.fn(),
+    };
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(<ExportConfirmationDialog {...props} />);
+    });
+
+    act(() => renderer.update(<ExportConfirmationDialog {...props} plan={null} />));
+
+    expect(renderedText(renderer.root)).toContain("download 1 track");
+    expect(renderedText(renderer.root)).not.toContain("download 0 tracks");
+    act(() => renderer.unmount());
+  });
+
   it("shows only the locked manifest and approximate download copy", () => {
     const tree = render();
     const text = textContent(tree);
