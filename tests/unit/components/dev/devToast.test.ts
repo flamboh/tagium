@@ -26,7 +26,7 @@ describe("dev toast controls", () => {
     spawnDevToast(kind);
 
     expect(toastMocks[kind]).toHaveBeenCalledWith(`${kind} toast`, {
-      description: "previewing Tagium's notification styling",
+      description: "previewing tagium's notification styling",
     });
   });
 
@@ -34,7 +34,7 @@ describe("dev toast controls", () => {
     spawnDevToast("neutral" satisfies DevToastKind);
 
     expect(toastMocks).toHaveBeenCalledWith("neutral toast", {
-      description: "previewing Tagium's notification styling",
+      description: "previewing tagium's notification styling",
     });
   });
 });

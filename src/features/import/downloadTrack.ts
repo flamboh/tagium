@@ -184,7 +184,7 @@ interface FetchImportedCoverDependencies {
 const readCoverResponseFile = async (response: Response, contentType: string) => {
   const declaredLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_COVER_ART_UPLOAD_BYTES) {
-    throw new Error("cover art must be 25 MB or smaller.");
+    throw new Error("cover art must be 25 mb or smaller.");
   }
   if (!response.body) throw new Error("album cover response body is unavailable.");
 
@@ -199,7 +199,7 @@ const readCoverResponseFile = async (response: Response, contentType: string) =>
       receivedBytes += value.byteLength;
       if (receivedBytes > MAX_COVER_ART_UPLOAD_BYTES) {
         await reader.cancel();
-        throw new Error("cover art must be 25 MB or smaller.");
+        throw new Error("cover art must be 25 mb or smaller.");
       }
       chunks.push(Uint8Array.from(value));
     }

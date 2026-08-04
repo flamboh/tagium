@@ -33,7 +33,7 @@ describe("playlistDownloadQueue", () => {
 
     const summary = derivePlaylistDownloadQueueSummary(queue, 12_000);
 
-    expect(summary.label).toBe("Downloading 1/3");
+    expect(summary.label).toBe("downloading 1/3");
     expect(summary.completedCount).toBe(1);
     expect(summary.activeCount).toBe(1);
     expect(summary.pendingCount).toBe(1);

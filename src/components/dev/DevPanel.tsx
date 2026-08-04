@@ -180,7 +180,7 @@ export function DevPanel() {
 
           <div className="grid gap-4 p-4">
             <section className="grid gap-3">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                 <Zap className="size-3.5" />
                 rate limit
               </div>
@@ -250,7 +250,7 @@ export function DevPanel() {
             </section>
 
             <section className="grid gap-3">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                 <AlertTriangle className="size-3.5" />
                 next audio
               </div>
@@ -280,7 +280,7 @@ export function DevPanel() {
             </section>
 
             <section className="grid gap-3">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                 <AlertTriangle className="size-3.5" />
                 next tunnel
               </div>
@@ -310,7 +310,7 @@ export function DevPanel() {
             </section>
 
             <section className="grid gap-3">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                 <BellRing className="size-3.5" />
                 toasts
               </div>

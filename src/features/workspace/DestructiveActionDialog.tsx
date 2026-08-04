@@ -30,7 +30,7 @@ export default function DestructiveActionDialog({
         <DialogHeader>
           <DialogTitle>{`remove ${plural ? `${itemCount} ` : ""}${noun}?`}</DialogTitle>
           <DialogDescription>
-            {`This removes the ${noun} from the current session. This cannot be undone.`}
+            {`this removes the ${noun} from the current session. this cannot be undone.`}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

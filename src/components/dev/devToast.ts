@@ -6,7 +6,7 @@ export const devToastKinds: DevToastKind[] = ["neutral", "success", "error", "in
 
 export const spawnDevToast = (kind: DevToastKind) => {
   const title = `${kind} toast`;
-  const options = { description: "previewing Tagium's notification styling" };
+  const options = { description: "previewing tagium's notification styling" };
 
   if (kind === "neutral") {
     toast(title, options);

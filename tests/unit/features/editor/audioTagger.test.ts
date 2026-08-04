@@ -59,23 +59,24 @@ describe("audioTagger metadata patches", () => {
     });
   });
 
-  it("consolidates every rejected file error into one presentation", () => {
-    const rejectedUploads = ["empty.mp3 is empty.", "song.wav is not an mp3."].map(
-      (downloadError, index) =>
+  it("presents lowercase recovery copy without changing filename casing", () => {
+    const rejectedUploads = ["EMPTY.MP3", "song.wav"].map(
+      (filename, index) =>
         ({
           file: {
             id: `rejected-${index}`,
-            filename: index === 0 ? "empty.mp3" : "song.wav",
+            filename,
             status: "error",
             downloadStatus: "ready",
-            downloadError,
+            downloadError: "private CODEC diagnostic",
           },
           albumSeed: { title: "", artist: "", genre: "" },
         }) satisfies UploadedTrack,
     );
 
     expect(getUploadRejectionMessage(rejectedUploads)).toBe(
-      "empty.mp3 is empty.\nsong.wav is not an mp3.",
+      "EMPTY.MP3 could not be imported. try a valid mp3, flac, or unencrypted m4a/mp4 file.\n" +
+        "song.wav could not be imported. try a valid mp3, flac, or unencrypted m4a/mp4 file.",
     );
   });
 

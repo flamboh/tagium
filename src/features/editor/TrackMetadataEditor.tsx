@@ -256,7 +256,7 @@ function TrackDetailsFields({
     },
     [active, focusedTitleFileIdRef, selectedFileId, titleRegistrationRef],
   );
-  const albumFieldReason = "Album title is synced with the album.";
+  const albumFieldReason = "album title is synced with the album.";
 
   return (
     <>
@@ -546,10 +546,10 @@ function TrackFileSummary({ selectedFile }: { selectedFile: LoadedTrack }) {
         <span className="font-medium">size: </span>
         {selectedFile.file &&
           selectedFile.status !== "error" &&
-          `${(selectedFile.file.size / (1024 * 1024)).toFixed(2)} MB`}
+          `${(selectedFile.file.size / (1024 * 1024)).toFixed(2)} mb`}
         {selectedFile.file &&
           selectedFile.status === "error" &&
-          `${(selectedFile.file.size / (1024 * 1024)).toFixed(2)} MB (metadata failed)`}
+          `${(selectedFile.file.size / (1024 * 1024)).toFixed(2)} mb (metadata failed)`}
         {!selectedFile.file && selectedFile.downloadStatus === "downloading" && "downloading"}
         {!selectedFile.file && selectedFile.downloadStatus === "error" && "download failed"}
         {!selectedFile.file && selectedFile.downloadStatus === "canceled" && "download canceled"}
