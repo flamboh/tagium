@@ -139,6 +139,24 @@ describe("editor keyboard shortcuts", () => {
     expect(currentActions.clearSelection).toHaveBeenCalledOnce();
   });
 
+  it("leaves editor shortcuts inert outside the editor destination", () => {
+    const target = createKeyboardTarget();
+    const currentActions = actions({ enabled: false, selectedFileCount: 1 });
+    subscribeToEditorKeyboardShortcuts(target, () => currentActions);
+    const selectAllEvent = keyboardEvent("a", { ctrlKey: true });
+    const deleteEvent = keyboardEvent("Delete");
+
+    target.dispatch(selectAllEvent);
+    target.dispatch(deleteEvent);
+    target.dispatch(keyboardEvent("Escape"));
+
+    expect(preventDefaultFor(selectAllEvent)).not.toHaveBeenCalled();
+    expect(preventDefaultFor(deleteEvent)).not.toHaveBeenCalled();
+    expect(currentActions.selectAllFiles).not.toHaveBeenCalled();
+    expect(currentActions.requestRemoveSelectedFiles).not.toHaveBeenCalled();
+    expect(currentActions.clearSelection).not.toHaveBeenCalled();
+  });
+
   it.each([
     { tagName: "INPUT", isContentEditable: false },
     { tagName: "TEXTAREA", isContentEditable: false },

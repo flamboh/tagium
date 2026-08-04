@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { act } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 import { renderHook } from "../../support/hookTestHarness";
@@ -8,6 +9,7 @@ describe("mobile workspace navigation history integration", () => {
     const events = new EventTarget();
     let state: unknown = {};
     const stack: unknown[] = [state];
+    let backCalls = 0;
     const history = {
       get state() {
         return state;
@@ -21,6 +23,7 @@ describe("mobile workspace navigation history integration", () => {
         stack[stack.length - 1] = next;
       },
       back() {
+        backCalls++;
         stack.pop();
         state = stack.at(-1);
         queueMicrotask(() => {
@@ -41,22 +44,25 @@ describe("mobile workspace navigation history integration", () => {
         setTimeout,
       }),
     );
-    let activeView: "editor" | "settings" = "editor";
-    const hook = renderHook(
-      () =>
-        useMobileWorkspaceNavigation({
-          activeView,
-          setActiveView: (view) => {
-            activeView = view;
-          },
-        }),
-      undefined,
-    );
+    const hook = renderHook(() => {
+      const [activeView, setActiveView] = useState<"editor" | "settings">("editor");
+      const navigation = useMobileWorkspaceNavigation({
+        activeView,
+        setActiveView,
+      });
+      return { ...navigation, activeView };
+    }, undefined);
     act(() => hook.result.openDrawer());
     let ran = false;
+    let ignoredWhileClosing = false;
     act(() =>
       hook.result.runAfterDrawerClose(() => {
         ran = true;
+      }),
+    );
+    act(() =>
+      hook.result.runAfterDrawerClose(() => {
+        ignoredWhileClosing = true;
       }),
     );
     expect(ran).toBe(false);
@@ -64,16 +70,32 @@ describe("mobile workspace navigation history integration", () => {
       await Promise.resolve();
     });
     expect(ran).toBe(true);
+    expect(ignoredWhileClosing).toBe(false);
+    expect(backCalls).toBe(1);
 
     act(() => hook.result.navigateToView("settings"));
-    expect(activeView).toBe("settings");
+    expect(hook.result.activeView).toBe("settings");
+    let ranAfterBack = false;
+    let ignoredWhileGoingBack = false;
+    act(() => hook.result.backWorkspace(() => (ranAfterBack = true)));
+    act(() => hook.result.backWorkspace(() => (ignoredWhileGoingBack = true)));
+    expect(ranAfterBack).toBe(false);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(hook.result.activeView).toBe("editor");
+    expect(ranAfterBack).toBe(true);
+    expect(ignoredWhileGoingBack).toBe(false);
+    expect(backCalls).toBe(2);
+
+    act(() => hook.result.navigateToView("settings"));
     state = { shareSlug: "shared-album" };
     const sharePop = new Event("popstate");
     Object.defineProperty(sharePop, "state", { value: state });
     act(() => {
       events.dispatchEvent(sharePop);
     });
-    expect(activeView).toBe("settings");
+    expect(hook.result.activeView).toBe("settings");
     hook.unmount();
   });
 });

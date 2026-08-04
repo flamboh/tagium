@@ -20,6 +20,7 @@ describe("settings page advanced metadata controls", () => {
     const normalMarkup = render(false);
     const advancedMarkup = render(true);
 
+    expect(normalMarkup).toContain('aria-label="back to workspace"');
     expect(normalMarkup).toContain("enable advanced metadata");
     expect(normalMarkup).not.toContain(getMetadataLinkDescriptor("albumArtist").label);
     expect(advancedMarkup).toContain(getMetadataLinkDescriptor("albumArtist").label);

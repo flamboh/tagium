@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode, RefObject, TransitionEvent } from "react";
 import {
   Controller,
@@ -43,6 +43,7 @@ import {
 type LoadedTrack = TagiumFile & { metadata: AudioMetadata };
 
 interface TrackMetadataEditorProps {
+  viewActive?: boolean;
   selectedFile: TagiumFile | null;
   selectedFileId: string | null;
   register: UseFormRegister<AudioMetadata>;
@@ -860,6 +861,12 @@ function LoadedTrackMetadataEditor({
 
 export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
   const focusedTitleFileIdRef = useRef<string | null>(null);
+  const viewActive = props.viewActive ?? true;
+  const wasViewActiveRef = useRef(viewActive);
+  const animateSelection = viewActive && wasViewActiveRef.current;
+  useLayoutEffect(() => {
+    wasViewActiveRef.current = viewActive;
+  }, [viewActive]);
   const { mode: editorMode, setMode: setEditorMode } = useMetadataEditorMode(
     props.advancedMetadata,
   );
@@ -905,7 +912,7 @@ export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
         data-editor-state="empty-selection"
         aria-hidden={trackIsSelected}
         inert={trackIsSelected}
-        className={`absolute inset-0 flex items-center justify-center bg-muted/5 px-4 pb-32 transition-opacity duration-200 motion-reduce:transition-none ${
+        className={`absolute inset-0 flex items-center justify-center bg-muted/5 px-4 pb-32 ${animateSelection ? "transition-opacity duration-200 motion-reduce:transition-none" : "transition-none"} ${
           trackIsSelected ? "pointer-events-none opacity-0" : "opacity-100"
         }`}
       >
@@ -916,7 +923,7 @@ export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
         aria-hidden={!trackIsSelected}
         inert={!trackIsSelected}
         onTransitionEnd={releaseExitedSelection}
-        className={`absolute inset-0 flex min-h-0 flex-col transition-opacity duration-200 motion-reduce:transition-none ${
+        className={`absolute inset-0 flex min-h-0 flex-col ${animateSelection ? "transition-opacity duration-200 motion-reduce:transition-none" : "transition-none"} ${
           trackIsSelected ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
