@@ -181,7 +181,7 @@ export default function TagSidebarPanel({
       onDrop={handleSidebarFileDrop}
     >
       <div className="h-14 flex items-center px-5 border-b flex-shrink-0">
-        <span className="font-bold text-xl tracking-tight select-none">tagium</span>
+        <span className="font-black text-xl tracking-tight select-none">tagium</span>
         <button
           type="button"
           className={cn(

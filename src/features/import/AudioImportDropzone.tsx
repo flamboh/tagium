@@ -77,7 +77,7 @@ export default function AudioImportDropzone({
       />
       {showBrand && (
         <div className="select-none text-center">
-          <h1 className="text-7xl font-bold tracking-[-0.04em] text-foreground">tagium</h1>
+          <h1 className="text-7xl font-black tracking-[-0.04em] text-foreground">tagium</h1>
           <p className="mt-3 text-base text-muted-foreground">tag your music</p>
         </div>
       )}
