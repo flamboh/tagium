@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -33,7 +33,9 @@ function MetadataCleanupDialogSession({
   onApply,
 }: MetadataCleanupDialogSessionProps) {
   const visibleSuggestionsRef = useRef(suggestions);
-  if (open) visibleSuggestionsRef.current = suggestions;
+  useLayoutEffect(() => {
+    if (open) visibleSuggestionsRef.current = suggestions;
+  }, [open, suggestions]);
   const visibleSuggestions = open ? suggestions : visibleSuggestionsRef.current;
   const [selectedIds, setSelectedIds] = useState(
     () => new Set(suggestions.map((suggestion) => suggestion.trackId)),

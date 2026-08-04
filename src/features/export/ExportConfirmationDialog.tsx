@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { useId, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -158,7 +158,9 @@ export function ExportConfirmationDialogView({
 
 export default function ExportConfirmationDialog(props: ExportConfirmationDialogProps) {
   const visiblePlanRef = useRef(props.plan);
-  if (props.plan) visiblePlanRef.current = props.plan;
+  useLayoutEffect(() => {
+    if (props.plan) visiblePlanRef.current = props.plan;
+  }, [props.plan]);
 
   return (
     <ExportConfirmationDialogView
