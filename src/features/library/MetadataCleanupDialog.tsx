@@ -90,7 +90,7 @@ function MetadataCleanupDialogSession({
                       {suggestion.beforeTitle}
                     </p>
                     <div className="flex min-w-0 items-center gap-2">
-                      <ArrowRight className="size-3.5 shrink-0 text-primary" />
+                      <ArrowRight className="size-3.5 shrink-0 text-foreground" />
                       <p className="truncate text-sm font-medium">{suggestion.afterTitle}</p>
                     </div>
                   </div>

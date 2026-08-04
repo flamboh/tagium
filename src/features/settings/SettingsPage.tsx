@@ -22,7 +22,7 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
-            className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center text-primary/80 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center text-brand/80 transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             onClick={onBack}
             aria-label="back to workspace"
           >

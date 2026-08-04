@@ -88,7 +88,7 @@ function SharedAlbumSkeleton({ onOpenTagium }: { onOpenTagium: () => void }) {
       >
         <div className="mb-5 h-4 w-56 animate-pulse rounded bg-muted motion-reduce:animate-none" />
         <div className="flex items-start gap-6 max-sm:gap-4">
-          <div className="size-40 shrink-0 animate-pulse rounded-xl bg-muted motion-reduce:animate-none max-sm:size-24" />
+          <div className="size-40 shrink-0 animate-pulse rounded-lg bg-muted motion-reduce:animate-none max-sm:size-24" />
           <div className="w-full space-y-3 py-1">
             <div className="h-8 w-3/4 animate-pulse rounded bg-muted motion-reduce:animate-none max-sm:h-7" />
             <div className="h-5 w-2/5 animate-pulse rounded bg-muted motion-reduce:animate-none" />
@@ -122,7 +122,7 @@ function Artwork({ slug, title }: { slug: string; title: string }) {
   return (
     <div
       aria-busy={status === "loading"}
-      className="relative flex size-40 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-center text-xs text-muted-foreground ring-1 ring-border/60 max-sm:size-24"
+      className="relative flex size-40 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted text-center text-xs text-muted-foreground ring-1 ring-border/60 max-sm:size-24"
     >
       {status === "failed" ? (
         <div className="flex flex-col items-center justify-center gap-2">
@@ -165,7 +165,7 @@ function AlbumHero({ manifest, slug }: { manifest: Manifest; slug: string }) {
       {manifest.album.artwork ? (
         <Artwork slug={slug} title={manifest.album.title} />
       ) : (
-        <div className="flex size-40 shrink-0 items-center justify-center rounded-xl bg-muted max-sm:size-24">
+        <div className="flex size-40 shrink-0 items-center justify-center rounded-lg bg-muted max-sm:size-24">
           <Music2 className="size-9 text-muted-foreground" aria-hidden="true" />
           <span className="sr-only">no cover art</span>
         </div>
