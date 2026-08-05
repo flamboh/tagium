@@ -5,7 +5,9 @@ test("unkeyed E2E builds make no PostHog requests", async ({ page, browserName }
   const postHogRequests: string[] = [];
   page.on("request", (request) => {
     const hostname = new URL(request.url()).hostname;
-    if (hostname.endsWith("posthog.com")) postHogRequests.push(request.url());
+    if (hostname.endsWith("posthog.com") || hostname === "t.tagium.app") {
+      postHogRequests.push(request.url());
+    }
   });
 
   await page.goto("/");
