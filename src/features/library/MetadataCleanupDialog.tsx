@@ -76,7 +76,7 @@ function MetadataCleanupDialogSession({
               {visibleSuggestions.map((suggestion) => (
                 <label
                   key={suggestion.trackId}
-                  className="flex cursor-pointer select-none items-start gap-3 py-4"
+                  className="flex cursor-pointer select-none items-center gap-3 py-4"
                 >
                   <Checkbox
                     checked={selectedIds.has(suggestion.trackId)}
@@ -88,7 +88,6 @@ function MetadataCleanupDialogSession({
                         return next;
                       })
                     }
-                    className="mt-1"
                   />
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <p className="truncate text-sm text-foreground/70 line-through decoration-2 decoration-foreground/80">
