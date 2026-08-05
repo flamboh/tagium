@@ -1,0 +1,20 @@
+{
+  "name": "tagium",
+  "short_name": "tagium",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#16161a",
+  "theme_color": "#900f1a",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

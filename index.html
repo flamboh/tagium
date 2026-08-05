@@ -45,13 +45,17 @@
       content="save your favorite music and edit mp3 tags all on the web."
     />
     <link rel="canonical" href="https://tagium.app/" />
-    <link rel="icon" href="/favicon.ico" />
+    <meta name="theme-color" content="#900f1a" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <script>
       (() => {
         const faviconByDeployEnv = {
-          local: "/favicon-dev.png",
-          preview: "/favicon-preview.png",
-          production: "/favicon.ico",
+          local: "/favicon-dev.svg",
+          preview: "/favicon-preview.svg",
+          production: "/favicon.svg",
         };
         const favicon = document.querySelector('link[rel="icon"]');
         const setDeployEnvFavicon = (deployEnv) => {
