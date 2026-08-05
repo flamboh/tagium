@@ -35,7 +35,7 @@ describe("analytics", () => {
     const analytics = createAnalytics(
       {
         key: "public-test-key",
-        host: "https://us.i.posthog.com",
+        host: "https://t.tagium.app",
         deployEnv: "production",
         releaseSha: "release-sha",
       },
@@ -64,7 +64,10 @@ describe("analytics", () => {
 
     expect(init).toHaveBeenCalledWith(
       "public-test-key",
-      expect.objectContaining({ api_host: "https://us.i.posthog.com" }),
+      expect.objectContaining({
+        api_host: "https://t.tagium.app",
+        ui_host: "https://us.posthog.com",
+      }),
     );
     expect(capture).toHaveBeenCalledWith("audio_upload_completed", {
       event_version: 1,

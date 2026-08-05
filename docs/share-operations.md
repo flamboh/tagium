@@ -26,7 +26,7 @@ TAGIUM_DEPLOY_ENV=production bun run configure:share-artwork-lifecycle:productio
 
 There is one Worker service named `tagium`. Preview uses `wrangler versions upload` and production uses `wrangler deploy` against that same service; no named Wrangler environments are used, so production routes remain attached to `tagium`.
 
-Cloudflare Build variables still required: `WORKERS_CI_BRANCH`, `WORKERS_CI_COMMIT_SHA`, `VITE_PUBLIC_POSTHOG_HOST`, and `VITE_PUBLIC_POSTHOG_KEY`. Deploy credentials (`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`) are supplied by the operator or Workers Build environment.
+Cloudflare Build variables still required: `WORKERS_CI_BRANCH`, `WORKERS_CI_COMMIT_SHA`, `VITE_PUBLIC_POSTHOG_HOST=https://t.tagium.app`, and `VITE_PUBLIC_POSTHOG_KEY`. Deploy credentials (`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`) are supplied by the operator or Workers Build environment.
 
 ## Disable or takedown
 

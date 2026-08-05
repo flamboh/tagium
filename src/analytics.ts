@@ -621,6 +621,7 @@ export const createAnalytics = (
         .then((loadedClient) => {
           loadedClient.init(config.key!, {
             api_host: config.host,
+            ui_host: "https://us.posthog.com",
             defaults: "2026-05-30",
             capture_pageview: "history_change",
             capture_pageleave: true,
