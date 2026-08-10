@@ -43,6 +43,24 @@ describe("system failure reporting", () => {
     expect(JSON.stringify(presentation)).not.toContain("private upstream");
   });
 
+  it("presents the import gateway's unsupported source token as non-retryable", () => {
+    expect(getSystemFailurePresentation(new Error("unsupported url"), "import")).toMatchObject({
+      code: "unsupported_source",
+      retryable: false,
+      description: "try a public soundcloud or youtube track url.",
+    });
+  });
+
+  it("keeps failed SoundCloud short-link resolution retryable", () => {
+    expect(
+      getSystemFailurePresentation(new Error("soundcloud short-link resolution failed"), "import"),
+    ).toMatchObject({
+      code: "unknown",
+      retryable: true,
+      title: "import failed",
+    });
+  });
+
   it("reports every explicit export failure", () => {
     reportSystemFailure(new Error("first private cause"), "export");
     reportSystemFailure(new Error("second private cause"), "export");

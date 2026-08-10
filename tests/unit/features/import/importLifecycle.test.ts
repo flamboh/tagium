@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { AnalyticsEvent } from "@/analytics";
-import { createImportLifecycleTracker } from "@/features/import/importLifecycle";
+import {
+  createImportLifecycleTracker,
+  ImportStageError,
+  importFailureStageFromDownloadError,
+} from "@/features/import/importLifecycle";
 
 describe("import lifecycle", () => {
+  it.each([
+    [new Error("error.api.fetch.fail"), "plan"],
+    [new ImportStageError("plan", new Error("malformed cobalt audio plan")), "plan"],
+    [new ImportStageError("tunnel", new Error("error.api.capacity_exceeded")), "tunnel"],
+    [new ImportStageError("processing", new Error("arbitrary worker failure")), "processing"],
+  ] as const)("preserves the typed download failure stage", (error, stage) => {
+    expect(importFailureStageFromDownloadError(error)).toBe(stage);
+  });
   it("emits one completed outcome after every resolved track completes", () => {
     const captured: AnalyticsEvent[] = [];
     let now = 100;
@@ -67,23 +79,29 @@ describe("import lifecycle", () => {
     });
     now = 1_125;
 
-    tracker.fail(operationId, new Error("private resolver response"), "resolve");
-    tracker.fail(operationId, new Error("duplicate failure"), "resolve");
+    tracker.fail(operationId, new Error("error.api.fetch.fail private resolver response"));
+    tracker.fail(operationId, new Error("duplicate failure"));
 
-    expect(captured.at(-1)).toEqual({
-      type: "import_finished",
-      sourceUrl: "https://soundcloud.com/artist/sets/private-set",
-      importKind: "set",
-      outcome: "failed",
-      totalCount: 0,
-      completedCount: 0,
-      failedCount: 0,
-      canceledCount: 0,
-      durationMs: 125,
-      error: expect.any(Error),
-      failureStage: "resolve",
-    });
-    expect(captured).toHaveLength(2);
+    expect(captured.slice(-2)).toEqual([
+      {
+        type: "import_resolution_failed",
+        sourceUrl: "https://soundcloud.com/artist/sets/private-set",
+        importKind: "set",
+        code: "fetch_failed",
+      },
+      {
+        type: "import_finished",
+        sourceUrl: "https://soundcloud.com/artist/sets/private-set",
+        importKind: "set",
+        outcome: "failed",
+        totalCount: 0,
+        completedCount: 0,
+        failedCount: 0,
+        canceledCount: 0,
+        durationMs: 125,
+      },
+    ]);
+    expect(captured).toHaveLength(3);
   });
 
   it.each([
@@ -123,4 +141,67 @@ describe("import lifecycle", () => {
       );
     },
   );
+
+  it("aggregates stable failure categories across a playlist", () => {
+    const captured: AnalyticsEvent[] = [];
+    const tracker = createImportLifecycleTracker({
+      capture: (event) => captured.push(event),
+      createId: () => "operation",
+      now: () => 100,
+    });
+    const operationId = tracker.start({
+      sourceUrl: "https://soundcloud.com/artist/sets/set",
+      importKind: "set",
+    });
+    tracker.resolve(operationId, {
+      trackIds: ["track-1", "track-2", "track-3"],
+      hasCover: false,
+    });
+
+    tracker.settle(operationId, {
+      trackId: "track-1",
+      outcome: "failed",
+      failureStage: "tunnel",
+      error: new Error("Cobalt tunnel response was empty."),
+    });
+    tracker.settle(operationId, {
+      trackId: "track-2",
+      outcome: "failed",
+      failureStage: "plan",
+      error: new Error("error.api.fetch.empty request-id=private"),
+    });
+    tracker.settle(operationId, {
+      trackId: "track-3",
+      outcome: "failed",
+      failureStage: "hydration",
+      error: new Error("downloaded track could not be parsed: /private/file.mp3"),
+    });
+
+    expect(captured.slice(-4, -1)).toEqual([
+      expect.objectContaining({
+        type: "import_failure_category",
+        stage: "tunnel",
+        code: "empty_response",
+        trackCount: 1,
+      }),
+      expect.objectContaining({
+        type: "import_failure_category",
+        stage: "plan",
+        code: "empty_response",
+        trackCount: 1,
+      }),
+      expect.objectContaining({
+        type: "import_failure_category",
+        stage: "hydration",
+        code: "parse_failed",
+        trackCount: 1,
+      }),
+    ]);
+    expect(
+      captured
+        .filter((event) => event.type === "import_failure_category")
+        .reduce((sum, event) => sum + event.trackCount, 0),
+    ).toBe(3);
+    expect(JSON.stringify(captured.slice(-4))).not.toContain("private");
+  });
 });

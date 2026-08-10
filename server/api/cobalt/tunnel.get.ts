@@ -30,9 +30,22 @@ type TunnelObservabilityContext = {
 };
 
 const COBALT_TUNNEL_TIMEOUT_MS = 300_000;
-const EMPTY_BODY_RETRY_DELAYS_MS = [100, 250, 500] as const;
+const EMPTY_BODY_RETRY_DELAYS_MS = [100, 250, 500, 1_000, 2_000, 4_000] as const;
 const EMPTY_BODY_RETRY_ATTEMPTS = EMPTY_BODY_RETRY_DELAYS_MS.length + 1;
+const EMPTY_BODY_RETRY_JITTER_RATIO = 0.2;
 type TunnelOutcome = "ready" | "recovered" | "exhausted" | "non_retryable";
+
+const getEmptyBodyRetryDelayMs = (baseDelayMs: number, tunnelUrl: URL, attempt: number) => {
+  let hash = 0;
+  for (const character of `${tunnelUrl.href}:${attempt}`) {
+    hash = (Math.imul(hash, 31) + character.charCodeAt(0)) | 0;
+  }
+
+  const unitInterval = (hash >>> 0) / 0xffff_ffff;
+  const jitterMultiplier =
+    1 - EMPTY_BODY_RETRY_JITTER_RATIO + unitInterval * EMPTY_BODY_RETRY_JITTER_RATIO * 2;
+  return Math.round(baseDelayMs * jitterMultiplier);
+};
 
 const withTunnelTelemetry = (headers: Headers, outcome: TunnelOutcome, attempts: number) => {
   headers.set("X-Tagium-Tunnel-Outcome", outcome);
@@ -326,7 +339,10 @@ export default defineHandler(async (event) => {
       requestHeaders.set("Fly-Force-Instance-Id", tunnelRequest.machineId);
     }
 
-    const fetchSignal = AbortSignal.timeout(COBALT_TUNNEL_TIMEOUT_MS);
+    const fetchSignal = AbortSignal.any([
+      AbortSignal.timeout(COBALT_TUNNEL_TIMEOUT_MS),
+      event.req.signal,
+    ]);
     let response: Response | undefined;
     let body: ReadableStream<Uint8Array> | undefined;
     for (let attempt = 1; attempt <= EMPTY_BODY_RETRY_ATTEMPTS; attempt++) {
@@ -348,7 +364,12 @@ export default defineHandler(async (event) => {
           if (error === undefined) resolve();
           else reject(error);
         };
-        const timer = setTimeout(() => done(), EMPTY_BODY_RETRY_DELAYS_MS[attempt - 1]);
+        const retryDelayMs = getEmptyBodyRetryDelayMs(
+          EMPTY_BODY_RETRY_DELAYS_MS[attempt - 1],
+          tunnelRequest.tunnelUrl,
+          attempt,
+        );
+        const timer = setTimeout(() => done(), retryDelayMs);
         if (fetchSignal.aborted) {
           onAbort();
           return;

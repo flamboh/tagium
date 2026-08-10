@@ -6,6 +6,7 @@ import {
   LocalAudioProcessorLive,
 } from "@/features/import/localAudioProcessor";
 import type { CobaltTunnelElapsedBucket, CobaltTunnelOutcome } from "@/analytics";
+import { ImportStageError } from "@/features/import/importLifecycle";
 
 export type AudioDownloadBitrate = "320" | "256" | "128" | "96" | "64";
 
@@ -39,7 +40,7 @@ export interface CobaltAudioDownloadRequest {
 
 const MAX_CONCURRENT_COBALT_DOWNLOADS = 4;
 const COBALT_TUNNEL_START_INTERVAL_MS = 1_600;
-const MAX_TUNNEL_ATTEMPTS = 4;
+const MAX_TUNNEL_ATTEMPTS = 7;
 let activeCobaltDownloads = 0;
 const pendingCobaltDownloads: (() => void)[] = [];
 let nextCobaltTunnelStartAt = 0;
@@ -274,6 +275,7 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
     }).pipe(
       Effect.flatMap((responseJson) => decodeCobaltDownloadPlan(responseJson)),
       Effect.mapError(toPublicAudioError),
+      Effect.mapError((error) => new ImportStageError("plan", error)),
     );
 
   const fetchTunnelFile = (
@@ -311,7 +313,7 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
           lastModified,
         });
       },
-      catch: toPublicAudioError,
+      catch: (error) => new ImportStageError("tunnel", toPublicAudioError(error)),
     });
 
   const runDownload = (request: CobaltAudioDownloadRequest) =>
@@ -320,13 +322,19 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
       const lastModified = getStableLastModified(request.sourceUrl);
 
       if (plan.status === "local-processing") {
-        return yield* localAudioProcessor.processLocalAudio({
-          plan,
-          lastModified,
-          fetchTunnelFile: (url, filename) =>
-            fetchTunnelFile(url, filename, lastModified, request.onLifecycle, request.signal),
-          signal: request.signal,
-        });
+        return yield* localAudioProcessor
+          .processLocalAudio({
+            plan,
+            lastModified,
+            fetchTunnelFile: (url, filename) =>
+              fetchTunnelFile(url, filename, lastModified, request.onLifecycle, request.signal),
+            signal: request.signal,
+          })
+          .pipe(
+            Effect.mapError((error) =>
+              error instanceof ImportStageError ? error : new ImportStageError("processing", error),
+            ),
+          );
       }
 
       return yield* fetchTunnelFile(

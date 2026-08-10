@@ -187,14 +187,21 @@ describe("analytics", () => {
       attempts: 3,
       elapsedBucket: "1_to_5_seconds",
     });
+    analytics.capture({
+      type: "cobalt_tunnel_readiness",
+      sourceUrl: "https://soundcloud.com/private-artist/private-track",
+      outcome: "exhausted",
+      attempts: 7,
+      elapsedBucket: "5_to_15_seconds",
+    });
 
-    expect(capture.mock.calls.at(-2)?.[1]).toEqual(
+    expect(capture.mock.calls.at(-3)?.[1]).toEqual(
       expect.objectContaining({
         provider: "soundcloud",
         failure_reason: "resolution_failed",
       }),
     );
-    expect(capture.mock.calls.at(-1)).toEqual([
+    expect(capture.mock.calls.at(-2)).toEqual([
       "cobalt_tunnel_readiness",
       expect.objectContaining({
         provider: "soundcloud",
@@ -203,6 +210,9 @@ describe("analytics", () => {
         elapsed_bucket: "1_to_5_seconds",
       }),
     ]);
+    expect(capture.mock.calls.at(-1)?.[1]).toEqual(
+      expect.objectContaining({ outcome: "exhausted", attempts: 7 }),
+    );
 
     const serialized = JSON.stringify(capture.mock.calls);
     for (const sensitiveValue of [
@@ -246,7 +256,7 @@ describe("analytics", () => {
     });
   });
 
-  it("maps import failures to stable codes without serializing exception details", async () => {
+  it("serializes typed import failure categories without private details", async () => {
     const capture = vi.fn();
     const analytics = createAnalytics(
       { key: "public-test-key", deployEnv: "production" },
@@ -259,36 +269,28 @@ describe("analytics", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    const cases = [
-      [new Error("error.api.capacity_exceeded private upstream detail"), "capacity"],
-      [new Error("Cobalt tunnel request failed (429): private body"), "rate_limited"],
-      [new Error("error.api.unreachable internal hostname"), "service_unavailable"],
-      [new Error("error.api.timed_out after private URL"), "timeout"],
-      [new Error("downloaded track could not be parsed: private filename"), "parse_failed"],
-      [new Error("unexpected private detail"), "unknown"],
-    ] as const;
+    analytics.capture({
+      type: "import_failure_category",
+      sourceUrl: "https://soundcloud.com/private-path",
+      importKind: "set",
+      stage: "tunnel",
+      code: "empty_response",
+      trackCount: 2,
+    });
 
-    for (const [error, expectedCode] of cases) {
-      analytics.capture({
-        type: "import_finished",
-        sourceUrl: "https://soundcloud.com/private-path",
-        importKind: "single",
-        outcome: "failed",
-        totalCount: 1,
-        completedCount: 0,
-        failedCount: 1,
-        canceledCount: 0,
-        durationMs: 250,
-        error,
-      });
-      expect(capture.mock.calls.at(-1)?.[1]).toEqual(
-        expect.objectContaining({ error_code: expectedCode }),
-      );
-    }
+    expect(capture.mock.calls.at(-1)?.[1]).toEqual(
+      expect.objectContaining({
+        provider: "soundcloud",
+        import_kind: "set",
+        stage: "tunnel",
+        code: "empty_response",
+        track_count: 2,
+      }),
+    );
 
     const payloads = JSON.stringify(capture.mock.calls);
     expect(payloads).not.toContain("private");
-    expect(payloads).not.toContain("error.api");
+    expect(payloads).not.toContain("soundcloud.com");
   });
 
   it("initializes PostHog with explicit privacy-preserving collection settings", async () => {
@@ -381,6 +383,7 @@ describe("analytics", () => {
       event: "$pageview",
       properties: {
         $browser: "Chrome",
+        $user_agent: "Mozilla/5.0 Chrome/140.0.0.0 Safari/537.36",
         $current_url: "https://tagium.example/?private=query",
         $referrer: "https://internal.example/user-name",
         $pathname: "/private-path",
@@ -406,10 +409,41 @@ describe("analytics", () => {
     });
     expect(pageview).toEqual({
       event: "$pageview",
-      properties: { $browser: "Chrome", app_view: "tagium" },
+      properties: {
+        $browser: "Chrome",
+        $user_agent: "Mozilla/5.0 Chrome/140.0.0.0 Safari/537.36",
+        app_view: "tagium",
+      },
     });
     expect(
       options.before_send({ event: "made_up_event", properties: { private: "value" } }),
+    ).toBeNull();
+    expect(
+      options.before_send({
+        event: "import_failure_category",
+        properties: {
+          provider: "soundcloud",
+          import_kind: "set",
+          stage: "private-url",
+          code: "private-request-id",
+          track_count: 1,
+        },
+      }),
+    ).toEqual({
+      event: "import_failure_category",
+      properties: { provider: "soundcloud", import_kind: "set", track_count: 1 },
+    });
+    expect(
+      options.before_send({
+        event: "import_retry_finished",
+        properties: {
+          provider: "mixed",
+          retry_count: 2,
+          completed_count: 1,
+          failed_count: 0,
+          canceled_count: 0,
+        },
+      }),
     ).toBeNull();
   });
 
@@ -588,6 +622,16 @@ describe("analytics", () => {
       previousFailedCount: 1,
       previousCanceledCount: 1,
     });
+    analytics.capture({
+      type: "import_retry_finished",
+      provider: "youtube",
+      retryCount: 3,
+      completedCount: 1,
+      failedCount: 1,
+      canceledCount: 1,
+      outcome: "canceled",
+      durationMs: 400,
+    });
 
     expect(capture.mock.calls.map(([name, properties]) => [name, properties])).toEqual([
       [
@@ -624,6 +668,18 @@ describe("analytics", () => {
           retry_count: 2,
           previous_failed_count: 1,
           previous_canceled_count: 1,
+        }),
+      ],
+      [
+        "import_retry_finished",
+        expect.objectContaining({
+          provider: "youtube",
+          retry_count: 3,
+          completed_count: 1,
+          failed_count: 1,
+          canceled_count: 1,
+          outcome: "canceled",
+          duration_ms: 400,
         }),
       ],
     ]);

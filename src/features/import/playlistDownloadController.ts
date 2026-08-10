@@ -10,31 +10,40 @@ import {
   markPlaylistDownloadTrackCanceled,
   markPlaylistDownloadTrackCompleted,
   markPlaylistDownloadTrackFailed,
-  removeActivePlaylistDownloadTrack,
   removePlaylistDownloadTracks,
   reserveNextPlaylistDownloadTrack,
+  type ActivePlaylistDownload,
   type PlaylistDownloadQueueRun,
   type PlaylistDownloadQueueRuntimeSnapshot,
   type PlaylistDownloadRuntimeTrack,
 } from "@/features/import/playlistDownloadQueueRuntime";
 import type { PlaylistDownloadQueueTrack as PlaylistDownloadQueueModelTrack } from "@/features/import/playlistDownloadQueue";
 import { createDownloadAdmissionWindow } from "@/features/import/downloadAdmissionWindow";
+import {
+  importFailureStageFromDownloadError,
+  type ImportTrackOutcome,
+} from "@/features/import/importLifecycle";
+import type { ImportFailureStage, ImportOutcome } from "@/analytics";
 
 export const PLAYLIST_DOWNLOAD_CONCURRENCY = 3;
 
 type PlaylistDownloadControllerRun<Track extends PlaylistDownloadRuntimeTrack> =
   PlaylistDownloadQueueRun<Track> & {
-    activeFibers: Map<string, Fiber.Fiber<void, unknown>>;
+    activeFibers: Map<ActivePlaylistDownload, Fiber.Fiber<void, unknown>>;
+    currentExecutions: Map<string, ActivePlaylistDownload>;
     budgetWakeFiber?: Fiber.Fiber<void>;
   };
 
 export type PlaylistDownloadControllerSnapshot = PlaylistDownloadQueueRuntimeSnapshot;
 
-export interface PlaylistDownloadTrackSettled<Track extends PlaylistDownloadRuntimeTrack> {
-  track: Track;
-  outcome: "completed" | "failed" | "canceled";
-  error?: unknown;
-}
+export type PlaylistDownloadTrackSettled<Track extends PlaylistDownloadRuntimeTrack> =
+  | { track: Track; outcome: "completed" | "canceled" }
+  | {
+      track: Track;
+      outcome: "failed";
+      error: unknown;
+      failureStage: ImportFailureStage;
+    };
 
 export type PlaylistDownloadControllerAction<Track extends PlaylistDownloadRuntimeTrack> =
   | {
@@ -43,8 +52,20 @@ export type PlaylistDownloadControllerAction<Track extends PlaylistDownloadRunti
     }
   | {
       type: "retry_started";
+      retryAttemptId: number;
       tracks: Track[];
       previousSnapshot: PlaylistDownloadControllerSnapshot;
+    }
+  | {
+      type: "retry_finished";
+      retryAttemptId: number;
+      tracks: Track[];
+      retryCount: number;
+      completedCount: number;
+      failedCount: number;
+      canceledCount: number;
+      outcome: ImportOutcome;
+      durationMs: number;
     };
 
 export interface PlaylistDownloadControllerDeps<Track extends PlaylistDownloadRuntimeTrack> {
@@ -72,7 +93,10 @@ export interface PlaylistDownloadController<Track extends PlaylistDownloadRuntim
 
 const isPlaylistDownloadAbort = (error: unknown) => {
   if (error instanceof DOMException && error.name === "AbortError") return true;
-  if (error instanceof Error && error.name === "AbortError") return true;
+  if (error instanceof Error) {
+    if (error.name === "AbortError") return true;
+    if (error.cause !== undefined) return isPlaylistDownloadAbort(error.cause);
+  }
   return false;
 };
 
@@ -89,14 +113,95 @@ const firstCauseError = (cause: Cause.Cause<unknown>) => {
   return cause;
 };
 
+type StagedDownloadFailure = { stage: ImportFailureStage; error: unknown };
+
+const isStagedDownloadFailure = (failure: unknown): failure is StagedDownloadFailure =>
+  typeof failure === "object" && failure !== null && "stage" in failure && "error" in failure;
+
+const retryOutcomeFrom = (counts: {
+  completedCount: number;
+  failedCount: number;
+  canceledCount: number;
+}): ImportOutcome => {
+  if (counts.canceledCount > 0) return "canceled";
+  if (counts.failedCount === 0) return "completed";
+  if (counts.completedCount > 0) return "partial";
+  return "failed";
+};
+
 export const createPlaylistDownloadController = <Track extends PlaylistDownloadRuntimeTrack>(
   deps: PlaylistDownloadControllerDeps<Track>,
 ): PlaylistDownloadController<Track> => {
   let currentRun: PlaylistDownloadControllerRun<Track> | null = null;
   let nextRunId = 0;
   let currentSnapshot: PlaylistDownloadControllerSnapshot | null = null;
+  let nextRetryAttemptId = 0;
+  const retryAttempts = new Map<
+    number,
+    {
+      runId: number;
+      tracks: Track[];
+      trackIds: Set<string>;
+      outcomes: Map<string, ImportTrackOutcome>;
+      startedAt: number;
+    }
+  >();
+  const pendingRetryAttemptIds = new Map<number, Map<string, number>>();
   const downloadAdmission = createDownloadAdmissionWindow();
   const now = deps.now ?? (() => Date.now());
+
+  const notifyTrackSettled = (
+    run: PlaylistDownloadControllerRun<Track>,
+    event: PlaylistDownloadTrackSettled<Track>,
+    retryAttemptId?: number,
+  ) => {
+    deps.onTrackSettled?.(event);
+    if (retryAttemptId === undefined) return;
+
+    const attempt = retryAttempts.get(retryAttemptId);
+    if (!attempt || attempt.runId !== run.id) return;
+    if (!attempt.trackIds.has(event.track.fileId)) return;
+    if (attempt.outcomes.has(event.track.fileId)) return;
+    attempt.outcomes.set(event.track.fileId, event.outcome);
+    if (attempt.outcomes.size !== attempt.trackIds.size) return;
+
+    let completedCount = 0;
+    let failedCount = 0;
+    let canceledCount = 0;
+    for (const outcome of attempt.outcomes.values()) {
+      if (outcome === "completed") completedCount += 1;
+      if (outcome === "failed") failedCount += 1;
+      if (outcome === "canceled") canceledCount += 1;
+    }
+    retryAttempts.delete(retryAttemptId);
+    const counts = { completedCount, failedCount, canceledCount };
+    deps.onAction?.({
+      type: "retry_finished",
+      retryAttemptId,
+      tracks: attempt.tracks,
+      retryCount: attempt.trackIds.size,
+      ...counts,
+      outcome: retryOutcomeFrom(counts),
+      durationMs: Math.max(0, now() - attempt.startedAt),
+    });
+  };
+
+  const takePendingRetryAttemptIdFor = (
+    run: PlaylistDownloadControllerRun<Track>,
+    trackId: string,
+  ) => {
+    const runAttempts = pendingRetryAttemptIds.get(run.id);
+    const retryAttemptId = runAttempts?.get(trackId);
+    runAttempts?.delete(trackId);
+    if (runAttempts?.size === 0) pendingRetryAttemptIds.delete(run.id);
+    return retryAttemptId;
+  };
+
+  const isCurrentExecution = (
+    run: PlaylistDownloadControllerRun<Track>,
+    trackId: string,
+    execution: ActivePlaylistDownload,
+  ) => run.currentExecutions.get(trackId) === execution;
 
   const createSnapshot = (run: PlaylistDownloadControllerRun<Track>) =>
     derivePlaylistDownloadQueueState(run, now());
@@ -140,15 +245,19 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
     const canceledTrackIds = cancelPendingPlaylistDownloadTracks(run, now());
     deps.markCanceled(canceledTrackIds);
     for (const track of pendingTracks) {
-      deps.onTrackSettled?.({ track, outcome: "canceled" });
+      notifyTrackSettled(
+        run,
+        { track, outcome: "canceled" },
+        takePendingRetryAttemptIdFor(run, track.fileId),
+      );
     }
   };
 
   const cancelActive = (run: PlaylistDownloadControllerRun<Track>) => {
     if (run.active.length === 0) return;
     const canceledTrackIds = cancelActivePlaylistDownloadTracks(run, now());
-    for (const trackId of canceledTrackIds) {
-      const fiber = run.activeFibers.get(trackId);
+    for (const execution of run.active) {
+      const fiber = run.activeFibers.get(execution);
       if (fiber) {
         Effect.runFork(Fiber.interrupt(fiber));
       }
@@ -156,68 +265,105 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
     deps.markCanceled(canceledTrackIds);
   };
 
-  const runDownloadEffect = (run: PlaylistDownloadControllerRun<Track>, track: Track) =>
+  const runDownloadEffect = (
+    run: PlaylistDownloadControllerRun<Track>,
+    track: Track,
+    execution: ActivePlaylistDownload,
+    retryAttemptId: number | undefined,
+  ) =>
     Effect.gen(function* () {
+      if (!isCurrentExecution(run, track.fileId, execution)) return;
       if (!deps.hasTrack(track.fileId)) {
         yield* Effect.sync(() => {
+          if (!isCurrentExecution(run, track.fileId, execution)) return;
           markPlaylistDownloadTrackCanceled(run, track.fileId, now());
           deps.markCanceled([track.fileId]);
-          deps.onTrackSettled?.({ track, outcome: "canceled" });
+          notifyTrackSettled(run, { track, outcome: "canceled" }, retryAttemptId);
         });
         return;
       }
 
-      const downloadedFile = yield* deps.downloadTrack(track);
-      if (currentRun !== run) return;
+      const downloadedFile = yield* deps.downloadTrack(track).pipe(
+        Effect.mapError(
+          (error): StagedDownloadFailure => ({
+            stage: importFailureStageFromDownloadError(error),
+            error,
+          }),
+        ),
+      );
+      if (currentRun !== run || !isCurrentExecution(run, track.fileId, execution)) return;
 
-      yield* deps.hydrateTrack(track, downloadedFile);
-      if (currentRun !== run) return;
+      yield* deps
+        .hydrateTrack(track, downloadedFile)
+        .pipe(Effect.mapError((error): StagedDownloadFailure => ({ stage: "hydration", error })));
+      if (currentRun !== run || !isCurrentExecution(run, track.fileId, execution)) return;
 
       yield* Effect.sync(() => {
+        if (!isCurrentExecution(run, track.fileId, execution)) return;
         markPlaylistDownloadTrackCompleted(run, track.fileId, now());
-        deps.onTrackSettled?.({ track, outcome: "completed" });
+        notifyTrackSettled(run, { track, outcome: "completed" }, retryAttemptId);
       });
     });
 
   const handleDownloadExit = (
     run: PlaylistDownloadControllerRun<Track>,
     track: Track,
+    execution: ActivePlaylistDownload,
+    retryAttemptId: number | undefined,
     exit: Exit.Exit<void, unknown>,
   ) => {
-    run.activeFibers.delete(track.fileId);
-    const trackWasRemoved = !run.model.items.some((item) => item.id === track.fileId);
+    run.activeFibers.delete(execution);
+    const executionIsCurrent = isCurrentExecution(run, track.fileId, execution);
+    if (executionIsCurrent) run.currentExecutions.delete(track.fileId);
+    const trackWasRemoved =
+      !executionIsCurrent || !run.model.items.some((item) => item.id === track.fileId);
 
     if (Exit.isFailure(exit)) {
-      const error = firstCauseError(exit.cause);
+      const failure = firstCauseError(exit.cause);
+      const stagedFailure = isStagedDownloadFailure(failure) ? failure : undefined;
+      const error = stagedFailure?.error ?? failure;
       if (trackWasRemoved) {
-        deps.onTrackSettled?.({ track, outcome: "canceled" });
+        notifyTrackSettled(run, { track, outcome: "canceled" }, retryAttemptId);
       } else if (Exit.hasInterrupts(exit) || isPlaylistDownloadAbort(error)) {
         markPlaylistDownloadTrackCanceled(run, track.fileId, now());
-        deps.onTrackSettled?.({ track, outcome: "canceled" });
+        notifyTrackSettled(run, { track, outcome: "canceled" }, retryAttemptId);
         if (currentRun === run) {
           deps.markCanceled([track.fileId]);
         }
       } else {
         markPlaylistDownloadTrackFailed(run, track.fileId, toErrorMessage(error), now());
-        deps.onTrackSettled?.({ track, outcome: "failed", error });
+        notifyTrackSettled(
+          run,
+          {
+            track,
+            outcome: "failed",
+            error,
+            failureStage: stagedFailure?.stage ?? "plan",
+          },
+          retryAttemptId,
+        );
         if (currentRun === run) {
           deps.markFailed(track.fileId, error);
         }
       }
+    } else if (trackWasRemoved) {
+      notifyTrackSettled(run, { track, outcome: "canceled" }, retryAttemptId);
     }
 
-    removeActivePlaylistDownloadTrack(run, track.fileId);
+    run.active = run.active.filter((active) => active !== execution);
     publish(run);
     pump(run);
   };
 
   const startDownload = (run: PlaylistDownloadControllerRun<Track>, track: Track) => {
-    markPlaylistDownloadTrackActive(run, track, now());
+    const execution = markPlaylistDownloadTrackActive(run, track, now());
+    run.currentExecutions.set(track.fileId, execution);
+    const retryAttemptId = takePendingRetryAttemptIdFor(run, track.fileId);
     publish(run);
 
-    const fiber = Effect.runFork(runDownloadEffect(run, track));
-    run.activeFibers.set(track.fileId, fiber);
-    fiber.addObserver((exit) => handleDownloadExit(run, track, exit));
+    const fiber = Effect.runFork(runDownloadEffect(run, track, execution, retryAttemptId));
+    run.activeFibers.set(execution, fiber);
+    fiber.addObserver((exit) => handleDownloadExit(run, track, execution, retryAttemptId, exit));
   };
 
   const pump = (run: PlaylistDownloadControllerRun<Track>) => {
@@ -250,7 +396,7 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
     finishIfIdle(run);
   };
 
-  const enqueue = (tracks: Track[]) => {
+  const enqueue = (tracks: Track[], startImmediately = true) => {
     if (tracks.length === 0) return [];
 
     if (currentRun && !currentRun.done && !currentRun.canceled) {
@@ -265,18 +411,19 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
 
       deps.markQueued(queuedTracks);
       publish(currentRun);
-      pump(currentRun);
+      if (startImmediately) pump(currentRun);
       return queuedTracks;
     }
 
     const run: PlaylistDownloadControllerRun<Track> = {
       ...createPlaylistDownloadQueueRun(++nextRunId, tracks, now(), deps.createModelTrack),
       activeFibers: new Map(),
+      currentExecutions: new Map(),
     };
     currentRun = run;
     deps.markQueued(tracks);
     publish(run);
-    pump(run);
+    if (startImmediately) pump(run);
     return tracks;
   };
 
@@ -296,26 +443,61 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
     },
     remove: (trackIds) => {
       if (!currentRun || trackIds.length === 0) return;
+      const run = currentRun;
 
-      const removed = removePlaylistDownloadTracks(currentRun, trackIds);
+      const removed = removePlaylistDownloadTracks(run, trackIds);
       if (removed.removedTrackIds.length === 0) return;
 
       for (const track of removed.pendingTracks) {
-        deps.onTrackSettled?.({ track, outcome: "canceled" });
+        notifyTrackSettled(
+          run,
+          { track, outcome: "canceled" },
+          takePendingRetryAttemptIdFor(run, track.fileId),
+        );
       }
-      for (const trackId of removed.activeTrackIds) {
-        const fiber = currentRun.activeFibers.get(trackId);
+      const removedActiveTrackIds = new Set(removed.activeTrackIds);
+      for (const execution of run.active) {
+        if (!removedActiveTrackIds.has(execution.fileId)) continue;
+        if (isCurrentExecution(run, execution.fileId, execution)) {
+          run.currentExecutions.delete(execution.fileId);
+        }
+        const fiber = run.activeFibers.get(execution);
         if (fiber) Effect.runFork(Fiber.interrupt(fiber));
       }
 
-      publish(currentRun);
-      pump(currentRun);
+      publish(run);
+      pump(run);
     },
     retry: (tracks) => {
       const previousSnapshot = currentSnapshot;
-      const queuedTracks = enqueue(tracks);
-      if (!previousSnapshot || queuedTracks.length === 0) return;
-      deps.onAction?.({ type: "retry_started", tracks: queuedTracks, previousSnapshot });
+      const queuedTracks = enqueue(tracks, false);
+      if (queuedTracks.length === 0 || !currentRun) return;
+      const retryRun = currentRun;
+      if (!previousSnapshot) {
+        pump(retryRun);
+        return;
+      }
+      const retryAttemptId = ++nextRetryAttemptId;
+      retryAttempts.set(retryAttemptId, {
+        runId: retryRun.id,
+        tracks: queuedTracks,
+        trackIds: new Set(queuedTracks.map((track) => track.fileId)),
+        outcomes: new Map(),
+        startedAt: now(),
+      });
+      const runPendingRetryAttemptIds =
+        pendingRetryAttemptIds.get(retryRun.id) ?? new Map<string, number>();
+      for (const track of queuedTracks) {
+        runPendingRetryAttemptIds.set(track.fileId, retryAttemptId);
+      }
+      pendingRetryAttemptIds.set(retryRun.id, runPendingRetryAttemptIds);
+      deps.onAction?.({
+        type: "retry_started",
+        retryAttemptId,
+        tracks: queuedTracks,
+        previousSnapshot,
+      });
+      pump(retryRun);
     },
     getSnapshot: () => currentSnapshot,
   };

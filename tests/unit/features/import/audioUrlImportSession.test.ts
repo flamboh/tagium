@@ -84,7 +84,7 @@ describe("audio URL import session", () => {
 
     await expect(
       hook.result.importing.commands.importUrl("https://soundcloud.com/discover"),
-    ).rejects.toThrow("unsupported_media_link");
+    ).rejects.toThrow("unsupported url");
     expect(mocks.capture).toHaveBeenCalledWith({
       type: "media_link_processed",
       sourceUrl: "https://soundcloud.com/discover",
@@ -117,7 +117,7 @@ describe("audio URL import session", () => {
 
     await expect(
       hook.result.commands.importUrl("https://on.soundcloud.com/private-token"),
-    ).rejects.toThrow("unsupported_media_link");
+    ).rejects.toThrow("soundcloud short-link resolution failed");
 
     expect(mocks.capture).toHaveBeenCalledWith({
       type: "media_link_processed",
@@ -140,6 +140,50 @@ describe("audio URL import session", () => {
     ).toBe(false);
     hook.unmount();
   });
+
+  it.each([
+    ["not a url", "invalid", "other"],
+    ["https://example.com/private-track", "unsupported", "other"],
+    ["http://youtube.com/watch?v=abcdefghijk", "invalid", "canonical"],
+    ["https://user:secret@youtube.com/watch?v=abcdefghijk", "invalid", "canonical"],
+    ["https://youtube.com:444/watch?v=abcdefghijk", "invalid", "canonical"],
+  ] as const)(
+    "rejects unsupported providers before starting an import (%s)",
+    async (sourceUrl, failureReason, shape) => {
+      const hook = renderHook(() => {
+        const library = useLibraryStore();
+        const editor = useTrackEditorSession({ library, settings: settings("320") });
+        const importing = useAudioImportSession({
+          library,
+          editor,
+          settings: settings("320"),
+          activateEditor: vi.fn(),
+        });
+        return { library, importing };
+      }, undefined);
+
+      await expect(hook.result.importing.commands.importUrl(sourceUrl)).rejects.toThrow(
+        "unsupported url",
+      );
+      expect(mocks.capture).toHaveBeenCalledWith({
+        type: "media_link_processed",
+        sourceUrl,
+        mediaKind: "unsupported",
+        shape,
+        normalized: false,
+        redirected: false,
+        outcome: "rejected",
+        failureReason,
+      });
+      expect(mocks.capture.mock.calls.some(([event]) => event.type === "import_started")).toBe(
+        false,
+      );
+      expect(mocks.resolveTrackMetadata).not.toHaveBeenCalled();
+      expect(mocks.downloadFromCobalt).not.toHaveBeenCalled();
+      expect(hook.result.library.getSnapshot().files).toEqual([]);
+      hook.unmount();
+    },
+  );
 
   it("wires recovery and exhaustion lifecycle events to tunnel analytics", async () => {
     mocks.resolveTrackMetadata.mockResolvedValue(undefined);
@@ -261,7 +305,9 @@ describe("audio URL import session", () => {
 
     let importing: Promise<void> | undefined;
     act(() => {
-      importing = hook.result.importing.commands.importUrl("https://example.com/latest-track");
+      importing = hook.result.importing.commands.importUrl(
+        "https://www.youtube.com/watch?v=abcdefghijk",
+      );
     });
     await vi.waitFor(() => expect(resolveMetadata).toBeTypeOf("function"));
     hook.rerender({ currentSettings: settings("128"), activateEditor: latestActivation });
