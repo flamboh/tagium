@@ -3,6 +3,7 @@ import { Effect } from "effect";
 import { downloadFromCobalt, runAudioBackendEffect } from "@/features/audio/audioBackend";
 import { runAudioEffectWithoutServices } from "@/features/audio/audioRuntime";
 import type { CobaltAudioDownloadRequest } from "@/features/import/cobaltAudio";
+import { ImportStageError } from "@/features/import/importLifecycle";
 import type { CobaltDownloadPlan } from "@/features/import/cobaltAudioSchemas";
 import { decodeCobaltDownloadPlanEffect } from "@/features/import/cobaltAudioSchemas";
 import {
@@ -117,7 +118,7 @@ describe("CobaltAudio download", () => {
     },
     {
       outcome: "exhausted",
-      attempts: "4",
+      attempts: "7",
       status: 502,
       expectedError: "Cobalt tunnel response was empty.",
     },
@@ -166,7 +167,12 @@ describe("CobaltAudio download", () => {
       });
 
       if (expectedError) {
-        await expect(download).rejects.toThrow(expectedError);
+        const error = await download.then(
+          () => undefined,
+          (cause: unknown) => cause,
+        );
+        expect(error).toBeInstanceOf(ImportStageError);
+        expect(error).toMatchObject({ stage: "tunnel", message: expectedError });
       } else {
         await download;
       }
@@ -390,12 +396,15 @@ describe("CobaltAudio download", () => {
       }),
     );
 
-    await expect(
-      runCobaltDownload({
-        sourceUrl: "https://soundcloud.com/artist/malformed",
-        audioBitrate: "128",
-      }),
-    ).rejects.toThrow();
+    const error = await runCobaltDownload({
+      sourceUrl: "https://soundcloud.com/artist/malformed",
+      audioBitrate: "128",
+    }).then(
+      () => undefined,
+      (cause: unknown) => cause,
+    );
+    expect(error).toBeInstanceOf(ImportStageError);
+    expect(error).toMatchObject({ stage: "plan" });
     expect(fetchedUrls).toEqual(["/api/cobalt/audio"]);
   });
 

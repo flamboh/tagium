@@ -57,10 +57,14 @@ Run the checked-in load tester only against a disposable Fly clone:
 
 ```sh
 flyctl apps create tagium-cobalt-loadtest
-flyctl deploy --config fly.cobalt.toml --app tagium-cobalt-loadtest
+flyctl deploy --config fly.cobalt.toml --app tagium-cobalt-loadtest \
+  --env API_URL=https://tagium-cobalt-loadtest.fly.dev/
 bun run load-test:cobalt -- --target https://tagium-cobalt-loadtest.fly.dev
 flyctl apps destroy tagium-cobalt-loadtest
 ```
 
 Never target the production Cobalt deployment. The script deliberately exercises real provider
 downloads and increasing concurrency; use its curated URL list or an explicitly supplied safe list.
+It refuses the production origin and aborts before fetching any tunnel whose origin differs from
+the disposable target. Keep the explicit `API_URL` override: without it, the shared production Fly
+configuration would make the clone return production tunnel URLs.

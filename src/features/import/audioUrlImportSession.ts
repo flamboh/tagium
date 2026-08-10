@@ -1,4 +1,4 @@
-import { analytics, analyticsProviderFromUrl, type MediaLinkShape } from "@/analytics";
+import { analytics, type MediaLinkShape } from "@/analytics";
 import type {
   CobaltAudioDownloadLifecycleEvent,
   CobaltAudioDownloadRequest,
@@ -32,7 +32,7 @@ import { parseMediaLink } from "@/lib/media-link";
 type ManagedDownloadTrack = QueuedDownloadTrack & { importOperationId?: string };
 const retryProvider = (
   tracks: readonly ManagedDownloadTrack[],
-): "youtube" | "soundcloud" | "other" => {
+): "youtube" | "soundcloud" | "other" | "mixed" => {
   const providers = new Set(
     tracks.map((track) => {
       try {
@@ -47,7 +47,7 @@ const retryProvider = (
       }
     }),
   );
-  return providers.size === 1 ? providers.values().next().value! : "other";
+  return providers.size === 1 ? providers.values().next().value! : "mixed";
 };
 type UrlImportEditor = Pick<
   TrackEditorSession["commands"],
@@ -61,6 +61,9 @@ const managedDownloadTrackFromFile = (file: TagiumFile): ManagedDownloadTrack | 
         fileId: file.id,
         title: file.metadata?.title || file.filename,
         downloadRequest: file.downloadRequest,
+        ...(file.downloadRequest.importId
+          ? { importOperationId: file.downloadRequest.importId }
+          : {}),
       }
     : null;
 const createPlaylistDownloadModelTrack = (track: ManagedDownloadTrack) => ({
@@ -214,12 +217,15 @@ export const createAudioUrlImportSession = ({
         library.dispatch({ type: "content-replaced", files: nextFiles });
       },
       markFailed: markDownloadError,
-      onTrackSettled: ({ track, outcome, error }) => {
+      onTrackSettled: (event) => {
+        const { track, outcome } = event;
         if (!track.importOperationId) return;
         importLifecycleTracker.settle(track.importOperationId, {
           trackId: track.fileId,
           outcome,
-          ...(error === undefined ? {} : { error }),
+          ...(event.outcome === "failed"
+            ? { error: event.error, failureStage: event.failureStage }
+            : {}),
         });
       },
       onAction: (event) => {
@@ -233,12 +239,25 @@ export const createAudioUrlImportSession = ({
           });
           return;
         }
+        if (event.type === "retry_started") {
+          analytics.capture({
+            type: "import_retry_started",
+            provider: retryProvider(event.tracks),
+            retryCount: event.tracks.length,
+            previousFailedCount: event.previousSnapshot.failed,
+            previousCanceledCount: event.previousSnapshot.canceledCount,
+          });
+          return;
+        }
         analytics.capture({
-          type: "import_retry_started",
+          type: "import_retry_finished",
           provider: retryProvider(event.tracks),
-          retryCount: event.tracks.length,
-          previousFailedCount: event.previousSnapshot.failed,
-          previousCanceledCount: event.previousSnapshot.canceledCount,
+          retryCount: event.retryCount,
+          completedCount: event.completedCount,
+          failedCount: event.failedCount,
+          canceledCount: event.canceledCount,
+          outcome: event.outcome,
+          durationMs: event.durationMs,
         });
       },
       emitSnapshot: (snapshot) => {
@@ -416,27 +435,42 @@ export const createAudioUrlImportSession = ({
           /* handled by unsupported guard below */
         }
       }
-      const provider = analyticsProviderFromUrl(trimmedUrl);
       if (parsed.kind === "unsupported") {
-        if (provider !== "other") {
-          analytics.capture({
-            type: "media_link_processed",
-            sourceUrl: trimmedUrl,
-            mediaKind: "unsupported",
-            shape: mediaLinkShapeFromUrl(trimmedUrl),
-            normalized: false,
-            redirected: false,
-            outcome: "rejected",
-            failureReason: shortLinkResolutionAttempted ? "resolution_failed" : "unsupported",
-          });
-          throw new Error("unsupported_media_link");
+        let isValidHttpsUrl = false;
+        try {
+          const candidate = new URL(trimmedUrl);
+          isValidHttpsUrl =
+            candidate.protocol === "https:" &&
+            candidate.username === "" &&
+            candidate.password === "" &&
+            candidate.port === "";
+        } catch {
+          // Invalid text is reported separately from a valid unsupported provider URL.
         }
-        parsed = { provider: "other", kind: "unsupported", canonicalUrl: trimmedUrl };
+        analytics.capture({
+          type: "media_link_processed",
+          sourceUrl: trimmedUrl,
+          mediaKind: "unsupported",
+          shape: mediaLinkShapeFromUrl(trimmedUrl),
+          normalized: false,
+          redirected: false,
+          outcome: "rejected",
+          failureReason: shortLinkResolutionAttempted
+            ? "resolution_failed"
+            : isValidHttpsUrl
+              ? "unsupported"
+              : "invalid",
+        });
+        throw new Error(
+          shortLinkResolutionAttempted
+            ? "soundcloud short-link resolution failed"
+            : "unsupported url",
+        );
       }
       analytics.capture({
         type: "media_link_processed",
         sourceUrl: trimmedUrl,
-        mediaKind: parsed.kind === "unsupported" ? "unsupported" : parsed.kind,
+        mediaKind: parsed.kind,
         shape: mediaLinkShapeFromUrl(trimmedUrl),
         normalized: parsed.canonicalUrl !== trimmedUrl,
         redirected,
@@ -460,7 +494,7 @@ export const createAudioUrlImportSession = ({
             // not carry request provenance.
             handlePlaylistDownload({ ...playlist, sourceUrl: normalizedUrl }, importOperationId);
           } catch (error) {
-            importLifecycleTracker.fail(importOperationId, error, "resolve");
+            importLifecycleTracker.fail(importOperationId, error);
             throw error;
           }
           return;

@@ -4,6 +4,18 @@ export type ImportOutcome = "completed" | "partial" | "failed" | "canceled";
 export type ExportKind = "track" | "album" | "library";
 export type TrackSourceMix = "local" | "imported" | "mixed" | "unknown";
 export type AnalyticsProvider = "youtube" | "soundcloud" | "other";
+export type AnalyticsProviderScope = AnalyticsProvider | "mixed";
+export type ImportFailureStage = "plan" | "tunnel" | "processing" | "hydration";
+export type ImportFailureCode =
+  | "capacity"
+  | "rate_limited"
+  | "service_unavailable"
+  | "timeout"
+  | "fetch_failed"
+  | "empty_response"
+  | "parse_failed"
+  | "metadata_write_failed"
+  | "unknown";
 export type MediaLinkShape = "canonical" | "short" | "mobile" | "nocookie" | "other";
 export type CobaltTunnelOutcome = "ready" | "recovered" | "exhausted" | "non_retryable";
 export type CobaltTunnelElapsedBucket =
@@ -16,7 +28,6 @@ export type AnalyticsErrorCode =
   | "rate_limited"
   | "service_unavailable"
   | "timeout"
-  | "resolve_failed"
   | "parse_failed"
   | "metadata_write_failed"
   | "unknown";
@@ -69,8 +80,20 @@ export type AnalyticsEvent =
       failedCount: number;
       canceledCount: number;
       durationMs: number;
-      error?: unknown;
-      failureStage?: "resolve";
+    }
+  | {
+      type: "import_resolution_failed";
+      sourceUrl: string;
+      importKind: ImportKind;
+      code: ImportFailureCode;
+    }
+  | {
+      type: "import_failure_category";
+      sourceUrl: string;
+      importKind: ImportKind;
+      stage: ImportFailureStage;
+      code: ImportFailureCode;
+      trackCount: number;
     }
   | {
       type: "export_started";
@@ -117,10 +140,20 @@ export type AnalyticsEvent =
     }
   | {
       type: "import_retry_started";
-      provider: "youtube" | "soundcloud" | "other";
+      provider: AnalyticsProviderScope;
       retryCount: number;
       previousFailedCount: number;
       previousCanceledCount: number;
+    }
+  | {
+      type: "import_retry_finished";
+      provider: AnalyticsProviderScope;
+      retryCount: number;
+      completedCount: number;
+      failedCount: number;
+      canceledCount: number;
+      outcome: ImportOutcome;
+      durationMs: number;
     };
 
 export interface AnalyticsConfig {
@@ -179,11 +212,7 @@ export const analyticsProviderFromUrl = (sourceUrl: string): AnalyticsProvider =
   return "other";
 };
 
-const errorCodeFrom = (
-  error: unknown,
-  failureStage?: Extract<AnalyticsEvent, { type: "import_finished" }>["failureStage"],
-): AnalyticsErrorCode => {
-  if (failureStage === "resolve") return "resolve_failed";
+const errorCodeFrom = (error: unknown): AnalyticsErrorCode => {
   const message = error instanceof Error ? error.message : "";
   if (message.includes("error.api.capacity_exceeded")) return "capacity";
   if (
@@ -259,7 +288,20 @@ const CUSTOM_EVENT_PROPERTIES: Record<string, ReadonlySet<string>> = {
     "failed_count",
     "canceled_count",
     "duration_ms",
-    "error_code",
+  ]),
+  import_failure_category: new Set([
+    ...COMMON_CUSTOM_PROPERTIES,
+    "provider",
+    "import_kind",
+    "stage",
+    "code",
+    "track_count",
+  ]),
+  import_resolution_failed: new Set([
+    ...COMMON_CUSTOM_PROPERTIES,
+    "provider",
+    "import_kind",
+    "code",
   ]),
   export_started: new Set([
     ...COMMON_CUSTOM_PROPERTIES,
@@ -301,6 +343,16 @@ const CUSTOM_EVENT_PROPERTIES: Record<string, ReadonlySet<string>> = {
     "previous_failed_count",
     "previous_canceled_count",
   ]),
+  import_retry_finished: new Set([
+    ...COMMON_CUSTOM_PROPERTIES,
+    "provider",
+    "retry_count",
+    "completed_count",
+    "failed_count",
+    "canceled_count",
+    "outcome",
+    "duration_ms",
+  ]),
 };
 const SAFE_SDK_EVENTS = new Set(["$pageview", "$pageleave", "$autocapture"]);
 const SAFE_SDK_PROPERTIES = new Set([
@@ -315,6 +367,7 @@ const SAFE_SDK_PROPERTIES = new Set([
   "$sent_at",
   "$lib",
   "$lib_version",
+  "$user_agent",
   "$browser",
   "$browser_version",
   "$os",
@@ -340,8 +393,29 @@ const isOneOf =
     typeof value === "string" && values.includes(value as Value);
 const isBoolean = (value: unknown) => typeof value === "boolean";
 const isBoundedTunnelAttempt = (value: unknown) =>
-  typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 4;
+  typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 7;
 const isAnalyticsProvider = isOneOf(["youtube", "soundcloud", "other"] as const);
+const isAnalyticsProviderScope = isOneOf(["youtube", "soundcloud", "other", "mixed"] as const);
+const isImportKind = isOneOf(["single", "set"] as const);
+const isImportOutcome = isOneOf(["completed", "partial", "failed", "canceled"] as const);
+const isImportFailureStage = isOneOf(["plan", "tunnel", "processing", "hydration"] as const);
+const isImportFailureCode = isOneOf([
+  "capacity",
+  "rate_limited",
+  "service_unavailable",
+  "timeout",
+  "fetch_failed",
+  "empty_response",
+  "parse_failed",
+  "metadata_write_failed",
+  "unknown",
+] as const);
+const isNonNegativeInteger = (value: unknown) =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0;
+const isPositiveInteger = (value: unknown) =>
+  typeof value === "number" && Number.isInteger(value) && value > 0;
+const isNonNegativeNumber = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0;
 const isMediaKind = isOneOf(["track", "playlist", "unsupported"] as const);
 const isMediaLinkShape = isOneOf(["canonical", "short", "mobile", "nocookie", "other"] as const);
 const isMediaLinkOutcome = isOneOf(["accepted", "rejected"] as const);
@@ -378,6 +452,43 @@ const CUSTOM_PROPERTY_VALIDATORS: Record<
     attempts: isBoundedTunnelAttempt,
     elapsed_bucket: isCobaltTunnelElapsedBucket,
   },
+  import_finished: {
+    provider: isAnalyticsProvider,
+    import_kind: isImportKind,
+    outcome: isImportOutcome,
+    total_count: isNonNegativeInteger,
+    completed_count: isNonNegativeInteger,
+    failed_count: isNonNegativeInteger,
+    canceled_count: isNonNegativeInteger,
+    duration_ms: isNonNegativeNumber,
+  },
+  import_failure_category: {
+    provider: isAnalyticsProvider,
+    import_kind: isImportKind,
+    stage: isImportFailureStage,
+    code: isImportFailureCode,
+    track_count: isPositiveInteger,
+  },
+  import_resolution_failed: {
+    provider: isAnalyticsProvider,
+    import_kind: isImportKind,
+    code: isImportFailureCode,
+  },
+  import_retry_started: {
+    provider: isAnalyticsProviderScope,
+    retry_count: isPositiveInteger,
+    previous_failed_count: isNonNegativeInteger,
+    previous_canceled_count: isNonNegativeInteger,
+  },
+  import_retry_finished: {
+    provider: isAnalyticsProviderScope,
+    retry_count: isPositiveInteger,
+    completed_count: isNonNegativeInteger,
+    failed_count: isNonNegativeInteger,
+    canceled_count: isNonNegativeInteger,
+    outcome: isImportOutcome,
+    duration_ms: isNonNegativeNumber,
+  },
 };
 
 const redactAndValidateEvent = (event: BeforeSendEvent): BeforeSendEvent | null => {
@@ -396,6 +507,23 @@ const redactAndValidateEvent = (event: BeforeSendEvent): BeforeSendEvent | null 
     if (!isAllowedCustomProperty && SENSITIVE_PROPERTY_NAME.test(property)) continue;
     if (!isAllowedCustomProperty && typeof value === "string" && URL_VALUE.test(value)) continue;
     properties[property] = value;
+  }
+
+  if (event.event === "import_retry_finished" || event.event === "import_finished") {
+    const expectedCount =
+      event.event === "import_retry_finished" ? properties.retry_count : properties.total_count;
+    const completedCount = properties.completed_count;
+    const failedCount = properties.failed_count;
+    const canceledCount = properties.canceled_count;
+    if (
+      typeof expectedCount !== "number" ||
+      typeof completedCount !== "number" ||
+      typeof failedCount !== "number" ||
+      typeof canceledCount !== "number" ||
+      completedCount + failedCount + canceledCount !== expectedCount
+    ) {
+      return null;
+    }
   }
 
   if (isSdkEvent) properties.app_view = "tagium";
@@ -445,7 +573,7 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
           ...commonProperties,
           provider: analyticsProviderFromUrl(event.sourceUrl),
           outcome: event.outcome,
-          attempts: Math.max(1, Math.min(4, Math.trunc(event.attempts))),
+          attempts: Math.max(1, Math.min(7, Math.trunc(event.attempts))),
           elapsed_bucket: event.elapsedBucket,
         },
       };
@@ -495,9 +623,28 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
           failed_count: event.failedCount,
           canceled_count: event.canceledCount,
           duration_ms: event.durationMs,
-          ...(event.error === undefined
-            ? {}
-            : { error_code: errorCodeFrom(event.error, event.failureStage) }),
+        },
+      };
+    case "import_failure_category":
+      return {
+        name: event.type,
+        properties: {
+          ...commonProperties,
+          provider: analyticsProviderFromUrl(event.sourceUrl),
+          import_kind: event.importKind,
+          stage: event.stage,
+          code: event.code,
+          track_count: event.trackCount,
+        },
+      };
+    case "import_resolution_failed":
+      return {
+        name: event.type,
+        properties: {
+          ...commonProperties,
+          provider: analyticsProviderFromUrl(event.sourceUrl),
+          import_kind: event.importKind,
+          code: event.code,
         },
       };
     case "export_started":
@@ -581,6 +728,20 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
           retry_count: event.retryCount,
           previous_failed_count: event.previousFailedCount,
           previous_canceled_count: event.previousCanceledCount,
+        },
+      };
+    case "import_retry_finished":
+      return {
+        name: event.type,
+        properties: {
+          ...commonProperties,
+          provider: event.provider,
+          retry_count: event.retryCount,
+          completed_count: event.completedCount,
+          failed_count: event.failedCount,
+          canceled_count: event.canceledCount,
+          outcome: event.outcome,
+          duration_ms: event.durationMs,
         },
       };
   }

@@ -8,7 +8,8 @@
  * against the Machine real users depend on will degrade the app for them.
  *
  *   flyctl apps create tagium-cobalt-loadtest
- *   flyctl deploy --config fly.cobalt.toml --app tagium-cobalt-loadtest
+ *   flyctl deploy --config fly.cobalt.toml --app tagium-cobalt-loadtest \
+ *     --env API_URL=https://tagium-cobalt-loadtest.fly.dev/
  *   bun run scripts/load-test-cobalt.ts --target https://tagium-cobalt-loadtest.fly.dev
  *   flyctl apps destroy tagium-cobalt-loadtest   # when you're done
  *
@@ -41,6 +42,7 @@
 import { readFileSync } from "node:fs";
 import { argv, env, exit } from "node:process";
 import { fileURLToPath } from "node:url";
+import { assertTunnelMatchesLoadTestTarget, parseLoadTestTarget } from "./load-test-cobalt-safety";
 
 // Last-resort fallback if scripts/load-test-urls.txt is missing or unreadable.
 const FALLBACK_URLS = ["https://www.youtube.com/watch?v=YE7VzlLtp-4"];
@@ -76,7 +78,7 @@ interface WaveSummary {
 }
 
 interface CliOptions {
-  target: string;
+  target: URL;
   urls: string[];
   waves: number[];
   requestsPerWave: number;
@@ -133,10 +135,11 @@ const parseArgs = (argv: string[]): CliOptions => {
     }
   }
 
-  const target = flags.get("target");
-  if (!target) {
+  const targetValue = flags.get("target");
+  if (!targetValue) {
     throw new Error("Missing required --target <cobalt-origin-url>.");
   }
+  const target = parseLoadTestTarget(targetValue);
 
   return {
     target,
@@ -201,7 +204,7 @@ const describeError = (error: unknown) => {
 };
 
 const performOneDownload = async (
-  target: string,
+  target: URL,
   sourceUrl: string,
   bitrate: string,
   apiKey: string | undefined,
@@ -254,7 +257,9 @@ const performOneDownload = async (
     return { ok: false, errorCode: plan.error.code, resolveMs };
   }
 
-  const tunnelUrls = pickTunnelUrls(plan);
+  const tunnelUrls = pickTunnelUrls(plan).map((url) =>
+    assertTunnelMatchesLoadTestTarget(target, url),
+  );
   if (tunnelUrls.length === 0) {
     return {
       ok: false,
@@ -393,7 +398,7 @@ const main = async () => {
     );
   }
 
-  console.log(`Target: ${options.target}`);
+  console.log(`Target: ${options.target.origin}`);
   console.log(`URLs: ${options.urls.join(", ")}`);
   console.log(`Waves (concurrency): ${options.waves.join(", ")}`);
   console.log(`Requests per wave: ${options.requestsPerWave}`);
