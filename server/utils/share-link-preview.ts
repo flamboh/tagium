@@ -16,6 +16,10 @@ export interface ShareLinkPreviewMetadata {
     type: "image/jpeg" | "image/png";
     alt: string;
   };
+  twitterImage: {
+    url: string;
+    alt: string;
+  };
 }
 
 const contentForManifest = (manifest: Manifest) =>
@@ -60,6 +64,10 @@ export const buildShareLinkPreviewMetadata = (
     description,
     url: canonicalUrl.href,
     image,
+    twitterImage: {
+      url: new URL(`/api/manifests/${encodeURIComponent(slug)}/social-card`, canonicalUrl).href,
+      alt: `${content.title} by ${content.artist}`,
+    },
   };
 };
 
@@ -93,17 +101,12 @@ export const renderShareLinkPreviewTags = (metadata: ShareLinkPreviewMetadata) =
   }
 
   tags.push(
-    meta("name", "twitter:card", "summary"),
+    meta("name", "twitter:card", "summary_large_image"),
     meta("name", "twitter:title", metadata.title),
     meta("name", "twitter:description", metadata.description),
+    meta("name", "twitter:image", metadata.twitterImage.url),
+    meta("name", "twitter:image:alt", metadata.twitterImage.alt),
   );
-
-  if (metadata.image) {
-    tags.push(
-      meta("name", "twitter:image", metadata.image.url),
-      meta("name", "twitter:image:alt", metadata.image.alt),
-    );
-  }
 
   tags.push(`<link rel="canonical" href="${escapeHtml(metadata.url)}" />`);
   return `${SHARE_LINK_PREVIEW_START}\n    ${tags.join("\n    ")}\n    ${SHARE_LINK_PREVIEW_END}`;

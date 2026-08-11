@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import artworkHandler from "../../server/api/manifests/[slug]/artwork.get";
+import socialCardHandler from "../../server/api/manifests/[slug]/social-card.get";
 import revokeHandler from "../../server/api/manifests/[slug].delete";
 import manifestHandler from "../../server/api/manifests/[slug].get";
 import publishHandler from "../../server/api/manifests/index.post";
@@ -224,6 +225,18 @@ describe("share manifest endpoints", () => {
     expect(cover.headers.get("content-type")).toBe("image/png");
     expect(new Uint8Array(await cover.arrayBuffer())).toEqual(png);
 
+    const socialCard = await socialCardHandler(
+      event(
+        request(`https://tagium.test/api/manifests/${receipt.slug}/social-card`, {}, runtime.env),
+        receipt.slug,
+      ),
+    );
+    expect(socialCard.status).toBe(200);
+    expect(socialCard.headers.get("cache-control")).toBe("no-store");
+    expect(socialCard.headers.get("content-type")).toBe("image/png");
+    const socialCardBytes = new Uint8Array(await socialCard.arrayBuffer());
+    expect(Array.from(socialCardBytes.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+
     const revoked = await revokeHandler(
       event(
         request(
@@ -268,6 +281,12 @@ describe("share manifest endpoints", () => {
       ),
       artworkHandler(
         event(request(`https://tagium.test/api/manifests/${slug}/artwork`, {}, runtime.env), slug),
+      ),
+      socialCardHandler(
+        event(
+          request(`https://tagium.test/api/manifests/${slug}/social-card`, {}, runtime.env),
+          slug,
+        ),
       ),
       revokeHandler(
         event(

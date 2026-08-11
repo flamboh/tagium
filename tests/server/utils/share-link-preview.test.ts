@@ -62,6 +62,10 @@ describe("share link previews", () => {
         type: "image/png",
         alt: "Album & <Deluxe> cover",
       },
+      twitterImage: {
+        url: "https://tagium.app/api/manifests/abc234/social-card",
+        alt: "Album & <Deluxe> by Artist",
+      },
     });
   });
 
@@ -86,6 +90,10 @@ describe("share link previews", () => {
         type: "image/png",
         alt: "tagium",
       },
+      twitterImage: {
+        url: "http://localhost:5173/api/manifests/xyz789/social-card",
+        alt: "untitled track by unknown artist",
+      },
     });
   });
 
@@ -99,9 +107,12 @@ describe("share link previews", () => {
     expect(output).toContain(
       '<meta property="og:image" content="https://tagium.app/api/manifests/abc234/artwork" />',
     );
-    expect(output).toContain('<meta name="twitter:card" content="summary" />');
+    expect(output).toContain('<meta name="twitter:card" content="summary_large_image" />');
     expect(output).toContain(
-      '<meta name="twitter:image:alt" content="Album &amp; &lt;Deluxe&gt; cover" />',
+      '<meta name="twitter:image" content="https://tagium.app/api/manifests/abc234/social-card" />',
+    );
+    expect(output).toContain(
+      '<meta name="twitter:image:alt" content="Album &amp; &lt;Deluxe&gt; by Artist" />',
     );
     expect(output).not.toContain('<meta property="og:title" content="tagium" />');
     expect(output).toContain('<script src="/assets/app.js"></script>');
