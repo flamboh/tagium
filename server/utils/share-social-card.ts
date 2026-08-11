@@ -1,10 +1,23 @@
 import { Resvg } from "@cf-wasm/resvg";
+import faviconSvg from "../../public/favicon.svg?raw";
 import { manifestTrackCount, type Manifest } from "../../src/features/share/shareManifest";
 
 export const SHARE_SOCIAL_CARD_WIDTH = 1_200;
 export const SHARE_SOCIAL_CARD_HEIGHT = 630;
 export const SATOSHI_STYLESHEET_URL =
   "https://api.fontshare.com/v2/css?f%5B%5D=satoshi%401&display=swap";
+
+const ARTWORK_SIZE = 630;
+const CONTENT_LEFT = 690;
+const CONTENT_WIDTH = 458;
+
+// Exact sRGB equivalents of the light theme tokens in src/index.css.
+const colors = {
+  background: "#fbf8f8",
+  foreground: "#1c1514",
+  mutedForeground: "#665b59",
+  primary: "#900f1a",
+} as const;
 
 export type ShareSocialCardArtwork = {
   bytes: Uint8Array;
@@ -141,11 +154,13 @@ const wrapText = (value: string, maximumWidth: number, fontSize: number, maximum
 };
 
 const titleLayout = (title: string) => {
-  for (const fontSize of [64, 58, 52] as const) {
-    const wrapped = wrapText(title, 498, fontSize, 3);
-    if (!wrapped.truncated) return { ...wrapped, fontSize };
+  for (const fontSize of [64, 58, 52, 48, 44] as const) {
+    const wrapped = wrapText(title, CONTENT_WIDTH, fontSize, 4);
+    if (!wrapped.truncated && (wrapped.lines.length <= 3 || fontSize === 44)) {
+      return { ...wrapped, fontSize };
+    }
   }
-  return { ...wrapText(title, 498, 46, 3), fontSize: 46 };
+  return { ...wrapText(title, CONTENT_WIDTH, 44, 4), fontSize: 44 };
 };
 
 const bytesToBase64 = (bytes: Uint8Array) => {
@@ -156,16 +171,17 @@ const bytesToBase64 = (bytes: Uint8Array) => {
   return btoa(binary);
 };
 
+const fallbackArtworkMarkup = faviconSvg.replace(
+  "<svg ",
+  `<svg x="0" y="0" width="${ARTWORK_SIZE}" height="${ARTWORK_SIZE}" `,
+);
+
 const artworkMarkup = (artwork: ShareSocialCardArtwork | undefined) =>
   artwork
-    ? `<image x="72" y="72" width="486" height="486" href="data:${artwork.type};base64,${bytesToBase64(
+    ? `<image x="0" y="0" width="${ARTWORK_SIZE}" height="${ARTWORK_SIZE}" href="data:${artwork.type};base64,${bytesToBase64(
         artwork.bytes,
-      )}" preserveAspectRatio="xMidYMid slice" clip-path="url(#cover)" />`
-    : `<rect x="72" y="72" width="486" height="486" rx="16" fill="#efe2e3" />
-       <g transform="translate(205 187) scale(12)" fill="none" stroke="#900f1a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-         <circle cx="8" cy="18" r="4" />
-         <path d="M12 18V2l7 4" />
-       </g>`;
+      )}" preserveAspectRatio="xMidYMid slice" />`
+    : fallbackArtworkMarkup;
 
 /** Build the deterministic SVG that is rasterized for X's large-image card. */
 export const renderShareSocialCardSvg = (manifest: Manifest, artwork?: ShareSocialCardArtwork) => {
@@ -184,36 +200,37 @@ export const renderShareSocialCardSvg = (manifest: Manifest, artwork?: ShareSoci
           detail: "shared track on tagium",
         };
   const title = titleLayout(content.title);
-  const lineHeight = Math.round(title.fontSize * 1.08);
-  const titleHeight = title.lines.length * lineHeight;
-  const titleTop = Math.round(270 - titleHeight / 2);
+  const lineHeight = Math.round(title.fontSize * 1.1);
+  const artistFontSize = approximateTextWidth(content.artist, 36) <= CONTENT_WIDTH ? 36 : 34;
   const artist =
-    approximateTextWidth(content.artist, 31) <= 498
+    approximateTextWidth(content.artist, artistFontSize) <= CONTENT_WIDTH
       ? content.artist
-      : truncateLine(content.artist, 498, 31);
+      : truncateLine(content.artist, CONTENT_WIDTH, artistFontSize);
+  const detailFontSize =
+    ([30, 28] as const).find(
+      (fontSize) => approximateTextWidth(content.detail, fontSize) <= CONTENT_WIDTH,
+    ) ?? 27;
+  const detail =
+    approximateTextWidth(content.detail, detailFontSize) <= CONTENT_WIDTH
+      ? content.detail
+      : truncateLine(content.detail, CONTENT_WIDTH, detailFontSize);
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${SHARE_SOCIAL_CARD_WIDTH}" height="${SHARE_SOCIAL_CARD_HEIGHT}" viewBox="0 0 ${SHARE_SOCIAL_CARD_WIDTH} ${SHARE_SOCIAL_CARD_HEIGHT}">
-  <defs>
-    <clipPath id="cover"><rect x="72" y="72" width="486" height="486" rx="16" /></clipPath>
-    <filter id="cover-shadow" x="36" y="44" width="558" height="558" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#2b171a" flood-opacity="0.2" />
-    </filter>
-  </defs>
-  <rect width="1200" height="630" fill="#fbf8f7" />
-  <circle cx="1130" cy="620" r="360" fill="#900f1a" opacity="0.055" />
-  <rect width="1200" height="10" fill="#900f1a" />
-  <rect x="72" y="72" width="486" height="486" rx="16" fill="#e8dddc" filter="url(#cover-shadow)" />
+  <rect width="1200" height="630" fill="${colors.background}" />
   ${artworkMarkup(artwork)}
+  <rect x="630" width="570" height="630" fill="${colors.background}" />
+  <rect x="630" width="8" height="630" fill="${colors.primary}" />
   <g font-family="Satoshi Variable" font-weight="600" font-feature-settings="'ss01' 1">
-    <text x="630" y="92" font-size="30" fill="#900f1a">tagium</text>
+    <text x="${CONTENT_LEFT}" y="102" font-size="34" fill="${colors.primary}">tagium</text>
     ${title.lines
       .map(
         (line, index) =>
-          `<text x="630" y="${titleTop + index * lineHeight}" dominant-baseline="hanging" font-size="${title.fontSize}" letter-spacing="-1.2" fill="#282124">${escapeXml(line)}</text>`,
+          `<text x="${CONTENT_LEFT}" y="${144 + index * lineHeight}" dominant-baseline="hanging" font-size="${title.fontSize}" letter-spacing="-1.2" fill="${colors.foreground}">${escapeXml(line)}</text>`,
       )
       .join("\n    ")}
-    <text x="630" y="405" font-size="31" fill="#75696c">${escapeXml(artist)}</text>
-    <text x="630" y="505" font-size="23" fill="#900f1a">${escapeXml(content.detail)}</text>
+    <text x="${CONTENT_LEFT}" y="432" font-size="${artistFontSize}" fill="${colors.mutedForeground}">${escapeXml(artist)}</text>
+    <rect x="${CONTENT_LEFT}" y="468" width="64" height="4" rx="2" fill="${colors.primary}" />
+    <text x="${CONTENT_LEFT}" y="530" font-size="${detailFontSize}" fill="${colors.primary}">${escapeXml(detail)}</text>
   </g>
 </svg>`;
 };
@@ -225,13 +242,22 @@ export const renderShareSocialCardPng = async (
   fontBytes?: Uint8Array,
 ) => {
   const satoshi = fontBytes ?? (await loadSatoshiFont());
-  const renderer = await Resvg.async(renderShareSocialCardSvg(manifest, artwork), {
-    font: {
-      fontBuffers: [satoshi],
-      defaultFontFamily: "Satoshi Variable",
-      loadSystemFonts: false,
-    },
-    fitTo: { mode: "original" },
-  });
-  return renderer.render().asPng();
+  const rasterize = async (candidate: ShareSocialCardArtwork | undefined) => {
+    const renderer = await Resvg.async(renderShareSocialCardSvg(manifest, candidate), {
+      font: {
+        fontBuffers: [satoshi],
+        defaultFontFamily: "Satoshi Variable",
+        loadSystemFonts: false,
+      },
+      fitTo: { mode: "original" },
+    });
+    return renderer.render().asPng();
+  };
+
+  if (!artwork) return rasterize(undefined);
+  try {
+    return await rasterize(artwork);
+  } catch {
+    return rasterize(undefined);
+  }
 };

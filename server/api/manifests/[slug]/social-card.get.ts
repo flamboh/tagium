@@ -29,7 +29,7 @@ export const createShareSocialCardHandler = (renderSocialCard: RenderShareSocial
       if (manifestResult.kind !== "available") return unavailable();
 
       const artworkResult = manifestArtwork(manifestResult.manifest)
-        ? await store.loadArtwork(slug)
+        ? await store.loadArtwork(slug).catch(() => undefined)
         : undefined;
       let artwork: ShareSocialCardArtwork | undefined;
       if (

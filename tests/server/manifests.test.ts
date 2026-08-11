@@ -158,6 +158,7 @@ const createRuntime = () => {
   return {
     records,
     artwork,
+    bucket,
     env: { SHARE_MANIFESTS: database, SHARE_ARTWORK: bucket } as ShareRuntimeEnv,
   };
 };
@@ -272,6 +273,37 @@ describe("share manifest endpoints", () => {
     );
     expect(unavailable.status).toBe(404);
     expect(unavailable.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("renders the fallback social card when stored artwork cannot be loaded", async () => {
+    const runtime = createRuntime();
+    const form = new FormData();
+    form.set("manifest", JSON.stringify(manifest));
+    form.set("cover", new File([png], "cover.png", { type: "image/png" }));
+    const published = await publishHandler(
+      event(
+        request("https://tagium.test/api/manifests", { method: "POST", body: form }, runtime.env),
+      ),
+    );
+    const receipt = (await published.json()) as { slug: string };
+    runtime.bucket.get = async () => {
+      throw new Error("artwork unavailable");
+    };
+    let renderedWithArtwork: boolean | undefined;
+    const handler = createShareSocialCardHandler(async (_manifest, artwork) => {
+      renderedWithArtwork = Boolean(artwork);
+      return png;
+    });
+
+    const socialCard = await handler(
+      event(
+        request(`https://tagium.test/api/manifests/${receipt.slug}/social-card`, {}, runtime.env),
+        receipt.slug,
+      ),
+    );
+
+    expect(socialCard.status).toBe(200);
+    expect(renderedWithArtwork).toBe(false);
   });
 
   it("uses one unavailable response for missing manifests, artwork, and invalid revocation", async () => {

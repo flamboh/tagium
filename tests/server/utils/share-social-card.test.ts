@@ -43,11 +43,17 @@ const decodeDataUrl = (dataUrl: string) => {
 const testFont = decodeDataUrl(interSemiBoldDataUrl);
 
 describe("share social cards", () => {
-  it("lays out escaped share content in the wide card template", () => {
+  it("lays out escaped share content in the artwork-first card template", () => {
     const svg = renderShareSocialCardSvg(manifest);
 
     expect(svg).toContain(`width="${SHARE_SOCIAL_CARD_WIDTH}"`);
     expect(svg).toContain(`height="${SHARE_SOCIAL_CARD_HEIGHT}"`);
+    expect(svg).toContain('<rect x="630" width="8" height="630" fill="#900f1a" />');
+    expect(svg).toContain('<svg x="0" y="0" width="630" height="630"');
+    expect(svg).toContain('<rect width="64" height="64" rx="4" fill="#900f1a" />');
+    expect(svg).toContain('font-size="34" fill="#900f1a">tagium</text>');
+    expect(svg).toContain('font-size="36" fill="#665b59">Artist</text>');
+    expect(svg).toContain('font-size="30" fill="#900f1a">1 track · shared on tagium</text>');
     expect(svg).toContain("Album &amp;");
     expect(svg).toContain("&lt;Deluxe&gt;");
     expect(svg).toContain("Artist");
@@ -62,6 +68,16 @@ describe("share social cards", () => {
     const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
     expect(view.getUint32(16)).toBe(SHARE_SOCIAL_CARD_WIDTH);
     expect(view.getUint32(20)).toBe(SHARE_SOCIAL_CARD_HEIGHT);
+  });
+
+  it("still renders a PNG when supplied artwork cannot be decoded", async () => {
+    const png = await renderShareSocialCardPng(
+      manifest,
+      { bytes: Uint8Array.of(1, 2, 3), type: "image/png" },
+      testFont,
+    );
+
+    expect(Array.from(png.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
   });
 
   it("loads and reuses Satoshi from Fontshare's official stylesheet", async () => {
