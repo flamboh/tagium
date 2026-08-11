@@ -24,7 +24,7 @@ Every PR must include brief, plain-language instructions for human review that p
 - Business-logic decisions, assumptions, or tradeoffs that need reviewer consideration.
 - What was verified automatically and anything that still requires manual verification.
 
-Keep this guidance focused on observable behavior and decisions rather than an exhaustive summary of the implementation. Do not include anything else in PRs.
+Keep this guidance focused on observable behavior and decisions rather than an exhaustive summary of the implementation.
 
 ## References
 
