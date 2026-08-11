@@ -2,16 +2,19 @@ import { Effect } from "effect";
 import { act } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { CobaltAudioDownloadRequest } from "@/features/import/cobaltAudio";
-import type { AppSettings } from "@/features/library/types";
+import type { AppSettings, AudioMetadata } from "@/features/library/types";
 import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 import type { Manifest } from "@/features/share/shareManifest";
 
 const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   downloadFromCobalt: vi.fn((_request: CobaltAudioDownloadRequest) => Effect.never),
+  fetchImportedCover: vi.fn(),
+  runAudioBackendEffect: vi.fn(),
   resolveTrackMetadata: vi.fn(),
   resolveSoundCloudSet: vi.fn(),
   resolveYouTubePlaylist: vi.fn(),
+  writeTags: vi.fn(),
 }));
 
 vi.mock("@/analytics", async (importOriginal) => ({
@@ -22,8 +25,12 @@ vi.mock("@/features/audio/audioBackend", () => ({
   downloadFromCobalt: mocks.downloadFromCobalt,
   provideAudioBackend: (operation: unknown) => operation,
   parseUploads: vi.fn(),
-  runAudioBackendEffect: vi.fn(),
-  writeTags: vi.fn(),
+  runAudioBackendEffect: mocks.runAudioBackendEffect,
+  writeTags: mocks.writeTags,
+}));
+vi.mock("@/features/import/downloadTrack", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/import/downloadTrack")>()),
+  fetchImportedCover: mocks.fetchImportedCover,
 }));
 vi.mock("@/features/import/trackMetadata", () => ({
   resolveTrackMetadata: mocks.resolveTrackMetadata,
@@ -335,6 +342,150 @@ describe("audio URL import session", () => {
     expect(hook.result.library.getSnapshot().albums[0]?.sourceUrl).toBe(submittedUrl);
     hook.unmount();
   });
+
+  it.each(["success", "failure"] as const)(
+    "preserves dirty track metadata when a playlist cover write ends in %s",
+    async (outcome) => {
+      let resolveCover: ((cover: AudioMetadata["picture"]) => void) | undefined;
+      mocks.fetchImportedCover.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveCover = resolve;
+          }),
+      );
+      mocks.resolveSoundCloudSet.mockResolvedValue({
+        title: "Imported album",
+        artist: "Artist",
+        genre: "Electronic",
+        isAlbum: true,
+        coverUrl: "https://example.com/cover.jpg",
+        tracks: [
+          {
+            title: "Track",
+            url: "https://soundcloud.com/artist/track",
+            trackNumber: 1,
+          },
+          {
+            title: "Second track",
+            url: "https://soundcloud.com/artist/second-track",
+            trackNumber: 2,
+          },
+        ],
+      });
+      const coverSettings = {
+        ...settings("320"),
+        applySoundCloudAlbumCoverToTracks: true,
+      };
+      const hook = renderHook(() => {
+        const library = useLibraryStore();
+        const editor = useTrackEditorSession({ library, settings: coverSettings });
+        const importing = useAudioImportSession({
+          library,
+          editor,
+          settings: coverSettings,
+          activateEditor: vi.fn(),
+        });
+        return { editor, importing, library };
+      }, undefined);
+
+      await act(async () => {
+        await hook.result.importing.commands.importUrl(
+          "https://soundcloud.com/artist/sets/imported-album",
+        );
+      });
+      const downloaded = new File(["downloaded"], "track.mp3", { type: "audio/mpeg" });
+      act(() => {
+        const snapshot = hook.result.library.getSnapshot();
+        hook.result.library.dispatch({
+          type: "content-replaced",
+          files: snapshot.files.map((file, index) =>
+            index === 0
+              ? {
+                  ...file,
+                  file: downloaded,
+                  originalFile: downloaded,
+                  status: "saved",
+                  downloadStatus: "ready",
+                }
+              : file,
+          ),
+        });
+      });
+      const comment = hook.result.editor.form.register("comment");
+      act(() => {
+        void comment.onChange({
+          target: { name: "comment", value: "keep this edit" },
+          type: "change",
+        });
+      });
+      const cover: AudioMetadata["picture"] = [
+        {
+          format: "image/jpeg",
+          type: 3,
+          description: "playlist cover",
+          data: new Uint8Array([1, 2, 3]),
+        },
+      ];
+      const written = new File(["written"], "track.mp3", { type: "audio/mpeg" });
+      let resolveWrite: ((file: File) => void) | undefined;
+      let rejectWrite: ((error: Error) => void) | undefined;
+      mocks.writeTags.mockReturnValueOnce(undefined);
+      mocks.runAudioBackendEffect.mockImplementationOnce(
+        () =>
+          new Promise((resolve, reject) => {
+            resolveWrite = resolve;
+            rejectWrite = reject;
+          }),
+      );
+
+      await act(async () => {
+        resolveCover?.(cover);
+        await vi.waitFor(() => expect(mocks.writeTags).toHaveBeenCalled());
+      });
+
+      expect(mocks.writeTags).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ comment: "keep this edit", picture: cover }),
+      );
+      act(() => {
+        void comment.onChange({
+          target: { name: "comment", value: "keep the latest edit" },
+          type: "change",
+        });
+        hook.result.editor.commands.flush();
+        const snapshot = hook.result.library.getSnapshot();
+        hook.result.library.dispatch({
+          type: "track-selected",
+          albumId: snapshot.albums[0]?.id ?? null,
+          fileId: snapshot.files[1]?.id ?? null,
+          mode: "replace",
+        });
+      });
+      await act(async () => {
+        if (outcome === "success") {
+          resolveWrite?.(written);
+          await vi.waitFor(() =>
+            expect(hook.result.library.getSnapshot().files[0]?.file).toBe(written),
+          );
+        } else {
+          rejectWrite?.(new Error("write failed"));
+          await vi.waitFor(() =>
+            expect(hook.result.library.getSnapshot().files[0]?.status).toBe("error"),
+          );
+        }
+      });
+
+      expect(hook.result.editor.form.getValues("picture")).toEqual(cover);
+      expect(hook.result.library.getSnapshot().files[0]).toMatchObject({
+        status: outcome === "success" ? "pending" : "error",
+        hasBufferedChanges: true,
+        metadata: { comment: "keep the latest edit", picture: cover },
+        pendingMetadataPatch: { comment: "keep the latest edit" },
+      });
+      act(() => hook.result.importing.commands.cancelQueue());
+      hook.unmount();
+    },
+  );
 
   it("uses the latest settings and activation callback after asynchronous metadata resolution", async () => {
     let resolveMetadata: ((metadata: { title: string; artist: string }) => void) | undefined;
