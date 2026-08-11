@@ -34,7 +34,7 @@ Use a maintainer credential with access only to the intended environment. This c
 
 ```sh
 TAGIUM_DEPLOY_ENV=production SHARE_MAINTAINER_CONFIRM=disable \
-  bun run disable:share-manifest -- <22-character-slug>
+  bun run disable:share-manifest -- <6-character-slug>
 ```
 
 It validates the environment and server-derived key, disables the D1 row first, then deletes the corresponding R2 object. A missing or previously-disabled row is safe to retry. If R2 deletion fails, the link remains disabled; repeat the exact command once R2 is available. Never use preview resource values for production (or vice versa).

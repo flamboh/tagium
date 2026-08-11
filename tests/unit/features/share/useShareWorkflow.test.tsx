@@ -50,7 +50,7 @@ import {
   projectTrackShareSnapshot,
 } from "@/features/share/sharePublication";
 
-const slug = "AbcdEFGHijklmno_123-45";
+const slug = "k7m4q2";
 const sharedManifest = {
   version: 1 as const,
   kind: "album" as const,

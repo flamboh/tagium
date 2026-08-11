@@ -1,4 +1,5 @@
-const SHARE_SLUG_PATTERN = /^[A-Za-z0-9_-]{22}$/;
+import { SHARE_SLUG_PATTERN } from "@/features/share/shareSlug";
+
 const PRODUCTION_ORIGINS = new Set(["https://tagium.app", "https://www.tagium.app"]);
 
 export type ShareLinkClassification =
@@ -31,8 +32,9 @@ export const classifyShareLink = (
 };
 
 export const shareSlugFromPathname = (pathname: string) => {
-  const match = pathname.match(/^\/share\/([A-Za-z0-9_-]{22})\/?$/);
-  return match?.[1] ?? null;
+  const match = pathname.match(/^\/share\/([^/]+)\/?$/);
+  const slug = match?.[1] ?? "";
+  return SHARE_SLUG_PATTERN.test(slug) ? slug : null;
 };
 
 export const shareLinkForSlug = (
