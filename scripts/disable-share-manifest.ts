@@ -13,7 +13,7 @@ if (
   !SHARE_SLUG_PATTERN.test(slug)
 ) {
   console.error(
-    "usage: TAGIUM_DEPLOY_ENV=preview|production SHARE_MAINTAINER_CONFIRM=disable bun run disable:share-manifest -- <22-char-slug>",
+    "usage: TAGIUM_DEPLOY_ENV=preview|production SHARE_MAINTAINER_CONFIRM=disable bun run disable:share-manifest -- <6-character-slug>",
   );
   exit(1);
 }

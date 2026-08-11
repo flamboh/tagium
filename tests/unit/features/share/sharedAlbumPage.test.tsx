@@ -29,7 +29,7 @@ vi.mock("@/components/ui/dialog", () => {
   };
 });
 
-const slug = "AbcdEFGHijklmno_123-45";
+const slug = "k7m4q2";
 const props = {
   state: {
     status: "ready" as const,

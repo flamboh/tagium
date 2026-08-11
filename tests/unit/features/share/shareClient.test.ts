@@ -30,12 +30,12 @@ const manifest = {
 describe("shared content client", () => {
   it("decodes the public response envelope without requesting audio", async () => {
     const fetch = vi.fn(async () => Response.json({ manifest, expiresAt: "2026-10-20T12:00:00Z" }));
-    await expect(fetchSharedContent("AbcdEFGHijklmno_123-45", { fetch })).resolves.toEqual({
+    await expect(fetchSharedContent("k7m4q2", { fetch })).resolves.toEqual({
       manifest,
       expiresAt: "2026-10-20T12:00:00Z",
     });
     expect(fetch).toHaveBeenCalledWith(
-      "/api/manifests/AbcdEFGHijklmno_123-45",
+      "/api/manifests/k7m4q2",
       expect.objectContaining({ cache: "no-store" }),
     );
     expect(fetch).toHaveBeenCalledOnce();
@@ -45,20 +45,20 @@ describe("shared content client", () => {
     const futureFetch = vi.fn(async () =>
       Response.json({ manifest: { ...manifest, version: 2 }, expiresAt: "2026-10-20T12:00:00Z" }),
     );
-    await expect(
-      fetchSharedContent("AbcdEFGHijklmno_123-45", { fetch: futureFetch }),
-    ).rejects.toBeInstanceOf(SharedContentVersionError);
+    await expect(fetchSharedContent("k7m4q2", { fetch: futureFetch })).rejects.toBeInstanceOf(
+      SharedContentVersionError,
+    );
     const missingFetch = vi.fn(async () => new Response(null, { status: 404 }));
-    await expect(
-      fetchSharedContent("AbcdEFGHijklmno_123-45", { fetch: missingFetch }),
-    ).rejects.toBeInstanceOf(SharedContentUnavailableError);
+    await expect(fetchSharedContent("k7m4q2", { fetch: missingFetch })).rejects.toBeInstanceOf(
+      SharedContentUnavailableError,
+    );
   });
 
   it("sends the private revocation permission only in the delete authorization header", async () => {
     const fetch = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(null, { status: 204 }),
     );
-    await revokeShare("AbcdEFGHijklmno_123-45", "private-secret", { fetch });
+    await revokeShare("k7m4q2", "private-secret", { fetch });
     const [url, request] = fetch.mock.calls[0]!;
     expect(url).not.toContain("private-secret");
     expect(request).toEqual(
@@ -71,26 +71,26 @@ describe("shared content client", () => {
 
   it("accepts only a 204 revocation response", async () => {
     const fetch = vi.fn(async () => new Response(null, { status: 404 }));
-    await expect(
-      revokeShare("AbcdEFGHijklmno_123-45", "private-secret", { fetch }),
-    ).rejects.toThrow("sharing could not be stopped");
+    await expect(revokeShare("k7m4q2", "private-secret", { fetch })).rejects.toThrow(
+      "sharing could not be stopped",
+    );
   });
 
   it("updates the same link with a bearer capability and never posts", async () => {
     const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       Response.json({
-        slug: "AbcdEFGHijklmno_123-45",
-        url: "https://tagium.app/share/AbcdEFGHijklmno_123-45",
+        slug: "k7m4q2",
+        url: "https://tagium.app/share/k7m4q2",
         expiresAt: "2026-10-20T12:00:00Z",
       }),
     );
     await expect(
-      updateShare("AbcdEFGHijklmno_123-45", "private-secret", manifest as never, null, {
+      updateShare("k7m4q2", "private-secret", manifest as never, null, {
         fetch,
       }),
-    ).resolves.toMatchObject({ slug: "AbcdEFGHijklmno_123-45" });
+    ).resolves.toMatchObject({ slug: "k7m4q2" });
     const [url, request] = fetch.mock.calls[0]!;
-    expect(url).toBe("/api/manifests/AbcdEFGHijklmno_123-45");
+    expect(url).toBe("/api/manifests/k7m4q2");
     expect(request).toMatchObject({
       method: "PATCH",
       headers: expect.objectContaining({ Authorization: "Bearer private-secret" }),

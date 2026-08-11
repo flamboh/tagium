@@ -257,7 +257,7 @@ describe("share manifest endpoints", () => {
 
   it("uses one unavailable response for missing manifests, artwork, and invalid revocation", async () => {
     const runtime = createRuntime();
-    const slug = "a".repeat(22);
+    const slug = "aaaaaa";
     for (const response of await Promise.all([
       manifestHandler(
         event(request(`https://tagium.test/api/manifests/${slug}`, {}, runtime.env), slug),
@@ -311,10 +311,7 @@ describe("share manifest endpoints", () => {
       ),
     );
     const read = await manifestHandler(
-      event(
-        request(`https://tagium.test/api/manifests/${"a".repeat(22)}`, {}, runtime.env),
-        "a".repeat(22),
-      ),
+      event(request("https://tagium.test/api/manifests/aaaaaa", {}, runtime.env), "aaaaaa"),
     );
     expect(create.status).toBe(429);
     expect(read.status).toBe(429);
@@ -448,7 +445,7 @@ describe("share manifest endpoints", () => {
   it("rate-limits updates and rejects cross-site or ambiguous update bodies", async () => {
     const runtime = createRuntime();
     runtime.env.SHARE_UPDATE_RATE_LIMITER = { limit: async () => ({ success: false }) };
-    const slug = "a".repeat(22);
+    const slug = "aaaaaa";
     const limitedForm = new FormData();
     limitedForm.set("manifest", JSON.stringify(manifest));
     const limited = await updateHandler(
@@ -605,11 +602,11 @@ describe("share manifest endpoints", () => {
     const limited = await revokeHandler(
       event(
         request(
-          `https://tagium.test/api/manifests/${"a".repeat(22)}`,
+          "https://tagium.test/api/manifests/aaaaaa",
           { method: "DELETE", headers: { authorization: `Bearer ${"x".repeat(10_000)}` } },
           runtime.env,
         ),
-        "a".repeat(22),
+        "aaaaaa",
       ),
     );
     expect(limited.status).toBe(429);
@@ -618,16 +615,18 @@ describe("share manifest endpoints", () => {
   it("marks shared-album routes as noindex without affecting other routes", () => {
     const headers = new Headers();
     noindexMiddleware({
-      req: new Request(`https://tagium.test/share/${"a".repeat(22)}`),
+      req: new Request("https://tagium.test/share/aaaaaa"),
       res: { headers },
     } as Parameters<typeof noindexMiddleware>[0]);
     expect(headers.get("x-robots-tag")).toBe("noindex, nofollow");
 
-    const otherHeaders = new Headers();
-    noindexMiddleware({
-      req: new Request("https://tagium.test/share/not-a-slug"),
-      res: { headers: otherHeaders },
-    } as Parameters<typeof noindexMiddleware>[0]);
-    expect(otherHeaders.get("x-robots-tag")).toBeNull();
+    for (const pathname of ["/share/not-a-slug", `/share/${"a".repeat(22)}`]) {
+      const otherHeaders = new Headers();
+      noindexMiddleware({
+        req: new Request(`https://tagium.test${pathname}`),
+        res: { headers: otherHeaders },
+      } as Parameters<typeof noindexMiddleware>[0]);
+      expect(otherHeaders.get("x-robots-tag")).toBeNull();
+    }
   });
 });

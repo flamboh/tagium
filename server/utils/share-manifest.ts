@@ -5,6 +5,7 @@ import {
   type Manifest,
   type ManifestArtwork,
 } from "../../src/features/share/shareManifest";
+import { createShareSlug, SHARE_SLUG_PATTERN } from "../../src/features/share/shareSlug";
 
 /**
  * The share-manifest module is the server seam for publishing, reading, and
@@ -17,7 +18,7 @@ export const SHARE_ARTWORK_MAX_BYTES = 5 * 1024 * 1024;
 export const SHARE_ARTWORK_MAX_EDGE = 1_600;
 export const SHARE_ARTWORK_MAX_PIXELS = 16_000_000;
 export const SHARE_MANIFEST_MAX_BYTES = 256 * 1024;
-export const SHARE_SLUG_PATTERN = /^[A-Za-z0-9_-]{22}$/;
+export { SHARE_SLUG_PATTERN } from "../../src/features/share/shareSlug";
 
 export type ShareManifest = Manifest;
 
@@ -293,10 +294,15 @@ const samePublishedValue = (left: StoredShareManifest, right: StoredShareManifes
 
 export const createShareManifestStore = (
   persistence: ShareManifestPersistence,
-  options: { now?: () => number; randomToken?: (bytes?: number) => string } = {},
+  options: {
+    now?: () => number;
+    randomToken?: (bytes?: number) => string;
+    randomSlug?: () => string;
+  } = {},
 ) => {
   const clock = options.now ?? nowMs;
   const token = options.randomToken ?? randomToken;
+  const slugToken = options.randomSlug ?? createShareSlug;
   return {
     publish: async (manifest: ShareManifest, artwork: ShareArtwork | undefined) => {
       const payload = JSON.stringify(withArtwork(manifest, artwork));
@@ -309,7 +315,7 @@ export const createShareManifestStore = (
       const revocationTokenHash = await hashShareSecret(revocationToken);
 
       for (let attempt = 0; attempt < 3; attempt++) {
-        const slug = token(16);
+        const slug = slugToken();
         // An attempt-specific key prevents a slug collision from overwriting an existing cover.
         const artworkKey = artwork
           ? `shares/${slug}/${token(8)}.${artwork.type === "image/png" ? "png" : "jpg"}`

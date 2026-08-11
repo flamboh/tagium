@@ -32,7 +32,7 @@ describe("local sharing permission", () => {
     vi.setSystemTime(new Date("2026-07-22T12:00:00Z"));
     const storage = new MemoryStorage();
     const receipt = {
-      slug: "AbcdEFGHijklmno_123-45",
+      slug: "k7m4q2",
       expiresAt: "2026-10-20T12:00:00Z",
       token: "private-revocation-secret",
     };

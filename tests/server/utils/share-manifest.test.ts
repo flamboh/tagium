@@ -6,6 +6,11 @@ import {
   type ShareManifestPersistence,
   type StoredShareManifest,
 } from "../../../server/utils/share-manifest";
+import {
+  createShareSlug,
+  SHARE_SLUG_ALPHABET,
+  SHARE_SLUG_PATTERN,
+} from "../../../src/features/share/shareSlug";
 
 const manifest = {
   version: 1 as const,
@@ -99,6 +104,16 @@ const createFakePersistence = () => {
 };
 
 describe("share manifest store", () => {
+  it("generates six-character slugs from the 30-character ambiguity-free alphabet", () => {
+    expect(SHARE_SLUG_ALPHABET).toHaveLength(30);
+    expect(new Set(SHARE_SLUG_ALPHABET).size).toBe(30);
+    expect(SHARE_SLUG_PATTERN.test("a".repeat(22))).toBe(false);
+    expect(SHARE_SLUG_PATTERN.test("K7M4Q2")).toBe(false);
+    for (let attempt = 0; attempt < 100; attempt++) {
+      expect(createShareSlug()).toMatch(SHARE_SLUG_PATTERN);
+    }
+  });
+
   it("publishes a single record and makes it unavailable at exactly 90 days", async () => {
     const fake = createFakePersistence();
     let now = 1_000;
@@ -216,9 +231,11 @@ describe("share manifest store", () => {
       fake.records.set(record.slug, record);
       return "created";
     };
-    const tokens = ["revocation", "a".repeat(22), "first-owner", "b".repeat(22), "second-owner"];
+    const tokens = ["revocation", "first-owner", "second-owner"];
+    const slugs = ["aaaaaa", "bbbbbb"];
     const store = createShareManifestStore(fake.persistence, {
       randomToken: () => tokens.shift()!,
+      randomSlug: () => slugs.shift()!,
     });
     await store.publish(manifest, await parseShareArtwork(new File([png], "cover.png")));
 

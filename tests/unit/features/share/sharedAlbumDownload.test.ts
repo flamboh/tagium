@@ -59,20 +59,15 @@ describe("shared album download planning", () => {
         data: new Uint8Array(new ArrayBuffer(3)),
       },
     ];
-    const plan = createSharedAlbumDownloadPlan(
-      manifest,
-      "AbcdEFGHijklmno_123-45",
-      () => `id-${++id}`,
-      cover,
-    );
+    const plan = createSharedAlbumDownloadPlan(manifest, "k7m4q2", () => `id-${++id}`, cover);
 
-    expect(plan.album.sourceManifestSlug).toBe("AbcdEFGHijklmno_123-45");
+    expect(plan.album.sourceManifestSlug).toBe("k7m4q2");
     expect(plan.album.sourceUrl).toBe(manifest.album.sourceUrl);
     expect(plan.album.cover).toBe(cover);
     expect(plan.album.cover?.[0]).toMatchObject({ type: 3, description: "shared cover" });
     expect(plan.pendingFiles[0]).toMatchObject({
       filename: "a custom filename.mp3",
-      sourceManifestSlug: "AbcdEFGHijklmno_123-45",
+      sourceManifestSlug: "k7m4q2",
       metadata: {
         title: "One",
         artist: "Track artist",

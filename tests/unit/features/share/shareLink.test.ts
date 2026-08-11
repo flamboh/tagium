@@ -5,7 +5,7 @@ import {
   shareSlugFromPathname,
 } from "@/features/share/shareLink";
 
-const slug = "AbcdEFGHijklmno_123-45";
+const slug = "k7m4q2";
 
 describe("share link classification", () => {
   it("builds the canonical link used for copying into another workspace", () => {
@@ -37,5 +37,7 @@ describe("share link classification", () => {
     });
     expect(shareSlugFromPathname(`/share/${slug}`)).toBe(slug);
     expect(shareSlugFromPathname("/share/short")).toBeNull();
+    expect(shareSlugFromPathname("/share/abcdefg")).toBeNull();
+    expect(shareSlugFromPathname("/share/old_code-123456789012")).toBeNull();
   });
 });
