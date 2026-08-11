@@ -2,12 +2,15 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   MAX_MANIFEST_PAYLOAD_BYTES,
   decodeManifest,
+  manifestArtwork,
+  manifestTrackCount,
   projectAlbumManifest,
+  projectTrackManifest,
   toManifestReplayInput,
-  type Manifest,
+  type AlbumManifest,
 } from "@/features/share/shareManifest";
 
-const manifest = (): Manifest =>
+const manifest = (): AlbumManifest =>
   decodeManifest({
     version: 1,
     kind: "album",
@@ -52,7 +55,7 @@ const manifest = (): Manifest =>
         },
       },
     ],
-  });
+  }) as AlbumManifest;
 
 describe("share manifests", () => {
   it("round-trips the supported v1 transport DTO without client artwork size or hash", () => {
@@ -63,6 +66,32 @@ describe("share manifests", () => {
       description: "album cover",
     });
     expect(() => decodeManifest({ ...manifest(), version: 2 })).toThrow();
+  });
+
+  it("decodes a v1 track manifest with its own artwork descriptor", () => {
+    const decoded = decodeManifest({
+      version: 1,
+      kind: "track",
+      track: {
+        ...manifest().tracks[0],
+        artwork: {
+          kind: "stored",
+          format: "image/png",
+          type: 4,
+          description: "front cover",
+        },
+      },
+    });
+
+    expect(decoded.kind).toBe("track");
+    expect(manifestTrackCount(decoded)).toBe(1);
+    expect(manifestArtwork(decoded)).toEqual({
+      kind: "stored",
+      format: "image/png",
+      type: 4,
+      description: "front cover",
+    });
+    if (decoded.kind === "track") expect(decoded.track.metadata.title).toBe("First");
   });
 
   it("preserves ordered duplicate source URLs and complete replay metadata", () => {
@@ -159,6 +188,37 @@ describe("share manifests", () => {
     expect(() =>
       projectAlbumManifest({ title: "", artist: "", genre: "" }, [{ filename: "local" }]),
     ).toThrow("only downloaded-source");
+  });
+
+  it("projects one track using its effective buffered metadata", () => {
+    const projected = projectTrackManifest(
+      {
+        filename: "original.mp3",
+        downloadRequest: { sourceUrl: "https://youtu.be/abcdefghijk", audioBitrate: "256" },
+        metadata: {
+          filename: "original",
+          title: "Original",
+          artist: "Artist",
+          album: "Album",
+          genre: ["Pop", "Dance"],
+          year: 2020,
+          trackNumber: 1,
+        },
+        pendingMetadataPatch: { filename: "edited", title: "Edited", trackNumber: 2 },
+      },
+      { kind: "stored", format: "image/jpeg", type: 3, description: "track cover" },
+    );
+
+    expect(projected).toMatchObject({
+      version: 1,
+      kind: "track",
+      track: {
+        audioBitrate: "256",
+        metadata: { filename: "edited", title: "Edited", genre: "Pop, Dance", trackNumber: 2 },
+        artwork: { description: "track cover" },
+      },
+    });
+    expect(manifestTrackCount(projected)).toBe(1);
   });
 
   it("rejects a decoded manifest whose serialized payload exceeds the contract limit", () => {

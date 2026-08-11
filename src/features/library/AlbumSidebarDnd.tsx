@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
@@ -17,7 +17,7 @@ import {
   Pencil,
   RefreshCw,
   Share2,
-  X,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +37,7 @@ import {
 } from "@/features/library/sidebarDnd";
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import type { AlbumActionItem, AlbumActionItemId } from "@/features/library/albumActionItems";
+import type { TrackActionItem } from "@/features/library/trackActionItems";
 
 const artistLabel = (artist: string) => (artist ? artist : "unknown");
 
@@ -44,10 +45,8 @@ type TrackRowBaseProps = {
   track: TagiumFile;
   selectedTone: "primary" | "secondary" | null;
   muted: boolean;
-  retryable: boolean;
+  actions: TrackActionItem[];
   onSelect: (event: ReactMouseEvent) => void;
-  onRemove: () => void;
-  onRetry: () => void;
 };
 
 type TrackRowProps =
@@ -71,11 +70,10 @@ export function SortableTrackRow({
   albumId,
   selectedTone,
   muted,
-  retryable,
+  actions,
   onSelect,
-  onRemove,
-  onRetry,
 }: TrackRowProps) {
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const previousStatusRef = useRef(track.status);
   const successTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const [showSavedCheck, setShowSavedCheck] = useState(false);
@@ -138,7 +136,7 @@ export function SortableTrackRow({
         ref={setActivatorNodeRef}
         variant="ghost"
         className={cn(
-          "justify-start h-auto py-2.5 px-4 pr-8 w-full text-left font-normal rounded-none hover:bg-accent/30 [@media(pointer:coarse)]:min-h-11",
+          "justify-start h-auto py-2.5 px-4 pr-12 w-full text-left font-normal rounded-none hover:bg-accent/30 [@media(pointer:coarse)]:min-h-11",
           container === "loose" ? "py-3" : "",
           muted ? "opacity-65" : "",
           selectedTone === "primary" ? "bg-accent text-accent-foreground" : "",
@@ -168,14 +166,11 @@ export function SortableTrackRow({
             {(track.downloadStatus === "error" || track.status === "error") && (
               <AlertCircle
                 aria-label="track has an error"
-                className={cn(
-                  "h-3 w-3 shrink-0 text-destructive",
-                  retryable ? "group-hover:opacity-0" : "",
-                )}
+                className="h-3 w-3 shrink-0 text-destructive"
               />
             )}
             {track.downloadStatus === "canceled" && (
-              <Ban className="h-3 w-3 text-muted-foreground flex-shrink-0 group-hover:opacity-0" />
+              <Ban className="h-3 w-3 text-muted-foreground flex-shrink-0" />
             )}
           </div>
         </div>
@@ -185,33 +180,62 @@ export function SortableTrackRow({
           track saved
         </span>
       )}
-      {retryable && (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onRetry();
-          }}
-          className="absolute right-7 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-full cursor-pointer [@media(pointer:coarse)]:right-11 [@media(pointer:coarse)]:top-0 [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:flex [@media(pointer:coarse)]:items-center [@media(pointer:coarse)]:justify-center [@media(pointer:coarse)]:p-0 [@media(pointer:coarse)]:opacity-100"
-          title="retry download"
-          aria-label={`retry download for ${track.filename}`}
-        >
-          <RefreshCw className="h-3 w-3 text-muted-foreground hover:text-brand" />
-        </button>
-      )}
-      <button
-        type="button"
-        aria-label="remove track"
-        onClick={(event) => {
-          event.stopPropagation();
-          onRemove();
-        }}
-        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded-full cursor-pointer [@media(pointer:coarse)]:right-0 [@media(pointer:coarse)]:top-0 [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:translate-y-0 [@media(pointer:coarse)]:flex [@media(pointer:coarse)]:items-center [@media(pointer:coarse)]:justify-center [@media(pointer:coarse)]:p-0 [@media(pointer:coarse)]:opacity-100"
-        title="remove track"
-      >
-        <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            ref={menuTriggerRef}
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-2 top-1/2 size-7 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100 [@media(pointer:coarse)]:right-0 [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:opacity-100"
+            aria-label={`track actions for ${track.filename}`}
+          >
+            <MoreVertical className="size-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          {actions.map((action) => {
+            const accessibleLabel = [action.label, action.description].filter(Boolean).join(", ");
+            return (
+              <Fragment key={action.id}>
+                {action.destructive && <hr className="-mx-1 my-1 h-px border-0 bg-border" />}
+                <DropdownMenuItem
+                  disabled={action.disabled}
+                  aria-label={accessibleLabel}
+                  title={action.description}
+                  className={cn(
+                    "[@media(pointer:coarse)]:min-h-10",
+                    action.destructive &&
+                      "text-destructive focus:bg-destructive/10 focus:text-destructive",
+                  )}
+                  onSelect={action.onSelect}
+                >
+                  <TrackActionItemContent action={action} />
+                </DropdownMenuItem>
+              </Fragment>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
+  );
+}
+
+const trackActionIcon = (action: TrackActionItem) => {
+  if (action.id === "retry") return RefreshCw;
+  if (action.id === "remove") return Trash2;
+  return action.shareVariant === "create" ? Share2 : Link2;
+};
+
+export function TrackActionItemContent({ action }: { action: TrackActionItem }) {
+  const ActionIcon = trackActionIcon(action);
+
+  return (
+    <>
+      <ActionIcon aria-hidden="true" className={cn(action.destructive && "text-destructive")} />
+      <span className="min-w-0 flex-1 truncate">{action.label}</span>
+      {action.description && <span className="sr-only">{action.description}</span>}
+    </>
   );
 }
 
@@ -228,14 +252,17 @@ type AlbumCardProps = {
   onFileDrop: (event: React.DragEvent<HTMLDivElement>) => void;
 };
 
-const albumActionIcon = (actionId: AlbumActionItemId, shareLabel: AlbumActionItem["label"]) => {
+const albumActionIcon = (
+  actionId: AlbumActionItemId,
+  shareVariant: AlbumActionItem["shareVariant"],
+) => {
   if (actionId === "edit") return Pencil;
   if (actionId === "cleanup") return BrushCleaning;
-  return shareLabel === "share album" ? Share2 : Link2;
+  return shareVariant === "create" ? Share2 : Link2;
 };
 
 export function AlbumActionItemContent({ action }: { action: AlbumActionItem }) {
-  const ActionIcon = albumActionIcon(action.id, action.label);
+  const ActionIcon = albumActionIcon(action.id, action.shareVariant);
 
   return (
     <>

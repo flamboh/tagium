@@ -28,7 +28,7 @@ export interface AudioImportSession {
     cancelQueue: () => void;
     retryQueue: () => void;
     removeTracks: (trackIds: string[]) => void;
-    importSharedAlbum: (
+    importSharedContent: (
       manifest: Manifest,
       sourceManifestSlug: string,
       cover?: AudioMetadata["picture"],
@@ -98,7 +98,7 @@ export const useAudioImportSession = ({
       cancelQueue: urlSession.cancelQueue,
       retryQueue: urlSession.retryQueue,
       removeTracks: urlSession.removeTracks,
-      importSharedAlbum: urlSession.importSharedAlbum,
+      importSharedContent: urlSession.importSharedContent,
     },
   };
 };

@@ -22,8 +22,9 @@ import {
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import { isTrackReadyForDownload } from "@/features/export/downloadLibrary";
 import { useAlbumSidebarDragController } from "@/features/library/useAlbumSidebarDragController";
-import type { ShareAlbumActionState } from "@/features/share/sharePublication";
+import type { ShareActionState } from "@/features/share/sharePublication";
 import { createAlbumActionItems } from "@/features/library/albumActionItems";
+import { createTrackActionItems } from "@/features/library/trackActionItems";
 
 interface AlbumSidebarProps {
   albums: AlbumGroup[];
@@ -44,7 +45,9 @@ interface AlbumSidebarProps {
   onReviewAlbumCleanup: (albumId: string, returnFocusTarget: HTMLButtonElement | null) => void;
   onDownloadAlbum: (albumId: string) => void;
   onShareAlbum?: (albumId: string) => void;
-  shareAlbumActions?: Readonly<Record<string, ShareAlbumActionState>>;
+  shareAlbumActions?: Readonly<Record<string, ShareActionState>>;
+  onShareTrack?: (trackId: string) => void;
+  shareTrackActions?: Readonly<Record<string, ShareActionState>>;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
     trackId: string,
@@ -88,6 +91,8 @@ export default function AlbumSidebar({
   onDownloadAlbum,
   onShareAlbum,
   shareAlbumActions = {},
+  onShareTrack,
+  shareTrackActions = {},
   onUploadToAlbum,
   onMoveTrackToAlbum,
   onMoveTrackToLoose,
@@ -120,6 +125,33 @@ export default function AlbumSidebar({
     if (selectedFileIds.has(trackId)) return "primary";
     if (selectedFileId === trackId) return "secondary";
     return null;
+  };
+
+  const actionsForTrack = (track: TagiumFile) => {
+    const shareAction = shareTrackActions[track.id];
+    const shareVariant = shareAction?.variant ?? "create";
+    const contentCanShare = Boolean(track.downloadRequest && track.metadata);
+    const canShareTrack =
+      Boolean(onShareTrack) &&
+      (shareVariant === "view" || contentCanShare) &&
+      (shareAction?.enabled ?? true);
+    const contentDisabledReason = track.downloadRequest
+      ? "track metadata is still loading"
+      : "local tracks cannot be shared";
+    const shareDisabledReason =
+      shareAction?.reason ??
+      (onShareTrack ? contentDisabledReason : "track sharing is unavailable");
+
+    return createTrackActionItems({
+      retryable: isRetryableError(track),
+      canShare: canShareTrack,
+      shareDisabledReason,
+      shareLabel: shareAction?.label ?? "share track",
+      shareVariant,
+      onRetry: () => onRetryDownload(track.id),
+      onShare: () => onShareTrack?.(track.id),
+      onRemove: () => onRemoveFile(track.id),
+    });
   };
 
   if (albums.length === 0 && looseTracks.length === 0) {
@@ -165,10 +197,8 @@ export default function AlbumSidebar({
                   container="loose"
                   selectedTone={selectedTone(track.id)}
                   muted={track.downloadStatus === "downloading"}
-                  retryable={isRetryableError(track)}
+                  actions={actionsForTrack(track)}
                   onSelect={(event) => onSelectLooseTrack(track.id, event)}
-                  onRetry={() => onRetryDownload(track.id)}
-                  onRemove={() => onRemoveFile(track.id)}
                 />
               ))}
             </DroppableTrackContainer>
@@ -194,7 +224,7 @@ export default function AlbumSidebar({
                   ? "add imported tracks first"
                   : "albums with local tracks cannot be shared";
               const shareAction = shareAlbumActions[album.id];
-              const retrievesExistingLink = shareAction?.label === "view share link";
+              const retrievesExistingLink = shareAction?.variant === "view";
               const canShareAlbum =
                 Boolean(onShareAlbum) &&
                 (retrievesExistingLink || contentCanShare) &&
@@ -206,6 +236,7 @@ export default function AlbumSidebar({
                 canShare: canShareAlbum,
                 shareDisabledReason,
                 shareLabel: shareAction?.label ?? "share album",
+                shareVariant: shareAction?.variant ?? "create",
                 onEdit: () => onEditAlbum(album.id),
                 onReviewCleanup: ({ returnFocusTarget }) =>
                   onReviewAlbumCleanup(album.id, returnFocusTarget),
@@ -251,10 +282,8 @@ export default function AlbumSidebar({
                               albumId={album.id}
                               selectedTone={selectedTone(track.id)}
                               muted={track.downloadStatus === "downloading"}
-                              retryable={isRetryableError(track)}
+                              actions={actionsForTrack(track)}
                               onSelect={(event) => onSelectFile(album.id, track.id, event)}
-                              onRetry={() => onRetryDownload(track.id)}
-                              onRemove={() => onRemoveFile(track.id)}
                             />
                           );
                         })

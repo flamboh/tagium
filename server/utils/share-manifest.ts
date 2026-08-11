@@ -1,5 +1,7 @@
 import {
   decodeManifest,
+  manifestArtwork,
+  manifestTrackCount,
   type Manifest,
   type ManifestArtwork,
 } from "../../src/features/share/shareManifest";
@@ -212,29 +214,44 @@ const readU32 = (bytes: Uint8Array, offset: number) =>
     bytes[offset + 3]) >>>
   0;
 
-const withArtwork = (manifest: ShareManifest, artwork: ShareArtwork | undefined): ShareManifest => {
-  const { artwork: clientArtwork, ...album } = manifest.album;
-  if (clientArtwork && !artwork) throw new ShareManifestValidationError("share_artwork_missing");
+const withArtworkDescriptor = (
+  manifest: ShareManifest,
+  artwork: ManifestArtwork | undefined,
+): ShareManifest => {
+  if (manifest.kind === "album") {
+    const { artwork: _artwork, ...album } = manifest.album;
+    return decodeManifest({
+      ...manifest,
+      album: { ...album, ...(artwork ? { artwork } : {}) },
+    });
+  }
+  const { artwork: _artwork, ...track } = manifest.track;
   return decodeManifest({
     ...manifest,
-    album: {
-      ...album,
-      ...(artwork
-        ? {
-            artwork: {
-              ...(clientArtwork ?? { kind: "stored", type: 3, description: "album cover" }),
-              format: artwork.type,
-            } satisfies ManifestArtwork,
-          }
-        : {}),
-    },
+    track: { ...track, ...(artwork ? { artwork } : {}) },
   });
 };
 
-const withoutArtwork = (manifest: ShareManifest): ShareManifest => {
-  const { artwork: _artwork, ...album } = manifest.album;
-  return decodeManifest({ ...manifest, album });
+const withArtwork = (manifest: ShareManifest, artwork: ShareArtwork | undefined): ShareManifest => {
+  const clientArtwork = manifestArtwork(manifest);
+  if (clientArtwork && !artwork) throw new ShareManifestValidationError("share_artwork_missing");
+  return withArtworkDescriptor(
+    manifest,
+    artwork
+      ? {
+          ...(clientArtwork ?? {
+            kind: "stored",
+            type: 3,
+            description: manifest.kind === "album" ? "album cover" : "track cover",
+          }),
+          format: artwork.type,
+        }
+      : undefined,
+  );
 };
+
+const withoutArtwork = (manifest: ShareManifest): ShareManifest =>
+  withArtworkDescriptor(manifest, undefined);
 
 const withRetainedArtwork = (
   manifest: ShareManifest,
@@ -242,14 +259,11 @@ const withRetainedArtwork = (
 ): ShareManifest => {
   if (!record.artworkKey) return withArtwork(manifest, undefined);
   const storedManifest = decodeStored(record.payloadJson);
-  const descriptor = manifest.album.artwork ?? storedManifest?.album.artwork;
-  if (!descriptor || !record.artworkType)
+  const descriptor =
+    manifestArtwork(manifest) ?? (storedManifest && manifestArtwork(storedManifest));
+  if (!descriptor || (record.artworkType !== "image/jpeg" && record.artworkType !== "image/png"))
     throw new ShareManifestValidationError("share_artwork_missing");
-  const { artwork: _artwork, ...album } = manifest.album;
-  return decodeManifest({
-    ...manifest,
-    album: { ...album, artwork: { ...descriptor, format: record.artworkType } },
-  });
+  return withArtworkDescriptor(manifest, { ...descriptor, format: record.artworkType });
 };
 
 const decodeStored = (payloadJson: string): ShareManifest | undefined => {
@@ -318,7 +332,7 @@ export const createShareManifestStore = (
             artworkBytes: artwork?.bytes.byteLength,
             artworkSha256: artwork?.sha256,
             revocationTokenHash,
-            trackCount: manifest.tracks.length,
+            trackCount: manifestTrackCount(manifest),
             payloadBytes,
             status: "active",
             createdAt,
@@ -376,7 +390,7 @@ export const createShareManifestStore = (
         version: nextManifest.version,
         payloadJson,
         payloadBytes,
-        trackCount: nextManifest.tracks.length,
+        trackCount: manifestTrackCount(nextManifest),
         artworkKey,
         artworkType:
           artworkUpdate.kind === "replace"

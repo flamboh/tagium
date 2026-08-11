@@ -4,15 +4,16 @@ import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 
 const mocks = vi.hoisted(() => ({
-  fetchSharedAlbum: vi.fn(),
-  fetchSharedAlbumArtwork: vi.fn(),
-  publishSharedAlbum: vi.fn(),
-  updateSharedAlbum: vi.fn(),
-  revokeSharedAlbum: vi.fn(),
+  fetchSharedContent: vi.fn(),
+  fetchSharedArtwork: vi.fn(),
+  publishShare: vi.fn(),
+  updateShare: vi.fn(),
+  revokeShare: vi.fn(),
   getRevocationReceipt: vi.fn(),
   storeRevocationReceipt: vi.fn(),
   removeRevocationReceipt: vi.fn(),
-  importSharedAlbum: vi.fn(),
+  importSharedContent: vi.fn(),
+  coverArtFileToPicture: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -20,13 +21,16 @@ const mocks = vi.hoisted(() => ({
 vi.mock("sonner", () => ({
   toast: { success: mocks.toastSuccess, error: mocks.toastError },
 }));
+vi.mock("@/features/editor/coverArtProcessing", () => ({
+  coverArtFileToPicture: mocks.coverArtFileToPicture,
+}));
 vi.mock("@/features/share/shareClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/share/shareClient")>()),
-  fetchSharedAlbum: mocks.fetchSharedAlbum,
-  fetchSharedAlbumArtwork: mocks.fetchSharedAlbumArtwork,
-  publishSharedAlbum: mocks.publishSharedAlbum,
-  updateSharedAlbum: mocks.updateSharedAlbum,
-  revokeSharedAlbum: mocks.revokeSharedAlbum,
+  fetchSharedContent: mocks.fetchSharedContent,
+  fetchSharedArtwork: mocks.fetchSharedArtwork,
+  publishShare: mocks.publishShare,
+  updateShare: mocks.updateShare,
+  revokeShare: mocks.revokeShare,
 }));
 vi.mock("@/features/share/revocationReceipt", () => ({
   getRevocationReceipt: mocks.getRevocationReceipt,
@@ -40,7 +44,11 @@ vi.mock("@/features/share/sharePresence", () => ({
 
 import { renderHook } from "../../support/hookTestHarness";
 import { useShareWorkflow } from "@/features/share/useShareWorkflow";
-import { SharedAlbumUnavailableError } from "@/features/share/shareClient";
+import { SharedContentUnavailableError } from "@/features/share/shareClient";
+import {
+  projectAlbumShareSnapshot,
+  projectTrackShareSnapshot,
+} from "@/features/share/sharePublication";
 
 const slug = "AbcdEFGHijklmno_123-45";
 const sharedManifest = {
@@ -65,12 +73,12 @@ const sharedManifest = {
 const workflow = (albums: Array<{ id: string; sourceManifestSlug?: string }> = []) => {
   const events: string[] = [];
   const library = {
-    state: { albums },
+    state: { albums, files: [] },
     getSnapshot: () => ({ albums, files: [] }),
     dispatch: vi.fn(() => events.push("select")),
   } as unknown as LibraryStore;
   const editor = { commands: { flush: vi.fn(() => events.push("flush")) } };
-  const importing = { commands: { importSharedAlbum: mocks.importSharedAlbum } };
+  const importing = { commands: { importSharedContent: mocks.importSharedContent } };
   const hook = renderHook(
     () =>
       useShareWorkflow({
@@ -101,7 +109,31 @@ const creatorWorkflow = (album: AlbumGroup, file: TagiumFile) => {
       useShareWorkflow({
         library,
         editor: { commands: { flush: vi.fn() } } as never,
-        importing: { commands: { importSharedAlbum: vi.fn() } } as never,
+        importing: { commands: { importSharedContent: vi.fn() } } as never,
+        enabled: true,
+      }),
+    undefined,
+  );
+  return { hook, library };
+};
+
+const trackCreatorWorkflow = (file: TagiumFile, albums: AlbumGroup[] = [], flush = vi.fn()) => {
+  const files = [file];
+  const library = {
+    state: { albums, files },
+    getSnapshot: () => ({ albums, files }),
+    dispatch: vi.fn((action: { type: string; fileId?: string; publication?: unknown }) => {
+      if (action.type === "track-share-publication-set" && action.fileId === file.id) {
+        file.sharePublication = action.publication as TagiumFile["sharePublication"];
+      }
+    }),
+  } as unknown as LibraryStore;
+  const hook = renderHook(
+    () =>
+      useShareWorkflow({
+        library,
+        editor: { commands: { flush } } as never,
+        importing: { commands: { importSharedContent: vi.fn() } } as never,
         enabled: true,
       }),
     undefined,
@@ -148,7 +180,7 @@ const creatorAlbum = (sharePublication?: AlbumGroup["sharePublication"]): AlbumG
 });
 
 beforeEach(() => {
-  const location = { pathname: "/" };
+  const location = { pathname: "/", origin: "https://tagium.app" };
   const fakeHistory: {
     state: unknown;
     replaceState: (state: unknown, title: string, path: string) => void;
@@ -186,7 +218,7 @@ describe("share workflow pasted links", () => {
       albumId: "album-1",
       mode: "replace",
     });
-    expect(mocks.fetchSharedAlbum).not.toHaveBeenCalled();
+    expect(mocks.fetchSharedContent).not.toHaveBeenCalled();
     hook.unmount();
   });
 
@@ -200,7 +232,7 @@ describe("share workflow pasted links", () => {
         resolveFetch = resolve;
       },
     );
-    mocks.fetchSharedAlbum.mockReturnValue(pending);
+    mocks.fetchSharedContent.mockReturnValue(pending);
     const before = location.pathname;
 
     const first = hook.result.importFromInput(slug);
@@ -211,8 +243,8 @@ describe("share workflow pasted links", () => {
     });
 
     expect(location.pathname).toBe(before);
-    expect(mocks.fetchSharedAlbum).toHaveBeenCalledOnce();
-    expect(mocks.importSharedAlbum).toHaveBeenCalledWith(sharedManifest, slug, undefined);
+    expect(mocks.fetchSharedContent).toHaveBeenCalledOnce();
+    expect(mocks.importSharedContent).toHaveBeenCalledWith(sharedManifest, slug, undefined);
     expect(mocks.toastSuccess).toHaveBeenCalledWith("album added to your library", {
       description: "downloading 1 track — watch progress in the sidebar.",
     });
@@ -222,27 +254,27 @@ describe("share workflow pasted links", () => {
 
   it("keeps a direct share route as a preview until its explicit add action", async () => {
     history.replaceState({}, "", `/share/${slug}`);
-    mocks.fetchSharedAlbum.mockResolvedValue({
+    mocks.fetchSharedContent.mockResolvedValue({
       manifest: sharedManifest,
       expiresAt: "2026-10-20T12:00:00.000Z",
     });
     const { hook } = workflow();
 
     await vi.waitFor(() => expect(hook.result.page).toMatchObject({ status: "ready", slug }));
-    expect(mocks.importSharedAlbum).not.toHaveBeenCalled();
+    expect(mocks.importSharedContent).not.toHaveBeenCalled();
     hook.unmount();
   });
 
   it("reports download progress after adding from a share preview", async () => {
     history.replaceState({}, "", `/share/${slug}`);
-    mocks.fetchSharedAlbum.mockResolvedValue({
+    mocks.fetchSharedContent.mockResolvedValue({
       manifest: sharedManifest,
       expiresAt: "2026-10-20T12:00:00.000Z",
     });
     const { hook } = workflow();
 
     await vi.waitFor(() => expect(hook.result.page).toMatchObject({ status: "ready", slug }));
-    await act(async () => hook.result.addSharedAlbum());
+    await act(async () => hook.result.addSharedContent());
 
     expect(mocks.toastSuccess).toHaveBeenCalledWith("album added to your library", {
       description: "downloading 1 track — watch progress in the sidebar.",
@@ -250,9 +282,61 @@ describe("share workflow pasted links", () => {
     hook.unmount();
   });
 
+  it("imports artwork from the fresh manifest fetched by the add action", async () => {
+    history.replaceState({}, "", `/share/${slug}`);
+    const freshManifest = {
+      ...sharedManifest,
+      album: {
+        ...sharedManifest.album,
+        artwork: {
+          kind: "stored" as const,
+          format: "image/png" as const,
+          type: 3,
+          description: "fresh artwork",
+        },
+      },
+    };
+    const artworkFile = { name: "fresh.png", type: "image/png" } as File;
+    const convertedPicture = [
+      {
+        format: "image/jpeg",
+        type: 0,
+        description: "converted",
+        data: new Uint8Array([1, 2, 3]),
+      },
+    ];
+    mocks.fetchSharedContent
+      .mockResolvedValueOnce({
+        manifest: sharedManifest,
+        expiresAt: "2026-10-20T12:00:00.000Z",
+      })
+      .mockResolvedValueOnce({
+        manifest: freshManifest,
+        expiresAt: "2026-10-20T12:00:00.000Z",
+      });
+    mocks.fetchSharedArtwork.mockResolvedValue(artworkFile);
+    mocks.coverArtFileToPicture.mockResolvedValue(convertedPicture);
+    const { hook } = workflow();
+
+    await vi.waitFor(() => expect(hook.result.page).toMatchObject({ status: "ready", slug }));
+    await act(async () => hook.result.addSharedContent());
+
+    expect(mocks.fetchSharedArtwork).toHaveBeenCalledOnce();
+    expect(mocks.coverArtFileToPicture).toHaveBeenCalledWith(artworkFile, "shared artwork");
+    expect(mocks.importSharedContent).toHaveBeenCalledWith(freshManifest, slug, [
+      {
+        ...convertedPicture[0],
+        format: "image/png",
+        type: 3,
+        description: "fresh artwork",
+      },
+    ]);
+    hook.unmount();
+  });
+
   it("rejects pasted links safely when sharing is disabled", async () => {
     const library = {
-      state: { albums: [] },
+      state: { albums: [], files: [] },
       getSnapshot: () => ({ albums: [], files: [] }),
       dispatch: vi.fn(),
     } as unknown as LibraryStore;
@@ -261,14 +345,14 @@ describe("share workflow pasted links", () => {
         useShareWorkflow({
           library,
           editor: { commands: { flush: vi.fn() } } as never,
-          importing: { commands: { importSharedAlbum: vi.fn() } } as never,
+          importing: { commands: { importSharedContent: vi.fn() } } as never,
           enabled: false,
         }),
       undefined,
     );
 
     await expect(hook.result.importFromInput(slug)).rejects.toBeInstanceOf(
-      SharedAlbumUnavailableError,
+      SharedContentUnavailableError,
     );
     hook.unmount();
   });
@@ -291,19 +375,19 @@ describe("share workflow publication lifecycle", () => {
   it("replaces a stopped publication with a fresh link", async () => {
     const album = creatorAlbum({ ...oldPublication, status: "stopped" });
     const { hook } = creatorWorkflow(album, creatorFile);
-    mocks.publishSharedAlbum.mockResolvedValue({
+    mocks.publishShare.mockResolvedValue({
       slug: "new-share",
       url: "https://tagium.app/share/new-share",
       expiresAt: "2031-01-01T00:00:00.000Z",
       revocationToken: "new-token",
     });
 
-    act(() => hook.result.openCreator(album.id));
+    await act(async () => hook.result.openCreator({ kind: "album", id: album.id }));
     expect(hook.result.dialog).toMatchObject({ status: "confirm", intent: "create" });
     await act(async () => hook.result.publish());
 
-    expect(mocks.publishSharedAlbum).toHaveBeenCalledOnce();
-    expect(mocks.updateSharedAlbum).not.toHaveBeenCalled();
+    expect(mocks.publishShare).toHaveBeenCalledOnce();
+    expect(mocks.updateShare).not.toHaveBeenCalled();
     expect(album.sharePublication).toMatchObject({
       slug: "new-share",
       status: "active",
@@ -311,16 +395,25 @@ describe("share workflow publication lifecycle", () => {
     hook.unmount();
   });
 
-  it("surfaces a recovery message if view-link permission disappears", () => {
-    const album = creatorAlbum(oldPublication);
-    mocks.getRevocationReceipt.mockReturnValue(capability);
+  it("surfaces a recovery message if view-link permission disappears", async () => {
+    const album = creatorAlbum({ ...oldPublication });
+    album.sharePublication!.publishedFingerprint = (
+      await projectAlbumShareSnapshot(album, [creatorFile])
+    ).fingerprint;
+    let opening = false;
+    let openCapabilityReads = 0;
+    mocks.getRevocationReceipt.mockImplementation(() => {
+      if (!opening) return capability;
+      openCapabilityReads += 1;
+      return openCapabilityReads === 1 ? capability : null;
+    });
     const { hook } = creatorWorkflow(album, creatorFile);
-    mocks.getRevocationReceipt
-      .mockReset()
-      .mockReturnValueOnce(capability)
-      .mockReturnValueOnce(null);
+    await vi.waitFor(() =>
+      expect(hook.result.shareActions[album.id]?.label).toBe("view share link"),
+    );
 
-    act(() => hook.result.openCreator(album.id));
+    opening = true;
+    await act(async () => hook.result.openCreator({ kind: "album", id: album.id }));
 
     expect(hook.result.dialog).toEqual({ status: "closed" });
     expect(mocks.toastError).toHaveBeenCalledWith("share link permission unavailable", {
@@ -331,10 +424,10 @@ describe("share workflow publication lifecycle", () => {
 
   it("explains that a failed create did not produce a link", async () => {
     const album = creatorAlbum();
-    mocks.publishSharedAlbum.mockRejectedValue(new Error("sharing is unavailable"));
+    mocks.publishShare.mockRejectedValue(new Error("sharing is unavailable"));
     const { hook } = creatorWorkflow(album, creatorFile);
 
-    act(() => hook.result.openCreator(album.id));
+    await act(async () => hook.result.openCreator({ kind: "album", id: album.id }));
     await act(async () => hook.result.publish());
 
     await vi.waitFor(() =>
@@ -350,13 +443,11 @@ describe("share workflow publication lifecycle", () => {
   it("explains that a failed update left the previous link version intact", async () => {
     const album = creatorAlbum(oldPublication);
     mocks.getRevocationReceipt.mockReturnValue(capability);
-    mocks.updateSharedAlbum.mockRejectedValue(new Error("offline"));
+    mocks.updateShare.mockRejectedValue(new Error("offline"));
     const { hook } = creatorWorkflow(album, creatorFile);
 
-    await vi.waitFor(() =>
-      expect(hook.result.shareActions[album.id]?.label).toBe("update shared album"),
-    );
-    act(() => hook.result.openCreator(album.id));
+    await act(async () => hook.result.openCreator({ kind: "album", id: album.id }));
+    expect(hook.result.dialog).toMatchObject({ status: "confirm", intent: "update" });
     await act(async () => hook.result.publish());
 
     await vi.waitFor(() =>
@@ -366,6 +457,121 @@ describe("share workflow publication lifecycle", () => {
         message: "the shared album could not be updated. the link still has the previous version.",
       }),
     );
+    hook.unmount();
+  });
+
+  it("creates an independent track publication from the track action menu", async () => {
+    const file: TagiumFile = structuredClone(creatorFile);
+    const { hook } = trackCreatorWorkflow(file);
+    mocks.publishShare.mockResolvedValue({
+      slug: "track-share",
+      url: "https://tagium.app/share/track-share",
+      expiresAt: "2031-01-01T00:00:00.000Z",
+      revocationToken: "track-token",
+    });
+
+    expect(hook.result.shareTrackActions[file.id]).toMatchObject({
+      enabled: true,
+      label: "share track",
+      variant: "create",
+    });
+    await act(async () => hook.result.openCreator({ kind: "track", id: file.id }));
+    expect(hook.result.dialog).toMatchObject({
+      status: "confirm",
+      intent: "create",
+      preview: { kind: "track", title: "One" },
+    });
+    await act(async () => hook.result.publish());
+
+    expect(mocks.publishShare).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "track" }),
+      null,
+    );
+    expect(file.sharePublication).toMatchObject({ slug: "track-share", status: "active" });
+    hook.unmount();
+  });
+
+  it("flushes an unpreviewed track edit before choosing update versus view", async () => {
+    const file: TagiumFile = structuredClone(creatorFile);
+    const published = await projectTrackShareSnapshot(file);
+    file.sharePublication = {
+      slug: oldPublication.slug,
+      url: oldPublication.url,
+      expiresAt: oldPublication.expiresAt,
+      publishedFingerprint: published.fingerprint,
+      status: "active",
+    };
+    mocks.getRevocationReceipt.mockReturnValue(capability);
+    const flush = vi.fn(() => {
+      file.pendingMetadataPatch = { genre: "Ambient" };
+    });
+    const { hook } = trackCreatorWorkflow(file, [], flush);
+
+    await vi.waitFor(() =>
+      expect(hook.result.shareTrackActions[file.id]?.label).toBe("view share link"),
+    );
+    await act(async () => hook.result.openCreator({ kind: "track", id: file.id }));
+
+    expect(flush).toHaveBeenCalledOnce();
+    expect(hook.result.dialog).toMatchObject({
+      status: "confirm",
+      intent: "update",
+      preview: { kind: "track" },
+    });
+    expect(file.pendingMetadataPatch).toEqual({ genre: "Ambient" });
+    hook.unmount();
+  });
+
+  it("reopens the source link instead of republishing a received track", async () => {
+    const file: TagiumFile = { ...structuredClone(creatorFile), sourceManifestSlug: slug };
+    const { hook } = trackCreatorWorkflow(file);
+
+    expect(hook.result.shareTrackActions[file.id]).toMatchObject({
+      label: "view share link",
+      variant: "view",
+    });
+    await act(async () => hook.result.openCreator({ kind: "track", id: file.id }));
+    expect(hook.result.dialog).toMatchObject({
+      status: "link",
+      url: `https://tagium.app/share/${slug}`,
+      preview: { kind: "track", title: "One" },
+    });
+    expect(mocks.publishShare).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it("keeps a local track shareable after it moves into a received album", async () => {
+    const file: TagiumFile = structuredClone(creatorFile);
+    const receivedAlbum: AlbumGroup = {
+      ...creatorAlbum(),
+      sourceManifestSlug: "received-album",
+    };
+    const { hook } = trackCreatorWorkflow(file, [receivedAlbum]);
+
+    expect(hook.result.shareTrackActions[file.id]).toMatchObject({
+      enabled: true,
+      label: "share track",
+      variant: "create",
+    });
+    await act(async () => hook.result.openCreator({ kind: "track", id: file.id }));
+    expect(hook.result.dialog).toMatchObject({ status: "confirm", intent: "create" });
+    hook.unmount();
+  });
+
+  it("reports oversized track metadata instead of rejecting the menu action", async () => {
+    const file: TagiumFile = {
+      ...structuredClone(creatorFile),
+      pendingMetadataPatch: { title: "x".repeat(1_025) },
+    };
+    const { hook } = trackCreatorWorkflow(file);
+
+    await expect(
+      act(async () => hook.result.openCreator({ kind: "track", id: file.id })),
+    ).resolves.toBeUndefined();
+    expect(hook.result.dialog).toEqual({ status: "closed" });
+    expect(mocks.toastError).toHaveBeenCalledWith("this track cannot be shared", {
+      description: "this track contains too much metadata to share.",
+    });
     hook.unmount();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { buildShareAlbumPreview } from "@/features/share/sharePreview";
+import { buildShareAlbumPreview, buildShareTrackPreview } from "@/features/share/sharePreview";
 
 const file = (id: string, filename: string, title?: string) => ({
   id,
@@ -19,6 +19,22 @@ describe("buildShareAlbumPreview", () => {
       { key: "b:0", title: "Other" },
       { key: "a:1", title: "Same" },
     ]);
+  });
+
+  it("builds a one-track preview from effective buffered metadata", () => {
+    const preview = buildShareTrackPreview({
+      id: "track",
+      filename: "original.mp3",
+      metadata: { title: "Original", filename: "original", picture: [] } as never,
+      pendingMetadataPatch: { title: "Edited" },
+    });
+
+    expect(preview).toMatchObject({
+      kind: "track",
+      title: "Edited",
+      tracks: [{ key: "track:0", title: "Edited" }],
+      cover: null,
+    });
   });
 
   it("falls back from blank or missing metadata titles to filenames", () => {

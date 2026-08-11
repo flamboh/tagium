@@ -13,8 +13,9 @@ export interface SharePreviewCover {
   blob: Blob;
 }
 
-export interface ShareAlbumPreview {
-  albumTitle: string;
+export interface SharePreview {
+  kind: "album" | "track";
+  title: string;
   tracks: readonly SharePreviewTrack[];
   cover: SharePreviewCover | null;
 }
@@ -25,7 +26,7 @@ type Picture = AudioMetadata["picture"][number];
 export const buildShareAlbumPreview = (
   album: Pick<AlbumGroup, "title" | "trackIds" | "cover">,
   files: readonly (Pick<TagiumFile, "id" | "filename" | "metadata"> | undefined)[],
-): ShareAlbumPreview => {
+): SharePreview => {
   const occurrences = new Map<string, number>();
   const tracks = album.trackIds.map((trackId, index) => {
     const occurrence = occurrences.get(trackId) ?? 0;
@@ -52,5 +53,35 @@ export const buildShareAlbumPreview = (
       }
     : null;
 
-  return { albumTitle: album.title, tracks, cover };
+  return { kind: "album", title: album.title, tracks, cover };
+};
+
+/** Build an immutable preview from a track's effective buffered metadata. */
+export const buildShareTrackPreview = (
+  file: Pick<TagiumFile, "id" | "filename" | "metadata" | "pendingMetadataPatch">,
+): SharePreview => {
+  const metadata = file.metadata ? { ...file.metadata, ...file.pendingMetadataPatch } : undefined;
+  const title = metadata?.title?.trim() || metadata?.filename?.trim() || file.filename;
+  const first = metadata?.picture?.[0] as Picture | undefined;
+  const cover = first?.data?.byteLength
+    ? {
+        format: first.format,
+        blob: new Blob(
+          [
+            first.data.buffer.slice(
+              first.data.byteOffset,
+              first.data.byteOffset + first.data.byteLength,
+            ),
+          ],
+          { type: first.format },
+        ),
+      }
+    : null;
+
+  return {
+    kind: "track",
+    title: title || "untitled track",
+    tracks: [{ key: `${file.id}:0`, title: title || "untitled track" }],
+    cover,
+  };
 };

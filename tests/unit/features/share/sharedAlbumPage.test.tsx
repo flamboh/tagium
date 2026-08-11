@@ -56,13 +56,13 @@ const props = {
   },
   workspaceTrackCount: 1,
   anotherTabOpen: false,
-  alreadyAddedAlbumId: null,
+  alreadyAddedTargetId: null,
   adding: false,
   canStopSharing: false,
   onBack: vi.fn(),
   onOpenTagium: vi.fn(),
   onAdd: vi.fn(),
-  onViewAlbum: vi.fn(),
+  onViewAdded: vi.fn(),
   onStopSharing: vi.fn(async () => undefined),
 };
 const artworkState = {
@@ -183,6 +183,30 @@ describe("shared album preview", () => {
     expect(text).not.toContain("your current tracks will stay here");
   });
 
+  it("renders a track link as one addable track without an album track list", async () => {
+    const trackState = {
+      ...props.state,
+      manifest: {
+        version: 1 as const,
+        kind: "track" as const,
+        track: props.state.manifest.tracks[0]!,
+      },
+    };
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(createElement(SharedAlbumPage, { ...props, state: trackState }));
+    });
+
+    const text = buttonText(renderer.root);
+    expect(text).toContain("shared track · 1 track · link expires oct 20");
+    expect(text).toContain(
+      "adding downloads this track from its original source with the shared tags.",
+    );
+    expect(buttonText(renderer.root.findByType("h1"))).toBe("Track");
+    expect(renderer.root.findAllByProps({ id: "shared-track-list-title" })).toHaveLength(0);
+    expect(findButton(renderer, "add to library")).toBeDefined();
+  });
+
   it("keeps loading, ready, and unavailable states in the same header and max-width shell", async () => {
     const states = [
       { status: "loading" as const, slug },
@@ -205,7 +229,7 @@ describe("shared album preview", () => {
       ["unavailable", "the link may have expired, or sharing was stopped."],
       [
         "newer-version",
-        "reload the page to update, then open the link again. the album has not been added.",
+        "reload the page to update, then open the link again. nothing has been added.",
       ],
     ] as const) {
       let renderer!: ReactTestRenderer;
@@ -286,29 +310,29 @@ describe("shared album preview", () => {
 
   it("opens an added album and offers a secondary add-another-copy action", async () => {
     const onAdd = vi.fn();
-    const onViewAlbum = vi.fn();
+    const onViewAdded = vi.fn();
     let renderer!: ReactTestRenderer;
     await act(async () => {
       renderer = create(
         createElement(SharedAlbumPage, {
           ...props,
-          alreadyAddedAlbumId: "album-1",
+          alreadyAddedTargetId: "album-1",
           onAdd,
-          onViewAlbum,
+          onViewAdded,
         }),
       );
     });
     void act(() => findButton(renderer, "open in tagium")?.props.onClick());
     void act(() => findButton(renderer, "add another copy")?.props.onClick());
-    expect(onViewAlbum).toHaveBeenCalledOnce();
+    expect(onViewAdded).toHaveBeenCalledOnce();
     expect(onAdd).toHaveBeenCalledWith(true);
   });
 
   it("keeps every primary action state the same size", async () => {
     const states = [
-      { alreadyAddedAlbumId: null, adding: false, label: "add to library" },
-      { alreadyAddedAlbumId: null, adding: true, label: "adding album…" },
-      { alreadyAddedAlbumId: "album-1", adding: false, label: "open in tagium" },
+      { alreadyAddedTargetId: null, adding: false, label: "add to library" },
+      { alreadyAddedTargetId: null, adding: true, label: "adding album…" },
+      { alreadyAddedTargetId: "album-1", adding: false, label: "open in tagium" },
     ] as const;
 
     for (const state of states) {

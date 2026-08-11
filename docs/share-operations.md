@@ -2,7 +2,7 @@
 
 Share links are unavailable immediately when their D1 row is disabled or reaches its 90-day expiry. R2 artwork deletion becomes eligible at 90 days and Cloudflare completes lifecycle deletion asynchronously (typically within the following day); it is not the availability control. The D1 row is retained only as minimal operational lifecycle metadata after expiry, so product copy must promise a **90-day link lifetime**, not instantaneous physical deletion of every record at the expiry timestamp.
 
-An album update replaces the manifest (and optionally its artwork) behind the existing slug using the creator capability. It preserves the original expiry and never creates or rotates a link. D1 replacement is conditional on the previously-read row; R2 uploads are compensated on a lost update, and superseded artwork is deleted best-effort after the D1 commit.
+A publication update replaces the track or album manifest (and optionally its artwork) behind the existing slug using the creator capability. It preserves the original expiry and never creates or rotates a link. D1 replacement is conditional on the previously-read row; R2 uploads are compensated on a lost update, and superseded artwork is deleted best-effort after the D1 commit.
 
 ## Deployments and one-time setup
 

@@ -11,10 +11,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { sharedArtworkUrl } from "@/features/share/shareClient";
-import type { Manifest, ManifestTrack } from "@/features/share/shareManifest";
+import {
+  manifestArtwork,
+  manifestTracks,
+  type Manifest,
+  type ManifestTrack,
+} from "@/features/share/shareManifest";
 import { shareLinkForSlug } from "@/features/share/shareLink";
 
-export type SharedAlbumPageState =
+export type SharedContentPageState =
   | { status: "loading"; slug: string }
   | {
       status: "unavailable";
@@ -23,7 +28,7 @@ export type SharedAlbumPageState =
     }
   | { status: "ready"; slug: string; manifest: Manifest; expiresAt: string };
 
-type ReadySharedAlbumPageState = Extract<SharedAlbumPageState, { status: "ready" }>;
+type ReadySharedContentPageState = Extract<SharedContentPageState, { status: "ready" }>;
 
 const skeletonRows = ["one", "two", "three", "four", "five", "six"] as const;
 const shortExpiryFormatter = new Intl.DateTimeFormat("en", {
@@ -77,13 +82,13 @@ function Header({
   );
 }
 
-function SharedAlbumSkeleton({ onOpenTagium }: { onOpenTagium: () => void }) {
+function SharedContentSkeleton({ onOpenTagium }: { onOpenTagium: () => void }) {
   return (
     <div className="min-h-svh bg-background">
       <Header onOpenTagium={onOpenTagium} />
       <main
         aria-busy="true"
-        aria-label="opening shared album"
+        aria-label="opening shared link"
         className="mx-auto w-full max-w-3xl px-5 pb-10 pt-9 sm:px-8 sm:pt-12"
       >
         <div className="mb-5 h-4 w-56 animate-pulse rounded bg-muted motion-reduce:animate-none" />
@@ -155,15 +160,26 @@ function Artwork({ slug, title }: { slug: string; title: string }) {
   );
 }
 
-function AlbumHero({ manifest, slug }: { manifest: Manifest; slug: string }) {
-  const title = manifest.album.title || "untitled album";
-  const sourceLabel = manifest.album.sourceUrl
-    ? new URL(manifest.album.sourceUrl).hostname.replace(/^www\./, "")
+function ContentHero({ manifest, slug }: { manifest: Manifest; slug: string }) {
+  const content =
+    manifest.kind === "album"
+      ? {
+          title: manifest.album.title || "untitled album",
+          artist: manifest.album.artist,
+          sourceUrl: manifest.album.sourceUrl,
+        }
+      : {
+          title: manifest.track.metadata.title || "untitled track",
+          artist: manifest.track.metadata.artist,
+          sourceUrl: manifest.track.sourceUrl,
+        };
+  const sourceLabel = content.sourceUrl
+    ? new URL(content.sourceUrl).hostname.replace(/^www\./, "")
     : null;
   return (
     <section className="flex items-start gap-6 max-sm:gap-4">
-      {manifest.album.artwork ? (
-        <Artwork slug={slug} title={manifest.album.title} />
+      {manifestArtwork(manifest) ? (
+        <Artwork slug={slug} title={content.title} />
       ) : (
         <div className="flex size-40 shrink-0 items-center justify-center rounded-lg bg-muted max-sm:size-24">
           <Music2 className="size-9 text-muted-foreground" aria-hidden="true" />
@@ -172,14 +188,14 @@ function AlbumHero({ manifest, slug }: { manifest: Manifest; slug: string }) {
       )}
       <div className="min-w-0 py-1">
         <h1 className="break-words text-3xl font-semibold tracking-tight [overflow-wrap:anywhere] max-sm:text-xl">
-          {title}
+          {content.title}
         </h1>
         <p className="mt-2 text-lg text-muted-foreground max-sm:text-sm">
-          {manifest.album.artist || "unknown artist"}
+          {content.artist || "unknown artist"}
         </p>
-        {manifest.album.sourceUrl && sourceLabel && (
+        {content.sourceUrl && sourceLabel && (
           <a
-            href={manifest.album.sourceUrl}
+            href={content.sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-3 inline-flex items-center gap-1 rounded-sm text-sm text-muted-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:text-foreground hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -243,7 +259,15 @@ function TrackList({
   );
 }
 
-function AnotherTabToast({ slug, anotherTabOpen }: { slug: string; anotherTabOpen: boolean }) {
+function AnotherTabToast({
+  slug,
+  kind,
+  anotherTabOpen,
+}: {
+  slug: string;
+  kind: Manifest["kind"];
+  anotherTabOpen: boolean;
+}) {
   useEffect(() => {
     if (!anotherTabOpen) return;
     const link = shareLinkForSlug(slug);
@@ -259,7 +283,7 @@ function AnotherTabToast({ slug, anotherTabOpen }: { slug: string; anotherTabOpe
     };
     const timeout = globalThis.setTimeout(() => {
       toast(
-        "tagium is already open in another tab. copy the link and add the album there instead.",
+        `tagium is already open in another tab. copy the link and add the ${kind} there instead.`,
         {
           duration: 12_000,
           action: {
@@ -270,7 +294,7 @@ function AnotherTabToast({ slug, anotherTabOpen }: { slug: string; anotherTabOpe
       );
     }, 1_500);
     return () => globalThis.clearTimeout(timeout);
-  }, [anotherTabOpen, slug]);
+  }, [anotherTabOpen, kind, slug]);
 
   return null;
 }
@@ -279,19 +303,29 @@ function formatExpiry(expiresAt: string) {
   return shortExpiryFormatter.format(new Date(expiresAt)).toLowerCase();
 }
 
-function RecipientContext({ trackCount, expiresAt }: { trackCount: number; expiresAt: string }) {
+function RecipientContext({
+  kind,
+  trackCount,
+  expiresAt,
+}: {
+  kind: Manifest["kind"];
+  trackCount: number;
+  expiresAt: string;
+}) {
   const noun = trackCount === 1 ? "track" : "tracks";
   return (
     <p className="mb-5 text-sm text-muted-foreground">
-      shared album · {trackCount} {noun} · link expires {formatExpiry(expiresAt)}
+      shared {kind} · {trackCount} {noun} · link expires {formatExpiry(expiresAt)}
     </p>
   );
 }
 
-function AddingExplanation() {
+function AddingExplanation({ kind }: { kind: Manifest["kind"] }) {
   return (
     <p className="mt-7 max-w-lg text-sm leading-6 text-muted-foreground">
-      adding downloads each track from its original source with the shared tags.
+      {kind === "album"
+        ? "adding downloads each track from its original source with the shared tags."
+        : "adding downloads this track from its original source with the shared tags."}
     </p>
   );
 }
@@ -301,22 +335,23 @@ function StopSharingDialog({
   onOpenChange,
   stopping,
   stopError,
+  kind,
   onStop,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   stopping: boolean;
   stopError: string | null;
+  kind: Manifest["kind"];
   onStop: () => void;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>stop sharing this album?</DialogTitle>
+          <DialogTitle>{`stop sharing this ${kind}?`}</DialogTitle>
           <DialogDescription>
-            the link will stop working immediately. anyone who already added the album keeps their
-            copy.
+            {`the link will stop working immediately. anyone who already added the ${kind} keeps their copy.`}
           </DialogDescription>
           {stopError && (
             <p role="alert" className="text-sm text-destructive">
@@ -347,17 +382,19 @@ function StopSharingDialog({
 }
 
 function ActionBar({
-  alreadyAddedAlbumId,
+  alreadyAddedTargetId,
   adding,
+  kind,
   primaryLabel,
   onAdd,
-  onViewAlbum,
+  onViewAdded,
 }: {
-  alreadyAddedAlbumId: string | null;
+  alreadyAddedTargetId: string | null;
   adding: boolean;
+  kind: Manifest["kind"];
   primaryLabel: string;
   onAdd: (allowDuplicate?: boolean) => void;
-  onViewAlbum: () => void;
+  onViewAdded: () => void;
 }) {
   return (
     <div className="mt-8 flex flex-wrap items-center gap-2">
@@ -366,18 +403,18 @@ function ActionBar({
           type="button"
           className="h-10 w-40 justify-center max-sm:w-full"
           disabled={adding}
-          onClick={alreadyAddedAlbumId ? onViewAlbum : () => onAdd()}
+          onClick={alreadyAddedTargetId ? onViewAdded : () => onAdd()}
         >
           {adding ? (
             <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
-          ) : alreadyAddedAlbumId ? (
+          ) : alreadyAddedTargetId ? (
             <Library aria-hidden="true" />
           ) : (
             <Plus aria-hidden="true" />
           )}
-          {adding ? "adding album…" : primaryLabel}
+          {adding ? `adding ${kind}…` : primaryLabel}
         </Button>
-        {alreadyAddedAlbumId && (
+        {alreadyAddedTargetId && (
           <Button
             type="button"
             variant="link"
@@ -393,33 +430,34 @@ function ActionBar({
   );
 }
 
-function SharedAlbumReadyPage({
+function SharedContentReadyPage({
   state,
   anotherTabOpen,
-  alreadyAddedAlbumId,
+  alreadyAddedTargetId,
   adding,
   canStopSharing,
   onOpenTagium,
   onAdd,
-  onViewAlbum,
+  onViewAdded,
   onStopSharing,
 }: {
-  state: ReadySharedAlbumPageState;
+  state: ReadySharedContentPageState;
   anotherTabOpen: boolean;
-  alreadyAddedAlbumId: string | null;
+  alreadyAddedTargetId: string | null;
   adding: boolean;
   canStopSharing: boolean;
   onBack: () => void;
   onOpenTagium: () => void;
   onAdd: (allowDuplicate?: boolean) => void;
-  onViewAlbum: () => void;
+  onViewAdded: () => void;
   onStopSharing: () => Promise<void>;
 }) {
   const [showStopConfirmation, setShowStopConfirmation] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const { manifest, slug } = state;
-  const primaryLabel = alreadyAddedAlbumId ? "open in tagium" : "add to library";
+  const tracks = manifestTracks(manifest);
+  const primaryLabel = alreadyAddedTargetId ? "open in tagium" : "add to library";
   const stopSharing = async () => {
     setStopping(true);
     setStopError(null);
@@ -447,24 +485,32 @@ function SharedAlbumReadyPage({
         onStop={() => setShowStopConfirmation(true)}
       />
       <main className="mx-auto w-full max-w-3xl px-5 pb-10 pt-9 sm:px-8 sm:pt-12">
-        <RecipientContext trackCount={manifest.tracks.length} expiresAt={state.expiresAt} />
-        <AlbumHero manifest={manifest} slug={slug} />
-        <AddingExplanation />
+        <RecipientContext
+          kind={manifest.kind}
+          trackCount={tracks.length}
+          expiresAt={state.expiresAt}
+        />
+        <ContentHero manifest={manifest} slug={slug} />
+        <AddingExplanation kind={manifest.kind} />
         <ActionBar
-          alreadyAddedAlbumId={alreadyAddedAlbumId}
+          alreadyAddedTargetId={alreadyAddedTargetId}
           adding={adding}
+          kind={manifest.kind}
           primaryLabel={primaryLabel}
           onAdd={onAdd}
-          onViewAlbum={onViewAlbum}
+          onViewAdded={onViewAdded}
         />
-        <AnotherTabToast slug={slug} anotherTabOpen={anotherTabOpen} />
-        <TrackList tracks={manifest.tracks} albumArtist={manifest.album.artist} />
+        <AnotherTabToast slug={slug} kind={manifest.kind} anotherTabOpen={anotherTabOpen} />
+        {manifest.kind === "album" && (
+          <TrackList tracks={manifest.tracks} albumArtist={manifest.album.artist} />
+        )}
       </main>
       <StopSharingDialog
         open={showStopConfirmation}
         onOpenChange={setStopDialogOpen}
         stopping={stopping}
         stopError={stopError}
+        kind={manifest.kind}
         onStop={() => void stopSharing()}
       />
     </div>
@@ -472,20 +518,20 @@ function SharedAlbumReadyPage({
 }
 
 export default function SharedAlbumPage(props: {
-  state: SharedAlbumPageState;
+  state: SharedContentPageState;
   workspaceTrackCount: number;
   anotherTabOpen: boolean;
-  alreadyAddedAlbumId: string | null;
+  alreadyAddedTargetId: string | null;
   adding: boolean;
   canStopSharing: boolean;
   onBack: () => void;
   onOpenTagium: () => void;
   onAdd: (allowDuplicate?: boolean) => void;
-  onViewAlbum: () => void;
+  onViewAdded: () => void;
   onStopSharing: () => Promise<void>;
 }) {
   if (props.state.status === "loading")
-    return <SharedAlbumSkeleton onOpenTagium={props.onOpenTagium} />;
+    return <SharedContentSkeleton onOpenTagium={props.onOpenTagium} />;
   if (props.state.status === "unavailable") {
     const newerVersion = props.state.reason === "newer-version";
     return (
@@ -503,11 +549,11 @@ export default function SharedAlbumPage(props: {
             <h1 className="text-2xl font-semibold tracking-tight">
               {newerVersion
                 ? "this link needs a newer version of tagium"
-                : "this shared album is no longer available"}
+                : "this share is no longer available"}
             </h1>
             <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
               {newerVersion
-                ? "reload the page to update, then open the link again. the album has not been added."
+                ? "reload the page to update, then open the link again. nothing has been added."
                 : "the link may have expired, or sharing was stopped."}
             </p>
           </div>
@@ -515,5 +561,5 @@ export default function SharedAlbumPage(props: {
       </div>
     );
   }
-  return <SharedAlbumReadyPage key={props.state.slug} {...props} state={props.state} />;
+  return <SharedContentReadyPage key={props.state.slug} {...props} state={props.state} />;
 }

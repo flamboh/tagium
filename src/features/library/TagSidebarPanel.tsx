@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { allTracksReadyForDownload } from "@/features/export/downloadLibrary";
 import { isValidFilenameBase } from "@/features/library/filename";
-import type { ShareAlbumActionState } from "@/features/share/sharePublication";
+import type { ShareActionState } from "@/features/share/sharePublication";
 import { useTheme } from "@/features/theme/useTheme";
 
 export interface TagSidebarPanelProps {
@@ -41,7 +41,9 @@ export interface TagSidebarPanelProps {
   onReviewAlbumCleanup: (albumId: string, returnFocusTarget: HTMLButtonElement | null) => void;
   onDownloadAlbum: (albumId: string) => void;
   onShareAlbum?: (albumId: string) => void;
-  shareAlbumActions?: Readonly<Record<string, ShareAlbumActionState>>;
+  shareAlbumActions?: Readonly<Record<string, ShareActionState>>;
+  onShareTrack?: (trackId: string) => void;
+  shareTrackActions?: Readonly<Record<string, ShareActionState>>;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
     trackId: string,
@@ -96,6 +98,8 @@ export default function TagSidebarPanel({
   onDownloadAlbum,
   onShareAlbum,
   shareAlbumActions,
+  onShareTrack,
+  shareTrackActions,
   onUploadToAlbum,
   onMoveTrackToAlbum,
   onMoveTrackToLoose,
@@ -240,6 +244,8 @@ export default function TagSidebarPanel({
         onDownloadAlbum={onDownloadAlbum}
         onShareAlbum={onShareAlbum}
         shareAlbumActions={shareAlbumActions}
+        onShareTrack={onShareTrack}
+        shareTrackActions={shareTrackActions}
         onUploadToAlbum={onUploadToAlbum}
         onMoveTrackToAlbum={onMoveTrackToAlbum}
         onMoveTrackToLoose={onMoveTrackToLoose}

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { AlbumGroup } from "@/features/library/types";
+import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import type { Manifest } from "@/features/share/shareManifest";
-import { fingerprintSharedAlbum, shareAlbumActionState } from "@/features/share/sharePublication";
+import {
+  fingerprintSharedContent,
+  shareAlbumActionState,
+  shareTrackActionState,
+} from "@/features/share/sharePublication";
 
 const manifest: Manifest = {
   version: 1,
@@ -46,12 +50,12 @@ const album = (overrides: Partial<AlbumGroup> = {}): AlbumGroup => ({
 
 describe("shared album publication state", () => {
   it("fingerprints the exact ordered manifest and artwork bytes", async () => {
-    const original = await fingerprintSharedAlbum(manifest, new Uint8Array([1, 2]));
-    const keyOrderOnly = await fingerprintSharedAlbum(
+    const original = await fingerprintSharedContent(manifest, new Uint8Array([1, 2]));
+    const keyOrderOnly = await fingerprintSharedContent(
       { tracks: manifest.tracks, album: manifest.album, kind: "album", version: 1 },
       new Uint8Array([1, 2]),
     );
-    const renamed = await fingerprintSharedAlbum(
+    const renamed = await fingerprintSharedContent(
       {
         ...manifest,
         tracks: [
@@ -64,11 +68,11 @@ describe("shared album publication state", () => {
       },
       new Uint8Array([1, 2]),
     );
-    const reordered = await fingerprintSharedAlbum(
+    const reordered = await fingerprintSharedContent(
       { ...manifest, tracks: [manifest.tracks[1]!, manifest.tracks[0]!] },
       new Uint8Array([1, 2]),
     );
-    const newArtwork = await fingerprintSharedAlbum(manifest, new Uint8Array([1, 3]));
+    const newArtwork = await fingerprintSharedContent(manifest, new Uint8Array([1, 3]));
 
     expect(keyOrderOnly).toBe(original);
     expect(new Set([original, renamed, reordered, newArtwork])).toHaveLength(4);
@@ -81,6 +85,7 @@ describe("shared album publication state", () => {
       enabled: true,
       label: "view share link",
       reason: "view share link",
+      variant: "view",
     });
   });
 
@@ -98,6 +103,7 @@ describe("shared album publication state", () => {
       enabled: true,
       label: "view share link",
       reason: "view share link",
+      variant: "view",
     });
     expect(shareAlbumActionState(published, "edited", true, 0)).toMatchObject({
       enabled: true,
@@ -128,6 +134,7 @@ describe("shared album publication state", () => {
       enabled: true,
       label: "share album",
       reason: "create a new share link",
+      variant: "create",
     });
     expect(
       shareAlbumActionState(
@@ -140,6 +147,37 @@ describe("shared album publication state", () => {
       enabled: true,
       label: "share album",
       reason: "create a new share link",
+      variant: "create",
     });
+  });
+
+  it("uses the same publication lifecycle labels for a track", () => {
+    const track = {
+      id: "track",
+      filename: "track.mp3",
+      status: "saved",
+      downloadStatus: "ready",
+    } as TagiumFile;
+    expect(shareTrackActionState(track, undefined, false, 0)).toMatchObject({
+      label: "share track",
+      variant: "create",
+    });
+    expect(
+      shareTrackActionState(
+        {
+          ...track,
+          sharePublication: {
+            slug: "slug",
+            url: "https://tagium.app/share/slug",
+            expiresAt: "2030-01-01T00:00:00.000Z",
+            publishedFingerprint: "published",
+            status: "active",
+          },
+        },
+        "edited",
+        true,
+        0,
+      ),
+    ).toMatchObject({ label: "update shared track", variant: "update" });
   });
 });

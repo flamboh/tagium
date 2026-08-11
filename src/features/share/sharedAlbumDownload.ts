@@ -1,16 +1,60 @@
 import {
   createPlaylistDownloadPlan,
+  createQueuedDownloadTracks,
+  createSingleUrlDownloadPlan,
   type PlaylistDownloadPlan,
+  type SingleUrlDownloadPlan,
 } from "@/features/import/downloadTrack";
 import type { AudioMetadata } from "@/features/library/types";
-import { toManifestReplayInput, type Manifest } from "@/features/share/shareManifest";
+import {
+  toManifestReplayInput,
+  type AlbumManifest,
+  type Manifest,
+  type ManifestTrack,
+  type TrackManifest,
+} from "@/features/share/shareManifest";
+
+export type SharedContentDownloadPlan = PlaylistDownloadPlan | SingleUrlDownloadPlan;
+
+const restoreSharedTrack = (
+  file: SingleUrlDownloadPlan["pendingFiles"][number],
+  track: ManifestTrack,
+  sourceManifestSlug: string,
+  hasSharedArtwork: boolean,
+  cover?: AudioMetadata["picture"],
+) => {
+  const metadata = track.metadata;
+  const picture = hasSharedArtwork && cover?.length ? cover : [];
+  return {
+    ...file,
+    filename: `${metadata.filename}.mp3`,
+    metadata: {
+      ...file.metadata,
+      ...metadata,
+      year: metadata.year ?? null,
+      trackNumber: metadata.trackNumber ?? null,
+      picture,
+    },
+    downloadRequest: {
+      sourceUrl: track.sourceUrl,
+      audioBitrate: track.audioBitrate,
+      ...(metadata.year === undefined ? {} : { year: metadata.year }),
+    },
+    pendingMetadataPatch: {
+      ...metadata,
+      picture,
+    },
+    hasBufferedChanges: true,
+    sourceManifestSlug,
+  };
+};
 
 /**
  * Enters the existing playlist planner while restoring fields a provider-shaped
  * playlist cannot express, such as per-track filenames, tags, and bitrates.
  */
 export const createSharedAlbumDownloadPlan = (
-  manifest: Manifest,
+  manifest: AlbumManifest,
   sourceManifestSlug: string,
   createId: () => string,
   cover?: AudioMetadata["picture"],
@@ -23,29 +67,13 @@ export const createSharedAlbumDownloadPlan = (
   });
   const pendingFiles = plan.pendingFiles.map((file, index) => {
     const track = replay.tracks[index]!;
-    const metadata = track.metadata;
-    const picture = cover?.length ? cover : file.metadata.picture;
-    return {
-      ...file,
-      filename: `${metadata.filename}.mp3`,
-      metadata: {
-        ...file.metadata,
-        ...metadata,
-        year: metadata.year ?? null,
-        trackNumber: metadata.trackNumber ?? null,
-        picture,
-      },
-      downloadRequest: {
-        sourceUrl: track.sourceUrl,
-        audioBitrate: track.audioBitrate,
-        ...(metadata.year === undefined ? {} : { year: metadata.year }),
-      },
-      pendingMetadataPatch: {
-        ...metadata,
-        ...(cover?.length ? { picture: cover } : {}),
-      },
-      hasBufferedChanges: true,
-    };
+    return restoreSharedTrack(
+      file,
+      track,
+      sourceManifestSlug,
+      Boolean(manifest.album.artwork),
+      cover,
+    );
   });
 
   return {
@@ -68,3 +96,45 @@ export const createSharedAlbumDownloadPlan = (
     },
   };
 };
+
+/**
+ * Enters the existing single-URL planner while restoring every field carried by
+ * the shared track manifest and retaining file-level share provenance.
+ */
+export const createSharedTrackDownloadPlan = (
+  manifest: TrackManifest,
+  sourceManifestSlug: string,
+  createId: () => string,
+  cover?: AudioMetadata["picture"],
+): SingleUrlDownloadPlan => {
+  const plan = createSingleUrlDownloadPlan({
+    sourceUrl: manifest.track.sourceUrl,
+    audioBitrate: manifest.track.audioBitrate,
+    createId,
+  });
+  const pendingFiles = plan.pendingFiles.map((file) =>
+    restoreSharedTrack(
+      file,
+      manifest.track,
+      sourceManifestSlug,
+      Boolean(manifest.track.artwork),
+      cover,
+    ),
+  );
+
+  return {
+    ...plan,
+    pendingFiles,
+    queuedTracks: createQueuedDownloadTracks(pendingFiles),
+  };
+};
+
+export const createSharedContentDownloadPlan = (
+  manifest: Manifest,
+  sourceManifestSlug: string,
+  createId: () => string,
+  cover?: AudioMetadata["picture"],
+): SharedContentDownloadPlan =>
+  manifest.kind === "album"
+    ? createSharedAlbumDownloadPlan(manifest, sourceManifestSlug, createId, cover)
+    : createSharedTrackDownloadPlan(manifest, sourceManifestSlug, createId, cover);

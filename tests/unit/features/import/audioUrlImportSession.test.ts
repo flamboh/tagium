@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { CobaltAudioDownloadRequest } from "@/features/import/cobaltAudio";
 import type { AppSettings } from "@/features/library/types";
 import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
+import type { Manifest } from "@/features/share/shareManifest";
 
 const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
@@ -55,6 +56,63 @@ afterEach(() => {
 });
 
 describe("audio URL import session", () => {
+  it("imports a shared track as an exact loose track with file-level provenance", async () => {
+    const manifest: Manifest = {
+      version: 1,
+      kind: "track",
+      track: {
+        sourceUrl: "https://soundcloud.com/artist/shared-track",
+        audioBitrate: "128",
+        metadata: {
+          filename: "shared filename",
+          title: "Shared title",
+          artist: "Shared artist",
+          album: "Metadata-only album",
+          genre: "Ambient",
+          year: 2024,
+          trackNumber: 9,
+        },
+      },
+    };
+    const hook = renderHook(() => {
+      const library = useLibraryStore();
+      const editor = useTrackEditorSession({ library, settings: settings("320") });
+      const importing = useAudioImportSession({
+        library,
+        editor,
+        settings: settings("320"),
+        activateEditor: vi.fn(),
+      });
+      return { library, importing };
+    }, undefined);
+
+    await act(async () => {
+      await hook.result.importing.commands.importSharedContent(manifest, "shared-track-slug");
+    });
+
+    const snapshot = hook.result.library.getSnapshot();
+    expect(snapshot.albums).toEqual([]);
+    expect(snapshot.looseTrackIds).toEqual([snapshot.files[0]?.id]);
+    expect(snapshot.selectedAlbumId).toBeNull();
+    expect(snapshot.files[0]).toMatchObject({
+      filename: "shared filename.mp3",
+      sourceManifestSlug: "shared-track-slug",
+      metadata: {
+        title: "Shared title",
+        artist: "Shared artist",
+        album: "Metadata-only album",
+        year: 2024,
+        trackNumber: 9,
+      },
+      downloadRequest: {
+        sourceUrl: "https://soundcloud.com/artist/shared-track",
+        audioBitrate: "128",
+      },
+    });
+    act(() => hook.result.importing.commands.cancelQueue());
+    hook.unmount();
+  });
+
   it("records accepted and rejected URL processing after resolution", async () => {
     mocks.resolveTrackMetadata.mockResolvedValue(undefined);
     const hook = renderHook(() => {

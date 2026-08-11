@@ -48,6 +48,11 @@ export type LibraryAction =
       type: "album-share-publication-set";
       albumId: string;
       publication: NonNullable<AlbumGroup["sharePublication"]>;
+    }
+  | {
+      type: "track-share-publication-set";
+      fileId: string;
+      publication: NonNullable<TagiumFile["sharePublication"]>;
     };
 
 const uniqueExistingTrackIds = (trackIds: Iterable<string>, fileIdSet: ReadonlySet<string>) => {
@@ -365,6 +370,13 @@ export const libraryReducer = (state: LibraryState, action: LibraryAction): Libr
         ...state,
         albums: state.albums.map((album) =>
           album.id === action.albumId ? { ...album, sharePublication: action.publication } : album,
+        ),
+      };
+    case "track-share-publication-set":
+      return {
+        ...state,
+        files: state.files.map((file) =>
+          file.id === action.fileId ? { ...file, sharePublication: action.publication } : file,
         ),
       };
   }

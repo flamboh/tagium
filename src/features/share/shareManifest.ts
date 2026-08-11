@@ -56,11 +56,13 @@ const metadataSchema = Schema.Struct({
   trackNumber: Schema.optionalKey(positiveInteger(1, 9_999)),
 });
 
-const trackSchema = Schema.Struct({
+const trackFields = {
   sourceUrl: sourceUrlSchema,
   audioBitrate: audioBitrateSchema,
   metadata: metadataSchema,
-});
+};
+
+const trackSchema = Schema.Struct(trackFields);
 
 const tracksSchema = Schema.Array(trackSchema).pipe(
   Schema.refine(
@@ -69,11 +71,7 @@ const tracksSchema = Schema.Array(trackSchema).pipe(
   ),
 );
 
-/**
- * Versioned, transport-safe representation of a shared album. It intentionally
- * contains neither artwork bytes nor client-supplied artwork size/checksum data.
- */
-export const manifestSchema = Schema.Struct({
+const albumManifestSchema = Schema.Struct({
   version: Schema.Literal(MANIFEST_VERSION),
   kind: Schema.Literal("album"),
   album: Schema.Struct({
@@ -87,10 +85,32 @@ export const manifestSchema = Schema.Struct({
   tracks: tracksSchema,
 });
 
+const trackManifestSchema = Schema.Struct({
+  version: Schema.Literal(MANIFEST_VERSION),
+  kind: Schema.Literal("track"),
+  track: Schema.Struct({ ...trackFields, artwork: Schema.optionalKey(artworkSchema) }),
+});
+
+/**
+ * Versioned, transport-safe representation of shared content. It intentionally
+ * contains neither artwork bytes nor client-supplied artwork size/checksum data.
+ */
+export const manifestSchema = Schema.Union([albumManifestSchema, trackManifestSchema]);
+
 export type Manifest = Schema.Schema.Type<typeof manifestSchema>;
-export type ManifestTrack = Manifest["tracks"][number];
-export type ManifestArtwork = NonNullable<Manifest["album"]["artwork"]>;
+export type AlbumManifest = Schema.Schema.Type<typeof albumManifestSchema>;
+export type TrackManifest = Schema.Schema.Type<typeof trackManifestSchema>;
+export type ManifestTrack = Schema.Schema.Type<typeof trackSchema>;
+export type ManifestArtwork = Schema.Schema.Type<typeof artworkSchema>;
 export type ManifestAudioBitrate = ManifestTrack["audioBitrate"];
+
+export const manifestArtwork = (manifest: Manifest): ManifestArtwork | undefined =>
+  manifest.kind === "album" ? manifest.album.artwork : manifest.track.artwork;
+
+export const manifestTracks = (manifest: Manifest): readonly ManifestTrack[] =>
+  manifest.kind === "album" ? manifest.tracks : [manifest.track];
+
+export const manifestTrackCount = (manifest: Manifest) => manifestTracks(manifest).length;
 
 /** HTTP responses intentionally serialize dates; milliseconds are storage-only. */
 export interface SharePublicationResponse {
@@ -153,29 +173,32 @@ export interface ManifestReplayInput {
 export const toManifestReplayInput = (
   manifest: Manifest,
   options: { sourceManifestSlug?: string } = {},
-): ManifestReplayInput => ({
-  ...(options.sourceManifestSlug === undefined
-    ? {}
-    : { sourceManifestSlug: options.sourceManifestSlug }),
-  playlist: {
-    title: manifest.album.title,
-    artist: manifest.album.artist,
-    genre: manifest.album.genre,
-    ...(manifest.album.year === undefined ? {} : { year: manifest.album.year }),
-    ...(manifest.album.sourceUrl === undefined ? {} : { sourceUrl: manifest.album.sourceUrl }),
-    isAlbum: true,
+): ManifestReplayInput => {
+  if (manifest.kind !== "album") throw new Error("track manifests cannot replay as albums");
+  return {
+    ...(options.sourceManifestSlug === undefined
+      ? {}
+      : { sourceManifestSlug: options.sourceManifestSlug }),
+    playlist: {
+      title: manifest.album.title,
+      artist: manifest.album.artist,
+      genre: manifest.album.genre,
+      ...(manifest.album.year === undefined ? {} : { year: manifest.album.year }),
+      ...(manifest.album.sourceUrl === undefined ? {} : { sourceUrl: manifest.album.sourceUrl }),
+      isAlbum: true,
+      tracks: manifest.tracks.map((track) => ({
+        title: track.metadata.title,
+        url: track.sourceUrl,
+        trackNumber: track.metadata.trackNumber ?? 1,
+      })),
+    },
     tracks: manifest.tracks.map((track) => ({
-      title: track.metadata.title,
-      url: track.sourceUrl,
-      trackNumber: track.metadata.trackNumber ?? 1,
+      sourceUrl: track.sourceUrl,
+      audioBitrate: track.audioBitrate,
+      metadata: track.metadata,
     })),
-  },
-  tracks: manifest.tracks.map((track) => ({
-    sourceUrl: track.sourceUrl,
-    audioBitrate: track.audioBitrate,
-    metadata: track.metadata,
-  })),
-});
+  };
+};
 
 /** Projects current effective (including buffered) library metadata into a v1 manifest. */
 export interface ManifestAlbumProjection {
@@ -218,11 +241,45 @@ export interface ManifestTrackProjection {
   downloadRequest?: { sourceUrl: string; audioBitrate: ManifestAudioBitrate };
 }
 
+export const projectManifestTrack = (file: ManifestTrackProjection): ManifestTrack => {
+  if (!file.downloadRequest || !file.metadata) {
+    throw new Error("only downloaded-source tracks with metadata can be shared");
+  }
+  const metadata = { ...file.metadata, ...file.pendingMetadataPatch };
+  return {
+    sourceUrl:
+      supportedProvenance(file.downloadRequest.sourceUrl) ?? file.downloadRequest.sourceUrl,
+    audioBitrate: file.downloadRequest.audioBitrate,
+    metadata: {
+      filename: metadata.filename || file.filename.replace(/\.mp3$/i, ""),
+      title: metadata.title,
+      artist: metadata.artist,
+      album: metadata.album,
+      genre: typeof metadata.genre === "string" ? metadata.genre : metadata.genre.join(", "),
+      ...(metadata.year === null ? {} : { year: metadata.year }),
+      ...(metadata.trackNumber === null ? {} : { trackNumber: metadata.trackNumber }),
+    },
+  };
+};
+
+export const projectTrackManifest = (
+  file: ManifestTrackProjection,
+  artwork?: ManifestArtwork,
+): TrackManifest =>
+  decodeManifest({
+    version: MANIFEST_VERSION,
+    kind: "track",
+    track: {
+      ...projectManifestTrack(file),
+      ...(artwork === undefined ? {} : { artwork }),
+    },
+  }) as TrackManifest;
+
 export const projectAlbumManifest = (
   album: ManifestAlbumProjection,
   files: readonly ManifestTrackProjection[],
   artwork?: ManifestArtwork,
-): Manifest =>
+): AlbumManifest =>
   decodeManifest({
     version: MANIFEST_VERSION,
     kind: "album",
@@ -236,24 +293,5 @@ export const projectAlbumManifest = (
         : { sourceUrl: supportedProvenance(album.sourceUrl) }),
       ...(artwork === undefined ? {} : { artwork }),
     },
-    tracks: files.map((file) => {
-      if (!file.downloadRequest || !file.metadata) {
-        throw new Error("only downloaded-source tracks with metadata can be shared");
-      }
-      const metadata = { ...file.metadata, ...file.pendingMetadataPatch };
-      return {
-        sourceUrl:
-          supportedProvenance(file.downloadRequest.sourceUrl) ?? file.downloadRequest.sourceUrl,
-        audioBitrate: file.downloadRequest.audioBitrate,
-        metadata: {
-          filename: metadata.filename || file.filename.replace(/\.mp3$/i, ""),
-          title: metadata.title,
-          artist: metadata.artist,
-          album: metadata.album,
-          genre: typeof metadata.genre === "string" ? metadata.genre : metadata.genre.join(", "),
-          ...(metadata.year === null ? {} : { year: metadata.year }),
-          ...(metadata.trackNumber === null ? {} : { trackNumber: metadata.trackNumber }),
-        },
-      };
-    }),
-  });
+    tracks: files.map(projectManifestTrack),
+  }) as AlbumManifest;
