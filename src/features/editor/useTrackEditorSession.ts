@@ -151,6 +151,7 @@ export const useTrackEditorSession = ({
   const lastResetFileIdRef = useRef<string | null>(null);
   const lastResetMetadataRef = useRef<AudioMetadata | null>(null);
   const formDirtyRef = useRef(false);
+  const latestMetadataWritesRef = useRef(new Map<string, symbol>());
   const [isCoverProcessing, setCoverProcessing] = useState(false);
   const {
     register,
@@ -327,6 +328,13 @@ export const useTrackEditorSession = ({
 
   const updateTags = useCallback(
     async (fileToUpdate: TagiumFile, newTags: AudioMetadata) => {
+      const writeToken = Symbol(fileToUpdate.id);
+      latestMetadataWritesRef.current.set(fileToUpdate.id, writeToken);
+      const isLatestWrite = () =>
+        latestMetadataWritesRef.current.get(fileToUpdate.id) === writeToken;
+      const finishWrite = () => {
+        if (isLatestWrite()) latestMetadataWritesRef.current.delete(fileToUpdate.id);
+      };
       const snapshot = library.getSnapshot();
       const latestFileToUpdate =
         snapshot.files.find((file) => file.id === fileToUpdate.id) ?? fileToUpdate;
@@ -363,6 +371,7 @@ export const useTrackEditorSession = ({
         );
         library.dispatch({ type: "content-replaced", files: nextFiles });
         if (library.getSnapshot().selectedFileId === fileToUpdate.id) reset(metadata);
+        finishWrite();
         return;
       }
 
@@ -397,6 +406,7 @@ export const useTrackEditorSession = ({
 
       try {
         const updatedFile = await runAudioBackendEffect(writeTags(latestFileToUpdate, metadata));
+        if (!isLatestWrite()) return;
         const { latestFile, latestMetadata, latestPendingPatch, latestSnapshot } =
           getLatestUpdateState();
         const remainingPatch = getMetadataPatchDifference(metadata, latestPendingPatch);
@@ -441,6 +451,7 @@ export const useTrackEditorSession = ({
         library.dispatch({ type: "content-replaced", files: nextFiles });
         if (library.getSnapshot().selectedFileId === fileToUpdate.id) reset(metadata);
       } catch (error) {
+        if (!isLatestWrite()) throw error;
         const message = getSystemFailurePresentation(error, "metadata").trackDescription;
         const { latestFile, latestMetadata, latestPendingPatch, latestSnapshot } =
           getLatestUpdateState();
@@ -469,6 +480,8 @@ export const useTrackEditorSession = ({
         );
         library.dispatch({ type: "content-replaced", files: nextFiles });
         throw error;
+      } finally {
+        finishWrite();
       }
     },
     [createCurrentMetadataPatch, getSubmittedMetadata, getValues, library, reset],
