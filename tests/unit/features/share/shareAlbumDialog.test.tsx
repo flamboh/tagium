@@ -78,7 +78,8 @@ vi.mock("@/components/ui/input", () => ({
 }));
 
 const preview = {
-  albumTitle: "Night Drive",
+  kind: "album",
+  title: "Night Drive",
   tracks: [
     { key: "a:0", title: "Intro" },
     { key: "a:1", title: "Intro" },
@@ -232,6 +233,29 @@ describe("share album dialog", () => {
     expect(renderer.root.findAllByProps({ "aria-label": "track preview" })).toHaveLength(1);
     expect(text(renderer)).toContain("Intro");
     expect(renderer.root.findAllByProps({ "aria-label": "no album cover" })).toHaveLength(1);
+  });
+
+  it("uses track-specific creator copy for a track publication", () => {
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        createElement(ShareAlbumDialog, {
+          state: {
+            status: "confirm",
+            preview: { ...preview, kind: "track", title: "Intro", tracks: [preview.tracks[0]] },
+          },
+          onClose: vi.fn(),
+          onPublish: vi.fn(),
+          onStopSharing: vi.fn(async () => undefined),
+        }),
+      );
+    });
+
+    expect(text(renderer)).toContain("share track: Intro");
+    expect(text(renderer)).toContain(
+      "anyone with the link can add this track. it is downloaded from its original source with these shared tags.",
+    );
+    expect(renderer.root.findAllByProps({ "aria-label": "no track artwork" })).toHaveLength(1);
   });
 
   it("uses concise update copy without changing the dialog structure", () => {

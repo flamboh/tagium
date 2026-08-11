@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
-import { createSharedAlbumDownloadPlan } from "@/features/share/sharedAlbumDownload";
+import {
+  createSharedAlbumDownloadPlan,
+  createSharedContentDownloadPlan,
+} from "@/features/share/sharedAlbumDownload";
 import type { Manifest } from "@/features/share/shareManifest";
 
 describe("shared album download planning", () => {
@@ -69,6 +72,7 @@ describe("shared album download planning", () => {
     expect(plan.album.cover?.[0]).toMatchObject({ type: 3, description: "shared cover" });
     expect(plan.pendingFiles[0]).toMatchObject({
       filename: "a custom filename.mp3",
+      sourceManifestSlug: "AbcdEFGHijklmno_123-45",
       metadata: {
         title: "One",
         artist: "Track artist",
@@ -88,5 +92,111 @@ describe("shared album download planning", () => {
     expect(plan.queuedTracks.map((track) => track.fileId)).toEqual(
       plan.pendingFiles.map((file) => file.id),
     );
+  });
+
+  it("reuses single-track planning and restores exact track fields as a loose track", () => {
+    const manifest: Manifest = {
+      version: 1,
+      kind: "track",
+      track: {
+        sourceUrl: "https://soundcloud.com/example/shared-track",
+        audioBitrate: "256",
+        artwork: {
+          kind: "stored",
+          format: "image/jpeg",
+          type: 3,
+          description: "shared track cover",
+        },
+        metadata: {
+          filename: "creator filename",
+          title: "Creator title",
+          artist: "Creator artist",
+          album: "Creator album tag",
+          genre: "Creator genre",
+          year: 2025,
+          trackNumber: 4,
+        },
+      },
+    };
+    const cover = [
+      {
+        format: "image/jpeg" as const,
+        type: 3,
+        description: "shared track cover",
+        data: new Uint8Array(new ArrayBuffer(3)),
+      },
+    ];
+    const plan = createSharedContentDownloadPlan(
+      manifest,
+      "shared-track-slug",
+      () => "track-id",
+      cover,
+    );
+
+    expect(plan.source).toBe("single-url");
+    if (plan.source !== "single-url") throw new Error("expected a loose-track plan");
+    expect(plan.looseTrackIds).toEqual(["track-id"]);
+    expect(plan.pendingFiles[0]).toMatchObject({
+      id: "track-id",
+      filename: "creator filename.mp3",
+      sourceManifestSlug: "shared-track-slug",
+      metadata: {
+        filename: "creator filename",
+        title: "Creator title",
+        artist: "Creator artist",
+        album: "Creator album tag",
+        genre: "Creator genre",
+        year: 2025,
+        trackNumber: 4,
+        picture: cover,
+      },
+      pendingMetadataPatch: {
+        filename: "creator filename",
+        title: "Creator title",
+        picture: cover,
+      },
+      downloadRequest: {
+        sourceUrl: "https://soundcloud.com/example/shared-track",
+        audioBitrate: "256",
+        year: 2025,
+      },
+    });
+    expect(plan.queuedTracks).toEqual([
+      {
+        fileId: "track-id",
+        title: "Creator title",
+        downloadRequest: plan.pendingFiles[0]?.downloadRequest,
+      },
+    ]);
+  });
+
+  it("restores an explicit no-artwork track snapshot over provider artwork", () => {
+    const manifest: Manifest = {
+      version: 1,
+      kind: "track",
+      track: {
+        sourceUrl: "https://soundcloud.com/example/no-art",
+        audioBitrate: "320",
+        metadata: {
+          filename: "no art",
+          title: "No art",
+          artist: "Artist",
+          album: "",
+          genre: "",
+        },
+      },
+    };
+
+    const plan = createSharedContentDownloadPlan(manifest, "no-art-slug", () => "track-id", [
+      {
+        format: "image/jpeg",
+        type: 3,
+        description: "stale provider artwork",
+        data: new Uint8Array([1]),
+      },
+    ]);
+
+    expect(plan.pendingFiles[0]?.metadata.picture).toEqual([]);
+    expect(plan.pendingFiles[0]?.pendingMetadataPatch?.picture).toEqual([]);
   });
 });

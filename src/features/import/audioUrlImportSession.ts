@@ -26,7 +26,7 @@ import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type { AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
 import { resolveYouTubePlaylist } from "@/features/import/youtubePlaylist";
 import type { Manifest } from "@/features/share/shareManifest";
-import { createSharedAlbumDownloadPlan } from "@/features/share/sharedAlbumDownload";
+import { createSharedContentDownloadPlan } from "@/features/share/sharedAlbumDownload";
 import { parseMediaLink } from "@/lib/media-link";
 
 type ManagedDownloadTrack = QueuedDownloadTrack & { importOperationId?: string };
@@ -115,7 +115,7 @@ export interface AudioUrlImportSession {
   cancelQueue: () => void;
   retryQueue: () => void;
   removeTracks: (trackIds: string[]) => void;
-  importSharedAlbum: (
+  importSharedContent: (
     manifest: Manifest,
     sourceManifestSlug: string,
     cover?: AudioMetadata["picture"],
@@ -379,11 +379,11 @@ export const createAudioUrlImportSession = ({
   };
 
   return {
-    importSharedAlbum: async (manifest, sourceManifestSlug, cover) => {
+    importSharedContent: async (manifest, sourceManifestSlug, cover) => {
       getEditor().flush();
       activateEditor();
       const snapshot = library.getSnapshot();
-      const plan = createSharedAlbumDownloadPlan(
+      const plan = createSharedContentDownloadPlan(
         manifest,
         sourceManifestSlug,
         () => crypto.randomUUID(),
@@ -392,7 +392,11 @@ export const createAudioUrlImportSession = ({
       library.dispatch({
         type: "content-replaced",
         files: [...snapshot.files, ...plan.pendingFiles],
-        albums: [...snapshot.albums, plan.album],
+        ...(plan.source === "playlist"
+          ? { albums: [...snapshot.albums, plan.album] }
+          : {
+              looseTrackIds: asUniqueTrackIds([...snapshot.looseTrackIds, ...plan.looseTrackIds]),
+            }),
         selection: {
           selectedAlbumId: plan.selection.selectedAlbumId,
           selectedFileId: plan.selection.selectedFileId,

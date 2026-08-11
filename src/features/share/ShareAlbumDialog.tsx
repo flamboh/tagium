@@ -10,25 +10,25 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { SharePublicationReceipt } from "@/features/share/shareClient";
-import type { ShareAlbumPreview } from "@/features/share/sharePreview";
+import type { SharePreview } from "@/features/share/sharePreview";
 
 export type ShareDialogState =
   | { status: "closed" }
-  | { status: "confirm"; preview: ShareAlbumPreview; intent?: "create" | "update" }
-  | { status: "publishing"; preview: ShareAlbumPreview; intent?: "create" | "update" }
+  | { status: "confirm"; preview: SharePreview; intent?: "create" | "update" }
+  | { status: "publishing"; preview: SharePreview; intent?: "create" | "update" }
   | {
       status: "published";
-      preview: ShareAlbumPreview;
+      preview: SharePreview;
       receipt: SharePublicationReceipt;
     }
   | {
       status: "link";
-      preview: ShareAlbumPreview;
+      preview: SharePreview;
       url: string;
     }
   | {
       status: "error";
-      preview: ShareAlbumPreview;
+      preview: SharePreview;
       intent?: "create" | "update";
       message: string;
     };
@@ -68,6 +68,7 @@ function ShareAlbumDialogSession({
       : state.status === "link"
         ? state.url
         : undefined;
+  const targetName = state.preview.kind;
 
   const closeDialog = () => {
     setCopyStatus("idle");
@@ -147,7 +148,7 @@ function ShareAlbumDialogSession({
         <>
           <DialogHeader className="border-b px-5 py-4 pr-12">
             <DialogTitle className="truncate text-left">
-              {`share album: ${state.preview.albumTitle}`}
+              {`share ${targetName}: ${state.preview.title}`}
             </DialogTitle>
           </DialogHeader>
 
@@ -156,7 +157,7 @@ function ShareAlbumDialogSession({
           {state.status === "published" || state.status === "link" ? (
             <div className="space-y-2 px-5 py-4">
               <div className="flex min-h-5 items-center justify-between gap-3">
-                <label htmlFor="album-share-link" className="text-sm font-medium">
+                <label htmlFor="share-link" className="text-sm font-medium">
                   share link
                 </label>
                 <span role="status" aria-live="polite" className="text-xs text-muted-foreground">
@@ -165,7 +166,7 @@ function ShareAlbumDialogSession({
               </div>
               <div className="flex gap-2">
                 <Input
-                  id="album-share-link"
+                  id="share-link"
                   ref={inputRef}
                   readOnly
                   value={linkUrl}
@@ -185,8 +186,9 @@ function ShareAlbumDialogSession({
           ) : (
             <div className="space-y-2 px-5 pb-4 pt-1">
               <p className="text-sm leading-6 text-foreground">
-                anyone with the link can add this album. tracks are added from their original
-                sources with these shared tags.
+                {state.preview.kind === "album"
+                  ? "anyone with the link can add this album. tracks are added from their original sources with these shared tags."
+                  : "anyone with the link can add this track. it is downloaded from its original source with these shared tags."}
               </p>
               <p className="text-sm text-muted-foreground">
                 {state.intent === "update"
@@ -205,8 +207,7 @@ function ShareAlbumDialogSession({
             <div className="px-5 pb-4 text-left text-sm text-muted-foreground">
               {confirmStop ? (
                 <>
-                  the link will stop working immediately. anyone who already added the album keeps
-                  their copy.
+                  {`the link will stop working immediately. anyone who already added the ${targetName} keeps their copy.`}
                   {stopError && (
                     <span role="alert" className="mt-1 block text-destructive">
                       {stopError}
@@ -296,10 +297,10 @@ function ShareAlbumDialogSession({
                   )}
                   {state.status === "publishing"
                     ? state.intent === "update"
-                      ? "updating shared album…"
+                      ? `updating shared ${targetName}…`
                       : "creating link…"
                     : state.intent === "update"
-                      ? "update shared album"
+                      ? `update shared ${targetName}`
                       : "create share link"}
                 </Button>
               </div>
@@ -322,18 +323,16 @@ const formatExpiry = (expiresAt: string) => {
       });
 };
 
-function SharePreview({
-  preview,
-  coverUrl,
-}: {
-  preview: ShareAlbumPreview;
-  coverUrl: string | null;
-}) {
+function SharePreview({ preview, coverUrl }: { preview: SharePreview; coverUrl: string | null }) {
   return (
     <div className="flex min-w-0 gap-4 px-5 py-4">
       <div
         className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted sm:size-32"
-        aria-label={preview.cover ? "album cover" : "no album cover"}
+        aria-label={
+          preview.cover
+            ? `${preview.kind} ${preview.kind === "album" ? "cover" : "artwork"}`
+            : `no ${preview.kind} ${preview.kind === "album" ? "cover" : "artwork"}`
+        }
       >
         {coverUrl ? (
           <img src={coverUrl} alt="" className="size-full object-cover" />

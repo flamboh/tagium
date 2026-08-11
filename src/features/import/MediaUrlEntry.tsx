@@ -11,7 +11,10 @@ import {
   getSystemFailurePresentation,
   reportSystemFailure,
 } from "@/features/workspace/systemFailure";
-import { SharedAlbumUnavailableError, SharedAlbumVersionError } from "@/features/share/shareClient";
+import {
+  SharedContentUnavailableError,
+  SharedContentVersionError,
+} from "@/features/share/shareClient";
 import { InvalidShareLinkError, ShareLinksDisabledError } from "@/features/share/shareLink";
 
 export interface MediaUrlEntryController {
@@ -79,11 +82,11 @@ export function useMediaUrlEntryController(
       if (
         error instanceof InvalidShareLinkError ||
         error instanceof ShareLinksDisabledError ||
-        error instanceof SharedAlbumUnavailableError
+        error instanceof SharedContentUnavailableError
       ) {
         setValidationError(error.message);
         return false;
-      } else if (error instanceof SharedAlbumVersionError) {
+      } else if (error instanceof SharedContentVersionError) {
         setValidationError("this link was made by a newer tagium version");
         return false;
       } else {

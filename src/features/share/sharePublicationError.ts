@@ -3,23 +3,29 @@ const metadataContractError = (message: string) =>
 
 const userFacingMessages = new Set([
   "the share link could not be created",
-  "the shared album could not be updated",
   "too many share requests; try again shortly",
   "too many update requests; try again shortly",
-  "this browser cannot update the shared album",
   "your browser did not allow tagium to save the sharing permission",
-  "the album is no longer in your library",
-  "the album has a missing track",
 ]);
 
 /** Converts implementation-level publish failures into copy safe for the share dialog. */
-export const sharePublicationErrorMessage = (error: unknown) => {
+export const sharePublicationErrorMessage = (error: unknown, kind: "album" | "track" = "album") => {
   if (!(error instanceof Error)) return "the share link could not be created";
   if (metadataContractError(error.message))
-    return "this album contains too much metadata to share.";
+    return `this ${kind} contains too much metadata to share.`;
   if (error.message === "only downloaded-source tracks with metadata can be shared") {
-    return "this album contains tracks that cannot be shared.";
+    return kind === "album"
+      ? "this album contains tracks that cannot be shared."
+      : "this track cannot be shared.";
   }
   const message = error.message.replace(/[.!?]+$/, "");
-  return userFacingMessages.has(message) ? message : "the share link could not be created";
+  const targetMessages = new Set([
+    `the shared ${kind} could not be updated`,
+    `this browser cannot update the shared ${kind}`,
+    `the ${kind} is no longer in your library`,
+    ...(kind === "album" ? ["the album has a missing track"] : []),
+  ]);
+  return userFacingMessages.has(message) || targetMessages.has(message)
+    ? message
+    : "the share link could not be created";
 };

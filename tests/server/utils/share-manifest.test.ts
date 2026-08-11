@@ -25,6 +25,19 @@ const manifest = {
     },
   ],
 };
+const trackManifest = {
+  version: 1 as const,
+  kind: "track" as const,
+  track: {
+    ...manifest.tracks[0],
+    artwork: {
+      kind: "stored" as const,
+      format: "image/jpeg" as const,
+      type: 3,
+      description: "front cover",
+    },
+  },
+};
 const png = Uint8Array.from(
   atob(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL7OwAAAABJRU5ErkJggg==",
@@ -137,6 +150,53 @@ describe("share manifest store", () => {
       kind: "available",
       manifest: {
         album: { artwork: { format: "image/png", type: 7, description: "front sleeve" } },
+      },
+    });
+  });
+
+  it("publishes and updates track manifests with nested artwork and a track count of one", async () => {
+    const fake = createFakePersistence();
+    const store = createShareManifestStore(fake.persistence);
+    const published = await store.publish(
+      trackManifest,
+      await parseShareArtwork(new File([png], "cover.png")),
+    );
+    const record = fake.records.get(published.slug)!;
+
+    expect(record.trackCount).toBe(1);
+    expect(await store.load(published.slug)).toMatchObject({
+      kind: "available",
+      manifest: {
+        kind: "track",
+        track: {
+          metadata: { title: "Track" },
+          artwork: { format: "image/png", type: 3, description: "front cover" },
+        },
+      },
+    });
+
+    await expect(
+      store.update(
+        published.slug,
+        published.revocationToken,
+        {
+          ...trackManifest,
+          track: {
+            ...trackManifest.track,
+            metadata: { ...trackManifest.track.metadata, title: "Edited track" },
+          },
+        },
+        { kind: "retain" },
+      ),
+    ).resolves.toMatchObject({ kind: "updated", slug: published.slug });
+    expect(fake.records.get(published.slug)?.trackCount).toBe(1);
+    expect(await store.load(published.slug)).toMatchObject({
+      kind: "available",
+      manifest: {
+        track: {
+          metadata: { title: "Edited track" },
+          artwork: { format: "image/png", description: "front cover" },
+        },
       },
     });
   });

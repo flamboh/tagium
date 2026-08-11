@@ -107,13 +107,13 @@ export default function AudioTagger() {
         state={sharing.page}
         workspaceTrackCount={files.length}
         anotherTabOpen={sharing.anotherTabOpen}
-        alreadyAddedAlbumId={sharing.alreadyAddedAlbumId}
+        alreadyAddedTargetId={sharing.alreadyAddedTargetId}
         adding={sharing.adding}
         canStopSharing={sharing.canStopSharing}
         onBack={sharing.back}
         onOpenTagium={sharing.openTagium}
-        onAdd={sharing.addSharedAlbum}
-        onViewAlbum={sharing.viewAlreadyAdded}
+        onAdd={sharing.addSharedContent}
+        onViewAdded={sharing.viewAlreadyAdded}
         onStopSharing={sharing.stopPageShare}
       />
     );
@@ -179,10 +179,21 @@ export default function AudioTagger() {
           onShareAlbum={
             shareLinksEnabled
               ? (albumId) =>
-                  mobileNavigation.runAfterDrawerClose(() => sharing.openCreator(albumId))
+                  mobileNavigation.runAfterDrawerClose(() => {
+                    void sharing.openCreator({ kind: "album", id: albumId });
+                  })
               : undefined
           }
           shareAlbumActions={shareLinksEnabled ? sharing.shareActions : undefined}
+          onShareTrack={
+            shareLinksEnabled
+              ? (fileId) =>
+                  mobileNavigation.runAfterDrawerClose(() => {
+                    void sharing.openCreator({ kind: "track", id: fileId });
+                  })
+              : undefined
+          }
+          shareTrackActions={shareLinksEnabled ? sharing.shareTrackActions : undefined}
           onUploadToAlbum={(albumId, filesToUpload) =>
             runPrimaryAction(() => void importing.commands.upload(filesToUpload, albumId))
           }

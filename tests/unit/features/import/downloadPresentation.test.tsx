@@ -1,10 +1,18 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { Check } from "lucide-react";
 import { SortableTrackRow } from "@/features/library/AlbumSidebarDnd";
 import PlaylistDownloadQueuePanel from "@/features/import/PlaylistDownloadQueuePanel";
 import type { TagiumFile } from "@/features/library/types";
+
+vi.mock("@/components/ui/dropdown-menu", () => ({
+  DropdownMenu: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  DropdownMenuTrigger: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  DropdownMenuContent: () => null,
+  DropdownMenuItem: ({ children }: { children?: ReactNode }) => <>{children}</>,
+}));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -22,10 +30,8 @@ describe("download presentation", () => {
       albumId="album-1"
       selectedTone={null}
       muted={false}
-      retryable={false}
+      actions={[]}
       onSelect={() => {}}
-      onRemove={() => {}}
-      onRetry={() => {}}
     />
   );
 
@@ -65,15 +71,13 @@ describe("download presentation", () => {
         albumId="album-1"
         selectedTone={null}
         muted={false}
-        retryable
+        actions={[]}
         onSelect={() => {}}
-        onRemove={() => {}}
-        onRetry={() => {}}
       />,
     );
 
     expect(markup).not.toContain(">canceled<");
-    expect(markup).toContain("h-3 w-3 text-muted-foreground flex-shrink-0 group-hover:opacity-0");
+    expect(markup).toContain("h-3 w-3 text-muted-foreground flex-shrink-0");
   });
 
   it("lets a completed queue be dismissed and hides it automatically after ten seconds", () => {

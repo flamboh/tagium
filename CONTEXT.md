@@ -1,19 +1,19 @@
 # Tagium
 
-Tagium lets people prepare album metadata locally and share that work without sharing the downloaded audio files themselves.
+Tagium lets people prepare track and album metadata locally and share that work without sharing the downloaded audio files themselves.
 
-## Shared albums
+## Shared content
 
-**Shared album source**:
-A local album created from another person's shared-album link. A shared album source is never eligible for its own share publication.
-_Avoid_: Imported manifest, shared manifest
+**Shared source**:
+A local track or album created from another person's share link. A shared source is never eligible for its own share publication.
+_Avoid_: Imported manifest, shared manifest, shared album source
 
 **Share publication**:
-The single creator-owned shared-album link associated with a local album. An unchanged active publication cannot be replaced by a second publication, and a stopped or expired publication does not silently become a new one.
+The single creator-owned share link associated with a local track or album. An unchanged active publication cannot be replaced by a second publication, and a stopped or expired publication does not silently become a new one.
 _Avoid_: Recipe, manifest
 
 **Published snapshot**:
-The exact shareable album metadata, ordered track metadata, and artwork represented by a share publication. A publication is unchanged when the local album matches this snapshot, changed when it differs, and unchanged again if those changes are reverted.
+The exact shareable track or album metadata and artwork represented by a share publication. A publication is unchanged when the local content matches this snapshot, changed when it differs, and unchanged again if those changes are reverted.
 _Avoid_: Saved metadata
 
 **Publication update**:

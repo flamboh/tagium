@@ -4,6 +4,14 @@ import type { AudioFormat } from "@/features/audio/metadataEngine/types";
 
 export type { AudioMetadata, MetadataPatch } from "@/features/audio/metadata";
 
+export interface SharePublication {
+  slug: string;
+  url: string;
+  expiresAt: string;
+  publishedFingerprint: string;
+  status: "active" | "stopped";
+}
+
 export interface TagiumFile {
   id: string;
   format?: AudioFormat;
@@ -26,6 +34,10 @@ export interface TagiumFile {
   hasBufferedChanges?: boolean;
   filename: string;
   metadata?: AudioMetadata;
+  /** In-memory provenance used to prevent republishing content received through a share link. */
+  sourceManifestSlug?: string;
+  /** The single creator-owned publication associated with this in-memory track. */
+  sharePublication?: SharePublication;
 }
 
 export interface AlbumGroup {
@@ -41,13 +53,7 @@ export interface AlbumGroup {
   /** In-memory provenance used to prevent accidental duplicate share-link imports. */
   sourceManifestSlug?: string;
   /** The single creator-owned publication associated with this in-memory album. */
-  sharePublication?: {
-    slug: string;
-    url: string;
-    expiresAt: string;
-    publishedFingerprint: string;
-    status: "active" | "stopped";
-  };
+  sharePublication?: SharePublication;
 }
 
 export interface MetadataLinks {

@@ -2,6 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { createAlbumActionItems } from "@/features/library/albumActionItems";
+import { createTrackActionItems } from "@/features/library/trackActionItems";
+import type { TagiumFile } from "@/features/library/types";
 
 vi.mock("@dnd-kit/sortable", () => ({
   useSortable: () => ({
@@ -15,7 +17,12 @@ vi.mock("@dnd-kit/sortable", () => ({
   }),
 }));
 
-import { AlbumActionItemContent, SortableAlbumCard } from "@/features/library/AlbumSidebarDnd";
+import {
+  AlbumActionItemContent,
+  SortableAlbumCard,
+  SortableTrackRow,
+  TrackActionItemContent,
+} from "@/features/library/AlbumSidebarDnd";
 
 const noOp = () => {};
 const album = {
@@ -39,6 +46,7 @@ const renderCard = (cleanupSuggestionCount: number) =>
           canShare: true,
           shareDisabledReason: "",
           shareLabel: "share album",
+          shareVariant: "create",
           onEdit: noOp,
           onReviewCleanup: noOp,
           onShare: noOp,
@@ -76,6 +84,7 @@ describe("SortableAlbumCard action menu", () => {
       canShare: true,
       shareDisabledReason: "",
       shareLabel: "share album",
+      shareVariant: "create",
       onEdit: noOp,
       onReviewCleanup: noOp,
       onShare: noOp,
@@ -87,5 +96,61 @@ describe("SortableAlbumCard action menu", () => {
     expect(markup).toContain("tabular-nums");
     expect(markup).toContain(">2 tracks</span>");
     expect(markup).not.toContain("flex-col");
+  });
+});
+
+describe("SortableTrackRow action menu", () => {
+  const track = {
+    id: "track-1",
+    filename: "Night Drive.mp3",
+    status: "saved",
+    downloadStatus: "ready",
+  } as TagiumFile;
+  const actions = createTrackActionItems({
+    retryable: false,
+    canShare: true,
+    shareDisabledReason: "",
+    shareLabel: "share track",
+    shareVariant: "create",
+    onRetry: noOp,
+    onShare: noOp,
+    onRemove: noOp,
+  });
+
+  it("renders one row-action trigger outside the draggable track button", () => {
+    const markup = renderToStaticMarkup(
+      <SortableTrackRow
+        track={track}
+        container="loose"
+        selectedTone={null}
+        muted={false}
+        actions={actions}
+        onSelect={noOp}
+      />,
+    );
+
+    expect(markup).toContain('aria-label="track actions for Night Drive.mp3"');
+    expect(markup).toContain("group-focus-within:opacity-100");
+    expect(markup).toContain("[@media(pointer:coarse)]:size-11");
+    expect(markup.match(/<button/g)).toHaveLength(2);
+    expect(markup).not.toContain('aria-label="remove track"');
+    expect(markup).not.toContain("retry download for");
+  });
+
+  it("chooses the share icon from the explicit action variant", () => {
+    const createMarkup = renderToStaticMarkup(
+      <TrackActionItemContent
+        action={{ ...actions[0], label: "update shared track", shareVariant: "create" }}
+      />,
+    );
+    const viewMarkup = renderToStaticMarkup(
+      <TrackActionItemContent
+        action={{ ...actions[0], label: "share track", shareVariant: "view" }}
+      />,
+    );
+
+    expect(createMarkup).toContain("lucide-share-2");
+    expect(createMarkup).not.toContain("lucide-link-2");
+    expect(viewMarkup).toContain("lucide-link-2");
   });
 });

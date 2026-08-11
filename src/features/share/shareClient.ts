@@ -1,19 +1,19 @@
 import { decodeManifest, MANIFEST_VERSION, type Manifest } from "@/features/share/shareManifest";
 
-const UNAVAILABLE_MESSAGE = "this shared album is no longer available";
-const SHARE_METADATA_TOO_LARGE_MESSAGE = "this album contains too much metadata to share.";
+const UNAVAILABLE_MESSAGE = "this share is no longer available";
+const SHARE_METADATA_TOO_LARGE_MESSAGE = "this share contains too much metadata to publish.";
 
-export class SharedAlbumUnavailableError extends Error {
+export class SharedContentUnavailableError extends Error {
   constructor() {
     super(UNAVAILABLE_MESSAGE);
-    this.name = "SharedAlbumUnavailableError";
+    this.name = "SharedContentUnavailableError";
   }
 }
 
-export class SharedAlbumVersionError extends Error {
+export class SharedContentVersionError extends Error {
   constructor() {
     super("this link was made by a newer tagium version");
-    this.name = "SharedAlbumVersionError";
+    this.name = "SharedContentVersionError";
   }
 }
 
@@ -33,24 +33,24 @@ const readJson = async (response: Response) => {
   try {
     return await response.json();
   } catch {
-    throw new SharedAlbumUnavailableError();
+    throw new SharedContentUnavailableError();
   }
 };
 
-export interface FetchedSharedAlbum {
+export interface FetchedSharedContent {
   manifest: Manifest;
   expiresAt: string;
 }
 
-export const fetchSharedAlbum = async (
+export const fetchSharedContent = async (
   slug: string,
   dependencies: { fetch?: typeof globalThis.fetch } = {},
-): Promise<FetchedSharedAlbum> => {
+): Promise<FetchedSharedContent> => {
   const response = await (dependencies.fetch ?? globalThis.fetch)(apiPath(slug), {
     headers: { Accept: "application/json" },
     cache: "no-store",
   });
-  if (!response.ok) throw new SharedAlbumUnavailableError();
+  if (!response.ok) throw new SharedContentUnavailableError();
 
   try {
     const payload = await readJson(response);
@@ -61,7 +61,7 @@ export const fetchSharedAlbum = async (
       !("expiresAt" in payload) ||
       typeof payload.expiresAt !== "string"
     ) {
-      throw new SharedAlbumUnavailableError();
+      throw new SharedContentUnavailableError();
     }
     if (
       typeof payload.manifest === "object" &&
@@ -69,19 +69,19 @@ export const fetchSharedAlbum = async (
       "version" in payload.manifest &&
       payload.manifest.version !== MANIFEST_VERSION
     ) {
-      throw new SharedAlbumVersionError();
+      throw new SharedContentVersionError();
     }
     return {
       manifest: decodeManifest(payload.manifest),
       expiresAt: payload.expiresAt,
     };
   } catch (error) {
-    if (error instanceof SharedAlbumVersionError) throw error;
-    throw new SharedAlbumUnavailableError();
+    if (error instanceof SharedContentVersionError) throw error;
+    throw new SharedContentUnavailableError();
   }
 };
 
-export const fetchSharedAlbumArtwork = async (
+export const fetchSharedArtwork = async (
   slug: string,
   dependencies: { fetch?: typeof globalThis.fetch } = {},
 ) => {
@@ -102,7 +102,7 @@ export const fetchSharedAlbumArtwork = async (
   );
 };
 
-export const publishSharedAlbum = async (
+export const publishShare = async (
   manifest: Manifest,
   cover: File | null,
   dependencies: { fetch?: typeof globalThis.fetch } = {},
@@ -135,7 +135,7 @@ export const publishSharedAlbum = async (
   return receipt as SharePublicationReceipt;
 };
 
-export const updateSharedAlbum = async (
+export const updateShare = async (
   slug: string,
   revocationToken: string,
   manifest: Manifest,
@@ -158,7 +158,7 @@ export const updateSharedAlbum = async (
     if (response.status === 400 || response.status === 413)
       throw new Error(SHARE_METADATA_TOO_LARGE_MESSAGE);
     if (response.status === 429) throw new Error("too many update requests; try again shortly");
-    throw new Error("the shared album could not be updated");
+    throw new Error(`the shared ${manifest.kind} could not be updated`);
   }
   const receipt = await readJson(response);
   if (
@@ -168,12 +168,12 @@ export const updateSharedAlbum = async (
     typeof receipt.url !== "string" ||
     typeof receipt.expiresAt !== "string"
   ) {
-    throw new Error("the shared album could not be updated");
+    throw new Error(`the shared ${manifest.kind} could not be updated`);
   }
   return receipt as ShareUpdateReceipt;
 };
 
-export const revokeSharedAlbum = async (
+export const revokeShare = async (
   slug: string,
   revocationToken: string,
   dependencies: { fetch?: typeof globalThis.fetch } = {},

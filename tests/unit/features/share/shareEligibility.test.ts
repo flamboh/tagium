@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { shareEligibility } from "@/features/share/shareEligibility";
+import { shareEligibility, shareTrackEligibility } from "@/features/share/shareEligibility";
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 
 const album: AlbumGroup = {
@@ -42,6 +42,22 @@ describe("share eligibility", () => {
   it("rejects albums imported from a shared album", () => {
     expect(shareEligibility({ ...album, sourceManifestSlug: "source" }, [importedTrack])).toBe(
       "shared albums cannot be shared again",
+    );
+  });
+
+  it("rejects local albums containing a track received from a share link", () => {
+    expect(
+      shareEligibility(album, [{ ...importedTrack, sourceManifestSlug: "track-source" }]),
+    ).toMatch(/containing tracks added from share links/i);
+  });
+
+  it("accepts replayable tracks and rejects local or received tracks", () => {
+    expect(shareTrackEligibility(importedTrack)).toBeNull();
+    expect(shareTrackEligibility({ ...importedTrack, downloadRequest: undefined })).toBe(
+      "local tracks cannot be shared",
+    );
+    expect(shareTrackEligibility({ ...importedTrack, sourceManifestSlug: "source" })).toMatch(
+      /share links cannot be shared again/i,
     );
   });
   it("accepts a replayable imported album", () => {

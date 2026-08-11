@@ -2,11 +2,11 @@ import { act } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 
-const { publishSharedAlbum } = vi.hoisted(() => ({ publishSharedAlbum: vi.fn() }));
+const { publishShare } = vi.hoisted(() => ({ publishShare: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/features/share/shareClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/share/shareClient")>()),
-  publishSharedAlbum,
+  publishShare,
 }));
 vi.mock("@/features/share/revocationReceipt", () => ({
   getRevocationReceipt: vi.fn((slug: string) => ({
@@ -24,6 +24,7 @@ vi.mock("@/features/share/sharePresence", () => ({
 
 import { renderHook } from "../../support/hookTestHarness";
 import { useShareWorkflow } from "@/features/share/useShareWorkflow";
+import { projectAlbumShareSnapshot } from "@/features/share/sharePublication";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -31,7 +32,7 @@ afterEach(() => {
 });
 
 describe("share creator preview state", () => {
-  it("reopens the original link for a received album", () => {
+  it("reopens the original link for a received album", async () => {
     const location = { pathname: "/", origin: "https://tagium.app" };
     vi.stubGlobal("location", location);
     vi.stubGlobal("history", { state: {}, replaceState: vi.fn(), back: vi.fn() });
@@ -74,7 +75,7 @@ describe("share creator preview state", () => {
         useShareWorkflow({
           library,
           editor: { commands: { flush: vi.fn() } } as never,
-          importing: { commands: { importSharedAlbum: vi.fn() } } as never,
+          importing: { commands: { importSharedContent: vi.fn() } } as never,
           enabled: true,
         }),
       undefined,
@@ -84,17 +85,17 @@ describe("share creator preview state", () => {
       enabled: true,
       label: "view share link",
     });
-    act(() => hook.result.openCreator("album"));
+    await act(async () => hook.result.openCreator({ kind: "album", id: "album" }));
     expect(hook.result.dialog).toMatchObject({
       status: "link",
       url: "https://tagium.app/share/received-album",
-      preview: { albumTitle: "Received" },
+      preview: { kind: "album", title: "Received" },
     });
-    expect(publishSharedAlbum).not.toHaveBeenCalled();
+    expect(publishShare).not.toHaveBeenCalled();
     hook.unmount();
   });
 
-  it("reopens an unchanged publication so its existing link can be copied again", () => {
+  it("reopens an unchanged publication so its existing link can be copied again", async () => {
     const location = { pathname: "/" };
     vi.stubGlobal("location", location);
     vi.stubGlobal("history", { state: {}, replaceState: vi.fn(), back: vi.fn() });
@@ -135,6 +136,9 @@ describe("share creator preview state", () => {
         downloadRequest: { sourceUrl: "https://soundcloud.com/a/first", audioBitrate: "320" },
       },
     ];
+    album.sharePublication.publishedFingerprint = (
+      await projectAlbumShareSnapshot(album, files as never)
+    ).fingerprint;
     const library = {
       state: { albums: [album], files },
       getSnapshot: () => ({ albums: [album], files }),
@@ -145,7 +149,7 @@ describe("share creator preview state", () => {
         useShareWorkflow({
           library,
           editor: { commands: { flush: vi.fn() } } as never,
-          importing: { commands: { importSharedAlbum: vi.fn() } } as never,
+          importing: { commands: { importSharedContent: vi.fn() } } as never,
           enabled: true,
         }),
       undefined,
@@ -156,7 +160,7 @@ describe("share creator preview state", () => {
       label: "view share link",
     });
 
-    act(() => hook.result.openCreator("album"));
+    await act(async () => hook.result.openCreator({ kind: "album", id: "album" }));
     expect(hook.result.dialog).toMatchObject({
       status: "published",
       receipt: {
@@ -167,9 +171,9 @@ describe("share creator preview state", () => {
     });
 
     act(() => hook.result.closeDialog());
-    act(() => hook.result.openCreator("album"));
+    await act(async () => hook.result.openCreator({ kind: "album", id: "album" }));
     expect(hook.result.dialog.status).toBe("published");
-    expect(publishSharedAlbum).not.toHaveBeenCalled();
+    expect(publishShare).not.toHaveBeenCalled();
     hook.unmount();
   });
 
@@ -179,7 +183,7 @@ describe("share creator preview state", () => {
     vi.stubGlobal("history", { state: {}, replaceState: vi.fn(), back: vi.fn() });
     vi.stubGlobal("window", new EventTarget());
     let rejectPublish!: (error: Error) => void;
-    publishSharedAlbum.mockReturnValueOnce(
+    publishShare.mockReturnValueOnce(
       new Promise((_, reject) => {
         rejectPublish = reject;
       }),
@@ -207,7 +211,7 @@ describe("share creator preview state", () => {
       },
     ];
     const library = {
-      state: { albums: [album] },
+      state: { albums: [album], files },
       getSnapshot: () => ({ albums: [album], files }),
       dispatch: vi.fn(),
     } as unknown as LibraryStore;
@@ -216,16 +220,17 @@ describe("share creator preview state", () => {
         useShareWorkflow({
           library,
           editor: { commands: { flush: vi.fn() } } as never,
-          importing: { commands: { importSharedAlbum: vi.fn() } } as never,
+          importing: { commands: { importSharedContent: vi.fn() } } as never,
           enabled: true,
         }),
       undefined,
     );
 
-    act(() => hook.result.openCreator("album"));
+    await act(async () => hook.result.openCreator({ kind: "album", id: "album" }));
     const preview = hook.result.dialog.status === "confirm" ? hook.result.dialog.preview : null;
     expect(preview).toMatchObject({
-      albumTitle: "Snapshot",
+      kind: "album",
+      title: "Snapshot",
       tracks: [
         { key: "a:0", title: "First" },
         { key: "a:1", title: "First" },
@@ -236,7 +241,7 @@ describe("share creator preview state", () => {
       void hook.result.publish();
       await Promise.resolve();
     });
-    await vi.waitFor(() => expect(publishSharedAlbum).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(publishShare).toHaveBeenCalledTimes(1));
     expect(hook.result.dialog.status).toBe("publishing");
     rejectPublish(new Error("offline"));
     await act(async () => {

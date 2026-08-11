@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import {
-  fetchSharedAlbum,
-  revokeSharedAlbum,
-  SharedAlbumUnavailableError,
-  SharedAlbumVersionError,
-  updateSharedAlbum,
+  fetchSharedContent,
+  revokeShare,
+  SharedContentUnavailableError,
+  SharedContentVersionError,
+  updateShare,
 } from "@/features/share/shareClient";
 
 const manifest = {
@@ -27,10 +27,10 @@ const manifest = {
   ],
 };
 
-describe("shared album client", () => {
+describe("shared content client", () => {
   it("decodes the public response envelope without requesting audio", async () => {
     const fetch = vi.fn(async () => Response.json({ manifest, expiresAt: "2026-10-20T12:00:00Z" }));
-    await expect(fetchSharedAlbum("AbcdEFGHijklmno_123-45", { fetch })).resolves.toEqual({
+    await expect(fetchSharedContent("AbcdEFGHijklmno_123-45", { fetch })).resolves.toEqual({
       manifest,
       expiresAt: "2026-10-20T12:00:00Z",
     });
@@ -46,19 +46,19 @@ describe("shared album client", () => {
       Response.json({ manifest: { ...manifest, version: 2 }, expiresAt: "2026-10-20T12:00:00Z" }),
     );
     await expect(
-      fetchSharedAlbum("AbcdEFGHijklmno_123-45", { fetch: futureFetch }),
-    ).rejects.toBeInstanceOf(SharedAlbumVersionError);
+      fetchSharedContent("AbcdEFGHijklmno_123-45", { fetch: futureFetch }),
+    ).rejects.toBeInstanceOf(SharedContentVersionError);
     const missingFetch = vi.fn(async () => new Response(null, { status: 404 }));
     await expect(
-      fetchSharedAlbum("AbcdEFGHijklmno_123-45", { fetch: missingFetch }),
-    ).rejects.toBeInstanceOf(SharedAlbumUnavailableError);
+      fetchSharedContent("AbcdEFGHijklmno_123-45", { fetch: missingFetch }),
+    ).rejects.toBeInstanceOf(SharedContentUnavailableError);
   });
 
   it("sends the private revocation permission only in the delete authorization header", async () => {
     const fetch = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(null, { status: 204 }),
     );
-    await revokeSharedAlbum("AbcdEFGHijklmno_123-45", "private-secret", { fetch });
+    await revokeShare("AbcdEFGHijklmno_123-45", "private-secret", { fetch });
     const [url, request] = fetch.mock.calls[0]!;
     expect(url).not.toContain("private-secret");
     expect(request).toEqual(
@@ -72,7 +72,7 @@ describe("shared album client", () => {
   it("accepts only a 204 revocation response", async () => {
     const fetch = vi.fn(async () => new Response(null, { status: 404 }));
     await expect(
-      revokeSharedAlbum("AbcdEFGHijklmno_123-45", "private-secret", { fetch }),
+      revokeShare("AbcdEFGHijklmno_123-45", "private-secret", { fetch }),
     ).rejects.toThrow("sharing could not be stopped");
   });
 
@@ -85,7 +85,7 @@ describe("shared album client", () => {
       }),
     );
     await expect(
-      updateSharedAlbum("AbcdEFGHijklmno_123-45", "private-secret", manifest as never, null, {
+      updateShare("AbcdEFGHijklmno_123-45", "private-secret", manifest as never, null, {
         fetch,
       }),
     ).resolves.toMatchObject({ slug: "AbcdEFGHijklmno_123-45" });

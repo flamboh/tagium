@@ -1,4 +1,4 @@
-import type { ShareAlbumActionState } from "@/features/share/sharePublication";
+import type { ShareActionState } from "@/features/share/sharePublication";
 
 export type AlbumActionItemId = "edit" | "cleanup" | "share";
 
@@ -12,6 +12,7 @@ export interface AlbumActionItem {
   trailingText?: string;
   description?: string;
   disabled: boolean;
+  shareVariant?: ShareActionState["variant"];
   onSelect: (invocation: AlbumActionInvocation) => void;
 }
 
@@ -20,6 +21,7 @@ export function createAlbumActionItems({
   canShare,
   shareDisabledReason,
   shareLabel,
+  shareVariant,
   onEdit,
   onReviewCleanup,
   onShare,
@@ -27,7 +29,8 @@ export function createAlbumActionItems({
   cleanupSuggestionCount: number;
   canShare: boolean;
   shareDisabledReason: string;
-  shareLabel: ShareAlbumActionState["label"];
+  shareLabel: ShareActionState["label"];
+  shareVariant: ShareActionState["variant"];
   onEdit: () => void;
   onReviewCleanup: (invocation: AlbumActionInvocation) => void;
   onShare: () => void;
@@ -55,6 +58,7 @@ export function createAlbumActionItems({
       trailingText: canShare ? undefined : "unavailable",
       description: canShare ? undefined : shareDisabledReason,
       disabled: !canShare,
+      shareVariant,
       onSelect: onShare,
     },
   ];
