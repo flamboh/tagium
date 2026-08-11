@@ -129,6 +129,7 @@ export default function AudioTagger() {
       />
       <MetadataCleanupDialog {...workspace.cleanupDialogProps} />
       <DestructiveActionDialog {...workspace.removalDialogProps} />
+      <DestructiveActionDialog {...workspace.albumDeletionDialogProps} />
       <AlbumMetadataDialog
         key={workspace.albumDialogProps.instanceKey}
         {...workspace.albumDialogProps}

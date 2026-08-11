@@ -50,6 +50,7 @@ const renderCard = (cleanupSuggestionCount: number) =>
           onEdit: noOp,
           onReviewCleanup: noOp,
           onShare: noOp,
+          onDelete: noOp,
         })}
         onSelect={noOp}
         onDownload={noOp}
@@ -88,6 +89,7 @@ describe("SortableAlbumCard action menu", () => {
       onEdit: noOp,
       onReviewCleanup: noOp,
       onShare: noOp,
+      onDelete: noOp,
     })[1];
     const markup = renderToStaticMarkup(<AlbumActionItemContent action={cleanupAction} />);
 
@@ -96,6 +98,25 @@ describe("SortableAlbumCard action menu", () => {
     expect(markup).toContain("tabular-nums");
     expect(markup).toContain(">2 tracks</span>");
     expect(markup).not.toContain("flex-col");
+  });
+
+  it("renders deletion with the destructive trash treatment", () => {
+    const deleteAction = createAlbumActionItems({
+      cleanupSuggestionCount: 0,
+      canShare: true,
+      shareDisabledReason: "",
+      shareLabel: "share album",
+      shareVariant: "create",
+      onEdit: noOp,
+      onReviewCleanup: noOp,
+      onShare: noOp,
+      onDelete: noOp,
+    })[3];
+    const markup = renderToStaticMarkup(<AlbumActionItemContent action={deleteAction} />);
+
+    expect(markup).toContain("lucide-trash-2");
+    expect(markup).toContain("text-destructive");
+    expect(markup).toContain("delete album");
   });
 });
 

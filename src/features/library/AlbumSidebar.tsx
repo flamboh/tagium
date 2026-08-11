@@ -42,6 +42,7 @@ interface AlbumSidebarProps {
   onRetryDownload: (fileId: string) => void;
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
+  onDeleteAlbum: (albumId: string, returnFocusTarget: HTMLButtonElement | null) => void;
   onReviewAlbumCleanup: (albumId: string, returnFocusTarget: HTMLButtonElement | null) => void;
   onDownloadAlbum: (albumId: string) => void;
   onShareAlbum?: (albumId: string) => void;
@@ -87,6 +88,7 @@ export default function AlbumSidebar({
   onRetryDownload,
   onAddAlbum,
   onEditAlbum,
+  onDeleteAlbum,
   onReviewAlbumCleanup,
   onDownloadAlbum,
   onShareAlbum,
@@ -241,6 +243,7 @@ export default function AlbumSidebar({
                 onReviewCleanup: ({ returnFocusTarget }) =>
                   onReviewAlbumCleanup(album.id, returnFocusTarget),
                 onShare: () => onShareAlbum?.(album.id),
+                onDelete: ({ returnFocusTarget }) => onDeleteAlbum(album.id, returnFocusTarget),
               });
               const fileDropProps = albumFileDropProps(album.id);
               return (

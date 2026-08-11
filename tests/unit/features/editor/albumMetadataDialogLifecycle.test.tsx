@@ -43,7 +43,6 @@ const props = {
     genre: "",
     cover: [{ format: "image/jpeg", type: 3, description: "", data: new Uint8Array([1]) }],
   },
-  trackCount: 1,
   onChange: vi.fn(),
   onClose: vi.fn(),
   onSave: vi.fn(),

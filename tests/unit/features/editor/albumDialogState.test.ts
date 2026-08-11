@@ -150,7 +150,7 @@ describe("albumDialogReducer", () => {
     });
   });
 
-  for (const finishType of ["closed", "saved", "deleted"] as const) {
+  for (const finishType of ["closed", "saved"] as const) {
     it(`keeps edit content stable while the ${finishType} dialog exits`, () => {
       const openState = reduce([{ type: "edit-opened", album: album() }]);
       const state = albumDialogReducer(openState, { type: finishType });

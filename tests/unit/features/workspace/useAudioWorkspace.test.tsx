@@ -75,6 +75,71 @@ afterEach(() => {
 });
 
 describe("audio workspace", () => {
+  it("confirms album deletion from the sidebar action before removing its tracks", () => {
+    const removeDownloads = vi.fn();
+    const hook = renderHook(() => {
+      const library = useLibraryStore();
+      const [settings, setSettings] = useState(initialSettings);
+      const editor = useTrackEditorSession({ library, settings });
+      const navigation = useWorkspaceNavigation({ library, editor });
+      const workspace = useAudioWorkspace({
+        library,
+        editor,
+        settings,
+        setSettings,
+        navigation,
+        removeDownloads,
+        busy: false,
+      });
+      return { library, workspace };
+    }, undefined);
+    const track = readyFile("track", "Track");
+    act(() => {
+      hook.result.library.dispatch({
+        type: "content-replaced",
+        files: [track],
+        looseTrackIds: [track.id],
+      });
+    });
+    act(() => hook.result.workspace.sidebarProps.onAddAlbum());
+    act(() =>
+      hook.result.workspace.albumDialogProps.onChange({
+        title: "Album to delete",
+        artist: "Artist",
+        genre: "Rock",
+      }),
+    );
+    act(() => hook.result.workspace.albumDialogProps.onSave());
+    const albumId = hook.result.library.getSnapshot().albums[0].id;
+    act(() => hook.result.workspace.sidebarProps.onMoveTrackToAlbum(track.id, albumId, "append"));
+    const returnFocusTarget = {
+      focus: vi.fn(),
+      isConnected: true,
+    } as unknown as HTMLButtonElement;
+
+    act(() => hook.result.workspace.sidebarProps.onDeleteAlbum(albumId, returnFocusTarget));
+    expect(hook.result.workspace.albumDeletionDialogProps).toMatchObject({
+      kind: "delete-album",
+      open: true,
+      albumTitle: "Album to delete",
+      trackCount: 1,
+      returnFocusTarget,
+    });
+    act(() => hook.result.workspace.albumDeletionDialogProps.onCancel());
+    expect(hook.result.workspace.albumDeletionDialogProps.open).toBe(false);
+    expect(hook.result.library.getSnapshot().albums).toHaveLength(1);
+
+    act(() => hook.result.workspace.sidebarProps.onDeleteAlbum(albumId, returnFocusTarget));
+    act(() => hook.result.workspace.albumDeletionDialogProps.onConfirm());
+    expect(removeDownloads).toHaveBeenCalledWith([track.id]);
+    expect(hook.result.library.getSnapshot()).toMatchObject({
+      albums: [],
+      files: [],
+      looseTrackIds: [],
+    });
+    hook.unmount();
+  });
+
   it("composes child-facing selection, dialogs, settings, cleanup, and keyboard behavior", () => {
     const removeDownloads = vi.fn();
     const hook = renderHook(() => {

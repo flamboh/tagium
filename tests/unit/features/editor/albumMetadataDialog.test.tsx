@@ -88,7 +88,6 @@ describe("album metadata validation layout", () => {
           open: true,
           mode: "create",
           draft: { title: "", artist: "", genre: "" },
-          trackCount: 0,
           onChange: vi.fn(),
           onClose: vi.fn(),
           onSave: vi.fn(),
@@ -140,7 +139,6 @@ describe("album metadata validation layout", () => {
         open: true,
         mode: "create",
         draft: { title: "", artist: "", genre: "" },
-        trackCount: 0,
         onChange: vi.fn(),
         onClose: vi.fn(),
         onSave: vi.fn(),
@@ -180,7 +178,6 @@ describe("album metadata validation layout", () => {
         open: true,
         mode: "create",
         draft: { ...draft, genre: "" },
-        trackCount: 0,
         onChange: vi.fn(),
         onClose: vi.fn(),
         onSave: vi.fn(),
@@ -201,7 +198,6 @@ describe("album metadata validation layout", () => {
           open: true,
           mode: "edit",
           draft: { title: "Album", artist: "Artist", genre: "" },
-          trackCount: 1,
           onChange: vi.fn(),
           onClose: vi.fn(),
           onSave: vi.fn(),
@@ -231,7 +227,6 @@ describe("album metadata validation layout", () => {
         open: true,
         mode: "create",
         draft: { title: "album", artist: "first artist", genre: "" },
-        trackCount: 0,
         onChange,
         onClose: vi.fn(),
         onSave: vi.fn(),
@@ -266,7 +261,6 @@ describe("album metadata validation layout", () => {
         open: true,
         mode: "create",
         draft: { title: "New Album", artist: "Artist", genre: "" },
-        trackCount: 0,
         onChange: vi.fn(),
         onClose,
         onSave,
@@ -299,43 +293,5 @@ describe("album metadata validation layout", () => {
     );
     (cancel.props.onClick as () => void)();
     expect(onClose).toHaveBeenCalledOnce();
-  });
-
-  it("confirms deletion only in edit mode", () => {
-    const hooks = createHookHarness();
-    const onDelete = vi.fn();
-    const render = () =>
-      hooks.render(() =>
-        AlbumMetadataDialog({
-          open: true,
-          mode: "edit",
-          draft: { title: "Existing Album", artist: "Artist", genre: "Rock" },
-          trackCount: 2,
-          onChange: vi.fn(),
-          onClose: vi.fn(),
-          onSave: vi.fn(),
-          onDelete,
-          placeholder: { title: "Album", artist: "Artist", genre: "Genre", year: "2026" },
-        }),
-      );
-
-    let tree = render();
-    expect(textContent(tree)).toContain("edit album");
-    const requestDelete = findElement(
-      tree,
-      (element) =>
-        textContent(element) === "delete album" && typeof element.props.onClick === "function",
-    );
-    (requestDelete.props.onClick as () => void)();
-
-    tree = render();
-    expect(textContent(tree)).toContain("delete album and all 2 tracks?");
-    const confirmDelete = findElement(
-      tree,
-      (element) => textContent(element) === "delete" && typeof element.props.onClick === "function",
-    );
-    (confirmDelete.props.onClick as () => void)();
-
-    expect(onDelete).toHaveBeenCalledOnce();
   });
 });

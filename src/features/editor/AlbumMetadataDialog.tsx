@@ -32,11 +32,9 @@ export interface AlbumMetadataDialogProps {
   open: boolean;
   mode: "create" | "edit";
   draft: AlbumMetadataDraft;
-  trackCount: number;
   onChange: Dispatch<SetStateAction<AlbumMetadataDraft>>;
   onClose: () => void;
   onSave: () => void;
-  onDelete?: () => void;
   onSyncCoverToTracks?: () => Promise<void> | void;
   placeholder: SampleAlbumMetadata;
 }
@@ -45,15 +43,12 @@ export default function AlbumMetadataDialog({
   open,
   mode,
   draft,
-  trackCount,
   onChange,
   onClose,
   onSave,
-  onDelete,
   onSyncCoverToTracks,
   placeholder,
 }: AlbumMetadataDialogProps) {
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [touchedFields, setTouchedFields] = useState({ title: false, artist: false });
   const [isProcessingCover, setIsProcessingCover] = useState(false);
   const coverSync = useAlbumCoverSync({
@@ -69,7 +64,6 @@ export default function AlbumMetadataDialog({
 
   const resetTransientState = () => {
     coverSync.cancel();
-    setShowDeleteConfirm(false);
     setTouchedFields({ title: false, artist: false });
   };
 
@@ -258,65 +252,25 @@ export default function AlbumMetadataDialog({
             </div>
           </div>
           <DialogFooter className="border-t p-5 flex items-center justify-end gap-2">
-            {showDeleteConfirm ? (
-              <>
-                <span className="text-sm text-muted-foreground mr-auto">
-                  delete album and all {trackCount} track{trackCount !== 1 ? "s" : ""}?
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isProcessingCover}
-                  onClick={() => setShowDeleteConfirm(false)}
-                >
-                  keep album
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  disabled={isProcessingCover}
-                  onClick={() => {
-                    resetTransientState();
-                    onDelete?.();
-                  }}
-                >
-                  delete
-                </Button>
-              </>
-            ) : (
-              <>
-                {mode === "edit" && onDelete && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    disabled={isProcessingCover}
-                    className="mr-auto text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => setShowDeleteConfirm(true)}
-                  >
-                    delete album
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isProcessingCover}
-                  onClick={handleClose}
-                >
-                  cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isProcessingCover || formInvalid}
-                  aria-busy={isProcessingCover || undefined}
-                >
-                  {isProcessingCover
-                    ? "processing cover"
-                    : mode === "create"
-                      ? "create album"
-                      : "save album"}
-                </Button>
-              </>
-            )}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isProcessingCover}
+              onClick={handleClose}
+            >
+              cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isProcessingCover || formInvalid}
+              aria-busy={isProcessingCover || undefined}
+            >
+              {isProcessingCover
+                ? "processing cover"
+                : mode === "create"
+                  ? "create album"
+                  : "save album"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
