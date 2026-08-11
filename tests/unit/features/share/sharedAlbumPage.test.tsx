@@ -35,6 +35,7 @@ const props = {
     status: "ready" as const,
     slug,
     expiresAt: "2026-10-20T12:00:00.000Z",
+    analyticsId: "a".repeat(43),
     manifest: {
       version: 1 as const,
       kind: "album" as const,

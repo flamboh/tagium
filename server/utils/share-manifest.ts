@@ -76,7 +76,12 @@ export interface ShareManifestPersistence {
 }
 
 export type ShareManifestUnavailable = { kind: "unavailable" };
-export type ShareManifestLoaded = { kind: "available"; manifest: ShareManifest; expiresAt: number };
+export type ShareManifestLoaded = {
+  kind: "available";
+  manifest: ShareManifest;
+  expiresAt: number;
+  analyticsId: string;
+};
 export type ShareManifestRevokeResult = "revoked" | "unavailable" | "artwork_unavailable";
 export type ShareArtworkUpdate =
   | { kind: "retain" }
@@ -101,6 +106,10 @@ export const hashShareSecret = async (value: string) =>
   base64url(
     new Uint8Array(await crypto.subtle.digest("SHA-256", toArrayBuffer(utf8.encode(value)))),
   );
+
+/** Stable public identifier for analytics that does not expose the short share capability. */
+const shareAnalyticsId = (revocationTokenHash: string) =>
+  hashShareSecret(`tagium-share-analytics:${revocationTokenHash}`);
 
 const randomToken = (bytes = 32) => {
   const value = new Uint8Array(bytes);
@@ -313,6 +322,7 @@ export const createShareManifestStore = (
       const expiresAt = createdAt + SHARE_MANIFEST_LIFETIME_MS;
       const revocationToken = token();
       const revocationTokenHash = await hashShareSecret(revocationToken);
+      const analyticsId = await shareAnalyticsId(revocationTokenHash);
 
       for (let attempt = 0; attempt < 3; attempt++) {
         const slug = slugToken();
@@ -348,7 +358,7 @@ export const createShareManifestStore = (
             if (artworkKey) await persistence.deleteArtwork(artworkKey).catch(() => undefined);
             throw error;
           });
-        if (created === "created") return { slug, expiresAt, revocationToken };
+        if (created === "created") return { slug, expiresAt, revocationToken, analyticsId };
         if (artworkKey) await persistence.deleteArtwork(artworkKey).catch(() => undefined);
       }
       throw new Error("share_slug_collision");
@@ -483,7 +493,12 @@ export const createShareManifestStore = (
       if (!record) return unavailable();
       const manifest = decodeStored(record.payloadJson);
       return manifest
-        ? { kind: "available", manifest, expiresAt: record.expiresAt }
+        ? {
+            kind: "available",
+            manifest,
+            expiresAt: record.expiresAt,
+            analyticsId: await shareAnalyticsId(record.revocationTokenHash),
+          }
         : unavailable();
     },
     loadArtwork: async (slug: string) => {

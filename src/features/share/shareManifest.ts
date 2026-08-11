@@ -112,17 +112,23 @@ export const manifestTracks = (manifest: Manifest): readonly ManifestTrack[] =>
 
 export const manifestTrackCount = (manifest: Manifest) => manifestTracks(manifest).length;
 
+export const SHARE_ANALYTICS_ID_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+export const isShareAnalyticsId = (value: unknown): value is string =>
+  typeof value === "string" && SHARE_ANALYTICS_ID_PATTERN.test(value);
+
 /** HTTP responses intentionally serialize dates; milliseconds are storage-only. */
 export interface SharePublicationResponse {
   slug: string;
   url: string;
   expiresAt: string;
   revocationToken: string;
+  analyticsId: string;
 }
 
 export interface ShareManifestResponse {
   manifest: Manifest;
   expiresAt: string;
+  analyticsId: string;
 }
 
 export const toShareExpiryIso = (expiresAt: number) => new Date(expiresAt).toISOString();

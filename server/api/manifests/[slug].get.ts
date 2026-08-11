@@ -18,7 +18,11 @@ export default defineHandler(async (event) => {
     const result = await store.load(event.context.params?.slug ?? "");
     return result.kind === "available"
       ? Response.json(
-          { manifest: result.manifest, expiresAt: toShareExpiryIso(result.expiresAt) },
+          {
+            manifest: result.manifest,
+            expiresAt: toShareExpiryIso(result.expiresAt),
+            analyticsId: result.analyticsId,
+          },
           { headers: noStore },
         )
       : unavailable();

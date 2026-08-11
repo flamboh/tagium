@@ -1,4 +1,9 @@
-import { decodeManifest, MANIFEST_VERSION, type Manifest } from "@/features/share/shareManifest";
+import {
+  decodeManifest,
+  isShareAnalyticsId,
+  MANIFEST_VERSION,
+  type Manifest,
+} from "@/features/share/shareManifest";
 
 const UNAVAILABLE_MESSAGE = "this share is no longer available";
 const SHARE_METADATA_TOO_LARGE_MESSAGE = "this share contains too much metadata to publish.";
@@ -24,6 +29,10 @@ export interface SharePublicationReceipt {
   revocationToken: string;
 }
 
+export interface CreatedSharePublicationReceipt extends SharePublicationReceipt {
+  analyticsId: string;
+}
+
 export type ShareUpdateReceipt = Omit<SharePublicationReceipt, "revocationToken">;
 
 const apiPath = (slug: string, suffix = "") =>
@@ -40,6 +49,7 @@ const readJson = async (response: Response) => {
 export interface FetchedSharedContent {
   manifest: Manifest;
   expiresAt: string;
+  analyticsId: string;
 }
 
 export const fetchSharedContent = async (
@@ -59,7 +69,9 @@ export const fetchSharedContent = async (
       payload === null ||
       !("manifest" in payload) ||
       !("expiresAt" in payload) ||
-      typeof payload.expiresAt !== "string"
+      typeof payload.expiresAt !== "string" ||
+      !("analyticsId" in payload) ||
+      !isShareAnalyticsId(payload.analyticsId)
     ) {
       throw new SharedContentUnavailableError();
     }
@@ -74,6 +86,7 @@ export const fetchSharedContent = async (
     return {
       manifest: decodeManifest(payload.manifest),
       expiresAt: payload.expiresAt,
+      analyticsId: payload.analyticsId,
     };
   } catch (error) {
     if (error instanceof SharedContentVersionError) throw error;
@@ -106,7 +119,7 @@ export const publishShare = async (
   manifest: Manifest,
   cover: File | null,
   dependencies: { fetch?: typeof globalThis.fetch } = {},
-): Promise<SharePublicationReceipt> => {
+): Promise<CreatedSharePublicationReceipt> => {
   const body = new FormData();
   body.set("manifest", JSON.stringify(manifest));
   if (cover) body.set("cover", cover);
@@ -128,11 +141,12 @@ export const publishShare = async (
     typeof receipt.slug !== "string" ||
     typeof receipt.url !== "string" ||
     typeof receipt.expiresAt !== "string" ||
-    typeof receipt.revocationToken !== "string"
+    typeof receipt.revocationToken !== "string" ||
+    !isShareAnalyticsId(receipt.analyticsId)
   ) {
     throw new Error("the share link could not be created");
   }
-  return receipt as SharePublicationReceipt;
+  return receipt as CreatedSharePublicationReceipt;
 };
 
 export const updateShare = async (

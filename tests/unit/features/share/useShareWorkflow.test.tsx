@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   removeRevocationReceipt: vi.fn(),
   importSharedContent: vi.fn(),
   coverArtFileToPicture: vi.fn(),
+  capture: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -21,6 +22,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("sonner", () => ({
   toast: { success: mocks.toastSuccess, error: mocks.toastError },
 }));
+vi.mock("@/analytics", () => ({ analytics: { capture: mocks.capture } }));
 vi.mock("@/features/editor/coverArtProcessing", () => ({
   coverArtFileToPicture: mocks.coverArtFileToPicture,
 }));
@@ -51,6 +53,7 @@ import {
 } from "@/features/share/sharePublication";
 
 const slug = "k7m4q2";
+const analyticsId = "a".repeat(43);
 const sharedManifest = {
   version: 1 as const,
   kind: "album" as const,
@@ -225,19 +228,29 @@ describe("share workflow pasted links", () => {
   it("imports a pasted link in place without changing browser history, and ignores a concurrent submit", async () => {
     const { hook } = workflow();
     let resolveFetch:
-      | ((value: { manifest: typeof sharedManifest; expiresAt: string }) => void)
+      | ((value: {
+          manifest: typeof sharedManifest;
+          expiresAt: string;
+          analyticsId: string;
+        }) => void)
       | undefined;
-    const pending = new Promise<{ manifest: typeof sharedManifest; expiresAt: string }>(
-      (resolve) => {
-        resolveFetch = resolve;
-      },
-    );
+    const pending = new Promise<{
+      manifest: typeof sharedManifest;
+      expiresAt: string;
+      analyticsId: string;
+    }>((resolve) => {
+      resolveFetch = resolve;
+    });
     mocks.fetchSharedContent.mockReturnValue(pending);
     const before = location.pathname;
 
     const first = hook.result.importFromInput(slug);
     const second = hook.result.importFromInput(slug);
-    resolveFetch?.({ manifest: sharedManifest, expiresAt: "2026-10-20T12:00:00.000Z" });
+    resolveFetch?.({
+      manifest: sharedManifest,
+      expiresAt: "2026-10-20T12:00:00.000Z",
+      analyticsId,
+    });
     await act(async () => {
       await Promise.all([first, second]);
     });
@@ -249,6 +262,12 @@ describe("share workflow pasted links", () => {
       description: "downloading 1 track — watch progress in the sidebar.",
     });
     expect(mocks.toastSuccess).not.toHaveBeenCalledWith(expect.stringContaining("at a time"));
+    expect(mocks.capture).toHaveBeenCalledWith({
+      type: "share_added",
+      shareId: analyticsId,
+      shareKind: "album",
+      trackCount: 1,
+    });
     hook.unmount();
   });
 
@@ -257,11 +276,20 @@ describe("share workflow pasted links", () => {
     mocks.fetchSharedContent.mockResolvedValue({
       manifest: sharedManifest,
       expiresAt: "2026-10-20T12:00:00.000Z",
+      analyticsId,
     });
     const { hook } = workflow();
 
     await vi.waitFor(() => expect(hook.result.page).toMatchObject({ status: "ready", slug }));
     expect(mocks.importSharedContent).not.toHaveBeenCalled();
+    expect(mocks.capture).toHaveBeenCalledOnce();
+    expect(mocks.capture).toHaveBeenCalledWith({
+      type: "share_opened",
+      shareId: analyticsId,
+      shareKind: "album",
+      trackCount: 1,
+      viewer: "recipient",
+    });
     hook.unmount();
   });
 
@@ -270,6 +298,7 @@ describe("share workflow pasted links", () => {
     mocks.fetchSharedContent.mockResolvedValue({
       manifest: sharedManifest,
       expiresAt: "2026-10-20T12:00:00.000Z",
+      analyticsId,
     });
     const { hook } = workflow();
 
@@ -278,6 +307,12 @@ describe("share workflow pasted links", () => {
 
     expect(mocks.toastSuccess).toHaveBeenCalledWith("album added to your library", {
       description: "downloading 1 track — watch progress in the sidebar.",
+    });
+    expect(mocks.capture).toHaveBeenNthCalledWith(2, {
+      type: "share_added",
+      shareId: analyticsId,
+      shareKind: "album",
+      trackCount: 1,
     });
     hook.unmount();
   });
@@ -309,10 +344,12 @@ describe("share workflow pasted links", () => {
       .mockResolvedValueOnce({
         manifest: sharedManifest,
         expiresAt: "2026-10-20T12:00:00.000Z",
+        analyticsId,
       })
       .mockResolvedValueOnce({
         manifest: freshManifest,
         expiresAt: "2026-10-20T12:00:00.000Z",
+        analyticsId,
       });
     mocks.fetchSharedArtwork.mockResolvedValue(artworkFile);
     mocks.coverArtFileToPicture.mockResolvedValue(convertedPicture);
@@ -380,6 +417,7 @@ describe("share workflow publication lifecycle", () => {
       url: "https://tagium.app/share/new-share",
       expiresAt: "2031-01-01T00:00:00.000Z",
       revocationToken: "new-token",
+      analyticsId,
     });
 
     await act(async () => hook.result.openCreator({ kind: "album", id: album.id }));
@@ -391,6 +429,12 @@ describe("share workflow publication lifecycle", () => {
     expect(album.sharePublication).toMatchObject({
       slug: "new-share",
       status: "active",
+    });
+    expect(mocks.capture).toHaveBeenCalledWith({
+      type: "share_created",
+      shareId: analyticsId,
+      shareKind: "album",
+      trackCount: 1,
     });
     hook.unmount();
   });
@@ -437,6 +481,7 @@ describe("share workflow publication lifecycle", () => {
         message: "the share link could not be created.",
       }),
     );
+    expect(mocks.capture).not.toHaveBeenCalled();
     hook.unmount();
   });
 
@@ -468,6 +513,7 @@ describe("share workflow publication lifecycle", () => {
       url: "https://tagium.app/share/track-share",
       expiresAt: "2031-01-01T00:00:00.000Z",
       revocationToken: "track-token",
+      analyticsId,
     });
 
     expect(hook.result.shareTrackActions[file.id]).toMatchObject({
