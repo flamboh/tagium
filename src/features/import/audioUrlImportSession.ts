@@ -125,7 +125,6 @@ export interface AudioUrlImportSession {
 export const createAudioUrlImportSession = ({
   library,
   getEditor,
-  resetEditorForm,
   getSettings,
   activateEditor,
   setUrlImporting,
@@ -133,7 +132,6 @@ export const createAudioUrlImportSession = ({
 }: {
   library: LibraryStore;
   getEditor: () => UrlImportEditor;
-  resetEditorForm: (metadata: Parameters<TrackEditorSession["form"]["reset"]>[0]) => void;
   getSettings: () => AppSettings;
   activateEditor: () => void;
   setUrlImporting: (importing: boolean) => void;
@@ -332,6 +330,7 @@ export const createAudioUrlImportSession = ({
       void (async () => {
         try {
           const cover = await fetchImportedCover(coverImport.coverUrl);
+          getEditor().flush(coverImport.trackIds);
           const current = library.getSnapshot();
           const covered = applyPlaylistImportedCover(
             current.files,
@@ -349,9 +348,6 @@ export const createAudioUrlImportSession = ({
             files: covered.files,
           });
           if (covered.files === current.files) return;
-          if (covered.selectedMetadata) {
-            resetEditorForm(covered.selectedMetadata);
-          }
           const trackIdSet = new Set(coverImport.trackIds);
           await Promise.all(
             covered.files.flatMap((file) => {

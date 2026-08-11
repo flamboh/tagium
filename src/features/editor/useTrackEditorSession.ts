@@ -25,6 +25,7 @@ import type {
   TagiumFile,
 } from "@/features/library/types";
 import { audioFilename, getAudioFormat } from "@/features/audio/audioFormat";
+import { EDITABLE_METADATA_FIELDS } from "@/features/audio/metadataFields";
 
 type PreviewField = "filename" | "title" | "artist";
 
@@ -77,6 +78,17 @@ const applyMetadataPatch = (metadata: AudioMetadata, patch: MetadataPatch): Audi
   ...(hasOwn(patch, "bpm") ? { bpm: getNullableNumericMetadataValue(patch.bpm) } : {}),
   ...(hasOwn(patch, "comment") ? { comment: patch.comment } : {}),
 });
+
+const getMetadataPatchDifference = (metadata: AudioMetadata, patch?: MetadataPatch) => {
+  if (!patch) return undefined;
+  const difference = { ...patch };
+  for (const field of EDITABLE_METADATA_FIELDS) {
+    if (hasOwn(difference, field) && Object.is(metadata[field], difference[field])) {
+      delete difference[field];
+    }
+  }
+  return sanitizePendingMetadataPatch(difference);
+};
 
 const getFilenameFromPatch = (file: TagiumFile, patch: MetadataPatch) =>
   hasOwn(patch, "filename") && patch.filename
@@ -137,7 +149,9 @@ export const useTrackEditorSession = ({
   const settingsRef = useRef(settings);
   const selectedFileIdRef = useRef<string | null>(library.state.selectedFileId);
   const lastResetFileIdRef = useRef<string | null>(null);
+  const lastResetMetadataRef = useRef<AudioMetadata | null>(null);
   const formDirtyRef = useRef(false);
+  const latestMetadataWritesRef = useRef(new Map<string, symbol>());
   const [isCoverProcessing, setCoverProcessing] = useState(false);
   const {
     register,
@@ -172,11 +186,15 @@ export const useTrackEditorSession = ({
     let nextFormIsDirty = formIsDirty;
     if (selectedFile?.metadata) {
       const selectedFileChanged = lastResetFileIdRef.current !== selectedFile.id;
+      const selectedMetadataChanged = lastResetMetadataRef.current !== selectedFile.metadata;
       if (selectedFileChanged || !formIsDirty) {
         lastResetFileIdRef.current = selectedFile.id;
         reset(selectedFile.metadata);
         nextFormIsDirty = false;
+      } else if (selectedMetadataChanged) {
+        reset(selectedFile.metadata, { keepDirtyValues: true });
       }
+      lastResetMetadataRef.current = selectedFile.metadata;
     }
     selectedFileIdRef.current = library.state.selectedFileId;
     formDirtyRef.current = nextFormIsDirty;
@@ -310,6 +328,13 @@ export const useTrackEditorSession = ({
 
   const updateTags = useCallback(
     async (fileToUpdate: TagiumFile, newTags: AudioMetadata) => {
+      const writeToken = Symbol(fileToUpdate.id);
+      latestMetadataWritesRef.current.set(fileToUpdate.id, writeToken);
+      const isLatestWrite = () =>
+        latestMetadataWritesRef.current.get(fileToUpdate.id) === writeToken;
+      const finishWrite = () => {
+        if (isLatestWrite()) latestMetadataWritesRef.current.delete(fileToUpdate.id);
+      };
       const snapshot = library.getSnapshot();
       const latestFileToUpdate =
         snapshot.files.find((file) => file.id === fileToUpdate.id) ?? fileToUpdate;
@@ -346,12 +371,70 @@ export const useTrackEditorSession = ({
         );
         library.dispatch({ type: "content-replaced", files: nextFiles });
         if (library.getSnapshot().selectedFileId === fileToUpdate.id) reset(metadata);
+        finishWrite();
         return;
       }
 
+      const getLatestUpdateState = () => {
+        const latestSnapshot = library.getSnapshot();
+        const latestFile = latestSnapshot.files.find((file) => file.id === fileToUpdate.id);
+        const latestFormValues =
+          latestFile && selectedFileIdRef.current === fileToUpdate.id && formDirtyRef.current
+            ? getValues()
+            : undefined;
+        const latestFormMetadata =
+          latestFile?.metadata && latestFormValues
+            ? getProjectableAudioMetadata(
+                getSubmittedMetadata(latestFormValues),
+                latestFile.metadata,
+                latestFormValues,
+              )
+            : undefined;
+        const latestFormPatch = latestFormMetadata
+          ? createCurrentMetadataPatch(latestFormMetadata, dirtyFieldsRef.current)
+          : undefined;
+        const latestPendingPatch = sanitizePendingMetadataPatch({
+          ...latestFile?.pendingMetadataPatch,
+          ...latestFormPatch,
+        });
+        const latestMetadata = latestFile?.metadata
+          ? applyMetadataPatch(latestFile.metadata, latestPendingPatch ?? {})
+          : undefined;
+
+        return { latestFile, latestMetadata, latestPendingPatch, latestSnapshot };
+      };
+
       try {
         const updatedFile = await runAudioBackendEffect(writeTags(latestFileToUpdate, metadata));
-        const nextFiles = library.getSnapshot().files.map((file) =>
+        if (!isLatestWrite()) return;
+        const { latestFile, latestMetadata, latestPendingPatch, latestSnapshot } =
+          getLatestUpdateState();
+        const remainingPatch = getMetadataPatchDifference(metadata, latestPendingPatch);
+
+        if (latestFile && latestMetadata && remainingPatch) {
+          const nextFile = withPendingMetadataPatch(
+            {
+              ...latestFile,
+              file: updatedFile,
+              originalFile: updatedFile,
+              filename: getFilenameFromPatch(latestFile, remainingPatch),
+              metadata: latestMetadata,
+              status: "pending",
+              downloadStatus: "ready",
+              downloadError: undefined,
+            },
+            remainingPatch,
+          );
+          library.dispatch({
+            type: "content-replaced",
+            files: latestSnapshot.files.map((file) =>
+              file.id === fileToUpdate.id ? nextFile : file,
+            ),
+          });
+          return;
+        }
+
+        const nextFiles = latestSnapshot.files.map((file) =>
           file.id === fileToUpdate.id
             ? clearPendingMetadataPatch({
                 ...file,
@@ -368,33 +451,40 @@ export const useTrackEditorSession = ({
         library.dispatch({ type: "content-replaced", files: nextFiles });
         if (library.getSnapshot().selectedFileId === fileToUpdate.id) reset(metadata);
       } catch (error) {
+        if (!isLatestWrite()) throw error;
         const message = getSystemFailurePresentation(error, "metadata").trackDescription;
-        const nextFiles = library.getSnapshot().files.map((file) =>
-          file.id === fileToUpdate.id
+        const { latestFile, latestMetadata, latestPendingPatch, latestSnapshot } =
+          getLatestUpdateState();
+        const failedPendingPatch = sanitizePendingMetadataPatch({
+          ...createSubmittedMetadataPatch(metadata),
+          ...latestPendingPatch,
+        });
+        const nextFiles = latestSnapshot.files.map((file) =>
+          file.id === fileToUpdate.id && latestFile
             ? withPendingMetadataPatch(
                 {
-                  ...file,
+                  ...latestFile,
                   status: "error" as const,
                   metadata: {
-                    ...metadata,
-                    duration: file.metadata?.duration || 0,
-                    bitrate: file.metadata?.bitrate || 0,
-                    sampleRate: file.metadata?.sampleRate || 0,
+                    ...(latestMetadata ?? metadata),
+                    duration: latestFile.metadata?.duration || 0,
+                    bitrate: latestFile.metadata?.bitrate || 0,
+                    sampleRate: latestFile.metadata?.sampleRate || 0,
                   },
-                  filename: metadata.filename
-                    ? audioFilename(metadata.filename, getAudioFormat(file))
-                    : file.filename,
+                  filename: getFilenameFromPatch(latestFile, failedPendingPatch ?? {}),
                   downloadError: message,
                 },
-                createSubmittedMetadataPatch(metadata),
+                failedPendingPatch,
               )
             : file,
         );
         library.dispatch({ type: "content-replaced", files: nextFiles });
         throw error;
+      } finally {
+        finishWrite();
       }
     },
-    [getSubmittedMetadata, library, reset],
+    [createCurrentMetadataPatch, getSubmittedMetadata, getValues, library, reset],
   );
 
   const hydrateDownloadedTrack = useCallback(

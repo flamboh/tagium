@@ -11,7 +11,6 @@ import type { Manifest } from "@/features/share/shareManifest";
 
 type AudioImportEditor = {
   commands: Pick<TrackEditorSession["commands"], "flush" | "hydrateDownloadedTrack" | "updateTags">;
-  form: Pick<TrackEditorSession["form"], "reset">;
 };
 
 export interface AudioImportSession {
@@ -76,7 +75,6 @@ export const useAudioImportSession = ({
     createAudioUrlImportSession({
       library,
       getEditor: () => editorRef.current.commands,
-      resetEditorForm: (metadata) => editorRef.current.form.reset(metadata),
       getSettings: () => settingsRef.current,
       activateEditor: () => activateEditorRef.current(),
       setUrlImporting,
