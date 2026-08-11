@@ -58,14 +58,14 @@ describe("share link previews", () => {
       description: "Artist · 2 tracks · shared on tagium",
       url: "https://tagium.app/share/abc234",
       image: {
-        url: "https://tagium.app/api/manifests/abc234/artwork",
-        type: "image/png",
+        url: "https://tagium.app/api/manifests/abc234/preview-artwork",
         alt: "Album & <Deluxe> cover",
       },
       twitterImage: {
         url: "https://tagium.app/api/manifests/abc234/social-card",
         alt: "Album & <Deluxe> by Artist",
       },
+      twitterTitle: "Album & <Deluxe> - Artist",
     });
   });
 
@@ -87,13 +87,13 @@ describe("share link previews", () => {
       url: "http://localhost:5173/share/xyz789",
       image: {
         url: "http://localhost:5173/icon-512.png",
-        type: "image/png",
         alt: "tagium",
       },
       twitterImage: {
         url: "http://localhost:5173/api/manifests/xyz789/social-card",
         alt: "untitled track by unknown artist",
       },
+      twitterTitle: "untitled track - unknown artist",
     });
   });
 
@@ -105,14 +105,18 @@ describe("share link previews", () => {
 
     expect(output).toContain("<title>Album &amp; &lt;Deluxe&gt; · tagium</title>");
     expect(output).toContain(
-      '<meta property="og:image" content="https://tagium.app/api/manifests/abc234/artwork" />',
+      '<meta property="og:image" content="https://tagium.app/api/manifests/abc234/preview-artwork" />',
     );
+    expect(output).not.toContain('property="og:image:type"');
     expect(output).toContain('<meta name="twitter:card" content="summary_large_image" />');
     expect(output).toContain(
       '<meta name="twitter:image" content="https://tagium.app/api/manifests/abc234/social-card" />',
     );
     expect(output).toContain(
       '<meta name="twitter:image:alt" content="Album &amp; &lt;Deluxe&gt; by Artist" />',
+    );
+    expect(output).toContain(
+      '<meta name="twitter:title" content="Album &amp; &lt;Deluxe&gt; - Artist" />',
     );
     expect(output).not.toContain('<meta property="og:title" content="tagium" />');
     expect(output).toContain('<script src="/assets/app.js"></script>');

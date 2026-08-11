@@ -13,13 +13,13 @@ export interface ShareLinkPreviewMetadata {
   url: string;
   image?: {
     url: string;
-    type: "image/jpeg" | "image/png";
     alt: string;
   };
   twitterImage: {
     url: string;
     alt: string;
   };
+  twitterTitle: string;
 }
 
 const contentForManifest = (manifest: Manifest) =>
@@ -49,13 +49,12 @@ export const buildShareLinkPreviewMetadata = (
       : `${content.artist} · shared track on tagium`;
   const image = artwork
     ? {
-        url: new URL(`/api/manifests/${encodeURIComponent(slug)}/artwork`, canonicalUrl).href,
-        type: artwork.format,
+        url: new URL(`/api/manifests/${encodeURIComponent(slug)}/preview-artwork`, canonicalUrl)
+          .href,
         alt: `${content.title} ${manifest.kind === "album" ? "cover" : "artwork"}`,
       }
     : {
         url: new URL("/icon-512.png", canonicalUrl).href,
-        type: "image/png" as const,
         alt: "tagium",
       };
 
@@ -68,6 +67,7 @@ export const buildShareLinkPreviewMetadata = (
       url: new URL(`/api/manifests/${encodeURIComponent(slug)}/social-card`, canonicalUrl).href,
       alt: `${content.title} by ${content.artist}`,
     },
+    twitterTitle: `${content.title} - ${content.artist}`,
   };
 };
 
@@ -95,14 +95,13 @@ export const renderShareLinkPreviewTags = (metadata: ShareLinkPreviewMetadata) =
   if (metadata.image) {
     tags.push(
       meta("property", "og:image", metadata.image.url),
-      meta("property", "og:image:type", metadata.image.type),
       meta("property", "og:image:alt", metadata.image.alt),
     );
   }
 
   tags.push(
     meta("name", "twitter:card", "summary_large_image"),
-    meta("name", "twitter:title", metadata.title),
+    meta("name", "twitter:title", metadata.twitterTitle),
     meta("name", "twitter:description", metadata.description),
     meta("name", "twitter:image", metadata.twitterImage.url),
     meta("name", "twitter:image:alt", metadata.twitterImage.alt),

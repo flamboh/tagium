@@ -28,18 +28,23 @@ export const createShareSocialCardHandler = (renderSocialCard: RenderShareSocial
       const manifestResult = await store.load(slug);
       if (manifestResult.kind !== "available") return unavailable();
 
-      const artworkResult = manifestArtwork(manifestResult.manifest)
-        ? await store.loadArtwork(slug).catch(() => undefined)
-        : undefined;
       let artwork: ShareSocialCardArtwork | undefined;
-      if (
-        artworkResult?.kind === "available" &&
-        (artworkResult.artwork.type === "image/jpeg" || artworkResult.artwork.type === "image/png")
-      ) {
-        artwork = {
-          bytes: new Uint8Array(await new Response(artworkResult.artwork.body).arrayBuffer()),
-          type: artworkResult.artwork.type,
-        };
+      if (manifestArtwork(manifestResult.manifest)) {
+        try {
+          const artworkResult = await store.loadArtwork(slug);
+          if (
+            artworkResult.kind === "available" &&
+            (artworkResult.artwork.type === "image/jpeg" ||
+              artworkResult.artwork.type === "image/png")
+          ) {
+            artwork = {
+              bytes: new Uint8Array(await new Response(artworkResult.artwork.body).arrayBuffer()),
+              type: artworkResult.artwork.type,
+            };
+          }
+        } catch {
+          // Artwork is optional for the social card; the renderer supplies the favicon fallback.
+        }
       }
       const png = await renderSocialCard(manifestResult.manifest, artwork);
       return new Response(Uint8Array.from(png).buffer, {

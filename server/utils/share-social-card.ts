@@ -1,11 +1,16 @@
 import { Resvg } from "@cf-wasm/resvg";
+import interSemiBoldDataUrl from "@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf?inline";
 import faviconSvg from "../../public/favicon.svg?raw";
 import { manifestTrackCount, type Manifest } from "../../src/features/share/shareManifest";
+import { isShareArtworkBytes } from "./share-manifest";
 
 export const SHARE_SOCIAL_CARD_WIDTH = 1_200;
 export const SHARE_SOCIAL_CARD_HEIGHT = 630;
 export const SATOSHI_STYLESHEET_URL =
   "https://api.fontshare.com/v2/css?f%5B%5D=satoshi%401&display=swap";
+export const SATOSHI_LOAD_TIMEOUT_MS = 3_000;
+export const SATOSHI_STYLESHEET_MAX_BYTES = 64 * 1024;
+export const SATOSHI_FONT_MAX_BYTES = 2 * 1024 * 1024;
 
 const ARTWORK_SIZE = 630;
 const CONTENT_LEFT = 690;
@@ -24,23 +29,94 @@ export type ShareSocialCardArtwork = {
   type: "image/jpeg" | "image/png";
 };
 
-type FetchFont = (input: string | URL) => Promise<Response>;
+type FetchFont = (input: string | URL, init?: RequestInit) => Promise<Response>;
+
+const readBoundedResponse = async (response: Response, maximumBytes: number) => {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maximumBytes) {
+    throw new Error("font_response_too_large");
+  }
+  if (!response.body) {
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.byteLength > maximumBytes) throw new Error("font_response_too_large");
+    return bytes;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const result = await reader.read();
+    if (result.done) break;
+    size += result.value.byteLength;
+    if (size > maximumBytes) {
+      await reader.cancel();
+      throw new Error("font_response_too_large");
+    }
+    chunks.push(result.value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+};
+
+const fetchBounded = async (
+  fetchFont: FetchFont,
+  input: string | URL,
+  maximumBytes: number,
+  signal: AbortSignal,
+) => {
+  const response = await fetchFont(input, { signal });
+  if (!response.ok) throw new Error("font_response_unavailable");
+  return readBoundedResponse(response, maximumBytes);
+};
 
 /** Load Satoshi through Fontshare's API without redistributing its proprietary font file. */
-export const createSatoshiFontLoader = (fetchFont: FetchFont = fetch) => {
+export const createSatoshiFontLoader = (
+  fetchFont: FetchFont = fetch,
+  timeoutMs = SATOSHI_LOAD_TIMEOUT_MS,
+) => {
   let fontPromise: Promise<Uint8Array> | undefined;
   return () => {
     fontPromise ??= (async () => {
-      const stylesheet = await fetchFont(SATOSHI_STYLESHEET_URL);
-      if (!stylesheet.ok) throw new Error("satoshi_stylesheet_unavailable");
-      const source = (await stylesheet.text()).match(
-        /url\(['"]?([^'")]+\.ttf)['"]?\)\s*format\(['"]truetype['"]\)/u,
-      )?.[1];
-      if (!source) throw new Error("satoshi_font_source_missing");
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const source = new TextDecoder()
+          .decode(
+            await fetchBounded(
+              fetchFont,
+              SATOSHI_STYLESHEET_URL,
+              SATOSHI_STYLESHEET_MAX_BYTES,
+              controller.signal,
+            ),
+          )
+          .match(/url\(['"]?([^'")]+\.ttf)['"]?\)\s*format\(['"]truetype['"]\)/u)?.[1];
+        if (!source) throw new Error("satoshi_font_source_missing");
 
-      const font = await fetchFont(new URL(source, SATOSHI_STYLESHEET_URL));
-      if (!font.ok) throw new Error("satoshi_font_unavailable");
-      return new Uint8Array(await font.arrayBuffer());
+        const font = await fetchBounded(
+          fetchFont,
+          new URL(source, SATOSHI_STYLESHEET_URL),
+          SATOSHI_FONT_MAX_BYTES,
+          controller.signal,
+        );
+        if (
+          font.length < 4 ||
+          font[0] !== 0x00 ||
+          font[1] !== 0x01 ||
+          font[2] !== 0x00 ||
+          font[3] !== 0x00
+        ) {
+          throw new Error("satoshi_font_invalid");
+        }
+        return font;
+      } finally {
+        clearTimeout(timeout);
+      }
     })().catch((error: unknown) => {
       fontPromise = undefined;
       throw error;
@@ -50,6 +126,25 @@ export const createSatoshiFontLoader = (fetchFont: FetchFont = fetch) => {
 };
 
 const loadSatoshiFont = createSatoshiFontLoader();
+
+const decodeDataUrl = (dataUrl: string) => {
+  const separator = dataUrl.indexOf(",");
+  return Uint8Array.from(atob(dataUrl.slice(separator + 1)), (character) =>
+    character.charCodeAt(0),
+  );
+};
+
+// Inter is bundled under the SIL Open Font License as a deterministic fallback. It supplies Greek
+// and Cyrillic glyphs missing from Satoshi and keeps rendering available when Fontshare is down.
+// Unsupported scripts and emoji become a visible square instead of disappearing in a Worker.
+export const BUNDLED_FALLBACK_FONT = decodeDataUrl(interSemiBoldDataUrl);
+let defaultFontPromise: Promise<Uint8Array> | undefined;
+export const loadShareCardFont = (fetchFont?: FetchFont) => {
+  if (fetchFont) {
+    return createSatoshiFontLoader(fetchFont)().catch(() => BUNDLED_FALLBACK_FONT);
+  }
+  return (defaultFontPromise ??= loadSatoshiFont().catch(() => BUNDLED_FALLBACK_FONT));
+};
 
 const cleanText = (value: string) =>
   Array.from(value, (character) => {
@@ -61,7 +156,14 @@ const cleanText = (value: string) =>
       (codePoint >= 0x20 && codePoint <= 0xd7ff) ||
       (codePoint >= 0xe000 && codePoint <= 0xfffd) ||
       (codePoint >= 0x10000 && codePoint <= 0x10ffff);
-    return validXmlCharacter ? character : " ";
+    if (!validXmlCharacter) return " ";
+    const supported =
+      codePoint <= 0x024f ||
+      (codePoint >= 0x0300 && codePoint <= 0x036f) ||
+      (codePoint >= 0x0370 && codePoint <= 0x052f) ||
+      (codePoint >= 0x1e00 && codePoint <= 0x1fff) ||
+      (codePoint >= 0x2000 && codePoint <= 0x218f);
+    return supported ? character : "□";
   })
     .join("")
     .replaceAll(/\s+/g, " ")
@@ -220,7 +322,7 @@ export const renderShareSocialCardSvg = (manifest: Manifest, artwork?: ShareSoci
   ${artworkMarkup(artwork)}
   <rect x="630" width="570" height="630" fill="${colors.background}" />
   <rect x="630" width="8" height="630" fill="${colors.primary}" />
-  <g font-family="Satoshi Variable" font-weight="600" font-feature-settings="'ss01' 1">
+  <g font-family="'Satoshi Variable', Inter" font-weight="600" font-feature-settings="'ss01' 1">
     <text x="${CONTENT_LEFT}" y="102" font-size="34" fill="${colors.primary}">tagium</text>
     ${title.lines
       .map(
@@ -241,11 +343,15 @@ export const renderShareSocialCardPng = async (
   artwork?: ShareSocialCardArtwork,
   fontBytes?: Uint8Array,
 ) => {
-  const satoshi = fontBytes ?? (await loadSatoshiFont());
+  const satoshi = fontBytes ?? (await loadShareCardFont());
   const rasterize = async (candidate: ShareSocialCardArtwork | undefined) => {
+    const fontBuffers =
+      satoshi === BUNDLED_FALLBACK_FONT
+        ? [BUNDLED_FALLBACK_FONT]
+        : [satoshi, BUNDLED_FALLBACK_FONT];
     const renderer = await Resvg.async(renderShareSocialCardSvg(manifest, candidate), {
       font: {
-        fontBuffers: [satoshi],
+        fontBuffers,
         defaultFontFamily: "Satoshi Variable",
         loadSystemFonts: false,
       },
@@ -255,9 +361,15 @@ export const renderShareSocialCardPng = async (
   };
 
   if (!artwork) return rasterize(undefined);
+  if (!isShareArtworkBytes(artwork.bytes, artwork.type)) return rasterize(undefined);
   try {
     return await rasterize(artwork);
-  } catch {
+  } catch (error) {
+    if (!isArtworkDecodeError(error)) throw error;
     return rasterize(undefined);
   }
 };
+
+const isArtworkDecodeError = (error: unknown) =>
+  error instanceof Error &&
+  /art|image|png|jpeg|decode|parse|invalid|unsupported/iu.test(error.message);
