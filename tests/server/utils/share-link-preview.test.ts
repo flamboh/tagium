@@ -65,7 +65,7 @@ describe("share link previews", () => {
         url: "https://tagium.app/api/manifests/abc234/social-card",
         alt: "Album & <Deluxe> by Artist",
       },
-      twitterTitle: "Album & <Deluxe> - Artist",
+      cardTitle: "Album & <Deluxe> - Artist",
     });
   });
 
@@ -93,7 +93,7 @@ describe("share link previews", () => {
         url: "http://localhost:5173/api/manifests/xyz789/social-card",
         alt: "untitled track by unknown artist",
       },
-      twitterTitle: "untitled track - unknown artist",
+      cardTitle: "untitled track - unknown artist",
     });
   });
 
@@ -117,6 +117,9 @@ describe("share link previews", () => {
     );
     expect(output).toContain(
       '<meta name="twitter:title" content="Album &amp; &lt;Deluxe&gt; - Artist" />',
+    );
+    expect(output).toContain(
+      '<meta property="og:title" content="Album &amp; &lt;Deluxe&gt; - Artist" />',
     );
     expect(output).not.toContain('<meta property="og:title" content="tagium" />');
     expect(output).toContain('<script src="/assets/app.js"></script>');
@@ -148,7 +151,7 @@ describe("share link previews", () => {
     expect(response.headers.get("content-length")).toBeNull();
     expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
     await expect(response.text()).resolves.toContain(
-      '<meta property="og:title" content="Album &amp; &lt;Deluxe&gt;" />',
+      '<meta property="og:title" content="Album &amp; &lt;Deluxe&gt; - Artist" />',
     );
   });
 

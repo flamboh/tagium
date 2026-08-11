@@ -19,7 +19,7 @@ export interface ShareLinkPreviewMetadata {
     url: string;
     alt: string;
   };
-  twitterTitle: string;
+  cardTitle: string;
 }
 
 const contentForManifest = (manifest: Manifest) =>
@@ -67,7 +67,7 @@ export const buildShareLinkPreviewMetadata = (
       url: new URL(`/api/manifests/${encodeURIComponent(slug)}/social-card`, canonicalUrl).href,
       alt: `${content.title} by ${content.artist}`,
     },
-    twitterTitle: `${content.title} - ${content.artist}`,
+    cardTitle: `${content.title} - ${content.artist}`,
   };
 };
 
@@ -85,7 +85,7 @@ export const renderShareLinkPreviewTags = (metadata: ShareLinkPreviewMetadata) =
   const tags = [
     `<title>${escapeHtml(`${metadata.title} · tagium`)}</title>`,
     meta("name", "description", metadata.description),
-    meta("property", "og:title", metadata.title),
+    meta("property", "og:title", metadata.cardTitle),
     meta("property", "og:description", metadata.description),
     meta("property", "og:type", "website"),
     meta("property", "og:url", metadata.url),
@@ -101,7 +101,7 @@ export const renderShareLinkPreviewTags = (metadata: ShareLinkPreviewMetadata) =
 
   tags.push(
     meta("name", "twitter:card", "summary_large_image"),
-    meta("name", "twitter:title", metadata.twitterTitle),
+    meta("name", "twitter:title", metadata.cardTitle),
     meta("name", "twitter:description", metadata.description),
     meta("name", "twitter:image", metadata.twitterImage.url),
     meta("name", "twitter:image:alt", metadata.twitterImage.alt),
