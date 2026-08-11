@@ -26,13 +26,17 @@ const manifest = {
     },
   ],
 };
+const analyticsId = "a".repeat(43);
 
 describe("shared content client", () => {
   it("decodes the public response envelope without requesting audio", async () => {
-    const fetch = vi.fn(async () => Response.json({ manifest, expiresAt: "2026-10-20T12:00:00Z" }));
+    const fetch = vi.fn(async () =>
+      Response.json({ manifest, expiresAt: "2026-10-20T12:00:00Z", analyticsId }),
+    );
     await expect(fetchSharedContent("k7m4q2", { fetch })).resolves.toEqual({
       manifest,
       expiresAt: "2026-10-20T12:00:00Z",
+      analyticsId,
     });
     expect(fetch).toHaveBeenCalledWith(
       "/api/manifests/k7m4q2",
@@ -43,13 +47,27 @@ describe("shared content client", () => {
 
   it("distinguishes a future contract from a generic unavailable response", async () => {
     const futureFetch = vi.fn(async () =>
-      Response.json({ manifest: { ...manifest, version: 2 }, expiresAt: "2026-10-20T12:00:00Z" }),
+      Response.json({
+        manifest: { ...manifest, version: 2 },
+        expiresAt: "2026-10-20T12:00:00Z",
+        analyticsId,
+      }),
     );
     await expect(fetchSharedContent("k7m4q2", { fetch: futureFetch })).rejects.toBeInstanceOf(
       SharedContentVersionError,
     );
     const missingFetch = vi.fn(async () => new Response(null, { status: 404 }));
     await expect(fetchSharedContent("k7m4q2", { fetch: missingFetch })).rejects.toBeInstanceOf(
+      SharedContentUnavailableError,
+    );
+  });
+
+  it("rejects a response without a privacy-safe analytics identifier", async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({ manifest, expiresAt: "2026-10-20T12:00:00Z", analyticsId: "k7m4q2" }),
+    );
+
+    await expect(fetchSharedContent("k7m4q2", { fetch })).rejects.toBeInstanceOf(
       SharedContentUnavailableError,
     );
   });

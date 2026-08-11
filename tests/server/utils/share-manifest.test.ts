@@ -121,9 +121,12 @@ describe("share manifest store", () => {
     const published = await store.publish(manifest, undefined);
 
     expect(published.expiresAt).toBe(1_000 + SHARE_MANIFEST_LIFETIME_MS);
+    expect(published.analyticsId).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(published.analyticsId).not.toBe(published.slug);
     expect(await store.load(published.slug)).toMatchObject({
       kind: "available",
       expiresAt: published.expiresAt,
+      analyticsId: published.analyticsId,
     });
     now = published.expiresAt;
     expect(await store.load(published.slug)).toEqual({ kind: "unavailable" });

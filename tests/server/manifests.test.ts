@@ -194,8 +194,11 @@ describe("share manifest endpoints", () => {
       slug: string;
       revocationToken: string;
       expiresAt: string;
+      analyticsId: string;
     };
     expect(isShareExpiryIso(receipt.expiresAt)).toBe(true);
+    expect(receipt.analyticsId).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(receipt.analyticsId).not.toBe(receipt.slug);
 
     const loaded = await manifestHandler(
       event(
@@ -205,8 +208,9 @@ describe("share manifest endpoints", () => {
     );
     expect(loaded.status).toBe(200);
     expect(loaded.headers.get("cache-control")).toBe("no-store");
-    const payload = (await loaded.clone().json()) as { expiresAt: string };
+    const payload = (await loaded.clone().json()) as { expiresAt: string; analyticsId: string };
     expect(isShareExpiryIso(payload.expiresAt)).toBe(true);
+    expect(payload.analyticsId).toBe(receipt.analyticsId);
     await expect(loaded.json()).resolves.toMatchObject({ manifest });
 
     const cover = await artworkHandler(

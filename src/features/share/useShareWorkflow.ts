@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { analytics } from "@/analytics";
 import { coverArtFileToPicture } from "@/features/editor/coverArtProcessing";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { AlbumGroup, SharePublication } from "@/features/library/types";
@@ -104,6 +105,7 @@ export const useShareWorkflow = ({
   const [anotherTabOpen, setAnotherTabOpen] = useState(false);
   const [, setExpiryTick] = useState(0);
   const loadingSlugRef = useRef<string | null>(null);
+  const pageLoadIdRef = useRef(0);
   const importingSlugRef = useRef<string | null>(null);
   const publicationReceiptsRef = useRef(
     new Map<string, { slug: string; expiresAt: string; token: string }>(),
@@ -265,25 +267,36 @@ export const useShareWorkflow = ({
     }),
   );
 
-  const loadSlug = useCallback(async (slug: string) => {
-    loadingSlugRef.current = slug;
-    setPage({ status: "loading", slug });
-    try {
-      const fetched = await fetchSharedContent(slug);
-      if (loadingSlugRef.current !== slug) return fetched;
-      setPage({ status: "ready", slug, ...fetched });
-      void detectAnotherTagiumTab().then(setAnotherTabOpen);
-      return fetched;
-    } catch (error) {
-      if (loadingSlugRef.current !== slug) throw error;
-      setPage({
-        status: "unavailable",
-        slug,
-        reason: error instanceof SharedContentVersionError ? "newer-version" : "unavailable",
-      });
-      throw error;
-    }
-  }, []);
+  const loadSlug = useCallback(
+    async (slug: string) => {
+      const loadId = ++pageLoadIdRef.current;
+      loadingSlugRef.current = slug;
+      setPage({ status: "loading", slug });
+      try {
+        const fetched = await fetchSharedContent(slug);
+        if (loadingSlugRef.current !== slug || pageLoadIdRef.current !== loadId) return fetched;
+        setPage({ status: "ready", slug, ...fetched });
+        analytics.capture({
+          type: "share_opened",
+          shareId: fetched.analyticsId,
+          shareKind: fetched.manifest.kind,
+          trackCount: manifestTrackCount(fetched.manifest),
+          viewer: getPublicationCapability(slug) ? "creator" : "recipient",
+        });
+        void detectAnotherTagiumTab().then(setAnotherTabOpen);
+        return fetched;
+      } catch (error) {
+        if (loadingSlugRef.current !== slug || pageLoadIdRef.current !== loadId) throw error;
+        setPage({
+          status: "unavailable",
+          slug,
+          reason: error instanceof SharedContentVersionError ? "newer-version" : "unavailable",
+        });
+        throw error;
+      }
+    },
+    [getPublicationCapability],
+  );
 
   useEffect(() => listenForTagiumPresence(), []);
 
@@ -347,6 +360,12 @@ export const useShareWorkflow = ({
             : entry,
         );
         await importing.commands.importSharedContent(fresh.manifest, slug, picture);
+        analytics.capture({
+          type: "share_added",
+          shareId: fresh.analyticsId,
+          shareKind: fresh.manifest.kind,
+          trackCount: manifestTrackCount(fresh.manifest),
+        });
         toast.success(`${fresh.manifest.kind} added to your library`, {
           description: sharedContentAddedDescription(fresh.manifest),
         });
@@ -533,6 +552,7 @@ export const useShareWorkflow = ({
       attemptedIntent = updating ? "update" : "create";
 
       let receipt;
+      let createdAnalyticsId: string | undefined;
       if (updating) {
         if (!existingPublication || !isActiveSharePublication(existingPublication)) {
           throw new Error(`the shared ${target.kind} can no longer be updated`);
@@ -553,6 +573,7 @@ export const useShareWorkflow = ({
         };
       } else {
         receipt = await publishShare(shareSnapshot.manifest, shareSnapshot.cover);
+        createdAnalyticsId = receipt.analyticsId;
         const capability = {
           slug: receipt.slug,
           expiresAt: receipt.expiresAt,
@@ -593,6 +614,14 @@ export const useShareWorkflow = ({
         status: "active",
       });
       setDialog({ status: "published", preview: currentDialog.preview, receipt });
+      if (createdAnalyticsId) {
+        analytics.capture({
+          type: "share_created",
+          shareId: createdAnalyticsId,
+          shareKind: shareSnapshot.manifest.kind,
+          trackCount: manifestTrackCount(shareSnapshot.manifest),
+        });
+      }
     } catch (error) {
       const createError = sharePublicationErrorMessage(error, target.kind).replace(/[.!?]+$/, "");
       setDialog({
@@ -687,6 +716,12 @@ export const useShareWorkflow = ({
             : entry,
         );
         await importing.commands.importSharedContent(fresh.manifest, page.slug, picture);
+        analytics.capture({
+          type: "share_added",
+          shareId: fresh.analyticsId,
+          shareKind: fresh.manifest.kind,
+          trackCount: manifestTrackCount(fresh.manifest),
+        });
         history.replaceState({}, "", "/");
         setPage(null);
         toast.success(`${fresh.manifest.kind} added to your library`, {

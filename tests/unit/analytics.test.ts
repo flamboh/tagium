@@ -123,6 +123,63 @@ describe("analytics", () => {
     expect(JSON.stringify(capture.mock.calls)).not.toContain("internal.example");
   });
 
+  it("serializes privacy-safe share lifecycle events", async () => {
+    const capture = vi.fn();
+    const analytics = createAnalytics(
+      { key: "public-test-key", deployEnv: "production" },
+      {
+        loadClient: async () => ({ init: vi.fn(), capture }),
+        schedule: (load) => load(),
+      },
+    );
+    analytics.initialize();
+    await Promise.resolve();
+    await Promise.resolve();
+    const shareId = "a".repeat(43);
+
+    analytics.capture({
+      type: "share_created",
+      shareId,
+      shareKind: "album",
+      trackCount: 4,
+    });
+    analytics.capture({
+      type: "share_opened",
+      shareId,
+      shareKind: "album",
+      trackCount: 4,
+      viewer: "recipient",
+    });
+    analytics.capture({
+      type: "share_added",
+      shareId,
+      shareKind: "album",
+      trackCount: 4,
+    });
+
+    expect(capture.mock.calls).toEqual([
+      [
+        "share_created",
+        expect.objectContaining({ share_id: shareId, share_kind: "album", track_count: 4 }),
+      ],
+      [
+        "share_opened",
+        expect.objectContaining({
+          share_id: shareId,
+          share_kind: "album",
+          track_count: 4,
+          viewer: "recipient",
+        }),
+      ],
+      [
+        "share_added",
+        expect.objectContaining({ share_id: shareId, share_kind: "album", track_count: 4 }),
+      ],
+    ]);
+    expect(JSON.stringify(capture.mock.calls)).not.toContain("k7m4q2");
+    expect(JSON.stringify(capture.mock.calls)).not.toContain("/share/");
+  });
+
   it("serializes URL shape and tunnel readiness as privacy-safe categories", async () => {
     const init = vi.fn();
     const capture = vi.fn();
@@ -432,6 +489,35 @@ describe("analytics", () => {
     ).toEqual({
       event: "import_failure_category",
       properties: { provider: "soundcloud", import_kind: "set", track_count: 1 },
+    });
+    expect(
+      options.before_send({
+        event: "share_opened",
+        properties: {
+          share_id: "a".repeat(43),
+          share_kind: "album",
+          track_count: 4,
+          viewer: "recipient",
+          share_slug: "k7m4q2",
+        },
+      }),
+    ).toEqual({
+      event: "share_opened",
+      properties: {
+        share_id: "a".repeat(43),
+        share_kind: "album",
+        track_count: 4,
+        viewer: "recipient",
+      },
+    });
+    expect(
+      options.before_send({
+        event: "share_opened",
+        properties: { share_id: "k7m4q2", share_kind: "album", track_count: 4 },
+      }),
+    ).toEqual({
+      event: "share_opened",
+      properties: { share_kind: "album", track_count: 4 },
     });
     expect(
       options.before_send({

@@ -154,6 +154,19 @@ export type AnalyticsEvent =
       canceledCount: number;
       outcome: ImportOutcome;
       durationMs: number;
+    }
+  | {
+      type: "share_created" | "share_added";
+      shareId: string;
+      shareKind: "album" | "track";
+      trackCount: number;
+    }
+  | {
+      type: "share_opened";
+      shareId: string;
+      shareKind: "album" | "track";
+      trackCount: number;
+      viewer: "creator" | "recipient";
     };
 
 export interface AnalyticsConfig {
@@ -353,6 +366,15 @@ const CUSTOM_EVENT_PROPERTIES: Record<string, ReadonlySet<string>> = {
     "outcome",
     "duration_ms",
   ]),
+  share_created: new Set([...COMMON_CUSTOM_PROPERTIES, "share_id", "share_kind", "track_count"]),
+  share_opened: new Set([
+    ...COMMON_CUSTOM_PROPERTIES,
+    "share_id",
+    "share_kind",
+    "track_count",
+    "viewer",
+  ]),
+  share_added: new Set([...COMMON_CUSTOM_PROPERTIES, "share_id", "share_kind", "track_count"]),
 };
 const SAFE_SDK_EVENTS = new Set(["$pageview", "$pageleave", "$autocapture"]);
 const SAFE_SDK_PROPERTIES = new Set([
@@ -432,6 +454,8 @@ const isCobaltTunnelElapsedBucket = isOneOf([
   "5_to_15_seconds",
   "15_seconds_or_more",
 ] as const);
+const isShareKind = isOneOf(["album", "track"] as const);
+const isShareViewer = isOneOf(["creator", "recipient"] as const);
 
 const CUSTOM_PROPERTY_VALIDATORS: Record<
   string,
@@ -488,6 +512,22 @@ const CUSTOM_PROPERTY_VALIDATORS: Record<
     canceled_count: isNonNegativeInteger,
     outcome: isImportOutcome,
     duration_ms: isNonNegativeNumber,
+  },
+  share_created: {
+    share_id: isShareAnalyticsId,
+    share_kind: isShareKind,
+    track_count: isPositiveInteger,
+  },
+  share_opened: {
+    share_id: isShareAnalyticsId,
+    share_kind: isShareKind,
+    track_count: isPositiveInteger,
+    viewer: isShareViewer,
+  },
+  share_added: {
+    share_id: isShareAnalyticsId,
+    share_kind: isShareKind,
+    track_count: isPositiveInteger,
   },
 };
 
@@ -744,6 +784,28 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
           duration_ms: event.durationMs,
         },
       };
+    case "share_created":
+    case "share_added":
+      return {
+        name: event.type,
+        properties: {
+          ...commonProperties,
+          share_id: event.shareId,
+          share_kind: event.shareKind,
+          track_count: event.trackCount,
+        },
+      };
+    case "share_opened":
+      return {
+        name: event.type,
+        properties: {
+          ...commonProperties,
+          share_id: event.shareId,
+          share_kind: event.shareKind,
+          track_count: event.trackCount,
+          viewer: event.viewer,
+        },
+      };
   }
 };
 
@@ -858,3 +920,4 @@ import {
   serializeMetadataLinkAnalytics,
   type MetadataLinkState,
 } from "@/features/library/metadataLinks";
+import { isShareAnalyticsId } from "@/features/share/shareManifest";

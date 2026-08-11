@@ -26,7 +26,13 @@ export type SharedContentPageState =
       slug: string;
       reason: "unavailable" | "newer-version";
     }
-  | { status: "ready"; slug: string; manifest: Manifest; expiresAt: string };
+  | {
+      status: "ready";
+      slug: string;
+      manifest: Manifest;
+      expiresAt: string;
+      analyticsId: string;
+    };
 
 type ReadySharedContentPageState = Extract<SharedContentPageState, { status: "ready" }>;
 
