@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import artworkHandler from "../../server/api/manifests/[slug]/artwork.get";
-import socialCardHandler from "../../server/api/manifests/[slug]/social-card.get";
+import { createShareSocialCardHandler } from "../../server/api/manifests/[slug]/social-card.get";
 import revokeHandler from "../../server/api/manifests/[slug].delete";
 import manifestHandler from "../../server/api/manifests/[slug].get";
 import publishHandler from "../../server/api/manifests/index.post";
@@ -50,6 +50,8 @@ const png = Uint8Array.from(
   ),
   (character) => character.charCodeAt(0),
 );
+
+const socialCardHandler = createShareSocialCardHandler(async () => png);
 
 const createRuntime = () => {
   const records = new Map<string, Record>();

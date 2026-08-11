@@ -1,26 +1,42 @@
 import { Resvg } from "@cf-wasm/resvg";
-import interSemiBoldDataUrl from "@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf?inline";
 import { manifestTrackCount, type Manifest } from "../../src/features/share/shareManifest";
 
 export const SHARE_SOCIAL_CARD_WIDTH = 1_200;
 export const SHARE_SOCIAL_CARD_HEIGHT = 630;
+export const SATOSHI_STYLESHEET_URL =
+  "https://api.fontshare.com/v2/css?f%5B%5D=satoshi%401&display=swap";
 
 export type ShareSocialCardArtwork = {
   bytes: Uint8Array;
   type: "image/jpeg" | "image/png";
 };
 
-const decodeDataUrl = (dataUrl: string) => {
-  const separator = dataUrl.indexOf(",");
-  if (separator === -1 || !dataUrl.slice(0, separator).endsWith(";base64")) {
-    throw new Error("invalid_inline_font");
-  }
-  return Uint8Array.from(atob(dataUrl.slice(separator + 1)), (character) =>
-    character.charCodeAt(0),
-  );
+type FetchFont = (input: string | URL) => Promise<Response>;
+
+/** Load Satoshi through Fontshare's API without redistributing its proprietary font file. */
+export const createSatoshiFontLoader = (fetchFont: FetchFont = fetch) => {
+  let fontPromise: Promise<Uint8Array> | undefined;
+  return () => {
+    fontPromise ??= (async () => {
+      const stylesheet = await fetchFont(SATOSHI_STYLESHEET_URL);
+      if (!stylesheet.ok) throw new Error("satoshi_stylesheet_unavailable");
+      const source = (await stylesheet.text()).match(
+        /url\(['"]?([^'")]+\.ttf)['"]?\)\s*format\(['"]truetype['"]\)/u,
+      )?.[1];
+      if (!source) throw new Error("satoshi_font_source_missing");
+
+      const font = await fetchFont(new URL(source, SATOSHI_STYLESHEET_URL));
+      if (!font.ok) throw new Error("satoshi_font_unavailable");
+      return new Uint8Array(await font.arrayBuffer());
+    })().catch((error: unknown) => {
+      fontPromise = undefined;
+      throw error;
+    });
+    return fontPromise;
+  };
 };
 
-const interSemiBold = decodeDataUrl(interSemiBoldDataUrl);
+const loadSatoshiFont = createSatoshiFontLoader();
 
 const cleanText = (value: string) =>
   Array.from(value, (character) => {
@@ -188,7 +204,7 @@ export const renderShareSocialCardSvg = (manifest: Manifest, artwork?: ShareSoci
   <rect width="1200" height="10" fill="#900f1a" />
   <rect x="72" y="72" width="486" height="486" rx="16" fill="#e8dddc" filter="url(#cover-shadow)" />
   ${artworkMarkup(artwork)}
-  <g font-family="Inter" font-weight="600">
+  <g font-family="Satoshi Variable" font-weight="600" font-feature-settings="'ss01' 1">
     <text x="630" y="92" font-size="30" fill="#900f1a">tagium</text>
     ${title.lines
       .map(
@@ -206,11 +222,13 @@ export const renderShareSocialCardSvg = (manifest: Manifest, artwork?: ShareSoci
 export const renderShareSocialCardPng = async (
   manifest: Manifest,
   artwork?: ShareSocialCardArtwork,
+  fontBytes?: Uint8Array,
 ) => {
+  const satoshi = fontBytes ?? (await loadSatoshiFont());
   const renderer = await Resvg.async(renderShareSocialCardSvg(manifest, artwork), {
     font: {
-      fontBuffers: [interSemiBold],
-      defaultFontFamily: "Inter",
+      fontBuffers: [satoshi],
+      defaultFontFamily: "Satoshi Variable",
       loadSystemFonts: false,
     },
     fitTo: { mode: "original" },
