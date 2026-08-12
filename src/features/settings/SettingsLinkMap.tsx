@@ -35,9 +35,13 @@ function LinkRow({
   onChange,
 }: SettingsLinkMapProps & { descriptor: MetadataLinkDescriptor }) {
   const linked = isMetadataLinkEnabled(settings, descriptor);
-  // Both field names hug the wire — right-aligned on the left, left-aligned on the right — so every
-  // row sits the same distance from its chain no matter how long the names are.
-  const nodeClassName = "hidden min-h-11 items-center px-3 text-sm sm:flex";
+  const nodeClassName = "hidden min-h-11 items-center text-sm sm:flex";
+  // The two stubs grow out of the chain when a link is on and retract into it when it is cut, so
+  // breaking a link reads as the wire pulling apart rather than as a change of line style.
+  const wireClassName = cn(
+    "hidden h-0.5 flex-1 bg-brand transition-transform duration-200 ease-out motion-reduce:transition-none sm:block",
+    linked ? "scale-x-100" : "scale-x-0",
+  );
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b py-3 last:border-b-0 sm:contents">
@@ -49,15 +53,9 @@ function LinkRow({
       >
         {descriptor.label}
       </span>
-      <div className={cn(nodeClassName, "justify-end text-right")}>{descriptor.map.source}</div>
-      <div className="relative flex items-center justify-center sm:min-h-11">
-        <div
-          className={cn(
-            "absolute inset-x-0 top-1/2 hidden border-t-2 transition-colors duration-150 motion-reduce:transition-none sm:block",
-            linked ? "border-solid border-brand" : "border-dashed border-muted-foreground/70",
-          )}
-          aria-hidden="true"
-        />
+      <div className={cn(nodeClassName, "pr-3")}>{descriptor.map.source}</div>
+      <div className="flex items-center justify-center sm:min-h-11">
+        <span className={cn(wireClassName, "origin-right")} aria-hidden="true" />
         <Button
           type="button"
           role="switch"
@@ -74,11 +72,12 @@ function LinkRow({
         >
           {linked ? <Link2 aria-hidden="true" /> : <Unlink aria-hidden="true" />}
         </Button>
+        <span className={cn(wireClassName, "origin-left")} aria-hidden="true" />
       </div>
       <div
         className={cn(
           nodeClassName,
-          "transition-colors motion-reduce:transition-none",
+          "pl-3 transition-colors motion-reduce:transition-none",
           !linked && "text-muted-foreground",
         )}
       >
@@ -94,7 +93,9 @@ export default function SettingsLinkMap({ settings, onChange }: SettingsLinkMapP
   );
 
   return (
-    <div className="flex flex-col gap-7">
+    // One grid spans both groups so every chain lines up down the whole map, however long an
+    // individual group's field names are; the groups opt into its columns with subgrid.
+    <div className="flex flex-col gap-7 sm:grid sm:w-fit sm:grid-cols-[auto_4.5rem_auto]">
       {linkGroups.map((group) => {
         const descriptors = visibleDescriptors.filter(
           (descriptor) => descriptor.map.group === group.id,
@@ -104,18 +105,24 @@ export default function SettingsLinkMap({ settings, onChange }: SettingsLinkMapP
           <section
             key={group.id}
             aria-label={`${group.source} field synced to ${group.synced} field`}
+            className="sm:col-span-3 sm:grid sm:grid-cols-subgrid"
           >
             <div className="mb-2 text-[0.6875rem] tracking-widest text-muted-foreground sm:hidden">
               {group.source} field → {group.synced} field
             </div>
-            <div className="mb-3 hidden grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] text-[0.6875rem] tracking-widest text-muted-foreground sm:grid lg:grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,1fr)]">
-              <span className="px-3 text-right">source {group.source} field</span>
-              <span aria-hidden="true" className="text-center">
-                →
-              </span>
-              <span className="px-3">synced {group.synced} field</span>
-            </div>
-            <div className="border-y sm:grid sm:grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] sm:border-0 lg:grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,1fr)]">
+            <span className="mb-3 hidden pr-3 text-[0.6875rem] tracking-widest text-muted-foreground sm:block">
+              source {group.source} field
+            </span>
+            <span
+              aria-hidden="true"
+              className="mb-3 hidden text-center text-[0.6875rem] tracking-widest text-muted-foreground sm:block"
+            >
+              →
+            </span>
+            <span className="mb-3 hidden pl-3 text-[0.6875rem] tracking-widest text-muted-foreground sm:block">
+              synced {group.synced} field
+            </span>
+            <div className="border-y sm:col-span-3 sm:grid sm:grid-cols-subgrid sm:border-0">
               {descriptors.map((descriptor) => (
                 <LinkRow
                   key={descriptor.id}
