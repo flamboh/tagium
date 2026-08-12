@@ -128,6 +128,17 @@ describe("audioTagger metadata patches", () => {
     expect(patch).toEqual({ filename: "New Title", title: "New Title" });
   });
 
+  it("derives a linked single album title from the submitted track title", () => {
+    const submittedMetadata = getSubmittedAudioMetadata(
+      metadata({ title: "Single Title", album: "Old Album" }),
+      false,
+      false,
+      true,
+    );
+
+    expect(submittedMetadata.album).toBe("Single Title");
+  });
+
   it("quietly sanitizes manual filenames before metadata is committed", () => {
     const submittedMetadata = getSubmittedAudioMetadata(
       metadata({ filename: " ../mix/name?.mp3 " }),

@@ -4,7 +4,10 @@ import type {
   CobaltAudioDownloadRequest,
 } from "@/features/import/cobaltAudio";
 import { downloadFromCobalt, provideAudioBackend } from "@/features/audio/audioBackend";
-import { applyPlaylistImportedCover } from "@/features/library/fileMetadataOps";
+import {
+  applyPlaylistImportedCover,
+  applySingleAlbumTitlesToFiles,
+} from "@/features/library/fileMetadataOps";
 import {
   createPlaylistDownloadPlan,
   createSingleUrlDownloadPlan,
@@ -285,9 +288,14 @@ export const createAudioUrlImportSession = ({
       importId: importOperationId,
       metadata,
     });
+    const pendingFiles = applySingleAlbumTitlesToFiles(
+      plan.pendingFiles,
+      plan.looseTrackIds,
+      getSettings(),
+    );
     library.dispatch({
       type: "content-replaced",
-      files: [...snapshot.files, ...plan.pendingFiles],
+      files: [...snapshot.files, ...pendingFiles],
       looseTrackIds: asUniqueTrackIds([...snapshot.looseTrackIds, ...plan.looseTrackIds]),
       selection: {
         selectedAlbumId: plan.selection.selectedAlbumId,

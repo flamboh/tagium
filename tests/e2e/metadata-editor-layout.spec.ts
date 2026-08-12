@@ -16,9 +16,21 @@ const uploadTrack = async (page: Page) => {
 };
 
 const enableAdvancedMetadata = async (page: Page) => {
-  await page.getByRole("button", { name: "settings" }).click();
+  const openLibrary = page.getByRole("button", { name: "open library" });
+  const openedFromMobileLibrary = await openLibrary.isVisible();
+  if (openedFromMobileLibrary) {
+    await openLibrary.click();
+    const library = page.getByRole("dialog", { name: "library" });
+    await library.getByRole("button", { name: "settings" }).click();
+  } else {
+    await page.getByRole("button", { name: "settings" }).click();
+  }
   await page.getByRole("checkbox", { name: "enable advanced metadata" }).click();
-  await page.getByRole("button", { name: "back to workspace" }).click();
+  if (openedFromMobileLibrary) {
+    await page.goBack();
+  } else {
+    await page.getByRole("button", { name: "back to workspace" }).click();
+  }
   await expect(page.getByRole("button", { name: "advanced" })).toBeVisible();
 };
 

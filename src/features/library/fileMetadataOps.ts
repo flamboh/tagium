@@ -281,6 +281,7 @@ export type MetadataPolicySettings = Pick<AppSettings, "metadataLinks" | "syncTr
 const defaultMetadataPolicySettings: MetadataPolicySettings = {
   syncTrackNumbers: true,
   metadataLinks: {
+    singleAlbum: true,
     artist: true,
     year: true,
     genre: true,
@@ -288,6 +289,32 @@ const defaultMetadataPolicySettings: MetadataPolicySettings = {
     albumArtist: true,
   },
 };
+
+/** Applies the loose-track policy that treats a single's album title as its track title. */
+export function applySingleAlbumTitlesToFiles(
+  files: TagiumFile[],
+  trackIds: readonly string[],
+  settings: MetadataPolicySettings = defaultMetadataPolicySettings,
+) {
+  if (!settings.metadataLinks.singleAlbum || trackIds.length === 0) return files;
+
+  const trackIdSet = new Set(trackIds);
+  return files.map((file) => {
+    if (!trackIdSet.has(file.id) || !file.metadata || file.metadata.album === file.metadata.title) {
+      return file;
+    }
+
+    const patch: MetadataPatch = { album: file.metadata.title };
+    return markPendingMetadataPatch(
+      {
+        ...file,
+        status: file.status === "saved" ? "pending" : file.status,
+        metadata: { ...file.metadata, ...patch },
+      },
+      patch,
+    );
+  });
+}
 
 export interface AlbumMetadataPolicyOptions {
   shared?: boolean;

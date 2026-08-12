@@ -85,7 +85,32 @@ describe("audio upload session", () => {
 
     expect(backendMocks.parseUploads).toHaveBeenCalledTimes(1);
     expect(library.getSnapshot().files).toHaveLength(1);
+    expect(library.getSnapshot().files[0]).toMatchObject({
+      metadata: { title: "Track", album: "Track" },
+      pendingMetadataPatch: { album: "Track" },
+    });
     expect(bufferEditor).toHaveBeenCalledTimes(2);
+  });
+
+  it("preserves a single's album title when its metadata link is disabled", async () => {
+    const source = new File(["audio"], "track.mp3", { lastModified: 42 });
+    backendMocks.parseUploads.mockResolvedValue([parsedUpload(source)]);
+    const library = createLibrary();
+    const session = createAudioUploadSession({
+      library,
+      getSettings: () => ({
+        ...defaultSettings,
+        metadataLinks: { ...defaultSettings.metadataLinks, singleAlbum: false },
+      }),
+      bufferEditor: vi.fn(),
+      activateEditor: vi.fn(),
+      setUploading: vi.fn(),
+    });
+
+    await session.upload([source]);
+
+    expect(library.getSnapshot().files[0].metadata?.album).toBe("");
+    expect(library.getSnapshot().files[0].pendingMetadataPatch).toBeUndefined();
   });
 
   it("reads current settings after an asynchronous parse before committing", async () => {

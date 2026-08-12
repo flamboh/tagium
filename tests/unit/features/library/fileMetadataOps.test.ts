@@ -3,6 +3,7 @@ import {
   applyAlbumCoverToFiles,
   applyAlbumCoverToFilesWithSelectedMetadata,
   applyAlbumSharedTagsToFiles,
+  applySingleAlbumTitlesToFiles,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
   areAlbumTrackCoversSynced,
@@ -47,6 +48,26 @@ const readyFile = (overrides: Partial<TagiumFile> = {}): TagiumFile => ({
 });
 
 describe("fileMetadataOps", () => {
+  it("links a single's album title to its track title when enabled", () => {
+    const file = readyFile({
+      status: "saved",
+      metadata: metadata({ title: "Single Title", album: "Old Album" }),
+    });
+
+    const [linked] = applySingleAlbumTitlesToFiles([file], [file.id], DEFAULT_APP_SETTINGS);
+    const [unlinked] = applySingleAlbumTitlesToFiles([file], [file.id], {
+      ...DEFAULT_APP_SETTINGS,
+      metadataLinks: { ...DEFAULT_APP_SETTINGS.metadataLinks, singleAlbum: false },
+    });
+
+    expect(linked).toMatchObject({
+      status: "pending",
+      metadata: { album: "Single Title" },
+      pendingMetadataPatch: { album: "Single Title" },
+    });
+    expect(unlinked).toBe(file);
+  });
+
   it("sanitizes sparse numeric metadata patches without losing explicit clears", () => {
     expect(
       sanitizePendingMetadataPatch({
@@ -213,6 +234,7 @@ describe("fileMetadataOps", () => {
       ...DEFAULT_APP_SETTINGS,
       advancedMetadata: true,
       metadataLinks: {
+        ...DEFAULT_APP_SETTINGS.metadataLinks,
         artist: false,
         year: true,
         genre: false,

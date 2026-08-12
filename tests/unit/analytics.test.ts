@@ -683,6 +683,7 @@ describe("analytics", () => {
       applySoundCloudCover: true,
       advancedMetadata: true,
       metadataLinks: {
+        singleAlbum: false,
         artist: true,
         year: false,
         genre: true,
@@ -727,6 +728,7 @@ describe("analytics", () => {
           audio_bitrate: "256",
           apply_soundcloud_cover: true,
           advanced_metadata: true,
+          link_single_album: false,
           link_artist: true,
           link_year: false,
           link_genre: true,

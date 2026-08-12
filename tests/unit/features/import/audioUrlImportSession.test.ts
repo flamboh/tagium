@@ -121,7 +121,7 @@ describe("audio URL import session", () => {
   });
 
   it("records accepted and rejected URL processing after resolution", async () => {
-    mocks.resolveTrackMetadata.mockResolvedValue(undefined);
+    mocks.resolveTrackMetadata.mockResolvedValue({ title: "Linked Single", artist: "Artist" });
     const hook = renderHook(() => {
       const library = useLibraryStore();
       const editor = useTrackEditorSession({ library, settings: settings("320") });
@@ -136,6 +136,10 @@ describe("audio URL import session", () => {
 
     await act(async () => {
       await hook.result.importing.commands.importUrl("https://www.youtube.com/watch?v=abcdefghijk");
+    });
+    expect(hook.result.library.getSnapshot().files[0]).toMatchObject({
+      metadata: { title: "Linked Single", album: "Linked Single" },
+      pendingMetadataPatch: { album: "Linked Single" },
     });
     expect(mocks.capture).toHaveBeenCalledWith({
       type: "media_link_processed",

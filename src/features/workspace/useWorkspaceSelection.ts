@@ -12,7 +12,11 @@ import {
   subscribeToEditorKeyboardShortcuts,
   type EditorKeyboardShortcutActions,
 } from "@/features/editor/editorKeyboardShortcuts";
-import { applyTrackOrderNumbersToFiles } from "@/features/library/fileMetadataOps";
+import {
+  applyAlbumSharedTagsToFiles,
+  applySingleAlbumTitlesToFiles,
+  applyTrackOrderNumbersToFiles,
+} from "@/features/library/fileMetadataOps";
 import type { TagSidebarPanelProps } from "@/features/library/TagSidebarPanel";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
@@ -189,6 +193,18 @@ export const useWorkspaceSelection = ({
           moved.albumsToSync,
           settingsRef.current,
         );
+      }
+      if (destination.type === "loose") {
+        finalFiles = applySingleAlbumTitlesToFiles(finalFiles, [trackId], settingsRef.current);
+      } else {
+        const destinationAlbum = moved.albums.find((album) => album.id === destination.albumId);
+        if (destinationAlbum) {
+          finalFiles = applyAlbumSharedTagsToFiles(
+            finalFiles,
+            { ...destinationAlbum, trackIds: [trackId] },
+            settingsRef.current,
+          );
+        }
       }
       library.dispatch({
         type: "content-replaced",

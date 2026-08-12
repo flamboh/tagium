@@ -10,6 +10,7 @@ import {
 } from "@/features/editor/audioTaggerUtils";
 import {
   applyAlbumSharedTagsToFiles,
+  applySingleAlbumTitlesToFiles,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
 } from "@/features/library/fileMetadataOps";
@@ -224,7 +225,11 @@ export const createAudioUploadSession = ({
             !forceSingleAlbum && merged.unassignedTrackIds.length > 0
               ? asUniqueTrackIds([...latest.looseTrackIds, ...merged.unassignedTrackIds])
               : latest.looseTrackIds;
-          let finalFiles = latest.files;
+          let finalFiles = applySingleAlbumTitlesToFiles(
+            latest.files,
+            merged.unassignedTrackIds,
+            settings,
+          );
           const uploadedTrackIds = orderedUploads.map((entry) => entry.file.id);
           if (settings.syncFilenames) {
             finalFiles = applySyncedFilenamesToFiles(finalFiles, uploadedTrackIds);

@@ -25,7 +25,7 @@ describe("settings page advanced metadata controls", () => {
     expect(normalMarkup).not.toContain(getMetadataLinkDescriptor("albumArtist").label);
     expect(advancedMarkup).toContain(getMetadataLinkDescriptor("albumArtist").label);
 
-    for (const id of ["artist", "year", "genre", "artwork"] as const) {
+    for (const id of ["singleAlbum", "artist", "year", "genre", "artwork"] as const) {
       expect(normalMarkup).toContain(getMetadataLinkDescriptor(id).label);
     }
     for (const removedSubtitle of [
