@@ -1,7 +1,9 @@
 import type { AppSettings, MetadataLinks } from "@/features/library/types";
 
-export type MetadataLinkId = keyof MetadataLinks | "trackNumber";
+export type MetadataLinkId = keyof MetadataLinks | "trackNumber" | "filename";
 export type MetadataLinkState = Record<MetadataLinkId, boolean>;
+
+export type MetadataLinkGroup = "albumToTrack" | "followsTrack";
 
 export interface MetadataLinkDescriptor {
   id: MetadataLinkId;
@@ -14,70 +16,90 @@ export interface MetadataLinkDescriptor {
     | "link_artwork"
     | "link_single_album"
     | "sync_track_numbers"
+    | "sync_filenames"
     | "link_album_artist";
-  setting: { kind: "metadataLink"; key: keyof MetadataLinks } | { kind: "trackNumbers" };
+  setting:
+    | { kind: "metadataLink"; key: keyof MetadataLinks }
+    | { kind: "trackNumbers" }
+    | { kind: "filenames" };
+  map: {
+    source: string;
+    target: string;
+    group: MetadataLinkGroup;
+  };
   requiresAdvancedMetadata?: true;
 }
 
 const descriptorById = {
-  singleAlbum: {
-    id: "singleAlbum",
-    label: "link single album title to track title",
-    disabledReason: "album title is synced with the track title.",
-    analyticsProperty: "link_single_album",
-    setting: { kind: "metadataLink", key: "singleAlbum" },
-  },
   artist: {
     id: "artist",
-    label: "link artist to album",
-    disabledReason: "artist is synced with the album.",
+    label: "artist follows the album artist",
+    disabledReason: "artist follows the album artist.",
     analyticsProperty: "link_artist",
     setting: { kind: "metadataLink", key: "artist" },
+    map: { source: "album artist", target: "artist", group: "albumToTrack" },
   },
   year: {
     id: "year",
-    label: "link year to album",
-    disabledReason: "year is synced with the album.",
+    label: "year follows the album year",
+    disabledReason: "year follows the album year.",
     analyticsProperty: "link_year",
     setting: { kind: "metadataLink", key: "year" },
+    map: { source: "album year", target: "year", group: "albumToTrack" },
   },
   genre: {
     id: "genre",
-    label: "link genre to album",
-    disabledReason: "genre is synced with the album.",
+    label: "genre follows the album genre",
+    disabledReason: "genre follows the album genre.",
     analyticsProperty: "link_genre",
     setting: { kind: "metadataLink", key: "genre" },
+    map: { source: "album genre", target: "genre", group: "albumToTrack" },
   },
   artwork: {
     id: "artwork",
-    label: "link artwork to album",
-    disabledReason: "artwork is synced with the album.",
+    label: "artwork follows the album cover",
+    disabledReason: "artwork follows the album cover.",
     analyticsProperty: "link_artwork",
     setting: { kind: "metadataLink", key: "artwork" },
+    map: { source: "album cover", target: "artwork", group: "albumToTrack" },
   },
   trackNumber: {
     id: "trackNumber",
-    label: "link track number to album order",
-    disabledReason: "track number is synced with the album.",
+    label: "track number follows the sidebar order",
+    disabledReason: "track number follows the sidebar order.",
     analyticsProperty: "sync_track_numbers",
     setting: { kind: "trackNumbers" },
+    map: { source: "sidebar order", target: "track number", group: "albumToTrack" },
+  },
+  filename: {
+    id: "filename",
+    label: "filename follows the track title",
+    disabledReason: "filename follows the track title.",
+    analyticsProperty: "sync_filenames",
+    setting: { kind: "filenames" },
+    map: { source: "track title", target: "filename", group: "followsTrack" },
+  },
+  singleAlbum: {
+    id: "singleAlbum",
+    label: "album title follows the track title",
+    disabledReason: "album title follows the track title.",
+    analyticsProperty: "link_single_album",
+    setting: { kind: "metadataLink", key: "singleAlbum" },
+    map: { source: "track title", target: "album title", group: "followsTrack" },
   },
   albumArtist: {
     id: "albumArtist",
-    label: "link album artist to track artist",
-    disabledReason: "album artist is synced with the album.",
+    label: "album artist tag follows the track artist",
+    disabledReason: "album artist tag follows the track artist.",
     analyticsProperty: "link_album_artist",
     setting: { kind: "metadataLink", key: "albumArtist" },
+    map: { source: "track artist", target: "album artist tag", group: "followsTrack" },
     requiresAdvancedMetadata: true,
   },
 } as const satisfies Record<MetadataLinkId, MetadataLinkDescriptor>;
 
 export const METADATA_LINK_DESCRIPTORS: readonly MetadataLinkDescriptor[] =
   Object.values(descriptorById);
-
-export const METADATA_LINK_SETTINGS_DESCRIPTORS = METADATA_LINK_DESCRIPTORS.filter(
-  (descriptor) => descriptor.id !== "trackNumber",
-);
 
 export const getMetadataLinkDescriptor = (id: MetadataLinkId) => descriptorById[id];
 
@@ -87,27 +109,39 @@ export const isMetadataLinkVisible = (
 ) => !descriptor.requiresAdvancedMetadata || settings.advancedMetadata;
 
 export const isMetadataLinkEnabled = (
-  settings: Pick<AppSettings, "metadataLinks" | "syncTrackNumbers">,
+  settings: Pick<AppSettings, "metadataLinks" | "syncTrackNumbers" | "syncFilenames">,
   descriptor: MetadataLinkDescriptor,
-) =>
-  descriptor.setting.kind === "trackNumbers"
-    ? settings.syncTrackNumbers
-    : settings.metadataLinks[descriptor.setting.key];
+) => {
+  switch (descriptor.setting.kind) {
+    case "metadataLink":
+      return settings.metadataLinks[descriptor.setting.key];
+    case "trackNumbers":
+      return settings.syncTrackNumbers;
+    case "filenames":
+      return settings.syncFilenames;
+  }
+};
 
 export const withMetadataLinkEnabled = (
   settings: AppSettings,
   descriptor: MetadataLinkDescriptor,
   enabled: boolean,
-): AppSettings =>
-  descriptor.setting.kind === "trackNumbers"
-    ? { ...settings, syncTrackNumbers: enabled }
-    : {
+): AppSettings => {
+  switch (descriptor.setting.kind) {
+    case "metadataLink":
+      return {
         ...settings,
         metadataLinks: { ...settings.metadataLinks, [descriptor.setting.key]: enabled },
       };
+    case "trackNumbers":
+      return { ...settings, syncTrackNumbers: enabled };
+    case "filenames":
+      return { ...settings, syncFilenames: enabled };
+  }
+};
 
 export const getMetadataLinkState = (
-  settings: Pick<AppSettings, "metadataLinks" | "syncTrackNumbers">,
+  settings: Pick<AppSettings, "metadataLinks" | "syncTrackNumbers" | "syncFilenames">,
 ): MetadataLinkState =>
   Object.fromEntries(
     METADATA_LINK_DESCRIPTORS.map((descriptor) => [

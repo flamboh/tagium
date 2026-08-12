@@ -1,18 +1,12 @@
 "use client";
 
-import { useId, useState } from "react";
-import { ChevronDown, ChevronsUpDown } from "lucide-react";
+import { useState } from "react";
+import { ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  METADATA_LINK_SETTINGS_DESCRIPTORS,
-  isMetadataLinkEnabled,
-  isMetadataLinkVisible,
-  withMetadataLinkEnabled,
-} from "@/features/library/metadataLinks";
 import type { AppSettings } from "@/features/library/types";
+import SettingsLinkMap from "@/features/settings/SettingsLinkMap";
 import { AUDIO_BITRATE_OPTIONS } from "@/features/settings/settings";
 
 interface SettingsSectionProps {
@@ -22,141 +16,15 @@ interface SettingsSectionProps {
 
 const checkboxRowClassName = "flex cursor-pointer select-none items-start gap-3 py-1";
 
-export function GeneralSettingsSection({ settings, onChange }: SettingsSectionProps) {
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="space-y-1">
-        <h3 className="text-base font-semibold">general</h3>
-        <p className="text-sm leading-5 text-muted-foreground">
-          choose how tracks are numbered and files are named while you edit.
-        </p>
-      </div>
-      <div className={checkboxRowClassName}>
-        <Checkbox
-          id="sync-track-numbers"
-          checked={settings.syncTrackNumbers}
-          onCheckedChange={(checked) =>
-            onChange({
-              ...settings,
-              syncTrackNumbers: checked === true,
-            })
-          }
-          className="mt-0.5"
-        />
-        <Label htmlFor="sync-track-numbers" className="cursor-pointer leading-5">
-          use album sidebar order as track number
-        </Label>
-      </div>
-      <div className={checkboxRowClassName}>
-        <Checkbox
-          id="sync-filenames"
-          checked={settings.syncFilenames}
-          onCheckedChange={(checked) =>
-            onChange({
-              ...settings,
-              syncFilenames: checked === true,
-            })
-          }
-          className="mt-0.5"
-        />
-        <Label htmlFor="sync-filenames" className="cursor-pointer leading-5">
-          sync all filenames with track titles
-        </Label>
-      </div>
-    </section>
-  );
-}
-
-export function MetadataSettingsSection({ settings, onChange }: SettingsSectionProps) {
-  const [metadataLinksOpen, setMetadataLinksOpen] = useState(false);
-  const metadataLinksContentId = useId();
-  const visibleMetadataLinks = METADATA_LINK_SETTINGS_DESCRIPTORS.filter((descriptor) =>
-    isMetadataLinkVisible(descriptor, settings),
-  );
-
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="space-y-1">
-        <h3 className="text-base font-semibold">metadata</h3>
-        <p className="text-sm leading-5 text-muted-foreground">
-          control which tags appear in the editor and how metadata stays in sync.
-        </p>
-      </div>
-      <label className={checkboxRowClassName}>
-        <Checkbox
-          id="advanced-metadata"
-          checked={settings.advancedMetadata}
-          onCheckedChange={(checked) =>
-            onChange({
-              ...settings,
-              advancedMetadata: checked === true,
-            })
-          }
-          className="mt-0.5"
-        />
-        <span className="space-y-0.5">
-          <span className="block text-sm font-medium leading-5">enable advanced metadata</span>
-          <span className="block text-xs leading-5 text-muted-foreground">
-            adds album artist, disc number, composer, bpm, and comments to the track editor.
-          </span>
-        </span>
-      </label>
-
-      <div
-        className="group/metadata-linking mt-1 border-t pt-3"
-        data-state={metadataLinksOpen ? "open" : "closed"}
-      >
-        <button
-          type="button"
-          className="flex w-full cursor-pointer select-none items-center justify-between rounded-md py-1 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          aria-expanded={metadataLinksOpen}
-          aria-controls={metadataLinksContentId}
-          onClick={() => setMetadataLinksOpen((open) => !open)}
-        >
-          <span>metadata linking</span>
-          <ChevronDown
-            className="size-4 text-muted-foreground transition-transform duration-200 ease-out group-data-[state=open]/metadata-linking:rotate-180 motion-reduce:transition-none"
-            aria-hidden="true"
-          />
-        </button>
-        <div
-          id={metadataLinksContentId}
-          aria-hidden={!metadataLinksOpen}
-          inert={!metadataLinksOpen}
-          data-metadata-linking-content
-          className="grid grid-rows-[0fr] opacity-0 transition-[grid-template-rows,opacity] duration-200 ease-out group-data-[state=open]/metadata-linking:grid-rows-[1fr] group-data-[state=open]/metadata-linking:opacity-100 motion-reduce:transition-none"
-        >
-          <div className="min-h-0 overflow-hidden">
-            <div className="flex flex-col gap-2 pt-2">
-              {visibleMetadataLinks.map((descriptor) => (
-                <label key={descriptor.id} className={checkboxRowClassName}>
-                  <Checkbox
-                    checked={isMetadataLinkEnabled(settings, descriptor)}
-                    onCheckedChange={(checked) =>
-                      onChange(withMetadataLinkEnabled(settings, descriptor, checked === true))
-                    }
-                    className="mt-0.5"
-                  />
-                  <span className="text-sm font-medium leading-5">{descriptor.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-export function DownloadsSettingsSection({ settings, onChange }: SettingsSectionProps) {
+export function ImportingSettingsSection({ settings, onChange }: SettingsSectionProps) {
   const [bitrateOpen, setBitrateOpen] = useState(false);
 
   return (
-    <section className="flex flex-col gap-3">
+    <section className="flex max-w-xl flex-col gap-5">
       <div className="space-y-1">
-        <h3 className="text-base font-semibold">downloads</h3>
+        <h3 className="text-base font-semibold">importing</h3>
         <p className="text-sm leading-5 text-muted-foreground">
-          choose the defaults used for imported audio.
+          choose what happens the moment audio lands in your library.
         </p>
       </div>
       <div className="flex flex-col gap-2">
@@ -212,17 +80,69 @@ export function DownloadsSettingsSection({ settings, onChange }: SettingsSection
           }
           className="mt-0.5"
         />
-        <span className="text-sm font-medium">
-          automatically apply soundcloud album cover to all tracks
+        <span className="space-y-0.5">
+          <span className="block text-sm font-medium leading-5">
+            use the soundcloud album cover for every track
+          </span>
+          <span className="block text-xs leading-5 text-muted-foreground">
+            applied once at import. individual track covers stay editable afterwards.
+          </span>
         </span>
       </label>
     </section>
   );
 }
 
+export function EditingSettingsSection({ settings, onChange }: SettingsSectionProps) {
+  return (
+    <section className="flex max-w-xl flex-col gap-5">
+      <div className="space-y-1">
+        <h3 className="text-base font-semibold">editing</h3>
+        <p className="text-sm leading-5 text-muted-foreground">
+          choose which fields the track editor shows you.
+        </p>
+      </div>
+      <label className={checkboxRowClassName}>
+        <Checkbox
+          id="advanced-metadata"
+          checked={settings.advancedMetadata}
+          onCheckedChange={(checked) =>
+            onChange({
+              ...settings,
+              advancedMetadata: checked === true,
+            })
+          }
+          className="mt-0.5"
+        />
+        <span className="space-y-0.5">
+          <span className="block text-sm font-medium leading-5">show advanced fields</span>
+          <span className="block text-xs leading-5 text-muted-foreground">
+            adds album artist, disc number, composer, bpm, and comments to the track editor.
+          </span>
+        </span>
+      </label>
+    </section>
+  );
+}
+
+export function LinkingSettingsSection({ settings, onChange }: SettingsSectionProps) {
+  return (
+    <section className="flex max-w-2xl flex-col gap-6">
+      <div className="space-y-1">
+        <h3 className="text-base font-semibold">linking</h3>
+        <p className="max-w-[65ch] text-sm leading-5 text-muted-foreground">
+          a linked field follows its source automatically — break a link to type into that field
+          directly.
+        </p>
+      </div>
+      <SettingsLinkMap settings={settings} onChange={onChange} />
+    </section>
+  );
+}
+
 export function AboutSettingsSection() {
   return (
-    <>
+    <div className="flex max-w-xl flex-col gap-6">
       <section className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
           <h3 className="text-base font-semibold">about</h3>
@@ -316,6 +236,6 @@ export function AboutSettingsSection() {
           </svg>
         </a>
       </nav>
-    </>
+    </div>
   );
 }

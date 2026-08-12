@@ -11,13 +11,14 @@ import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 describe("metadata link descriptors", () => {
   it("keeps stable labels, disabled reasons, and analytics-facing ids", () => {
     expect(getMetadataLinkDescriptor("singleAlbum")).toMatchObject({
-      label: "link single album title to track title",
-      disabledReason: "album title is synced with the track title.",
+      label: "album title follows the track title",
+      disabledReason: "album title follows the track title.",
       analyticsProperty: "link_single_album",
+      map: { source: "track title", target: "album title", group: "followsTrack" },
     });
     expect(getMetadataLinkDescriptor("albumArtist")).toMatchObject({
-      label: "link album artist to track artist",
-      disabledReason: "album artist is synced with the album.",
+      label: "album artist tag follows the track artist",
+      disabledReason: "album artist tag follows the track artist.",
       analyticsProperty: "link_album_artist",
       requiresAdvancedMetadata: true,
     });
@@ -33,13 +34,20 @@ describe("metadata link descriptors", () => {
       false,
     );
     const state = getMetadataLinkState(updated);
+    const filenameUnlinked = withMetadataLinkEnabled(
+      updated,
+      getMetadataLinkDescriptor("filename"),
+      false,
+    );
 
     expect(state.artist).toBe(false);
+    expect(filenameUnlinked.syncFilenames).toBe(false);
     expect(serializeMetadataLinkAnalytics(state)).toMatchObject({
       link_single_album: true,
       link_artist: false,
       link_album_artist: true,
       sync_track_numbers: true,
+      sync_filenames: true,
     });
   });
 });
