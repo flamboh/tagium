@@ -90,7 +90,7 @@ const hasMetadata = (selectedFile: TagiumFile | null): selectedFile is LoadedTra
   Boolean(selectedFile?.metadata);
 
 const syncedInputClassName =
-  "disabled:pointer-events-auto disabled:cursor-not-allowed disabled:border-dashed disabled:bg-muted/10 disabled:text-muted-foreground disabled:opacity-100 dark:disabled:bg-muted/10";
+  "disabled:pointer-events-auto disabled:cursor-not-allowed disabled:bg-muted/10 disabled:text-muted-foreground disabled:opacity-100 dark:disabled:bg-muted/10";
 
 function DisabledReason({
   disabled,

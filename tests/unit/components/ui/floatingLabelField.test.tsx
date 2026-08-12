@@ -20,6 +20,10 @@ describe("floating label fields", () => {
     expect(markup).toContain('<label for="track-title"');
     expect(markup).toContain("title</span>");
     expect(markup).toContain('<span class="sr-only"> required</span>');
+    expect(markup).toContain('<fieldset aria-hidden="true"');
+    expect(markup).toContain("<legend");
+    expect(markup).toContain("invisible inline-flex");
+    expect(markup).not.toContain("bg-background");
     expect(markup.indexOf('id="track-title"')).toBeLessThan(markup.indexOf("<label"));
   });
 
@@ -31,5 +35,6 @@ describe("floating label fields", () => {
     expect(markup).toContain('<textarea id="track-comment"');
     expect(markup).toContain('placeholder="add a comment"');
     expect(markup).toContain('<label for="track-comment"');
+    expect(markup).toContain('<fieldset aria-hidden="true"');
   });
 });
