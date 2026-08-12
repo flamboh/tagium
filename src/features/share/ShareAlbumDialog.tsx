@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Copy01Icon, Loading02Icon, MusicNote04Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import {
+  Copy01Icon,
+  LoaderPinwheelIcon,
+  MusicNote04Icon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -257,7 +262,7 @@ function ShareAlbumDialogSession({
                   >
                     {stopping && (
                       <HugeiconsIcon
-                        icon={Loading02Icon}
+                        icon={LoaderPinwheelIcon}
                         strokeWidth={2}
                         aria-hidden="true"
                         className="animate-spin motion-reduce:animate-none"
@@ -294,7 +299,7 @@ function ShareAlbumDialogSession({
                 >
                   {state.status === "publishing" && (
                     <HugeiconsIcon
-                      icon={Loading02Icon}
+                      icon={LoaderPinwheelIcon}
                       strokeWidth={2}
                       aria-hidden="true"
                       className="animate-spin motion-reduce:animate-none"

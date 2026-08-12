@@ -13,7 +13,7 @@ import {
   Edit03Icon,
   FileMusicIcon,
   Link02Icon,
-  Loading02Icon,
+  LoaderPinwheelIcon,
   MoreVerticalIcon,
   Refresh04Icon,
   Share08Icon,
@@ -161,7 +161,7 @@ export function SortableTrackRow({
             <span className="truncate text-sm flex-1">{track.filename}</span>
             {track.downloadStatus === "downloading" && (
               <HugeiconsIcon
-                icon={Loading02Icon}
+                icon={LoaderPinwheelIcon}
                 strokeWidth={2}
                 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground"
               />

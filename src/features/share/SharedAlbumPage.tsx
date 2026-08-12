@@ -3,7 +3,7 @@ import {
   ImageNotFound01Icon,
   LibraryIcon,
   LinkSquare02Icon,
-  Loading02Icon,
+  LoaderPinwheelIcon,
   MusicNote04Icon,
   PlusSignIcon,
   RotateLeft02Icon,
@@ -159,7 +159,7 @@ function Artwork({ slug, title }: { slug: string; title: string }) {
           {status === "loading" && (
             <div role="status">
               <HugeiconsIcon
-                icon={Loading02Icon}
+                icon={LoaderPinwheelIcon}
                 strokeWidth={2}
                 className="size-6 animate-spin motion-reduce:animate-none"
                 aria-hidden="true"
@@ -404,7 +404,7 @@ function StopSharingDialog({
           >
             {stopping && (
               <HugeiconsIcon
-                icon={Loading02Icon}
+                icon={LoaderPinwheelIcon}
                 strokeWidth={2}
                 className="animate-spin motion-reduce:animate-none"
                 aria-hidden="true"
@@ -444,7 +444,7 @@ function ActionBar({
         >
           {adding ? (
             <HugeiconsIcon
-              icon={Loading02Icon}
+              icon={LoaderPinwheelIcon}
               strokeWidth={2}
               className="animate-spin motion-reduce:animate-none"
               aria-hidden="true"
