@@ -130,7 +130,7 @@ test("persists link changes made through the settings switch", async ({ page }) 
   await page.getByRole("button", { name: "linking", exact: true }).click();
 
   const artistLink = page.getByRole("switch", {
-    name: "artist follows the album artist",
+    name: "sync artist with the album artist",
   });
   await expect(artistLink).toHaveAttribute("aria-checked", "true");
   await artistLink.click();
@@ -172,7 +172,7 @@ test("keeps every settings destination and link control usable at 390px", async 
 
   await settingsNav.getByRole("button", { name: "linking", exact: true }).click();
   const filenameLink = page.getByRole("switch", {
-    name: "filename follows the track title",
+    name: "sync filename with the track title",
   });
   await expect(filenameLink).toHaveAttribute("aria-checked", "true");
   await filenameLink.click();
@@ -459,14 +459,14 @@ test("gates advanced fields, retains their values, and reveals hidden validation
   await expect(advancedSetting).not.toBeChecked();
   await page.getByRole("button", { name: "linking", exact: true }).click();
   await expect(
-    page.getByRole("switch", { name: "album artist tag follows the track artist" }),
+    page.getByRole("switch", { name: "sync album artist tag with the track artist" }),
   ).not.toBeAttached();
 
   await page.getByRole("button", { name: "editing", exact: true }).click();
   await advancedSetting.click();
   await page.getByRole("button", { name: "linking", exact: true }).click();
   await expect(
-    page.getByRole("switch", { name: "album artist tag follows the track artist" }),
+    page.getByRole("switch", { name: "sync album artist tag with the track artist" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "back to workspace" }).click();
 

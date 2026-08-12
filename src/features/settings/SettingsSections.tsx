@@ -131,8 +131,8 @@ export function LinkingSettingsSection({ settings, onChange }: SettingsSectionPr
       <div className="space-y-1">
         <h3 className="text-base font-semibold">linking</h3>
         <p className="max-w-[65ch] text-sm leading-5 text-muted-foreground">
-          a linked field follows its source automatically — break a link to type into that field
-          directly.
+          linked fields are synced with their source. unlink a field to allow it to be freely
+          edited.
         </p>
       </div>
       <SettingsLinkMap settings={settings} onChange={onChange} />

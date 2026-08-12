@@ -18,13 +18,15 @@ interface SettingsLinkMapProps {
   onChange: (settings: AppSettings) => void;
 }
 
+// `source` names what a row reads from, `synced` what it writes to. Both column headers are
+// prefixed with their role so the direction of every wire is readable without clicking one.
 const linkGroups = [
-  { id: "albumToTrack", source: "album", target: "every track" },
-  { id: "followsTrack", source: "track", target: "follows the track" },
+  { id: "fromAlbum", source: "album", synced: "every track" },
+  { id: "fromTrack", source: "track", synced: "related fields" },
 ] as const satisfies ReadonlyArray<{
   id: MetadataLinkGroup;
   source: string;
-  target: string;
+  synced: string;
 }>;
 
 function LinkRow({
@@ -106,14 +108,14 @@ export default function SettingsLinkMap({ settings, onChange }: SettingsLinkMapP
         );
 
         return (
-          <section key={group.id} aria-label={`${group.source} · ${group.target}`}>
+          <section key={group.id} aria-label={`${group.source} synced to ${group.synced}`}>
             <div className="mb-2 text-[0.6875rem] tracking-widest text-muted-foreground sm:hidden">
-              {group.source} · {group.target}
+              {group.source} → {group.synced}
             </div>
             <div className="mb-2 hidden grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] text-center text-[0.6875rem] tracking-widest text-muted-foreground sm:grid lg:grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,1fr)]">
-              <span>{group.source}</span>
-              <span aria-hidden="true" />
-              <span>{group.target}</span>
+              <span>source · {group.source}</span>
+              <span aria-hidden="true">→</span>
+              <span>synced · {group.synced}</span>
             </div>
             <div className="border-y sm:grid sm:grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] sm:border-0 lg:grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,1fr)]">
               {descriptors.map((descriptor, index) => (

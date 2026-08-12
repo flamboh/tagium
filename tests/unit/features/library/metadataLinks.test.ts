@@ -11,14 +11,14 @@ import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 describe("metadata link descriptors", () => {
   it("keeps stable labels, disabled reasons, and analytics-facing ids", () => {
     expect(getMetadataLinkDescriptor("singleAlbum")).toMatchObject({
-      label: "album title follows the track title",
-      disabledReason: "album title follows the track title.",
+      label: "sync album title with the track title",
+      disabledReason: "album title is synced with the track title.",
       analyticsProperty: "link_single_album",
-      map: { source: "track title", target: "album title", group: "followsTrack" },
+      map: { source: "track title", target: "album title", group: "fromTrack" },
     });
     expect(getMetadataLinkDescriptor("albumArtist")).toMatchObject({
-      label: "album artist tag follows the track artist",
-      disabledReason: "album artist tag follows the track artist.",
+      label: "sync album artist tag with the track artist",
+      disabledReason: "album artist tag is synced with the track artist.",
       analyticsProperty: "link_album_artist",
       requiresAdvancedMetadata: true,
     });

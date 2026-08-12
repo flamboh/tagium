@@ -3,7 +3,7 @@ import type { AppSettings, MetadataLinks } from "@/features/library/types";
 export type MetadataLinkId = keyof MetadataLinks | "trackNumber" | "filename";
 export type MetadataLinkState = Record<MetadataLinkId, boolean>;
 
-export type MetadataLinkGroup = "albumToTrack" | "followsTrack";
+export type MetadataLinkGroup = "fromAlbum" | "fromTrack";
 
 export interface MetadataLinkDescriptor {
   id: MetadataLinkId;
@@ -33,67 +33,67 @@ export interface MetadataLinkDescriptor {
 const descriptorById = {
   artist: {
     id: "artist",
-    label: "artist follows the album artist",
-    disabledReason: "artist follows the album artist.",
+    label: "sync artist with the album artist",
+    disabledReason: "artist is synced with the album artist.",
     analyticsProperty: "link_artist",
     setting: { kind: "metadataLink", key: "artist" },
-    map: { source: "album artist", target: "artist", group: "albumToTrack" },
+    map: { source: "album artist", target: "artist", group: "fromAlbum" },
   },
   year: {
     id: "year",
-    label: "year follows the album year",
-    disabledReason: "year follows the album year.",
+    label: "sync year with the album year",
+    disabledReason: "year is synced with the album year.",
     analyticsProperty: "link_year",
     setting: { kind: "metadataLink", key: "year" },
-    map: { source: "album year", target: "year", group: "albumToTrack" },
+    map: { source: "album year", target: "year", group: "fromAlbum" },
   },
   genre: {
     id: "genre",
-    label: "genre follows the album genre",
-    disabledReason: "genre follows the album genre.",
+    label: "sync genre with the album genre",
+    disabledReason: "genre is synced with the album genre.",
     analyticsProperty: "link_genre",
     setting: { kind: "metadataLink", key: "genre" },
-    map: { source: "album genre", target: "genre", group: "albumToTrack" },
+    map: { source: "album genre", target: "genre", group: "fromAlbum" },
   },
   artwork: {
     id: "artwork",
-    label: "artwork follows the album cover",
-    disabledReason: "artwork follows the album cover.",
+    label: "sync artwork with the album cover",
+    disabledReason: "artwork is synced with the album cover.",
     analyticsProperty: "link_artwork",
     setting: { kind: "metadataLink", key: "artwork" },
-    map: { source: "album cover", target: "artwork", group: "albumToTrack" },
+    map: { source: "album cover", target: "artwork", group: "fromAlbum" },
   },
   trackNumber: {
     id: "trackNumber",
-    label: "track number follows the sidebar order",
-    disabledReason: "track number follows the sidebar order.",
+    label: "sync track number with the sidebar order",
+    disabledReason: "track number is synced with the sidebar order.",
     analyticsProperty: "sync_track_numbers",
     setting: { kind: "trackNumbers" },
-    map: { source: "sidebar order", target: "track number", group: "albumToTrack" },
+    map: { source: "sidebar order", target: "track number", group: "fromAlbum" },
   },
   filename: {
     id: "filename",
-    label: "filename follows the track title",
-    disabledReason: "filename follows the track title.",
+    label: "sync filename with the track title",
+    disabledReason: "filename is synced with the track title.",
     analyticsProperty: "sync_filenames",
     setting: { kind: "filenames" },
-    map: { source: "track title", target: "filename", group: "followsTrack" },
+    map: { source: "track title", target: "filename", group: "fromTrack" },
   },
   singleAlbum: {
     id: "singleAlbum",
-    label: "album title follows the track title",
-    disabledReason: "album title follows the track title.",
+    label: "sync album title with the track title",
+    disabledReason: "album title is synced with the track title.",
     analyticsProperty: "link_single_album",
     setting: { kind: "metadataLink", key: "singleAlbum" },
-    map: { source: "track title", target: "album title", group: "followsTrack" },
+    map: { source: "track title", target: "album title", group: "fromTrack" },
   },
   albumArtist: {
     id: "albumArtist",
-    label: "album artist tag follows the track artist",
-    disabledReason: "album artist tag follows the track artist.",
+    label: "sync album artist tag with the track artist",
+    disabledReason: "album artist tag is synced with the track artist.",
     analyticsProperty: "link_album_artist",
     setting: { kind: "metadataLink", key: "albumArtist" },
-    map: { source: "track artist", target: "album artist tag", group: "followsTrack" },
+    map: { source: "track artist", target: "album artist tag", group: "fromTrack" },
     requiresAdvancedMetadata: true,
   },
 } as const satisfies Record<MetadataLinkId, MetadataLinkDescriptor>;
