@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { RefreshIcon } from "@hugeicons/core-free-icons";
+import { Refresh04Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -237,7 +237,7 @@ export default function AlbumMetadataDialog({
                           onClick={coverSync.start}
                         >
                           <HugeiconsIcon
-                            icon={RefreshIcon}
+                            icon={Refresh04Icon}
                             strokeWidth={2}
                             data-icon="inline-start"
                             style={{

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Cancel01Icon, RefreshIcon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, Refresh04Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 
@@ -102,7 +102,7 @@ export default function PlaylistDownloadQueuePanel({
                 onClick={onRetry}
                 aria-label="retry playlist downloads"
               >
-                <HugeiconsIcon icon={RefreshIcon} strokeWidth={2} className="size-3.5" />
+                <HugeiconsIcon icon={Refresh04Icon} strokeWidth={2} className="size-3.5" />
               </Button>
             )}
             {showCancel && (

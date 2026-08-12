@@ -1,6 +1,6 @@
 "use client";
 
-import { Link02Icon, Unlink02Icon } from "@hugeicons/core-free-icons";
+import { Link02Icon, Unlink05Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -74,7 +74,7 @@ function LinkRow({
           {linked ? (
             <HugeiconsIcon icon={Link02Icon} strokeWidth={2} aria-hidden="true" />
           ) : (
-            <HugeiconsIcon icon={Unlink02Icon} strokeWidth={2} aria-hidden="true" />
+            <HugeiconsIcon icon={Unlink05Icon} strokeWidth={2} aria-hidden="true" />
           )}
         </Button>
         <span className={cn(wireClassName, "origin-left")} aria-hidden="true" />

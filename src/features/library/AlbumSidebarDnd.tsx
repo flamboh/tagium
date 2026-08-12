@@ -15,7 +15,7 @@ import {
   Link02Icon,
   Loading02Icon,
   MoreVerticalIcon,
-  RefreshIcon,
+  Refresh04Icon,
   Share08Icon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
@@ -239,7 +239,7 @@ export function SortableTrackRow({
 }
 
 const trackActionIcon = (action: TrackActionItem) => {
-  if (action.id === "retry") return RefreshIcon;
+  if (action.id === "retry") return Refresh04Icon;
   if (action.id === "remove") return Delete02Icon;
   return action.shareVariant === "create" ? Share08Icon : Link02Icon;
 };
