@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import AlbumMetadataDialog from "@/features/editor/AlbumMetadataDialog";
 import DestructiveActionDialog from "@/features/workspace/DestructiveActionDialog";
 import LandingScreen from "@/features/import/LandingScreen";
+import ListeningGuide from "@/features/listening-guide/ListeningGuide";
 import MediaUrlEntry, { useMediaUrlEntryController } from "@/features/import/MediaUrlEntry";
 import MetadataCleanupDialog from "@/features/library/MetadataCleanupDialog";
 import SettingsPage from "@/features/settings/SettingsPage";
@@ -79,11 +80,14 @@ export default function AudioTagger() {
     await importing.commands.importUrl(sourceUrl);
   };
   const mediaUrlEntryController = useMediaUrlEntryController(handleUrlImport);
-  const mediaUrlEntryPresentation = getMediaUrlEntryPresentation(
-    libraryIsEmpty,
-    activeView === "settings",
-    Boolean(editor.selectedFile),
-  );
+  const mediaUrlEntryPresentation =
+    activeView === "listening-guide"
+      ? null
+      : getMediaUrlEntryPresentation(
+          libraryIsEmpty,
+          activeView === "settings",
+          Boolean(editor.selectedFile),
+        );
 
   if (shareLinksEnabled && sharing.page) {
     return (
@@ -191,9 +195,23 @@ export default function AudioTagger() {
                 >
                   <SettingsPage {...workspace.settingsPageProps} />
                 </div>
+                <div
+                  data-view="listening-guide"
+                  aria-hidden={activeView !== "listening-guide"}
+                  inert={activeView !== "listening-guide"}
+                  className={`absolute inset-0 flex min-h-0 flex-col bg-background transition-opacity duration-200 motion-reduce:transition-none ${
+                    activeView === "listening-guide"
+                      ? "z-10 opacity-100"
+                      : "pointer-events-none z-0 opacity-0"
+                  }`}
+                >
+                  <ListeningGuide onBack={activateEditor} />
+                </div>
               </div>
             ) : activeView === "settings" ? (
               <SettingsPage {...workspace.settingsPageProps} />
+            ) : activeView === "listening-guide" ? (
+              <ListeningGuide onBack={activateEditor} />
             ) : null}
           </div>
           <LandingScreen active={landingIsActive} onAudioUpload={importing.commands.upload}>

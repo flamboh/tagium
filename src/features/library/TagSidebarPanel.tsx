@@ -1,8 +1,8 @@
 "use client";
 
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { useRef, useState } from "react";
-import { Settings } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Download, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AlbumSidebar from "@/features/library/AlbumSidebar";
 import PlaylistDownloadQueuePanel, {
@@ -25,6 +25,7 @@ export interface TagSidebarPanelProps {
   selectedFileIds: Set<string>;
   cleanupSuggestionCountByAlbumId: ReadonlyMap<string, number>;
   settingsOpen: boolean;
+  listeningGuideOpen: boolean;
   onAudioUpload: (files: File[]) => void;
   onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
   onSelectFile: (albumId: string, fileId: string, event?: ReactMouseEvent) => void;
@@ -55,12 +56,96 @@ export interface TagSidebarPanelProps {
   playlistDownloadQueue?: PlaylistDownloadQueuePanelState | null;
   onDownloadAll: () => void;
   onOpenSettings: () => void;
+  onOpenListeningGuide: () => void;
   onCancelPlaylistDownloadQueue?: () => void;
   onRetryPlaylistDownloadQueue?: () => void;
 }
 
 const isFileDrag = (event: React.DragEvent<HTMLDivElement>) =>
   event.dataTransfer.types.includes("Files");
+
+const listeningGuideServices = ["spotify?", "apple music?", "spotify?"];
+const sidebarEntryButtonClassName =
+  "h-16 w-full flex-col gap-0 bg-transparent py-3 text-center shadow-none hover:bg-muted/30 dark:hover:bg-muted/30";
+const sidebarIconButtonClassName =
+  "h-10 w-full bg-transparent shadow-none hover:bg-muted/30 dark:hover:bg-muted/30";
+
+function ListeningGuideEntryButton({ active, onClick }: { active: boolean; onClick: () => void }) {
+  const [serviceIndex, setServiceIndex] = useState(0);
+  const [transitionEnabled, setTransitionEnabled] = useState(true);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updateMotionPreference = () => {
+      setPrefersReducedMotion(mediaQuery.matches);
+      setTransitionEnabled(!mediaQuery.matches);
+      if (mediaQuery.matches) {
+        setServiceIndex(0);
+      }
+    };
+
+    updateMotionPreference();
+    mediaQuery.addEventListener("change", updateMotionPreference);
+
+    return () => mediaQuery.removeEventListener("change", updateMotionPreference);
+  }, []);
+
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+
+    const interval = setInterval(() => {
+      setServiceIndex((current) =>
+        current >= listeningGuideServices.length - 1 ? 1 : current + 1,
+      );
+    }, 3_000);
+
+    return () => clearInterval(interval);
+  }, [prefersReducedMotion]);
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      className={sidebarEntryButtonClassName}
+      onClick={onClick}
+      aria-label="how do i listen on spotify or apple music?"
+      aria-current={active ? "page" : undefined}
+    >
+      <span className="text-xs font-normal text-muted-foreground">how do i listen on</span>
+      <span className="relative h-5 w-full overflow-hidden font-semibold">
+        <span
+          aria-hidden="true"
+          className={cn(
+            "flex flex-col motion-reduce:transition-none",
+            transitionEnabled &&
+              !prefersReducedMotion &&
+              "transition-transform duration-300 ease-in-out",
+          )}
+          style={{ transform: `translateY(-${serviceIndex * 1.25}rem)` }}
+          onTransitionEnd={() => {
+            if (serviceIndex !== listeningGuideServices.length - 1) return;
+
+            setTransitionEnabled(false);
+            setServiceIndex(0);
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => setTransitionEnabled(true));
+            });
+          }}
+        >
+          {listeningGuideServices.map((service, index) => (
+            <span
+              key={`${service}-${index}`}
+              className="flex h-5 shrink-0 items-center justify-center"
+            >
+              {service}
+            </span>
+          ))}
+        </span>
+      </span>
+    </Button>
+  );
+}
 
 export default function TagSidebarPanel({
   loading,
@@ -72,6 +157,7 @@ export default function TagSidebarPanel({
   selectedFileIds,
   cleanupSuggestionCountByAlbumId,
   settingsOpen,
+  listeningGuideOpen,
   onAudioUpload,
   onSelectAlbum,
   onSelectFile,
@@ -93,6 +179,7 @@ export default function TagSidebarPanel({
   playlistDownloadQueue = null,
   onDownloadAll,
   onOpenSettings,
+  onOpenListeningGuide,
   onCancelPlaylistDownloadQueue,
   onRetryPlaylistDownloadQueue,
 }: TagSidebarPanelProps) {
@@ -199,34 +286,45 @@ export default function TagSidebarPanel({
       />
 
       <div className="px-3 py-3 border-t flex-shrink-0 flex flex-col gap-2">
-        {canDownloadAll && !loading ? (
-          <Button className="w-full" onClick={onDownloadAll}>
-            download all
-          </Button>
-        ) : (
+        <div className="grid grid-cols-2 gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="block">
-                <Button className="w-full" onClick={onDownloadAll} disabled>
-                  {loading ? "downloading..." : "download all"}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className={sidebarIconButtonClassName}
+                  onClick={onDownloadAll}
+                  disabled={!canDownloadAll || loading}
+                  aria-label={loading ? "downloading library" : "download all"}
+                >
+                  <Download />
                 </Button>
               </span>
             </TooltipTrigger>
-            <TooltipContent>{downloadAllReason}</TooltipContent>
+            <TooltipContent>
+              {canDownloadAll && !loading ? "download all" : downloadAllReason}
+            </TooltipContent>
           </Tooltip>
-        )}
-        <Button
-          variant="outline"
-          className={cn(
-            "h-auto w-full flex-col justify-center gap-1 py-3 text-center",
-            settingsOpen &&
-              "border-transparent bg-accent text-accent-foreground shadow-none hover:bg-accent",
-          )}
-          onClick={onOpenSettings}
-        >
-          <Settings />
-          settings
-        </Button>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                className={sidebarIconButtonClassName}
+                onClick={onOpenSettings}
+                aria-label="settings"
+                aria-current={settingsOpen ? "page" : undefined}
+              >
+                <Settings />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>settings</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <ListeningGuideEntryButton active={listeningGuideOpen} onClick={onOpenListeningGuide} />
       </div>
     </div>
   );

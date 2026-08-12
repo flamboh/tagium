@@ -12,6 +12,7 @@ vi.mock("sonner", () => ({ toast: toastMocks.toast }));
 
 import { renderHook } from "../../support/hookTestHarness";
 import { useAudioWorkspace } from "@/features/workspace/useAudioWorkspace";
+import type { ActiveView } from "@/features/workspace/audioWorkspaceTypes";
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
 
@@ -72,7 +73,7 @@ describe("audio workspace", () => {
     const hook = renderHook(() => {
       const library = useLibraryStore();
       const [settings, setSettings] = useState(initialSettings);
-      const [activeView, setActiveView] = useState<"editor" | "settings">("editor");
+      const [activeView, setActiveView] = useState<ActiveView>("editor");
       const editor = useTrackEditorSession({ library, settings });
       const workspace = useAudioWorkspace({
         library,

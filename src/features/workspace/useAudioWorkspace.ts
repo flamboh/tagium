@@ -22,6 +22,7 @@ type WorkspaceEditor = Pick<TrackEditorSession, "isCoverProcessing"> & {
 type WorkspaceSidebarProps = Pick<
   TagSidebarPanelProps,
   | "settingsOpen"
+  | "listeningGuideOpen"
   | "onSelectAlbum"
   | "onSelectFile"
   | "onSelectLooseTrack"
@@ -36,6 +37,7 @@ type WorkspaceSidebarProps = Pick<
   | "onPromptCreateAlbumFromLooseTracks"
   | "onReorderAlbums"
   | "onOpenSettings"
+  | "onOpenListeningGuide"
 >;
 
 export interface AudioWorkspace {
@@ -93,7 +95,12 @@ export const useAudioWorkspace = ({
       cleanupSuggestionCountByAlbumId: cleanup.cleanupSuggestionCountByAlbumId,
       onReviewAlbumCleanup: cleanup.onReviewAlbum,
       settingsOpen: activeView === "settings",
+      listeningGuideOpen: activeView === "listening-guide",
       onOpenSettings: settingsPageProps.onBack,
+      onOpenListeningGuide: () => {
+        if (editor.isCoverProcessing) return;
+        setActiveView((current) => (current === "listening-guide" ? "editor" : "listening-guide"));
+      },
     },
   };
 };

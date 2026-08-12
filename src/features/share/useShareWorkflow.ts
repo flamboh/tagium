@@ -544,6 +544,7 @@ export const useShareWorkflow = ({
         );
         await importing.commands.importSharedAlbum(fresh.manifest, page.slug, picture);
         history.replaceState({}, "", "/");
+        document.title = "tagium";
         setPage(null);
         toast.success("album added to your library", {
           description: sharedAlbumAddedDescription(fresh.manifest.tracks.length),
