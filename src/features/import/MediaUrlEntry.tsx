@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowRight02Icon, Link02Icon, LoaderPinwheelIcon } from "@hugeicons/core-free-icons";
+import { ArrowRight02Icon, Link02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -286,7 +287,7 @@ export default function MediaUrlEntry({
               className="size-10 rounded-lg"
             >
               {controller.submitting ? (
-                <HugeiconsIcon icon={LoaderPinwheelIcon} strokeWidth={2} className="animate-spin" />
+                <HugeiconsIcon icon={loaderCircleIcon} strokeWidth={2} className="animate-spin" />
               ) : (
                 <HugeiconsIcon icon={ArrowRight02Icon} strokeWidth={2} />
               )}

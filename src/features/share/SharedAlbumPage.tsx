@@ -3,12 +3,12 @@ import {
   ImageNotFound01Icon,
   LibraryIcon,
   LinkSquare02Icon,
-  LoaderPinwheelIcon,
   MusicNote04Icon,
   PlusSignIcon,
   RotateLeft02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -159,7 +159,7 @@ function Artwork({ slug, title }: { slug: string; title: string }) {
           {status === "loading" && (
             <div role="status">
               <HugeiconsIcon
-                icon={LoaderPinwheelIcon}
+                icon={loaderCircleIcon}
                 strokeWidth={2}
                 className="size-6 animate-spin motion-reduce:animate-none"
                 aria-hidden="true"
@@ -404,7 +404,7 @@ function StopSharingDialog({
           >
             {stopping && (
               <HugeiconsIcon
-                icon={LoaderPinwheelIcon}
+                icon={loaderCircleIcon}
                 strokeWidth={2}
                 className="animate-spin motion-reduce:animate-none"
                 aria-hidden="true"
@@ -444,7 +444,7 @@ function ActionBar({
         >
           {adding ? (
             <HugeiconsIcon
-              icon={LoaderPinwheelIcon}
+              icon={loaderCircleIcon}
               strokeWidth={2}
               className="animate-spin motion-reduce:animate-none"
               aria-hidden="true"

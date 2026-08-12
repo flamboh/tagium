@@ -13,13 +13,13 @@ import {
   Edit03Icon,
   FileMusicIcon,
   Link02Icon,
-  LoaderPinwheelIcon,
   MoreVerticalIcon,
   Refresh04Icon,
   Share08Icon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -161,7 +161,7 @@ export function SortableTrackRow({
             <span className="truncate text-sm flex-1">{track.filename}</span>
             {track.downloadStatus === "downloading" && (
               <HugeiconsIcon
-                icon={LoaderPinwheelIcon}
+                icon={loaderCircleIcon}
                 strokeWidth={2}
                 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground"
               />
