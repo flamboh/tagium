@@ -27,6 +27,8 @@ describe("floating label fields", () => {
     expect(markup).toContain("border-input");
     expect(markup).toContain("pointer-events-none");
     expect(markup).toContain("absolute");
+    expect(markup).toContain("leading-tight");
+    expect(markup).not.toContain("leading-none");
     expect(markup).not.toContain("bg-background");
 
     // The label follows the control so its focus and invalid colors can key off `peer`.

@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  */
 const insetLabelClassName = cn(
   "pointer-events-none absolute top-2.5 left-3 flex max-w-[calc(100%-1.5rem)] items-center gap-0.5",
-  "text-[0.6875rem] leading-none tracking-widest text-muted-foreground transition-colors select-none",
+  "text-[0.6875rem] leading-tight tracking-widest text-muted-foreground transition-colors select-none",
   "peer-focus-visible:text-ring peer-aria-invalid:text-destructive",
 );
 
