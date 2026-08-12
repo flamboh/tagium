@@ -723,6 +723,7 @@ export const useShareWorkflow = ({
           trackCount: manifestTrackCount(fresh.manifest),
         });
         history.replaceState({}, "", "/");
+        document.title = "tagium";
         setPage(null);
         toast.success(`${fresh.manifest.kind} added to your library`, {
           description: sharedContentAddedDescription(fresh.manifest),

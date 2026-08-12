@@ -199,6 +199,7 @@ beforeEach(() => {
   vi.stubGlobal("location", location);
   vi.stubGlobal("history", fakeHistory);
   vi.stubGlobal("window", new EventTarget());
+  vi.stubGlobal("document", { title: "tagium" });
 });
 
 afterEach(() => {
@@ -314,6 +315,23 @@ describe("share workflow pasted links", () => {
       shareKind: "album",
       trackCount: 1,
     });
+    hook.unmount();
+  });
+
+  it("restores the app title after adding from a share preview", async () => {
+    history.replaceState({}, "", `/share/${slug}`);
+    document.title = "Track · tagium";
+    mocks.fetchSharedContent.mockResolvedValue({
+      manifest: sharedManifest,
+      expiresAt: "2026-10-20T12:00:00.000Z",
+      analyticsId,
+    });
+    const { hook } = workflow();
+
+    await vi.waitFor(() => expect(hook.result.page).toMatchObject({ status: "ready", slug }));
+    await act(async () => hook.result.addSharedContent());
+
+    expect(document.title).toBe("tagium");
     hook.unmount();
   });
 
