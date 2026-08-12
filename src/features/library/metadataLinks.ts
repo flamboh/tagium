@@ -12,6 +12,7 @@ export interface MetadataLinkDescriptor {
     | "link_year"
     | "link_genre"
     | "link_artwork"
+    | "link_single_album"
     | "sync_track_numbers"
     | "link_album_artist";
   setting: { kind: "metadataLink"; key: keyof MetadataLinks } | { kind: "trackNumbers" };
@@ -19,6 +20,13 @@ export interface MetadataLinkDescriptor {
 }
 
 const descriptorById = {
+  singleAlbum: {
+    id: "singleAlbum",
+    label: "link single album title to track title",
+    disabledReason: "album title is synced with the track title.",
+    analyticsProperty: "link_single_album",
+    setting: { kind: "metadataLink", key: "singleAlbum" },
+  },
   artist: {
     id: "artist",
     label: "link artist to album",

@@ -75,9 +75,11 @@ export const getSubmittedAudioMetadata = (
   data: AudioMetadata,
   syncFilenames: boolean,
   albumArtistLinked = false,
+  singleAlbumLinked = false,
 ): AudioMetadata => ({
   ...data,
   filename: sanitizeFilenameBase(syncFilenames ? data.title : data.filename),
+  album: singleAlbumLinked ? data.title : data.album,
   year: getNullableNumericMetadataValue(data.year),
   trackNumber: getNullableNumericMetadataValue(data.trackNumber),
   albumArtist: albumArtistLinked ? data.artist : data.albumArtist,

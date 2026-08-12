@@ -221,6 +221,7 @@ function TrackDetailsFields({
   register,
   placeholder,
   inAlbum,
+  linkedAlbumValue,
   syncFilenames,
   metadataLinks,
   filenameInvalid,
@@ -232,6 +233,7 @@ function TrackDetailsFields({
   register: UseFormRegister<AudioMetadata>;
   placeholder: SampleTrackMetadata;
   inAlbum: boolean;
+  linkedAlbumValue: string;
   syncFilenames: boolean;
   metadataLinks: MetadataLinkState;
   filenameInvalid: boolean;
@@ -244,6 +246,7 @@ function TrackDetailsFields({
   const artistRegistration = register("artist", {
     onChange: (event) => onPreviewMetadataChange("artist", event),
   });
+  const albumRegistration = register("album");
   const { ref: titleRegistrationRef, ...titleInputRegistration } = titleRegistration;
   const titleInputRef = useCallback(
     (node: HTMLInputElement | null) => {
@@ -256,7 +259,12 @@ function TrackDetailsFields({
     },
     [active, focusedTitleFileIdRef, selectedFileId, titleRegistrationRef],
   );
-  const albumFieldReason = "album title is synced with the album.";
+  const singleAlbumLinked = !inAlbum && metadataLinks.singleAlbum;
+  const albumLinked = inAlbum || singleAlbumLinked;
+  const albumFieldReason = singleAlbumLinked
+    ? getMetadataLinkDescriptor("singleAlbum").disabledReason
+    : "album title is synced with the album.";
+  const albumFieldReasonId = "track-album-sync-reason";
 
   return (
     <>
@@ -295,15 +303,24 @@ function TrackDetailsFields({
         <label htmlFor="track-album" className={fieldLabelClassName}>
           album:
         </label>
-        <DisabledReason disabled={inAlbum} reason={albumFieldReason}>
+        <DisabledReason disabled={albumLinked} reason={albumFieldReason}>
           <Input
-            {...register("album")}
+            key={singleAlbumLinked ? "linked" : "unlinked"}
+            {...(singleAlbumLinked ? { name: albumRegistration.name } : albumRegistration)}
             id="track-album"
+            aria-describedby={albumLinked ? albumFieldReasonId : undefined}
             placeholder={placeholder.album}
-            disabled={inAlbum}
+            disabled={albumLinked}
+            readOnly={albumLinked}
+            value={singleAlbumLinked ? linkedAlbumValue : undefined}
             className={`${placeholderClassName} ${syncedInputClassName}`}
           />
         </DisabledReason>
+        {albumLinked && (
+          <p id={albumFieldReasonId} className="sr-only">
+            {albumFieldReason}
+          </p>
+        )}
       </div>
       <div className="grid grid-cols-[minmax(4.5rem,0.8fr)_minmax(0,1.4fr)_minmax(4.5rem,0.8fr)] gap-2">
         <div>
@@ -681,7 +698,11 @@ function LoadedTrackMetadataEditor({
   editorMode,
   onEditorModeChange,
 }: LoadedTrackMetadataEditorProps) {
-  const watchedTitle = useWatch({ control, name: "title", defaultValue: "" });
+  const watchedTitle = useWatch({
+    control,
+    name: "title",
+    defaultValue: selectedFile.metadata.title,
+  });
   const watchedFilename = useWatch({ control, name: "filename", defaultValue: "" });
   const linkedAlbumArtistDisplay = useWatch({
     control,
@@ -817,6 +838,7 @@ function LoadedTrackMetadataEditor({
                       trackNumber: placeholder.trackNumber.toLowerCase(),
                     }}
                     inAlbum={Boolean(selectedFileAlbum)}
+                    linkedAlbumValue={watchedTitle}
                     syncFilenames={syncFilenames}
                     metadataLinks={metadataLinks}
                     filenameInvalid={filenameInvalid}

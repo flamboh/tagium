@@ -75,6 +75,54 @@ afterEach(() => {
 });
 
 describe("audio workspace", () => {
+  it("replaces a single's album title when the track moves into an album", () => {
+    const hook = renderHook(() => {
+      const library = useLibraryStore();
+      const [settings, setSettings] = useState(initialSettings);
+      const editor = useTrackEditorSession({ library, settings });
+      const navigation = useWorkspaceNavigation({ library, editor });
+      const workspace = useAudioWorkspace({
+        library,
+        editor,
+        settings,
+        setSettings,
+        navigation,
+        removeDownloads: vi.fn(),
+        busy: false,
+      });
+      return { library, workspace };
+    }, undefined);
+    const single = readyFile("single", "Single Title");
+    single.status = "pending";
+    single.metadata = { ...single.metadata!, album: "Single Title" };
+    single.pendingMetadataPatch = { album: "Single Title" };
+
+    act(() => {
+      hook.result.library.dispatch({
+        type: "content-replaced",
+        files: [single],
+        albums: [
+          {
+            id: "album",
+            title: "Album Title",
+            artist: "Album Artist",
+            genre: "Album Genre",
+            trackIds: [],
+          },
+        ],
+        looseTrackIds: [single.id],
+      });
+    });
+    act(() => hook.result.workspace.sidebarProps.onMoveTrackToAlbum(single.id, "album", "append"));
+
+    expect(hook.result.library.getSnapshot().files[0]).toMatchObject({
+      status: "pending",
+      metadata: { album: "Album Title" },
+      pendingMetadataPatch: { album: "Album Title" },
+    });
+    hook.unmount();
+  });
+
   it("confirms album deletion from the sidebar action before removing its tracks", () => {
     const removeDownloads = vi.fn();
     const hook = renderHook(() => {

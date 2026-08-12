@@ -211,20 +211,30 @@ export const useTrackEditorSession = ({
     formDirtyRef.current = nextFormIsDirty;
   }, [formIsDirty, library.state.selectedFileId, reset, selectedFile]);
 
+  const isSingleAlbumLinkedForFile = useCallback(
+    (fileId: string | null) => {
+      if (!fileId || !settingsRef.current.metadataLinks.singleAlbum) return false;
+      return !library.getSnapshot().albums.some((album) => album.trackIds.includes(fileId));
+    },
+    [library],
+  );
+
   const getSubmittedMetadata = useCallback(
-    (data: AudioMetadata) =>
+    (data: AudioMetadata, fileId: string | null) =>
       getSubmittedAudioMetadata(
         data,
         settingsRef.current.syncFilenames,
         settingsRef.current.metadataLinks.albumArtist,
+        isSingleAlbumLinkedForFile(fileId),
       ),
-    [],
+    [isSingleAlbumLinkedForFile],
   );
 
   const createCurrentMetadataPatch = useCallback(
     (
       metadata: AudioMetadata,
       dirtyFields: Partial<Record<keyof AudioMetadata, unknown>>,
+      fileId: string | null,
       extraFields: Iterable<keyof MetadataPatch> = [],
     ) => {
       const fields = new Set(extraFields);
@@ -234,6 +244,9 @@ export const useTrackEditorSession = ({
       ) {
         fields.add("albumArtist");
       }
+      if (isSingleAlbumLinkedForFile(fileId) && (dirtyFields.title || fields.has("title"))) {
+        fields.add("album");
+      }
       return createDirtyMetadataPatch(
         metadata,
         dirtyFields,
@@ -241,7 +254,7 @@ export const useTrackEditorSession = ({
         fields,
       );
     },
-    [],
+    [isSingleAlbumLinkedForFile],
   );
 
   const applyCurrentFormMetadataToFiles = useCallback(
@@ -253,11 +266,15 @@ export const useTrackEditorSession = ({
       const currentFile = files.find((file) => file.id === selectedId);
       if (!currentFile) return files;
       const submittedData = getProjectableAudioMetadata(
-        getSubmittedMetadata(getValues()),
+        getSubmittedMetadata(getValues(), selectedId),
         currentFile.metadata,
         getValues(),
       );
-      const metadataPatch = createCurrentMetadataPatch(submittedData, dirtyFieldsRef.current);
+      const metadataPatch = createCurrentMetadataPatch(
+        submittedData,
+        dirtyFieldsRef.current,
+        selectedId,
+      );
       if (!metadataPatch) return files;
       return files.map((file) =>
         file.id === selectedId
@@ -308,13 +325,16 @@ export const useTrackEditorSession = ({
     if (!currentFile) return;
     const formValues = { ...getValues(), [pendingPreview.field]: pendingPreview.value };
     const submittedData = getProjectableAudioMetadata(
-      getSubmittedMetadata(formValues),
+      getSubmittedMetadata(formValues, pendingPreview.fileId),
       currentFile.metadata,
       formValues,
     );
-    const metadataPatch = createCurrentMetadataPatch(submittedData, dirtyFieldsRef.current, [
-      pendingPreview.field,
-    ]);
+    const metadataPatch = createCurrentMetadataPatch(
+      submittedData,
+      dirtyFieldsRef.current,
+      pendingPreview.fileId,
+      [pendingPreview.field],
+    );
     if (!metadataPatch) return;
     const nextFiles = snapshot.files.map((file) =>
       file.id === pendingPreview.fileId
@@ -381,7 +401,7 @@ export const useTrackEditorSession = ({
       const latestFileToUpdate =
         snapshot.files.find((file) => file.id === fileToUpdate.id) ?? fileToUpdate;
       const submittedMetadata = getProjectableAudioMetadata(
-        getSubmittedMetadata(newTags),
+        getSubmittedMetadata(newTags, fileToUpdate.id),
         latestFileToUpdate.metadata,
         newTags,
       );
@@ -427,13 +447,13 @@ export const useTrackEditorSession = ({
         const latestFormMetadata =
           latestFile?.metadata && latestFormValues
             ? getProjectableAudioMetadata(
-                getSubmittedMetadata(latestFormValues),
+                getSubmittedMetadata(latestFormValues, fileToUpdate.id),
                 latestFile.metadata,
                 latestFormValues,
               )
             : undefined;
         const latestFormPatch = latestFormMetadata
-          ? createCurrentMetadataPatch(latestFormMetadata, dirtyFieldsRef.current)
+          ? createCurrentMetadataPatch(latestFormMetadata, dirtyFieldsRef.current, fileToUpdate.id)
           : undefined;
         const latestPendingPatch = sanitizePendingMetadataPatch({
           ...latestFile?.pendingMetadataPatch,
@@ -548,13 +568,13 @@ export const useTrackEditorSession = ({
             const formMetadata =
               selectedFileIdRef.current === fileId && formDirtyRef.current && currentFile.metadata
                 ? getProjectableAudioMetadata(
-                    getSubmittedMetadata(getValues()),
+                    getSubmittedMetadata(getValues(), fileId),
                     currentFile.metadata,
                     getValues(),
                   )
                 : undefined;
             const currentFormPatch = formMetadata
-              ? createCurrentMetadataPatch(formMetadata, dirtyFieldsRef.current)
+              ? createCurrentMetadataPatch(formMetadata, dirtyFieldsRef.current, fileId)
               : undefined;
             const currentPendingPatch = currentFormPatch
               ? sanitizePendingMetadataPatch({
@@ -589,13 +609,13 @@ export const useTrackEditorSession = ({
               const latestFormMetadata =
                 selectedFileIdRef.current === fileId && formDirtyRef.current
                   ? getProjectableAudioMetadata(
-                      getSubmittedMetadata(getValues()),
+                      getSubmittedMetadata(getValues(), fileId),
                       latestFile.metadata,
                       getValues(),
                     )
                   : undefined;
               const latestFormPatch = latestFormMetadata
-                ? createCurrentMetadataPatch(latestFormMetadata, dirtyFieldsRef.current)
+                ? createCurrentMetadataPatch(latestFormMetadata, dirtyFieldsRef.current, fileId)
                 : undefined;
               // Downloaded metadata is authoritative for untouched fields; only replay user edits.
               const latestMetadataForResolve =

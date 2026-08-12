@@ -6,6 +6,7 @@ import TrackMetadataEditor, {
   MetadataEditorModeToggle,
 } from "@/features/editor/TrackMetadataEditor";
 import { getMetadataLinkDescriptor } from "@/features/library/metadataLinks";
+import type { MetadataLinkState } from "@/features/library/metadataLinks";
 import type { AudioMetadata, TagiumFile } from "@/features/library/types";
 
 const metadata: AudioMetadata = {
@@ -38,12 +39,22 @@ const loadedTrack: TagiumFile = {
 function EditorHarness({
   selectedFile = loadedTrack,
   syncFilenames = true,
+  metadataLinks = {
+    singleAlbum: true,
+    artist: true,
+    year: true,
+    genre: true,
+    artwork: true,
+    albumArtist: true,
+    trackNumber: true,
+  },
 }: {
   selectedFile?: TagiumFile | null;
   syncFilenames?: boolean;
+  metadataLinks?: MetadataLinkState;
 }) {
   const { register, control, getValues, setError, clearErrors, setFocus } = useForm<AudioMetadata>({
-    defaultValues: metadata,
+    defaultValues: selectedFile?.metadata ?? metadata,
   });
 
   return (
@@ -64,14 +75,7 @@ function EditorHarness({
         selectedFileAlbum={undefined}
         syncFilenames={syncFilenames}
         advancedMetadata
-        metadataLinks={{
-          artist: true,
-          year: true,
-          genre: true,
-          artwork: true,
-          albumArtist: true,
-          trackNumber: true,
-        }}
+        metadataLinks={metadataLinks}
         onPreviewMetadataChange={vi.fn()}
         onAudioUpload={vi.fn()}
       />
@@ -158,6 +162,37 @@ describe("track metadata editor form seam", () => {
     expect(markup).toContain('id="track-album-artist-sync-reason"');
     expect(markup).toMatch(/id="track-album-artist-sync-reason" class="sr-only"/);
     expect(markup).toContain(getMetadataLinkDescriptor("albumArtist").disabledReason);
+  });
+
+  it("shows a single's album title as a disabled link to its track title by default", () => {
+    const selectedFile = {
+      ...loadedTrack,
+      metadata: { ...metadata, title: "Single Title", album: "Old Album" },
+    };
+    const linkedMarkup = renderToStaticMarkup(<EditorHarness selectedFile={selectedFile} />);
+    const unlinkedMarkup = renderToStaticMarkup(
+      <EditorHarness
+        selectedFile={selectedFile}
+        metadataLinks={{
+          singleAlbum: false,
+          artist: true,
+          year: true,
+          genre: true,
+          artwork: true,
+          albumArtist: true,
+          trackNumber: true,
+        }}
+      />,
+    );
+    const linkedInput = linkedMarkup.match(/<input[^>]*id="track-album"[^>]*>/)?.[0];
+    const unlinkedInput = unlinkedMarkup.match(/<input[^>]*id="track-album"[^>]*>/)?.[0];
+
+    expect(linkedInput).toContain('value="Single Title"');
+    expect(linkedInput).toContain(' disabled=""');
+    expect(linkedInput).toContain('aria-describedby="track-album-sync-reason"');
+    expect(linkedMarkup).toContain(getMetadataLinkDescriptor("singleAlbum").disabledReason);
+    expect(unlinkedInput).not.toContain(' disabled=""');
+    expect(unlinkedInput).not.toContain("aria-describedby");
   });
 
   it("lowercases metadata placeholders", () => {

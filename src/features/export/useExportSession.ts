@@ -12,6 +12,7 @@ import {
 } from "@/features/export/downloadLibrary";
 import {
   applyAlbumSharedTagsToFiles,
+  applySingleAlbumTitlesToFiles,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
 } from "@/features/library/fileMetadataOps";
@@ -91,17 +92,29 @@ export const useExportSession = ({
         album,
         albums,
         trackIds: album?.trackIds,
+        singleTrackIds: album ? [] : snapshot.looseTrackIds,
       };
     },
     [library],
   );
 
   const applyExportProjection = useCallback(
-    (files: TagiumFile[], albums: AlbumGroup[], allAlbums: AlbumGroup[], trackIds?: string[]) => {
+    (
+      files: TagiumFile[],
+      albums: AlbumGroup[],
+      allAlbums: AlbumGroup[],
+      singleTrackIds: string[],
+      trackIds?: string[],
+    ) => {
       let projectedFiles = files;
       for (const album of albums) {
         projectedFiles = applyAlbumSharedTagsToFiles(projectedFiles, album, settingsRef.current);
       }
+      projectedFiles = applySingleAlbumTitlesToFiles(
+        projectedFiles,
+        singleTrackIds,
+        settingsRef.current,
+      );
       if (settingsRef.current.syncTrackNumbers) {
         projectedFiles = applyTrackOrderNumbersToFiles(
           projectedFiles,
@@ -128,6 +141,7 @@ export const useExportSession = ({
           editor.projectFiles(context.trackIds),
           context.albums,
           context.snapshot.albums,
+          context.singleTrackIds,
           context.trackIds,
         ),
       };
@@ -143,6 +157,7 @@ export const useExportSession = ({
         editor.flush(context.trackIds),
         context.albums,
         context.snapshot.albums,
+        context.singleTrackIds,
         context.trackIds,
       );
       library.dispatch({ type: "content-replaced", files });

@@ -57,6 +57,7 @@ export interface AlbumGroup {
 }
 
 export interface MetadataLinks {
+  singleAlbum: boolean;
   artist: boolean;
   year: boolean;
   genre: boolean;

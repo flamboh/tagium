@@ -14,6 +14,7 @@ const settings: AppSettings = {
   syncFilenames: false,
   audioBitrate: "320",
   applySoundCloudAlbumCoverToTracks: false,
+  metadataLinks: { ...DEFAULT_APP_SETTINGS.metadataLinks, singleAlbum: false },
 };
 const metadata = (title: string): AudioMetadata => ({
   filename: title.toLowerCase().replaceAll(" ", "-"),
@@ -47,6 +48,39 @@ const readyFile = (id: string, title: string): TagiumFile => {
 };
 
 describe("track editor session", () => {
+  it("buffers the linked album title when a single's title changes", () => {
+    const linkedSettings: AppSettings = {
+      ...settings,
+      metadataLinks: { ...settings.metadataLinks, singleAlbum: true },
+    };
+    const hook = renderHook(() => {
+      const library = useLibraryStore();
+      return { library, editor: useTrackEditorSession({ library, settings: linkedSettings }) };
+    }, undefined);
+    const file = readyFile("single", "Original");
+    act(() => {
+      hook.result.library.dispatch({
+        type: "content-replaced",
+        files: [file],
+        looseTrackIds: [file.id],
+        selection: { selectedAlbumId: null, selectedFileId: file.id },
+      });
+    });
+
+    const title = hook.result.editor.form.register("title");
+    act(() => {
+      void title.onChange({ target: { name: "title", value: "Edited Single" }, type: "change" });
+      hook.result.editor.commands.preview("title", "Edited Single");
+      hook.result.editor.commands.flush();
+    });
+
+    expect(hook.result.library.getSnapshot().files[0]).toMatchObject({
+      metadata: { title: "Edited Single", album: "Edited Single" },
+      pendingMetadataPatch: { title: "Edited Single", album: "Edited Single" },
+    });
+    hook.unmount();
+  });
+
   it("flushes dirty metadata before selection and resets the next form", () => {
     const hook = renderHook(() => {
       const library = useLibraryStore();

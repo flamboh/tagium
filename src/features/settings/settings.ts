@@ -17,6 +17,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   applySoundCloudAlbumCoverToTracks: true,
   advancedMetadata: false,
   metadataLinks: {
+    singleAlbum: true,
     artist: true,
     year: true,
     genre: true,
@@ -45,6 +46,7 @@ const storedAppSettingsSchema = Schema.Struct({
   ),
   advancedMetadata: booleanWithDefault(DEFAULT_APP_SETTINGS.advancedMetadata),
   metadataLinks: Schema.Struct({
+    singleAlbum: booleanWithDefault(DEFAULT_APP_SETTINGS.metadataLinks.singleAlbum),
     artist: booleanWithDefault(DEFAULT_APP_SETTINGS.metadataLinks.artist),
     year: booleanWithDefault(DEFAULT_APP_SETTINGS.metadataLinks.year),
     genre: booleanWithDefault(DEFAULT_APP_SETTINGS.metadataLinks.genre),
