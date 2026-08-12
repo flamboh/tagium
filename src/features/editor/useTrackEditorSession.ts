@@ -129,7 +129,14 @@ export interface TrackEditorSession {
   isCoverProcessing: boolean;
   form: Pick<
     ReturnType<typeof useForm<AudioMetadata>>,
-    "register" | "control" | "getValues" | "setError" | "clearErrors" | "setFocus" | "reset"
+    | "register"
+    | "control"
+    | "getValues"
+    | "setError"
+    | "clearErrors"
+    | "setFocus"
+    | "reset"
+    | "subscribe"
   >;
   commands: {
     projectFiles: (trackIds?: string[]) => TagiumFile[];
@@ -173,6 +180,7 @@ export const useTrackEditorSession = ({
     setError,
     clearErrors,
     setFocus,
+    subscribe,
     formState: { dirtyFields },
   } = useForm<AudioMetadata>();
   const formIsDirty = Object.keys(dirtyFields).length > 0;
@@ -684,7 +692,7 @@ export const useTrackEditorSession = ({
     selectedFile,
     selectedFileAlbum,
     isCoverProcessing,
-    form: { register, control, getValues, setError, clearErrors, setFocus, reset },
+    form: { register, control, getValues, setError, clearErrors, setFocus, reset, subscribe },
     commands: {
       projectFiles,
       flush,

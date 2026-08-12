@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { analytics } from "@/analytics";
 import { coverArtFileToPicture } from "@/features/editor/coverArtProcessing";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
-import type { AlbumGroup, SharePublication } from "@/features/library/types";
+import type { AlbumGroup, SharePublication, TagiumFile } from "@/features/library/types";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type { AudioImportSession } from "@/features/workspace/useAudioImportSession";
 import {
@@ -39,6 +39,18 @@ import {
 import type { SharedContentPageState } from "@/features/share/SharedAlbumPage";
 
 type ShareTarget = { kind: "album"; id: string } | { kind: "track"; id: string };
+
+const SHAREABLE_TRACK_METADATA_FIELDS = [
+  "filename",
+  "title",
+  "artist",
+  "album",
+  "genre",
+  "year",
+  "trackNumber",
+  "picture",
+] as const;
+const SHARE_FINGERPRINT_DELAY_MS = 150;
 
 const safelyGetRevocationReceipt = (slug: string) => {
   try {
@@ -81,7 +93,9 @@ export const useShareWorkflow = ({
   enabled,
 }: {
   library: LibraryStore;
-  editor: Pick<TrackEditorSession, "commands">;
+  editor: Pick<TrackEditorSession, "commands"> & {
+    form: Pick<TrackEditorSession["form"], "subscribe">;
+  };
   importing: Pick<AudioImportSession, "commands">;
   enabled: boolean;
 }) => {
@@ -103,6 +117,7 @@ export const useShareWorkflow = ({
   );
   const [adding, setAdding] = useState(false);
   const [anotherTabOpen, setAnotherTabOpen] = useState(false);
+  const [editorProjectionVersion, setEditorProjectionVersion] = useState(0);
   const [, setExpiryTick] = useState(0);
   const loadingSlugRef = useRef<string | null>(null);
   const pageLoadIdRef = useRef(0);
@@ -115,6 +130,51 @@ export const useShareWorkflow = ({
     (slug: string) => publicationReceiptsRef.current.get(slug) ?? safelyGetRevocationReceipt(slug),
     [],
   );
+
+  const subscribeToEditorForm = editor.form.subscribe;
+  useEffect(() => {
+    if (!enabled) return;
+    let timer: ReturnType<typeof globalThis.setTimeout> | undefined;
+    const unsubscribe = subscribeToEditorForm({
+      name: SHAREABLE_TRACK_METADATA_FIELDS,
+      formState: { values: true },
+      callback: () => {
+        if (timer !== undefined) globalThis.clearTimeout(timer);
+        timer = globalThis.setTimeout(
+          () => setEditorProjectionVersion((version) => version + 1),
+          SHARE_FINGERPRINT_DELAY_MS,
+        );
+      },
+    });
+    return () => {
+      if (timer !== undefined) globalThis.clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [enabled, subscribeToEditorForm]);
+
+  // Form edits are projected without mutating library state; cache that projection by its real inputs.
+  const projectFilesRef = useRef(editor.commands.projectFiles);
+  projectFilesRef.current = editor.commands.projectFiles;
+  const projectedFilesCacheRef = useRef<
+    | {
+        sourceFiles: readonly TagiumFile[];
+        version: number;
+        projectedFiles: TagiumFile[];
+      }
+    | undefined
+  >(undefined);
+  if (
+    !projectedFilesCacheRef.current ||
+    projectedFilesCacheRef.current.sourceFiles !== library.state.files ||
+    projectedFilesCacheRef.current.version !== editorProjectionVersion
+  ) {
+    projectedFilesCacheRef.current = {
+      sourceFiles: library.state.files,
+      version: editorProjectionVersion,
+      projectedFiles: projectFilesRef.current(),
+    };
+  }
+  const projectedFiles = projectedFilesCacheRef.current.projectedFiles;
 
   useEffect(() => {
     const expiries: number[] = [];
@@ -153,7 +213,7 @@ export const useShareWorkflow = ({
     void Promise.all(
       publishedAlbums.map(async (album) => {
         const files = album.trackIds.map((trackId) =>
-          library.state.files.find((file) => file.id === trackId),
+          projectedFiles.find((file) => file.id === trackId),
         );
         if (files.some((file) => !file)) return [album.id, undefined] as const;
         try {
@@ -172,11 +232,11 @@ export const useShareWorkflow = ({
     return () => {
       canceled = true;
     };
-  }, [library.state.albums, library.state.files]);
+  }, [library.state.albums, projectedFiles]);
 
   useEffect(() => {
     let canceled = false;
-    const publishedTracks = library.state.files.filter(
+    const publishedTracks = projectedFiles.filter(
       (file) => file.sharePublication?.status === "active",
     );
     if (!publishedTracks.length) {
@@ -203,7 +263,7 @@ export const useShareWorkflow = ({
     return () => {
       canceled = true;
     };
-  }, [library.state.files]);
+  }, [projectedFiles]);
 
   const currentLibrary = library.getSnapshot();
   const shareActions = Object.fromEntries(
