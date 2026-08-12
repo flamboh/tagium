@@ -74,7 +74,10 @@ describe("share creator preview state", () => {
       () =>
         useShareWorkflow({
           library,
-          editor: { commands: { flush: vi.fn() } } as never,
+          editor: {
+            commands: { flush: vi.fn(), projectFiles: () => files },
+            form: { subscribe: () => () => undefined },
+          } as never,
           importing: { commands: { importSharedContent: vi.fn() } } as never,
           enabled: true,
         }),
@@ -148,7 +151,10 @@ describe("share creator preview state", () => {
       () =>
         useShareWorkflow({
           library,
-          editor: { commands: { flush: vi.fn() } } as never,
+          editor: {
+            commands: { flush: vi.fn(), projectFiles: () => files },
+            form: { subscribe: () => () => undefined },
+          } as never,
           importing: { commands: { importSharedContent: vi.fn() } } as never,
           enabled: true,
         }),
@@ -219,7 +225,10 @@ describe("share creator preview state", () => {
       () =>
         useShareWorkflow({
           library,
-          editor: { commands: { flush: vi.fn() } } as never,
+          editor: {
+            commands: { flush: vi.fn(), projectFiles: () => files },
+            form: { subscribe: () => () => undefined },
+          } as never,
           importing: { commands: { importSharedContent: vi.fn() } } as never,
           enabled: true,
         }),

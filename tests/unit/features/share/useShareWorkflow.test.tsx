@@ -2,6 +2,9 @@ import { act } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
+import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
+import { useLibraryStore } from "@/features/library/useLibraryStore";
+import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 
 const mocks = vi.hoisted(() => ({
   fetchSharedContent: vi.fn(),
@@ -80,7 +83,10 @@ const workflow = (albums: Array<{ id: string; sourceManifestSlug?: string }> = [
     getSnapshot: () => ({ albums, files: [] }),
     dispatch: vi.fn(() => events.push("select")),
   } as unknown as LibraryStore;
-  const editor = { commands: { flush: vi.fn(() => events.push("flush")) } };
+  const editor = {
+    commands: { flush: vi.fn(() => events.push("flush")), projectFiles: () => [] },
+    form: { subscribe: () => () => undefined },
+  };
   const importing = { commands: { importSharedContent: mocks.importSharedContent } };
   const hook = renderHook(
     () =>
@@ -111,7 +117,10 @@ const creatorWorkflow = (album: AlbumGroup, file: TagiumFile) => {
     () =>
       useShareWorkflow({
         library,
-        editor: { commands: { flush: vi.fn() } } as never,
+        editor: {
+          commands: { flush: vi.fn(), projectFiles: () => files },
+          form: { subscribe: () => () => undefined },
+        } as never,
         importing: { commands: { importSharedContent: vi.fn() } } as never,
         enabled: true,
       }),
@@ -135,7 +144,10 @@ const trackCreatorWorkflow = (file: TagiumFile, albums: AlbumGroup[] = [], flush
     () =>
       useShareWorkflow({
         library,
-        editor: { commands: { flush } } as never,
+        editor: {
+          commands: { flush, projectFiles: () => files },
+          form: { subscribe: () => () => undefined },
+        } as never,
         importing: { commands: { importSharedContent: vi.fn() } } as never,
         enabled: true,
       }),
@@ -399,7 +411,10 @@ describe("share workflow pasted links", () => {
       () =>
         useShareWorkflow({
           library,
-          editor: { commands: { flush: vi.fn() } } as never,
+          editor: {
+            commands: { flush: vi.fn(), projectFiles: () => [] },
+            form: { subscribe: () => () => undefined },
+          } as never,
           importing: { commands: { importSharedContent: vi.fn() } } as never,
           enabled: false,
         }),
@@ -583,6 +598,79 @@ describe("share workflow publication lifecycle", () => {
       preview: { kind: "track" },
     });
     expect(file.pendingMetadataPatch).toEqual({ genre: "Ambient" });
+    hook.unmount();
+  });
+
+  it.each([
+    ["year", "2026"],
+    ["genre", "Ambient"],
+    ["trackNumber", "2"],
+  ] as const)("offers an update after a %s-only form edit", async (field, value) => {
+    const file: TagiumFile = structuredClone(creatorFile);
+    const published = await projectTrackShareSnapshot(file);
+    file.sharePublication = {
+      slug: oldPublication.slug,
+      url: oldPublication.url,
+      expiresAt: oldPublication.expiresAt,
+      publishedFingerprint: published.fingerprint,
+      status: "active",
+    };
+    mocks.getRevocationReceipt.mockReturnValue(capability);
+    const hook = renderHook(() => {
+      const library = useLibraryStore();
+      const editor = useTrackEditorSession({
+        library,
+        settings: {
+          ...DEFAULT_APP_SETTINGS,
+          syncFilenames: false,
+          syncTrackNumbers: false,
+          metadataLinks: { ...DEFAULT_APP_SETTINGS.metadataLinks, singleAlbum: false },
+        },
+      });
+      const sharing = useShareWorkflow({
+        library,
+        editor,
+        importing: { commands: { importSharedContent: vi.fn() } } as never,
+        enabled: true,
+      });
+      return { editor, library, sharing };
+    }, undefined);
+    act(() => {
+      hook.result.library.dispatch({
+        type: "content-replaced",
+        files: [file],
+        looseTrackIds: [file.id],
+        selection: { selectedAlbumId: null, selectedFileId: file.id },
+      });
+    });
+    await vi.waitFor(() =>
+      expect(hook.result.sharing.shareTrackActions[file.id]?.label).toBe("view share link"),
+    );
+
+    const registration = hook.result.editor.form.register(
+      field,
+      field === "genre" ? {} : { valueAsNumber: true },
+    );
+    const target = {
+      name: field,
+      value,
+      ...(field === "genre" ? {} : { type: "number", valueAsNumber: Number(value) }),
+    };
+    act(() => {
+      if (field !== "genre") {
+        registration.ref(target as HTMLInputElement);
+        target.value = value;
+        target.valueAsNumber = Number(value);
+      }
+      void registration.onChange({ target, type: "change" });
+    });
+    expect(hook.result.editor.form.getValues(field)).toBe(
+      field === "genre" ? value : Number(value),
+    );
+
+    await vi.waitFor(() =>
+      expect(hook.result.sharing.shareTrackActions[file.id]?.label).toBe("update shared track"),
+    );
     hook.unmount();
   });
 

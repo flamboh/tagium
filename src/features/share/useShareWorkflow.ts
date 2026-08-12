@@ -40,6 +40,18 @@ import type { SharedContentPageState } from "@/features/share/SharedAlbumPage";
 
 type ShareTarget = { kind: "album"; id: string } | { kind: "track"; id: string };
 
+const SHAREABLE_TRACK_METADATA_FIELDS = [
+  "filename",
+  "title",
+  "artist",
+  "album",
+  "genre",
+  "year",
+  "trackNumber",
+  "picture",
+] as const;
+const SHARE_FINGERPRINT_DELAY_MS = 150;
+
 const safelyGetRevocationReceipt = (slug: string) => {
   try {
     return getRevocationReceipt(slug);
@@ -81,7 +93,9 @@ export const useShareWorkflow = ({
   enabled,
 }: {
   library: LibraryStore;
-  editor: Pick<TrackEditorSession, "commands">;
+  editor: Pick<TrackEditorSession, "commands"> & {
+    form: Pick<TrackEditorSession["form"], "subscribe">;
+  };
   importing: Pick<AudioImportSession, "commands">;
   enabled: boolean;
 }) => {
@@ -111,10 +125,42 @@ export const useShareWorkflow = ({
     new Map<string, { slug: string; expiresAt: string; token: string }>(),
   );
   const publicationActionInFlightRef = useRef(false);
+  const projectFilesRef = useRef(editor.commands.projectFiles);
+  const [projectedFiles, setProjectedFiles] = useState(() => library.state.files);
   const getPublicationCapability = useCallback(
     (slug: string) => publicationReceiptsRef.current.get(slug) ?? safelyGetRevocationReceipt(slug),
     [],
   );
+
+  // Keep form projection work outside render while always calling the latest editor command.
+  useEffect(() => {
+    projectFilesRef.current = editor.commands.projectFiles;
+  });
+
+  useEffect(() => {
+    setProjectedFiles(projectFilesRef.current());
+  }, [library.state.files]);
+
+  const subscribeToEditorForm = editor.form.subscribe;
+  useEffect(() => {
+    if (!enabled) return;
+    let timer: ReturnType<typeof globalThis.setTimeout> | undefined;
+    const unsubscribe = subscribeToEditorForm({
+      name: SHAREABLE_TRACK_METADATA_FIELDS,
+      formState: { values: true },
+      callback: () => {
+        if (timer !== undefined) globalThis.clearTimeout(timer);
+        timer = globalThis.setTimeout(
+          () => setProjectedFiles(projectFilesRef.current()),
+          SHARE_FINGERPRINT_DELAY_MS,
+        );
+      },
+    });
+    return () => {
+      if (timer !== undefined) globalThis.clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [enabled, subscribeToEditorForm]);
 
   useEffect(() => {
     const expiries: number[] = [];
@@ -153,7 +199,7 @@ export const useShareWorkflow = ({
     void Promise.all(
       publishedAlbums.map(async (album) => {
         const files = album.trackIds.map((trackId) =>
-          library.state.files.find((file) => file.id === trackId),
+          projectedFiles.find((file) => file.id === trackId),
         );
         if (files.some((file) => !file)) return [album.id, undefined] as const;
         try {
@@ -172,11 +218,11 @@ export const useShareWorkflow = ({
     return () => {
       canceled = true;
     };
-  }, [library.state.albums, library.state.files]);
+  }, [library.state.albums, projectedFiles]);
 
   useEffect(() => {
     let canceled = false;
-    const publishedTracks = library.state.files.filter(
+    const publishedTracks = projectedFiles.filter(
       (file) => file.sharePublication?.status === "active",
     );
     if (!publishedTracks.length) {
@@ -203,7 +249,7 @@ export const useShareWorkflow = ({
     return () => {
       canceled = true;
     };
-  }, [library.state.files]);
+  }, [projectedFiles]);
 
   const currentLibrary = library.getSnapshot();
   const shareActions = Object.fromEntries(
