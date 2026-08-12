@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useReducer, useRef } from "react";
+import { useCallback, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { analytics } from "@/analytics";
 import { createAlbumFromTracks, updateAlbumMetadata } from "@/features/library/albumOps";
 import {
@@ -16,6 +16,7 @@ import {
   areAlbumTrackCoversSynced,
 } from "@/features/library/fileMetadataOps";
 import { getSampleAlbum } from "@/features/editor/sampleMetadata";
+import type { DestructiveActionDialogProps } from "@/features/workspace/DestructiveActionDialog";
 import type { TagSidebarPanelProps } from "@/features/library/TagSidebarPanel";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
@@ -28,7 +29,7 @@ type AlbumEditor = {
 
 type AlbumSidebarProps = Pick<
   TagSidebarPanelProps,
-  "onAddAlbum" | "onEditAlbum" | "onPromptCreateAlbumFromLooseTracks"
+  "onAddAlbum" | "onEditAlbum" | "onDeleteAlbum" | "onPromptCreateAlbumFromLooseTracks"
 >;
 
 export const useWorkspaceAlbumDialog = ({
@@ -41,12 +42,21 @@ export const useWorkspaceAlbumDialog = ({
   editor: AlbumEditor;
   settings: AppSettings;
   removeDownloads: (trackIds: string[]) => void;
-}): { dialogProps: AlbumMetadataDialogProps; sidebarProps: AlbumSidebarProps } => {
+}): {
+  dialogProps: AlbumMetadataDialogProps;
+  deletionDialogProps: DestructiveActionDialogProps;
+  sidebarProps: AlbumSidebarProps;
+} => {
   const [dialog, dispatchDialog] = useReducer(
     albumDialogReducer,
     undefined,
     createAlbumDialogState,
   );
+  const [deletionDialog, setDeletionDialog] = useState<{
+    open: boolean;
+    albumId: string | null;
+    returnFocusTarget: HTMLButtonElement | null;
+  }>({ open: false, albumId: null, returnFocusTarget: null });
   const editorRef = useRef(editor);
   const settingsRef = useRef(settings);
   const removeDownloadsRef = useRef(removeDownloads);
@@ -204,6 +214,9 @@ export const useWorkspaceAlbumDialog = ({
   }, [dialog, library]);
 
   const editingAlbumId = dialog.mode === "edit" ? dialog.editingAlbumId : null;
+  const deletingAlbum = deletionDialog.albumId
+    ? library.state.albums.find((album) => album.id === deletionDialog.albumId)
+    : undefined;
   return {
     dialogProps: {
       instanceKey: dialog.open ? (editingAlbumId ?? `create:${dialog.placeholderSeed}`) : "closed",
@@ -211,19 +224,23 @@ export const useWorkspaceAlbumDialog = ({
       mode: dialog.mode,
       draft: dialog.draft,
       placeholder: getSampleAlbum(dialog.placeholderSeed),
-      trackCount: editingAlbumId
-        ? (library.state.albums.find((album) => album.id === editingAlbumId)?.trackIds.length ?? 0)
-        : 0,
       onChange: (update) => dispatchDialog({ type: "draft-changed", update }),
       onClose: () => dispatchDialog({ type: "closed" }),
       onSave: save,
       onSyncCoverToTracks: syncCover,
-      onDelete: editingAlbumId
-        ? () => {
-            removeAlbum(editingAlbumId);
-            dispatchDialog({ type: "deleted" });
-          }
-        : undefined,
+    },
+    deletionDialogProps: {
+      kind: "delete-album",
+      open: deletionDialog.open && Boolean(deletingAlbum),
+      albumTitle: deletingAlbum?.title ?? "album",
+      trackCount: deletingAlbum?.trackIds.length ?? 0,
+      returnFocusTarget: deletionDialog.returnFocusTarget,
+      onCancel: () => setDeletionDialog((current) => ({ ...current, open: false })),
+      onConfirm: () => {
+        const albumId = deletionDialog.albumId;
+        setDeletionDialog((current) => ({ ...current, open: false }));
+        if (albumId) removeAlbum(albumId);
+      },
     },
     sidebarProps: {
       onAddAlbum: () => {
@@ -233,6 +250,10 @@ export const useWorkspaceAlbumDialog = ({
       onEditAlbum: (albumId) => {
         const album = library.getSnapshot().albums.find((entry) => entry.id === albumId);
         if (album) dispatchDialog({ type: "edit-opened", album });
+      },
+      onDeleteAlbum: (albumId, returnFocusTarget) => {
+        const album = library.getSnapshot().albums.find((entry) => entry.id === albumId);
+        if (album) setDeletionDialog({ open: true, albumId, returnFocusTarget });
       },
       onPromptCreateAlbumFromLooseTracks: (sourceTrackId, targetTrackId) => {
         if (sourceTrackId === targetTrackId) return;

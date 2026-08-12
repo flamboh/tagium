@@ -23,7 +23,7 @@ export type AlbumDialogAction =
     }
   | { type: "edit-opened"; album: AlbumGroup }
   | { type: "draft-changed"; update: SetStateAction<AlbumMetadataDraft> }
-  | { type: "closed" | "saved" | "deleted" };
+  | { type: "closed" | "saved" };
 
 export type AlbumDialogSubmission =
   | {
@@ -114,7 +114,6 @@ export const albumDialogReducer = (
       };
     case "closed":
     case "saved":
-    case "deleted":
       return { ...state, open: false };
   }
 };

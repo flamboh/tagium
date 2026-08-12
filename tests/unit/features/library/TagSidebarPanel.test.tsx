@@ -41,6 +41,7 @@ describe("TagSidebarPanel", () => {
         onRetryDownload={noOp}
         onAddAlbum={noOp}
         onEditAlbum={noOp}
+        onDeleteAlbum={noOp}
         onReviewAlbumCleanup={noOp}
         onDownloadAlbum={noOp}
         onUploadToAlbum={noOp}

@@ -12,15 +12,21 @@ describe("album action items", () => {
       onEdit: vi.fn(),
       onReviewCleanup: vi.fn(),
       onShare: vi.fn(),
+      onDelete: vi.fn(),
     });
 
-    expect(items.map(({ id }) => id)).toEqual(["edit", "cleanup", "share"]);
+    expect(items.map(({ id }) => id)).toEqual(["edit", "cleanup", "share", "delete"]);
     expect(items[1]).toMatchObject({
       label: "clean up tracks",
       trailingText: "2 tracks",
       disabled: false,
     });
     expect(items[2]).toMatchObject({ label: "update shared album", disabled: false });
+    expect(items[3]).toMatchObject({
+      label: "delete album",
+      disabled: false,
+      destructive: true,
+    });
   });
 
   it("always includes cleanup and carries disabled reasons without changing row height", () => {
@@ -33,6 +39,7 @@ describe("album action items", () => {
       onEdit: vi.fn(),
       onReviewCleanup: vi.fn(),
       onShare: vi.fn(),
+      onDelete: vi.fn(),
     });
 
     expect(items[1]).toMatchObject({ trailingText: "none needed", disabled: true });
@@ -53,6 +60,7 @@ describe("album action items", () => {
       onEdit: vi.fn(),
       onReviewCleanup: vi.fn(),
       onShare: vi.fn(),
+      onDelete: vi.fn(),
     });
 
     expect(items[1]).toMatchObject({ trailingText: "1 track", disabled: false });

@@ -29,6 +29,7 @@ type WorkspaceSidebarProps = Pick<
   | "onRemoveFile"
   | "onAddAlbum"
   | "onEditAlbum"
+  | "onDeleteAlbum"
   | "cleanupSuggestionCountByAlbumId"
   | "onReviewAlbumCleanup"
   | "onMoveTrackToAlbum"
@@ -42,6 +43,7 @@ type WorkspaceSidebarProps = Pick<
 export interface AudioWorkspace {
   cleanupDialogProps: MetadataCleanupDialogProps;
   removalDialogProps: DestructiveActionDialogProps;
+  albumDeletionDialogProps: DestructiveActionDialogProps;
   albumDialogProps: AlbumMetadataDialogProps;
   settingsPageProps: SettingsPageProps;
   sidebarProps: WorkspaceSidebarProps;
@@ -82,6 +84,7 @@ export const useAudioWorkspace = ({
   return {
     cleanupDialogProps: cleanup.dialogProps,
     removalDialogProps: selection.removalDialogProps,
+    albumDeletionDialogProps: album.deletionDialogProps,
     albumDialogProps: album.dialogProps,
     settingsPageProps,
     sidebarProps: {

@@ -38,6 +38,7 @@ export interface TagSidebarPanelProps {
   onRetryDownload: (fileId: string) => void;
   onAddAlbum: () => void;
   onEditAlbum: (albumId: string) => void;
+  onDeleteAlbum: (albumId: string, returnFocusTarget: HTMLButtonElement | null) => void;
   onReviewAlbumCleanup: (albumId: string, returnFocusTarget: HTMLButtonElement | null) => void;
   onDownloadAlbum: (albumId: string) => void;
   onShareAlbum?: (albumId: string) => void;
@@ -94,6 +95,7 @@ export default function TagSidebarPanel({
   onRetryDownload,
   onAddAlbum,
   onEditAlbum,
+  onDeleteAlbum,
   onReviewAlbumCleanup,
   onDownloadAlbum,
   onShareAlbum,
@@ -240,6 +242,7 @@ export default function TagSidebarPanel({
         onRetryDownload={onRetryDownload}
         onAddAlbum={onAddAlbum}
         onEditAlbum={onEditAlbum}
+        onDeleteAlbum={onDeleteAlbum}
         onReviewAlbumCleanup={onReviewAlbumCleanup}
         onDownloadAlbum={onDownloadAlbum}
         onShareAlbum={onShareAlbum}

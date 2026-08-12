@@ -1,6 +1,6 @@
 import type { ShareActionState } from "@/features/share/sharePublication";
 
-export type AlbumActionItemId = "edit" | "cleanup" | "share";
+export type AlbumActionItemId = "edit" | "cleanup" | "share" | "delete";
 
 export interface AlbumActionInvocation {
   returnFocusTarget: HTMLButtonElement | null;
@@ -12,6 +12,7 @@ export interface AlbumActionItem {
   trailingText?: string;
   description?: string;
   disabled: boolean;
+  destructive?: boolean;
   shareVariant?: ShareActionState["variant"];
   onSelect: (invocation: AlbumActionInvocation) => void;
 }
@@ -25,6 +26,7 @@ export function createAlbumActionItems({
   onEdit,
   onReviewCleanup,
   onShare,
+  onDelete,
 }: {
   cleanupSuggestionCount: number;
   canShare: boolean;
@@ -34,6 +36,7 @@ export function createAlbumActionItems({
   onEdit: () => void;
   onReviewCleanup: (invocation: AlbumActionInvocation) => void;
   onShare: () => void;
+  onDelete: (invocation: AlbumActionInvocation) => void;
 }): AlbumActionItem[] {
   return [
     {
@@ -60,6 +63,13 @@ export function createAlbumActionItems({
       disabled: !canShare,
       shareVariant,
       onSelect: onShare,
+    },
+    {
+      id: "delete",
+      label: "delete album",
+      disabled: false,
+      destructive: true,
+      onSelect: onDelete,
     },
   ];
 }

@@ -258,6 +258,7 @@ const albumActionIcon = (
 ) => {
   if (actionId === "edit") return Pencil;
   if (actionId === "cleanup") return BrushCleaning;
+  if (actionId === "delete") return Trash2;
   return shareVariant === "create" ? Share2 : Link2;
 };
 
@@ -266,7 +267,13 @@ export function AlbumActionItemContent({ action }: { action: AlbumActionItem }) 
 
   return (
     <>
-      <ActionIcon aria-hidden="true" className={cn(action.id === "cleanup" && "text-brand")} />
+      <ActionIcon
+        aria-hidden="true"
+        className={cn(
+          action.id === "cleanup" && "text-brand",
+          action.destructive && "text-destructive",
+        )}
+      />
       <span className="min-w-0 flex-1 truncate">{action.label}</span>
       {action.trailingText && (
         <span
@@ -388,16 +395,22 @@ export function SortableAlbumCard({
                 .filter(Boolean)
                 .join(", ");
               return (
-                <DropdownMenuItem
-                  key={action.id}
-                  disabled={action.disabled}
-                  aria-label={accessibleLabel}
-                  title={action.description}
-                  className="[@media(pointer:coarse)]:min-h-10"
-                  onSelect={() => action.onSelect({ returnFocusTarget: menuTriggerRef.current })}
-                >
-                  <AlbumActionItemContent action={action} />
-                </DropdownMenuItem>
+                <Fragment key={action.id}>
+                  {action.destructive && <hr className="-mx-1 my-1 h-px border-0 bg-border" />}
+                  <DropdownMenuItem
+                    disabled={action.disabled}
+                    aria-label={accessibleLabel}
+                    title={action.description}
+                    className={cn(
+                      "[@media(pointer:coarse)]:min-h-10",
+                      action.destructive &&
+                        "text-destructive focus:bg-destructive/10 focus:text-destructive",
+                    )}
+                    onSelect={() => action.onSelect({ returnFocusTarget: menuTriggerRef.current })}
+                  >
+                    <AlbumActionItemContent action={action} />
+                  </DropdownMenuItem>
+                </Fragment>
               );
             })}
           </DropdownMenuContent>

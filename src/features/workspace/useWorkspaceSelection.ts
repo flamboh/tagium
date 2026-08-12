@@ -222,8 +222,10 @@ export const useWorkspaceSelection = ({
 
   return {
     removalDialogProps: {
+      kind: "remove-tracks",
       open: removalDialog.open,
       itemCount: removalDialog.trackIds.length,
+      returnFocusTarget: null,
       onCancel: () => setRemovalDialog((current) => ({ ...current, open: false })),
       onConfirm: () => {
         const trackIds = removalDialog.trackIds;
