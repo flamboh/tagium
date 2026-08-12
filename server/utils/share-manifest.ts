@@ -195,6 +195,10 @@ const detectImageType = (bytes: Uint8Array): ShareArtwork["type"] | undefined =>
   return undefined;
 };
 
+/** Revalidates stored artwork before it is exposed to link crawlers or image decoders. */
+export const isShareArtworkBytes = (bytes: Uint8Array, type: ShareArtwork["type"]) =>
+  detectImageType(bytes) === type;
+
 const validDimensions = (width: number, height: number) =>
   width > 0 &&
   height > 0 &&
