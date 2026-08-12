@@ -459,14 +459,14 @@ test("gates advanced fields, retains their values, and reveals hidden validation
   await expect(advancedSetting).not.toBeChecked();
   await page.getByRole("button", { name: "linking", exact: true }).click();
   await expect(
-    page.getByRole("switch", { name: "sync album artist tag with the track artist" }),
+    page.getByRole("switch", { name: "sync album artist with the track artist" }),
   ).not.toBeAttached();
 
   await page.getByRole("button", { name: "editing", exact: true }).click();
   await advancedSetting.click();
   await page.getByRole("button", { name: "linking", exact: true }).click();
   await expect(
-    page.getByRole("switch", { name: "sync album artist tag with the track artist" }),
+    page.getByRole("switch", { name: "sync album artist with the track artist" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "back to workspace" }).click();
 

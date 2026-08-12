@@ -22,7 +22,7 @@ interface SettingsLinkMapProps {
 // prefixed with their role so the direction of every wire is readable without clicking one.
 const linkGroups = [
   { id: "fromAlbum", source: "album", synced: "track" },
-  { id: "fromTrack", source: "track", synced: "related" },
+  { id: "fromTrack", source: "track", synced: "track" },
 ] as const satisfies ReadonlyArray<{
   id: MetadataLinkGroup;
   source: string;
