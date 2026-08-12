@@ -1,6 +1,6 @@
 "use client";
 
-import { Link02Icon, Unlink05Icon } from "@hugeicons/core-free-icons";
+import { Link05Icon, Unlink05Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -72,7 +72,7 @@ function LinkRow({
           onClick={() => onChange(withMetadataLinkEnabled(settings, descriptor, !linked))}
         >
           {linked ? (
-            <HugeiconsIcon icon={Link02Icon} strokeWidth={2} aria-hidden="true" />
+            <HugeiconsIcon icon={Link05Icon} strokeWidth={2} aria-hidden="true" />
           ) : (
             <HugeiconsIcon icon={Unlink05Icon} strokeWidth={2} aria-hidden="true" />
           )}
