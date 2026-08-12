@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GithubIcon, NewTwitterIcon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
+import { GithubIcon, TwitterIcon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -213,12 +213,7 @@ export function AboutSettingsSection() {
           aria-label="twitter"
           className="inline-flex size-12 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
         >
-          <HugeiconsIcon
-            icon={NewTwitterIcon}
-            strokeWidth={2}
-            className="size-6"
-            aria-hidden="true"
-          />
+          <HugeiconsIcon icon={TwitterIcon} strokeWidth={2} className="size-6" aria-hidden="true" />
         </a>
       </nav>
     </div>
