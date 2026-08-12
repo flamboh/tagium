@@ -4,18 +4,30 @@ import * as React from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-interface FloatingFieldLabelProps {
+/**
+ * Metadata fields are one uninterrupted outlined box with the label seated inside its top
+ * edge, so the outline never has to be notched or painted over. The label borrows the small
+ * wide-tracked caption idiom used elsewhere in the app (see SettingsLinkMap), and the control
+ * keeps every one of its own states — border, focus ring, invalid, disabled.
+ */
+const insetLabelClassName = cn(
+  "pointer-events-none absolute top-2.5 left-3 flex max-w-[calc(100%-1.5rem)] items-center gap-0.5",
+  "text-[0.6875rem] leading-none tracking-widest text-muted-foreground transition-colors select-none",
+  "peer-focus-visible:text-ring peer-aria-invalid:text-destructive",
+);
+
+/** Reserves room for the inset label above the value and gives disabled fields a dashed outline. */
+const insetFieldClassName = "peer px-3 pt-7 disabled:border-dashed";
+
+interface InsetFieldLabelProps {
   htmlFor: string;
   label: string;
   required?: boolean;
 }
 
-function FloatingFieldLabel({ htmlFor, label, required }: FloatingFieldLabelProps) {
+function InsetFieldLabel({ htmlFor, label, required }: InsetFieldLabelProps) {
   return (
-    <label
-      htmlFor={htmlFor}
-      className="absolute left-2 top-0 z-20 flex max-w-[calc(100%-1rem)] -translate-y-1/2 items-center gap-0.5 px-1 text-xs leading-none font-medium text-muted-foreground transition-colors peer-focus-visible:text-ring peer-aria-invalid:text-destructive"
-    >
+    <label htmlFor={htmlFor} className={insetLabelClassName}>
       <span className="truncate">{label}</span>
       {required && (
         <>
@@ -26,22 +38,6 @@ function FloatingFieldLabel({ htmlFor, label, required }: FloatingFieldLabelProp
         </>
       )}
     </label>
-  );
-}
-
-function FloatingFieldOutline({ label, required }: Omit<FloatingFieldLabelProps, "htmlFor">) {
-  return (
-    <fieldset
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-0 z-10 m-0 min-w-0 rounded-md border border-input px-2 py-0 shadow-xs transition-[border-color,box-shadow] peer-focus-visible:border-ring peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50 peer-aria-invalid:border-destructive peer-aria-invalid:ring-destructive/20 peer-disabled:border-dashed dark:peer-aria-invalid:ring-destructive/40"
-    >
-      <legend className="float-none w-auto max-w-[calc(100%-1rem)] overflow-hidden whitespace-nowrap p-0 text-xs leading-none">
-        <span className="invisible inline-flex max-w-full items-center gap-0.5 px-1">
-          <span className="truncate">{label}</span>
-          {required && <span className="shrink-0">*</span>}
-        </span>
-      </legend>
-    </fieldset>
   );
 }
 
@@ -60,20 +56,14 @@ function FloatingLabelInput({
   ...props
 }: FloatingLabelInputProps) {
   return (
-    <div data-slot="floating-label-field" className={cn("relative isolate", containerClassName)}>
+    <div data-slot="floating-label-field" className={cn("relative", containerClassName)}>
       <Input
         id={id}
         required={required}
-        className={cn(
-          "peer relative z-0 h-14 border-transparent px-3 pb-1.5 pt-4 shadow-none placeholder:text-muted-foreground",
-          "focus-visible:border-transparent focus-visible:ring-0",
-          "aria-invalid:border-transparent aria-invalid:ring-0",
-          className,
-        )}
+        className={cn(insetFieldClassName, "h-14 pb-1.5", className)}
         {...props}
       />
-      <FloatingFieldLabel htmlFor={id} label={label} required={required} />
-      <FloatingFieldOutline label={label} required={required} />
+      <InsetFieldLabel htmlFor={id} label={label} required={required} />
     </div>
   );
 }
@@ -84,6 +74,15 @@ type FloatingLabelTextareaProps = Omit<React.ComponentProps<"textarea">, "id"> &
   containerClassName?: string;
 };
 
+/* There is no textarea primitive in the app, so the surface below mirrors `Input`. */
+const textareaSurfaceClassName = cn(
+  "border-input flex w-full min-w-0 resize-y rounded-md border bg-transparent text-base shadow-xs",
+  "transition-[color,box-shadow] outline-none placeholder:text-muted-foreground selection:bg-brand selection:text-background",
+  "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30",
+  "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+  "aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40",
+);
+
 function FloatingLabelTextarea({
   id,
   label,
@@ -93,20 +92,14 @@ function FloatingLabelTextarea({
   ...props
 }: FloatingLabelTextareaProps) {
   return (
-    <div data-slot="floating-label-field" className={cn("relative isolate", containerClassName)}>
+    <div data-slot="floating-label-field" className={cn("relative", containerClassName)}>
       <textarea
         id={id}
         required={required}
-        className={cn(
-          "peer relative z-0 flex min-h-20 w-full resize-y rounded-md border border-transparent bg-transparent px-3 pb-2 pt-4 text-base shadow-none outline-none placeholder:text-muted-foreground selection:bg-brand selection:text-background disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30",
-          "focus-visible:border-transparent focus-visible:ring-0",
-          "aria-invalid:border-transparent aria-invalid:ring-0",
-          className,
-        )}
+        className={cn(textareaSurfaceClassName, insetFieldClassName, "min-h-20 pb-2", className)}
         {...props}
       />
-      <FloatingFieldLabel htmlFor={id} label={label} required={required} />
-      <FloatingFieldOutline label={label} required={required} />
+      <InsetFieldLabel htmlFor={id} label={label} required={required} />
     </div>
   );
 }
