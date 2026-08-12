@@ -34,15 +34,6 @@ describe("local error presentation", () => {
     );
   });
 
-  it("centers the filename independently from the fixed error margin", () => {
-    expect(trackMetadataEditorSource).toContain(
-      'className="flex h-full min-w-0 items-center justify-between gap-3"',
-    );
-    expect(trackMetadataEditorSource).toContain(
-      'className="absolute inset-x-4 bottom-1 h-4 min-w-0 overflow-hidden',
-    );
-  });
-
   it("keeps cover validation state separate from tooltip visibility", () => {
     expect(coverArtSource).toContain(
       'onOpenChange={(open) => dispatch({ type: "errorOpenChanged", open })}',

@@ -52,6 +52,37 @@ const readEditorLayout = async (page: Page) =>
     };
   });
 
+test("keeps the mobile library button beside the filename", async ({ page, browserName }) => {
+  test.skip(browserName !== "chromium", "layout geometry is covered in Chromium");
+  await page.setViewportSize({ width: 320, height: 568 });
+  await uploadTrack(page);
+  await enableAdvancedMetadata(page);
+  await page
+    .locator("#track-title")
+    .fill("a very long filename that needs all of the available header width");
+
+  const header = page.locator("[data-track-filename-header]");
+  const menu = header.getByRole("button", { name: "open library" });
+  const filename = header.getByRole("heading", { level: 2 });
+  const modeToggle = header.getByRole("group", { name: "metadata fields" });
+  const [headerBox, menuBox, filenameBox, modeToggleBox] = await Promise.all([
+    header.boundingBox(),
+    menu.boundingBox(),
+    filename.boundingBox(),
+    modeToggle.boundingBox(),
+  ]);
+
+  expect(headerBox).not.toBeNull();
+  expect(menuBox).not.toBeNull();
+  expect(filenameBox).not.toBeNull();
+  expect(modeToggleBox).not.toBeNull();
+  expect(menuBox!.x + menuBox!.width + 8).toBeLessThanOrEqual(filenameBox!.x);
+  expect(filenameBox!.x + filenameBox!.width + 8).toBeLessThanOrEqual(modeToggleBox!.x);
+  expect(modeToggleBox!.x + modeToggleBox!.width).toBeLessThanOrEqual(
+    headerBox!.x + headerBox!.width - 12,
+  );
+});
+
 for (const viewport of [
   { name: "desktop", width: 1280, height: 900 },
   { name: "compact", width: 390, height: 700 },
