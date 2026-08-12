@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -48,10 +49,12 @@ function EditorHarness({
     albumArtist: true,
     trackNumber: true,
   },
+  headerLeadingAction,
 }: {
   selectedFile?: TagiumFile | null;
   syncFilenames?: boolean;
   metadataLinks?: MetadataLinkState;
+  headerLeadingAction?: ReactNode;
 }) {
   const { register, control, getValues, setError, clearErrors, setFocus } = useForm<AudioMetadata>({
     defaultValues: selectedFile?.metadata ?? metadata,
@@ -60,6 +63,7 @@ function EditorHarness({
   return (
     <TooltipProvider>
       <TrackMetadataEditor
+        headerLeadingAction={headerLeadingAction}
         selectedFile={selectedFile}
         selectedFileId={selectedFile?.id ?? null}
         register={register}
@@ -105,6 +109,27 @@ describe("track metadata editor form seam", () => {
     expect(markup).toContain("loading metadata");
     expect(markup.match(/aria-label="metadata fields"/g)).toHaveLength(1);
     expect(markup).not.toContain('id="track-title"');
+  });
+
+  it("keeps a leading action inside loaded and pending track headers", () => {
+    const leadingAction = <button aria-label="open library">menu</button>;
+    const loadedMarkup = renderToStaticMarkup(
+      <EditorHarness syncFilenames={false} headerLeadingAction={leadingAction} />,
+    );
+    const pendingMarkup = renderToStaticMarkup(
+      <EditorHarness
+        selectedFile={{
+          id: "pending-track",
+          filename: "pending-track.flac",
+          status: "pending",
+          downloadStatus: "downloading",
+        }}
+        headerLeadingAction={leadingAction}
+      />,
+    );
+
+    expect(loadedMarkup).toMatch(/aria-label="open library".*aria-label="filename"/);
+    expect(pendingMarkup).toMatch(/aria-label="open library".*pending-track\.flac/);
   });
 
   it("associates every metadata label with its input", () => {

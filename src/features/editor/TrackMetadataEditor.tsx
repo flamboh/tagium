@@ -44,6 +44,7 @@ type LoadedTrack = TagiumFile & { metadata: AudioMetadata };
 
 interface TrackMetadataEditorProps {
   viewActive?: boolean;
+  headerLeadingAction?: ReactNode;
   selectedFile: TagiumFile | null;
   selectedFileId: string | null;
   register: UseFormRegister<AudioMetadata>;
@@ -79,7 +80,7 @@ interface LoadedTrackMetadataEditorProps extends Omit<TrackMetadataEditorProps, 
 
 interface PendingTrackMetadataEditorProps extends Pick<
   TrackMetadataEditorProps,
-  "selectedFile" | "advancedMetadata"
+  "selectedFile" | "advancedMetadata" | "headerLeadingAction"
 > {
   editorMode: MetadataEditorMode;
   onEditorModeChange: (mode: MetadataEditorMode) => void;
@@ -120,6 +121,7 @@ interface TrackFailure {
 }
 
 function TrackFilenameHeader({
+  headerLeadingAction,
   syncFilenames,
   watchedFilename,
   sanitizedFilename,
@@ -130,6 +132,7 @@ function TrackFilenameHeader({
   extension,
   actions,
 }: {
+  headerLeadingAction?: ReactNode;
   syncFilenames: boolean;
   watchedFilename: string;
   sanitizedFilename: string;
@@ -141,42 +144,54 @@ function TrackFilenameHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="relative h-16 border-b flex-shrink-0 px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6">
-      <div className="flex h-full min-w-0 items-center justify-between gap-3">
-        {syncFilenames ? (
-          <h2 className="inline-flex min-w-0 items-center text-base font-semibold text-muted-foreground max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="min-w-0 cursor-not-allowed truncate">
-                  {sanitizedFilename || filenamePlaceholder}
+    <div
+      data-track-filename-header
+      className="relative h-16 border-b flex-shrink-0 px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6"
+    >
+      <div className="flex h-full min-w-0 items-center gap-3">
+        {headerLeadingAction}
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+          {syncFilenames ? (
+            <h2 className="inline-flex min-w-0 items-center text-base font-semibold text-muted-foreground max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="min-w-0 cursor-not-allowed truncate">
+                    {sanitizedFilename || filenamePlaceholder}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>filename follows the title</TooltipContent>
+              </Tooltip>
+              <span className="shrink-0 select-none text-muted-foreground/70">.{extension}</span>
+            </h2>
+          ) : (
+            <label className="inline-flex min-w-0 items-center text-base font-semibold max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
+              <span className="grid w-fit max-w-[calc(100%-2.25rem)] overflow-hidden">
+                <span className="invisible col-start-1 row-start-1 whitespace-pre" aria-hidden>
+                  {watchedFilename || filenamePlaceholder}
                 </span>
-              </TooltipTrigger>
-              <TooltipContent>filename follows the title</TooltipContent>
-            </Tooltip>
-            <span className="shrink-0 select-none text-muted-foreground/70">.{extension}</span>
-          </h2>
-        ) : (
-          <label className="inline-flex min-w-0 items-center text-base font-semibold max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
-            <span className="grid w-fit max-w-[calc(100%-2.25rem)] overflow-hidden">
-              <span className="invisible col-start-1 row-start-1 whitespace-pre" aria-hidden>
-                {watchedFilename || filenamePlaceholder}
+                <input
+                  {...filenameRegistration}
+                  aria-label="filename"
+                  aria-invalid={filenameInvalid}
+                  aria-describedby={filenameInvalid ? "track-filename-error" : undefined}
+                  size={1}
+                  className="col-start-1 row-start-1 min-w-0 truncate bg-transparent outline-none placeholder:text-muted-foreground/45"
+                  placeholder={filenamePlaceholder}
+                />
               </span>
-              <input
-                {...filenameRegistration}
-                aria-label="filename"
-                aria-invalid={filenameInvalid}
-                aria-describedby={filenameInvalid ? "track-filename-error" : undefined}
-                size={1}
-                className="col-start-1 row-start-1 min-w-0 truncate bg-transparent outline-none placeholder:text-muted-foreground/45"
-                placeholder={filenamePlaceholder}
-              />
-            </span>
-            <span className="shrink-0 select-none text-muted-foreground/70">.{extension}</span>
-          </label>
-        )}
-        {actions}
+              <span className="shrink-0 select-none text-muted-foreground/70">.{extension}</span>
+            </label>
+          )}
+          {actions}
+        </div>
       </div>
-      <div className="absolute inset-x-4 bottom-1 h-4 min-w-0 overflow-hidden text-xs leading-4 text-destructive max-lg:[@media(max-height:700px)]:inset-x-3 max-lg:[@media(max-height:700px)]:bottom-0 lg:inset-x-6 lg:h-8">
+      <div
+        className={`absolute bottom-1 h-4 min-w-0 overflow-hidden text-xs leading-4 text-destructive max-lg:[@media(max-height:700px)]:bottom-0 lg:inset-x-6 lg:h-8 ${
+          headerLeadingAction
+            ? "left-[4.5rem] right-4 max-lg:[@media(max-height:700px)]:left-[4.25rem] max-lg:[@media(max-height:700px)]:right-3"
+            : "inset-x-4 max-lg:[@media(max-height:700px)]:inset-x-3"
+        }`}
+      >
         {filenameInvalid ? (
           <div className="flex min-w-0 items-center gap-2">
             <p
@@ -640,6 +655,7 @@ export function MetadataEditorModeToggle({
 function PendingTrackMetadataEditor({
   selectedFile,
   advancedMetadata,
+  headerLeadingAction,
   editorMode,
   onEditorModeChange,
 }: PendingTrackMetadataEditorProps) {
@@ -656,8 +672,12 @@ function PendingTrackMetadataEditor({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6">
-        <div className="min-w-0">
+      <div
+        data-track-filename-header
+        className="flex h-16 shrink-0 items-center gap-3 border-b px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6"
+      >
+        {headerLeadingAction}
+        <div className="min-w-0 flex-1">
           <h2 className="truncate text-base font-semibold text-muted-foreground max-lg:[@media(max-height:700px)]:text-sm lg:text-lg">
             {selectedFile.filename}
           </h2>
@@ -677,6 +697,7 @@ function PendingTrackMetadataEditor({
 }
 
 function LoadedTrackMetadataEditor({
+  headerLeadingAction,
   selectedFile,
   selectedFileId,
   focusedTitleFileIdRef,
@@ -779,6 +800,7 @@ function LoadedTrackMetadataEditor({
         className="flex min-h-0 flex-col h-full"
       >
         <TrackFilenameHeader
+          headerLeadingAction={headerLeadingAction}
           syncFilenames={syncFilenames}
           watchedFilename={watchedFilename}
           sanitizedFilename={sanitizeFilenameBase(filenameValue)}
@@ -964,6 +986,7 @@ export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
             <PendingTrackMetadataEditor
               selectedFile={displayedSelection.selectedFile}
               advancedMetadata={props.advancedMetadata}
+              headerLeadingAction={props.headerLeadingAction}
               editorMode={editorMode}
               onEditorModeChange={setEditorMode}
             />

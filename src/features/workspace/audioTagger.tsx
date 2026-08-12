@@ -100,6 +100,23 @@ export default function AudioTagger() {
     activeView === "settings",
     Boolean(editor.selectedFile),
   );
+  const menuInTrackHeader =
+    mobileNavigation.isMobile && activeView === "editor" && Boolean(editor.selectedFile);
+  const mobileMenuButton = mobileNavigation.isMobile ? (
+    <Button
+      ref={menuButtonRef}
+      type="button"
+      size="icon"
+      variant="outline"
+      className={`size-11 bg-background/95 shadow-sm md:hidden ${mobileNavigation.drawerOpen ? "pointer-events-none opacity-0" : ""}`}
+      tabIndex={mobileNavigation.drawerOpen ? -1 : 0}
+      aria-label="open library"
+      data-export-focus-fallback
+      onClick={(event) => mobileNavigation.openDrawer(event.currentTarget)}
+    >
+      <Menu />
+    </Button>
+  ) : null;
 
   if (shareLinksEnabled && sharing.page) {
     return (
@@ -142,20 +159,8 @@ export default function AudioTagger() {
         onConfirm={() => void exporting.confirmDownload()}
         onRestoreFocus={exporting.restoreConfirmationFocus}
       />
-      {mobileNavigation.isMobile && (
-        <Button
-          ref={menuButtonRef}
-          type="button"
-          size="icon"
-          variant="outline"
-          className={`fixed left-3 top-3 z-30 size-11 bg-background/95 shadow-sm md:hidden ${mobileNavigation.drawerOpen ? "pointer-events-none opacity-0" : ""}`}
-          tabIndex={mobileNavigation.drawerOpen ? -1 : 0}
-          aria-label="open library"
-          data-export-focus-fallback
-          onClick={(event) => mobileNavigation.openDrawer(event.currentTarget)}
-        >
-          <Menu />
-        </Button>
+      {mobileMenuButton && !menuInTrackHeader && (
+        <div className="fixed left-3 top-3 z-30 md:hidden">{mobileMenuButton}</div>
       )}
       <div className="min-h-svh touch-pan-y flex flex-col overflow-x-hidden bg-background md:h-svh md:touch-auto md:flex-row md:overflow-hidden">
         <TagSidebarPanel
@@ -235,6 +240,7 @@ export default function AudioTagger() {
                 >
                   <TrackMetadataEditor
                     viewActive={activeView === "editor"}
+                    headerLeadingAction={menuInTrackHeader ? mobileMenuButton : undefined}
                     selectedFile={editor.selectedFile}
                     selectedFileId={selectedFileId}
                     register={editor.form.register}
