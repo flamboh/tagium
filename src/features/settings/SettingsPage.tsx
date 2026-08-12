@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { AppSettings } from "@/features/library/types";
 import {
   AboutSettingsSection,
@@ -40,7 +41,7 @@ export default function SettingsPage({ settings, onChange, onBack }: SettingsPag
             onClick={onBack}
             aria-label="back to workspace"
           >
-            <ArrowLeft className="size-5" />
+            <HugeiconsIcon icon={ArrowLeft02Icon} strokeWidth={2} className="size-5" />
           </button>
           <h2 className="relative -top-px truncate text-lg font-semibold leading-tight">
             settings

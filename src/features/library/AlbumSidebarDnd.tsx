@@ -5,20 +5,21 @@ import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import {
-  AlertCircle,
-  Ban,
-  BrushCleaning,
-  Check,
-  Download,
-  FileMusic,
-  Link2,
-  Loader2,
-  MoreVertical,
-  Pencil,
-  RefreshCw,
-  Share2,
-  Trash2,
-} from "lucide-react";
+  AlertCircleIcon,
+  BanIcon,
+  BrushCleaningIcon,
+  Delete02Icon,
+  Download01Icon,
+  Edit03Icon,
+  FileMusicIcon,
+  Link02Icon,
+  Loading02Icon,
+  MoreVerticalIcon,
+  RefreshIcon,
+  Share08Icon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -149,28 +150,44 @@ export function SortableTrackRow({
         <div className="flex flex-col gap-1 w-full min-w-0">
           <div className="flex items-center gap-1.5 w-full overflow-hidden">
             {container === "loose" ? (
-              <FileMusic className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <HugeiconsIcon
+                icon={FileMusicIcon}
+                strokeWidth={2}
+                className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+              />
             ) : (
               <span className="min-w-3 text-[11px] text-muted-foreground">{index}</span>
             )}
             <span className="truncate text-sm flex-1">{track.filename}</span>
             {track.downloadStatus === "downloading" && (
-              <Loader2 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground" />
+              <HugeiconsIcon
+                icon={Loading02Icon}
+                strokeWidth={2}
+                className="h-3 w-3 shrink-0 animate-spin text-muted-foreground"
+              />
             )}
             {track.downloadStatus !== "downloading" && showSavedCheck && (
-              <Check
+              <HugeiconsIcon
+                icon={Tick02Icon}
+                strokeWidth={2}
                 aria-hidden="true"
                 className="h-3 w-3 shrink-0 animate-in fade-in text-success motion-reduce:animate-none"
               />
             )}
             {(track.downloadStatus === "error" || track.status === "error") && (
-              <AlertCircle
+              <HugeiconsIcon
+                icon={AlertCircleIcon}
+                strokeWidth={2}
                 aria-label="track has an error"
                 className="h-3 w-3 shrink-0 text-destructive"
               />
             )}
             {track.downloadStatus === "canceled" && (
-              <Ban className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+              <HugeiconsIcon
+                icon={BanIcon}
+                strokeWidth={2}
+                className="h-3 w-3 text-muted-foreground flex-shrink-0"
+              />
             )}
           </div>
         </div>
@@ -190,7 +207,7 @@ export function SortableTrackRow({
             className="absolute right-2 top-1/2 size-7 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100 [@media(pointer:coarse)]:right-0 [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:opacity-100"
             aria-label={`track actions for ${track.filename}`}
           >
-            <MoreVertical className="size-3.5" />
+            <HugeiconsIcon icon={MoreVerticalIcon} strokeWidth={2} className="size-3.5" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
@@ -222,17 +239,22 @@ export function SortableTrackRow({
 }
 
 const trackActionIcon = (action: TrackActionItem) => {
-  if (action.id === "retry") return RefreshCw;
-  if (action.id === "remove") return Trash2;
-  return action.shareVariant === "create" ? Share2 : Link2;
+  if (action.id === "retry") return RefreshIcon;
+  if (action.id === "remove") return Delete02Icon;
+  return action.shareVariant === "create" ? Share08Icon : Link02Icon;
 };
 
 export function TrackActionItemContent({ action }: { action: TrackActionItem }) {
-  const ActionIcon = trackActionIcon(action);
+  const actionIcon = trackActionIcon(action);
 
   return (
     <>
-      <ActionIcon aria-hidden="true" className={cn(action.destructive && "text-destructive")} />
+      <HugeiconsIcon
+        icon={actionIcon}
+        strokeWidth={2}
+        aria-hidden="true"
+        className={cn(action.destructive && "text-destructive")}
+      />
       <span className="min-w-0 flex-1 truncate">{action.label}</span>
       {action.description && <span className="sr-only">{action.description}</span>}
     </>
@@ -256,18 +278,20 @@ const albumActionIcon = (
   actionId: AlbumActionItemId,
   shareVariant: AlbumActionItem["shareVariant"],
 ) => {
-  if (actionId === "edit") return Pencil;
-  if (actionId === "cleanup") return BrushCleaning;
-  if (actionId === "delete") return Trash2;
-  return shareVariant === "create" ? Share2 : Link2;
+  if (actionId === "edit") return Edit03Icon;
+  if (actionId === "cleanup") return BrushCleaningIcon;
+  if (actionId === "delete") return Delete02Icon;
+  return shareVariant === "create" ? Share08Icon : Link02Icon;
 };
 
 export function AlbumActionItemContent({ action }: { action: AlbumActionItem }) {
-  const ActionIcon = albumActionIcon(action.id, action.shareVariant);
+  const actionIcon = albumActionIcon(action.id, action.shareVariant);
 
   return (
     <>
-      <ActionIcon
+      <HugeiconsIcon
+        icon={actionIcon}
+        strokeWidth={2}
         aria-hidden="true"
         className={cn(
           action.id === "cleanup" && "text-brand",
@@ -360,7 +384,7 @@ export function SortableAlbumCard({
                 disabled={!canDownload}
                 aria-label={`download ${album.title}`}
               >
-                <Download className="h-3.5 w-3.5" />
+                <HugeiconsIcon icon={Download01Icon} strokeWidth={2} className="h-3.5 w-3.5" />
               </Button>
             </span>
           </TooltipTrigger>
@@ -380,7 +404,7 @@ export function SortableAlbumCard({
                 cleanupSuggestionCount > 0 ? ", cleanup suggested" : ""
               }`}
             >
-              <MoreVertical className="h-3.5 w-3.5" />
+              <HugeiconsIcon icon={MoreVerticalIcon} strokeWidth={2} className="h-3.5 w-3.5" />
               {cleanupSuggestionCount > 0 && (
                 <span
                   aria-hidden="true"
@@ -475,7 +499,11 @@ export function SidebarDragPreview({
   if (active.type === "track" && track) {
     return (
       <div className="flex w-64 max-w-[calc(100vw-2rem)] items-center gap-2 rounded-md border bg-card px-4 py-3 text-left shadow-lg">
-        <FileMusic className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+        <HugeiconsIcon
+          icon={FileMusicIcon}
+          strokeWidth={2}
+          className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground"
+        />
         <span className="min-w-0 flex-1 truncate text-sm">{track.filename}</span>
       </div>
     );

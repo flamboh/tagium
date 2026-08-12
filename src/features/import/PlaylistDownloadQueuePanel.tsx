@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RefreshCw, X } from "lucide-react";
+import { Cancel01Icon, RefreshIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 
 export type PlaylistDownloadQueueStatus =
@@ -101,7 +102,7 @@ export default function PlaylistDownloadQueuePanel({
                 onClick={onRetry}
                 aria-label="retry playlist downloads"
               >
-                <RefreshCw className="size-3.5" />
+                <HugeiconsIcon icon={RefreshIcon} strokeWidth={2} className="size-3.5" />
               </Button>
             )}
             {showCancel && (
@@ -113,7 +114,7 @@ export default function PlaylistDownloadQueuePanel({
                 onClick={onCancel}
                 aria-label="cancel playlist downloads"
               >
-                <X className="size-3.5" />
+                <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-3.5" />
               </Button>
             )}
             {!showCancel && (
@@ -125,7 +126,7 @@ export default function PlaylistDownloadQueuePanel({
                 onClick={() => setDismissedQueueId(queue.id)}
                 aria-label="dismiss playlist download progress"
               >
-                <X className="size-3.5" />
+                <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-3.5" />
               </Button>
             )}
           </div>

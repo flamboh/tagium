@@ -3,7 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useId, useRef } from "react";
-import { Upload } from "lucide-react";
+import { Upload01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { AUDIO_UPLOAD_ACCEPT } from "@/features/audio/audioFormat";
 
 interface AudioUploadProps {
@@ -46,7 +47,11 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
         onClick={handleButtonClick}
         aria-label="upload audio files"
       >
-        <Upload className="h-6 w-6 text-muted-foreground" />
+        <HugeiconsIcon
+          icon={Upload01Icon}
+          strokeWidth={2}
+          className="h-6 w-6 text-muted-foreground"
+        />
         <span className="text-xs text-muted-foreground">upload mp3, flac, or m4a/mp4 files</span>
       </Button>
     </div>

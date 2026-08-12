@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { PlusSignIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 
 export function AlbumSidebarEmptyState({
@@ -29,7 +30,7 @@ export function AlbumSidebarEmptyState({
           className="pointer-events-auto"
           onClick={onAddAlbum}
         >
-          <Plus className="h-4 w-4" />
+          <HugeiconsIcon icon={PlusSignIcon} strokeWidth={2} className="h-4 w-4" />
           add album
         </Button>
       </div>

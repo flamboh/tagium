@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
-import { ExternalLink, ImageOff, Library, Loader2, Music2, Plus, RotateCcw } from "lucide-react";
+import {
+  ImageNotFound01Icon,
+  LibraryIcon,
+  LinkSquare02Icon,
+  Loading02Icon,
+  MusicNote04Icon,
+  PlusSignIcon,
+  RotateLeft02Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -137,14 +146,21 @@ function Artwork({ slug, title }: { slug: string; title: string }) {
     >
       {status === "failed" ? (
         <div className="flex flex-col items-center justify-center gap-2">
-          <ImageOff className="size-6" aria-hidden="true" />
+          <HugeiconsIcon
+            icon={ImageNotFound01Icon}
+            strokeWidth={2}
+            className="size-6"
+            aria-hidden="true"
+          />
           <span className="max-sm:sr-only">cover art unavailable</span>
         </div>
       ) : (
         <>
           {status === "loading" && (
             <div role="status">
-              <Loader2
+              <HugeiconsIcon
+                icon={Loading02Icon}
+                strokeWidth={2}
                 className="size-6 animate-spin motion-reduce:animate-none"
                 aria-hidden="true"
               />
@@ -188,7 +204,12 @@ function ContentHero({ manifest, slug }: { manifest: Manifest; slug: string }) {
         <Artwork slug={slug} title={content.title} />
       ) : (
         <div className="flex size-40 shrink-0 items-center justify-center rounded-lg bg-muted max-sm:size-24">
-          <Music2 className="size-9 text-muted-foreground" aria-hidden="true" />
+          <HugeiconsIcon
+            icon={MusicNote04Icon}
+            strokeWidth={2}
+            className="size-9 text-muted-foreground"
+            aria-hidden="true"
+          />
           <span className="sr-only">no cover art</span>
         </div>
       )}
@@ -208,7 +229,12 @@ function ContentHero({ manifest, slug }: { manifest: Manifest; slug: string }) {
             aria-label={`from ${sourceLabel} (opens in a new tab)`}
           >
             from {sourceLabel}
-            <ExternalLink className="size-3.5" aria-hidden="true" />
+            <HugeiconsIcon
+              icon={LinkSquare02Icon}
+              strokeWidth={2}
+              className="size-3.5"
+              aria-hidden="true"
+            />
           </a>
         )}
       </div>
@@ -377,7 +403,12 @@ function StopSharingDialog({
             onClick={onStop}
           >
             {stopping && (
-              <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+              <HugeiconsIcon
+                icon={Loading02Icon}
+                strokeWidth={2}
+                className="animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
             )}
             stop sharing
           </Button>
@@ -412,11 +443,16 @@ function ActionBar({
           onClick={alreadyAddedTargetId ? onViewAdded : () => onAdd()}
         >
           {adding ? (
-            <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            <HugeiconsIcon
+              icon={Loading02Icon}
+              strokeWidth={2}
+              className="animate-spin motion-reduce:animate-none"
+              aria-hidden="true"
+            />
           ) : alreadyAddedTargetId ? (
-            <Library aria-hidden="true" />
+            <HugeiconsIcon icon={LibraryIcon} strokeWidth={2} aria-hidden="true" />
           ) : (
-            <Plus aria-hidden="true" />
+            <HugeiconsIcon icon={PlusSignIcon} strokeWidth={2} aria-hidden="true" />
           )}
           {adding ? `adding ${kind}…` : primaryLabel}
         </Button>
@@ -547,9 +583,19 @@ export default function SharedAlbumPage(props: {
           <div className="py-16">
             <div className="mb-5 flex size-11 items-center justify-center rounded-lg bg-muted">
               {newerVersion ? (
-                <RotateCcw className="size-5" aria-hidden="true" />
+                <HugeiconsIcon
+                  icon={RotateLeft02Icon}
+                  strokeWidth={2}
+                  className="size-5"
+                  aria-hidden="true"
+                />
               ) : (
-                <Music2 className="size-5" aria-hidden="true" />
+                <HugeiconsIcon
+                  icon={MusicNote04Icon}
+                  strokeWidth={2}
+                  className="size-5"
+                  aria-hidden="true"
+                />
               )}
             </div>
             <h1 className="text-2xl font-semibold tracking-tight">

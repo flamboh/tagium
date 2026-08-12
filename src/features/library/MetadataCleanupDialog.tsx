@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -94,7 +95,11 @@ function MetadataCleanupDialogSession({
                       {suggestion.beforeTitle}
                     </p>
                     <div className="flex min-w-0 items-center gap-2">
-                      <ArrowRight className="size-3.5 shrink-0 text-foreground" />
+                      <HugeiconsIcon
+                        icon={ArrowRight02Icon}
+                        strokeWidth={2}
+                        className="size-3.5 shrink-0 text-foreground"
+                      />
                       <p className="truncate text-sm font-medium">{suggestion.afterTitle}</p>
                     </div>
                   </div>

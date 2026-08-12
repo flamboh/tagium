@@ -3,7 +3,8 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { Plus } from "lucide-react";
+import { PlusSignIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import { AlbumSidebarEmptyState } from "@/features/library/AlbumSidebarEmptyState";
 import {
@@ -174,7 +175,7 @@ export default function AlbumSidebar({
           onClick={onAddAlbum}
           aria-label="add album"
         >
-          <Plus className="h-4 w-4" />
+          <HugeiconsIcon icon={PlusSignIcon} strokeWidth={2} className="h-4 w-4" />
         </Button>
       </div>
 

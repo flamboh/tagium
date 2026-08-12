@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, Loader2, Music2 } from "lucide-react";
+import { Copy01Icon, Loading02Icon, MusicNote04Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -175,9 +176,9 @@ function ShareAlbumDialogSession({
                 />
                 <Button type="button" onClick={copyLink} className="h-9 w-32 shrink-0">
                   {copyStatus === "copied" ? (
-                    <Check aria-hidden="true" />
+                    <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} aria-hidden="true" />
                   ) : (
-                    <Copy aria-hidden="true" />
+                    <HugeiconsIcon icon={Copy01Icon} strokeWidth={2} aria-hidden="true" />
                   )}
                   {copyStatus === "copied" ? "copied" : "copy link"}
                 </Button>
@@ -255,7 +256,9 @@ function ShareAlbumDialogSession({
                     onClick={() => void stopSharing()}
                   >
                     {stopping && (
-                      <Loader2
+                      <HugeiconsIcon
+                        icon={Loading02Icon}
+                        strokeWidth={2}
                         aria-hidden="true"
                         className="animate-spin motion-reduce:animate-none"
                       />
@@ -290,7 +293,9 @@ function ShareAlbumDialogSession({
                   onClick={onPublish}
                 >
                   {state.status === "publishing" && (
-                    <Loader2
+                    <HugeiconsIcon
+                      icon={Loading02Icon}
+                      strokeWidth={2}
                       aria-hidden="true"
                       className="animate-spin motion-reduce:animate-none"
                     />
@@ -337,7 +342,12 @@ function SharePreview({ preview, coverUrl }: { preview: SharePreview; coverUrl: 
         {coverUrl ? (
           <img src={coverUrl} alt="" className="size-full object-cover" />
         ) : (
-          <Music2 className="size-8 text-muted-foreground" aria-hidden="true" />
+          <HugeiconsIcon
+            icon={MusicNote04Icon}
+            strokeWidth={2}
+            className="size-8 text-muted-foreground"
+            aria-hidden="true"
+          />
         )}
       </div>
       <ol

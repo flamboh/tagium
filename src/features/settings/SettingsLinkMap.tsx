@@ -1,6 +1,7 @@
 "use client";
 
-import { Link2, Unlink } from "lucide-react";
+import { Link02Icon, Unlink02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import {
   METADATA_LINK_DESCRIPTORS,
@@ -70,7 +71,11 @@ function LinkRow({
           )}
           onClick={() => onChange(withMetadataLinkEnabled(settings, descriptor, !linked))}
         >
-          {linked ? <Link2 aria-hidden="true" /> : <Unlink aria-hidden="true" />}
+          {linked ? (
+            <HugeiconsIcon icon={Link02Icon} strokeWidth={2} aria-hidden="true" />
+          ) : (
+            <HugeiconsIcon icon={Unlink02Icon} strokeWidth={2} aria-hidden="true" />
+          )}
         </Button>
         <span className={cn(wireClassName, "origin-left")} aria-hidden="true" />
       </div>
