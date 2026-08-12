@@ -118,12 +118,65 @@ test("prevents checkbox label text selection", async ({ page }) => {
   await page.getByRole("button", { name: "settings" }).click();
 
   const checkboxLabel = page
-    .getByText("automatically apply soundcloud album cover to all tracks", {
-      exact: true,
-    })
-    .locator("..");
+    .locator("label")
+    .filter({ hasText: "use the soundcloud album cover for every track" });
 
   await expect(checkboxLabel).toHaveCSS("user-select", "none");
+});
+
+test("persists link changes made through the settings switch", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "settings" }).click();
+  await page.getByRole("button", { name: "linking", exact: true }).click();
+
+  const artistLink = page.getByRole("switch", {
+    name: "sync artist with the album artist",
+  });
+  await expect(artistLink).toHaveAttribute("aria-checked", "true");
+  await artistLink.click();
+  await expect(artistLink).toHaveAttribute("aria-checked", "false");
+
+  await page.getByRole("button", { name: "back to workspace" }).click();
+  await page.reload();
+  await page.getByRole("button", { name: "settings" }).click();
+  await page.getByRole("button", { name: "linking", exact: true }).click();
+  await expect(artistLink).toHaveAttribute("aria-checked", "false");
+});
+
+test("keeps every settings destination and link control usable at 390px", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 700 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "open library" }).click();
+  await page
+    .getByRole("dialog", { name: "library" })
+    .getByRole("button", { name: "settings" })
+    .click();
+
+  const settingsNav = page.getByRole("navigation", { name: "settings sections" });
+  const importingDestination = settingsNav.getByRole("button", {
+    name: "importing",
+    exact: true,
+  });
+  await expect
+    .poll(async () => (await importingDestination.boundingBox())?.x ?? Number.POSITIVE_INFINITY)
+    .toBeLessThanOrEqual(9);
+
+  for (const name of ["importing", "editing", "linking", "about"]) {
+    const destination = settingsNav.getByRole("button", { name, exact: true });
+    const bounds = await destination.boundingBox();
+    if (!bounds) throw new Error(`${name} settings destination bounds were not found`);
+
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
+  }
+
+  await settingsNav.getByRole("button", { name: "linking", exact: true }).click();
+  const filenameLink = page.getByRole("switch", {
+    name: "sync filename with the track title",
+  });
+  await expect(filenameLink).toHaveAttribute("aria-checked", "true");
+  await filenameLink.click();
+  await expect(filenameLink).toHaveAttribute("aria-checked", "false");
 });
 
 test("switches the metadata editor and settings without unmounting either panel", async ({
@@ -378,9 +431,10 @@ test("releases the loaded editor immediately when reduced motion is preferred", 
 test("toggles advanced metadata from the entire setting row exactly once", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "settings" }).click();
+  await page.getByRole("button", { name: "editing", exact: true }).click();
 
-  const advancedSetting = page.getByRole("checkbox", { name: "enable advanced metadata" });
-  const advancedSettingRow = page.locator("label").filter({ hasText: "enable advanced metadata" });
+  const advancedSetting = page.getByRole("checkbox", { name: "show advanced fields" });
+  const advancedSettingRow = page.locator("label").filter({ hasText: "show advanced fields" });
   const bounds = await advancedSettingRow.boundingBox();
   if (!bounds) throw new Error("advanced metadata setting row bounds were not found");
 
@@ -399,14 +453,21 @@ test("gates advanced fields, retains their values, and reveals hidden validation
   await uploadTrack(page);
   await page.locator("#track-title").fill("Advanced track");
   await page.getByRole("button", { name: "settings" }).click();
+  await page.getByRole("button", { name: "editing", exact: true }).click();
 
-  const advancedSetting = page.getByRole("checkbox", { name: "enable advanced metadata" });
+  const advancedSetting = page.getByRole("checkbox", { name: "show advanced fields" });
   await expect(advancedSetting).not.toBeChecked();
-  await page.getByText("metadata linking", { exact: true }).click();
-  await expect(page.getByText("link album artist to track artist")).not.toBeAttached();
+  await page.getByRole("button", { name: "linking", exact: true }).click();
+  await expect(
+    page.getByRole("switch", { name: "sync album artist with the track artist" }),
+  ).not.toBeAttached();
 
+  await page.getByRole("button", { name: "editing", exact: true }).click();
   await advancedSetting.click();
-  await expect(page.getByText("link album artist to track artist")).toBeVisible();
+  await page.getByRole("button", { name: "linking", exact: true }).click();
+  await expect(
+    page.getByRole("switch", { name: "sync album artist with the track artist" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "back to workspace" }).click();
 
   await expect(page.getByRole("group", { name: "metadata fields" })).toBeVisible();
@@ -425,11 +486,13 @@ test("gates advanced fields, retains their values, and reveals hidden validation
   await expect(page.locator("#track-composer")).toHaveValue("Retained composer");
 
   await page.getByRole("button", { name: "settings" }).click();
+  await page.getByRole("button", { name: "editing", exact: true }).click();
   await advancedSetting.click();
   await page.getByRole("button", { name: "back to workspace" }).click();
   await expect(page.getByRole("group", { name: "metadata fields" })).not.toBeAttached();
 
   await page.getByRole("button", { name: "settings" }).click();
+  await page.getByRole("button", { name: "editing", exact: true }).click();
   await advancedSetting.click();
   await page.getByRole("button", { name: "back to workspace" }).click();
   await expect(page.getByRole("button", { name: "advanced", exact: true })).toHaveAttribute(

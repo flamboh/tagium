@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, BellRing, RotateCcw, SlidersHorizontal, Zap } from "lucide-react";
+import {
+  Alert02Icon,
+  FlashIcon,
+  Notification03Icon,
+  PreferenceHorizontalIcon,
+  RotateLeft02Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -145,7 +152,7 @@ export function DevPanel() {
                 className="size-10 border border-foreground/15 bg-foreground text-background shadow-lg hover:bg-foreground/90"
                 aria-label="open dev panel"
               >
-                <SlidersHorizontal />
+                <HugeiconsIcon icon={PreferenceHorizontalIcon} strokeWidth={2} />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
@@ -173,7 +180,7 @@ export function DevPanel() {
                 disabled={busy}
                 aria-label="refresh dev config"
               >
-                <RotateCcw />
+                <HugeiconsIcon icon={RotateLeft02Icon} strokeWidth={2} />
               </Button>
             </div>
           </div>
@@ -181,7 +188,7 @@ export function DevPanel() {
           <div className="grid gap-4 p-4">
             <section className="grid gap-3">
               <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                <Zap className="size-3.5" />
+                <HugeiconsIcon icon={FlashIcon} strokeWidth={2} className="size-3.5" />
                 rate limit
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -251,7 +258,7 @@ export function DevPanel() {
 
             <section className="grid gap-3">
               <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                <AlertTriangle className="size-3.5" />
+                <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} className="size-3.5" />
                 next audio
               </div>
               <div className="flex flex-wrap gap-2">
@@ -281,7 +288,7 @@ export function DevPanel() {
 
             <section className="grid gap-3">
               <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                <AlertTriangle className="size-3.5" />
+                <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} className="size-3.5" />
                 next tunnel
               </div>
               <div className="flex flex-wrap gap-2">
@@ -311,7 +318,7 @@ export function DevPanel() {
 
             <section className="grid gap-3">
               <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                <BellRing className="size-3.5" />
+                <HugeiconsIcon icon={Notification03Icon} strokeWidth={2} className="size-3.5" />
                 toasts
               </div>
               <div className="flex flex-wrap gap-2">

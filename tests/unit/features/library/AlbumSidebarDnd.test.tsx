@@ -1,5 +1,13 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vite-plus/test";
+import {
+  BrushCleaningIcon,
+  Delete02Icon,
+  Link02Icon,
+  MoreVerticalIcon,
+  Share08Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { createAlbumActionItems } from "@/features/library/albumActionItems";
 import { createTrackActionItems } from "@/features/library/trackActionItems";
@@ -25,6 +33,11 @@ import {
 } from "@/features/library/AlbumSidebarDnd";
 
 const noOp = () => {};
+const renderIconContents = (icon: IconSvgElement) =>
+  renderToStaticMarkup(<HugeiconsIcon icon={icon} strokeWidth={2} />)
+    .replace(/^<svg[^>]*>/, "")
+    .replace(/<\/svg>$/, "");
+
 const album = {
   id: "album-1",
   title: "Signal",
@@ -66,7 +79,7 @@ describe("SortableAlbumCard action menu", () => {
   it("renders a visible, accessible menu trigger outside the album activator", () => {
     const markup = renderCard(0);
 
-    expect(markup).toContain("lucide-ellipsis-vertical");
+    expect(markup).toContain(renderIconContents(MoreVerticalIcon));
     expect(markup).toContain('aria-label="album actions for Signal"');
     expect(markup).not.toContain("cleanup suggested");
     expect(markup.match(/<button/g)).toHaveLength(3);
@@ -93,7 +106,7 @@ describe("SortableAlbumCard action menu", () => {
     })[1];
     const markup = renderToStaticMarkup(<AlbumActionItemContent action={cleanupAction} />);
 
-    expect(markup).toContain("lucide-brush-cleaning");
+    expect(markup).toContain(renderIconContents(BrushCleaningIcon));
     expect(markup).toContain("clean up tracks");
     expect(markup).toContain("tabular-nums");
     expect(markup).toContain(">2 tracks</span>");
@@ -114,7 +127,7 @@ describe("SortableAlbumCard action menu", () => {
     })[3];
     const markup = renderToStaticMarkup(<AlbumActionItemContent action={deleteAction} />);
 
-    expect(markup).toContain("lucide-trash-2");
+    expect(markup).toContain(renderIconContents(Delete02Icon));
     expect(markup).toContain("text-destructive");
     expect(markup).toContain("delete album");
   });
@@ -170,8 +183,8 @@ describe("SortableTrackRow action menu", () => {
       />,
     );
 
-    expect(createMarkup).toContain("lucide-share-2");
-    expect(createMarkup).not.toContain("lucide-link-2");
-    expect(viewMarkup).toContain("lucide-link-2");
+    expect(createMarkup).toContain(renderIconContents(Share08Icon));
+    expect(createMarkup).not.toContain(renderIconContents(Link02Icon));
+    expect(viewMarkup).toContain(renderIconContents(Link02Icon));
   });
 });

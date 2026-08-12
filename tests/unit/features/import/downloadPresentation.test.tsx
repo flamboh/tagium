@@ -2,7 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { Check } from "lucide-react";
+import { Tick02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { SortableTrackRow } from "@/features/library/AlbumSidebarDnd";
 import PlaylistDownloadQueuePanel from "@/features/import/PlaylistDownloadQueuePanel";
 import type { TagiumFile } from "@/features/library/types";
@@ -131,25 +132,28 @@ describe("download presentation", () => {
     act(() => {
       renderer = create(renderTrackRow(pendingTrack));
     });
-    expect(renderer!.root.findAllByType(Check)).toHaveLength(0);
+    const findSavedIcons = () =>
+      renderer!.root.findAllByType(HugeiconsIcon).filter((node) => node.props.icon === Tick02Icon);
+
+    expect(findSavedIcons()).toHaveLength(0);
 
     act(() => {
       renderer!.update(renderTrackRow({ ...pendingTrack, status: "saved" }));
     });
-    expect(renderer!.root.findAllByType(Check)).toHaveLength(1);
+    expect(findSavedIcons()).toHaveLength(1);
     expect(renderer!.root.findAllByProps({ role: "status", "aria-live": "polite" })).toHaveLength(
       1,
     );
-    expect(renderer!.root.findByType(Check).props["aria-hidden"]).toBe("true");
+    expect(findSavedIcons()[0].props["aria-hidden"]).toBe("true");
 
     act(() => {
       vi.advanceTimersByTime(2_999);
     });
-    expect(renderer!.root.findAllByType(Check)).toHaveLength(1);
+    expect(findSavedIcons()).toHaveLength(1);
     act(() => {
       vi.advanceTimersByTime(1);
     });
-    expect(renderer!.root.findAllByType(Check)).toHaveLength(0);
+    expect(findSavedIcons()).toHaveLength(0);
 
     act(() => {
       renderer!.update(renderTrackRow({ ...pendingTrack, status: "pending" }));
@@ -176,7 +180,9 @@ describe("download presentation", () => {
       renderer = create(renderTrackRow(savedTrack));
     });
 
-    expect(renderer!.root.findAllByType(Check)).toHaveLength(0);
+    expect(
+      renderer!.root.findAllByType(HugeiconsIcon).filter((node) => node.props.icon === Tick02Icon),
+    ).toHaveLength(0);
     expect(renderer!.root.findAllByProps({ role: "status" })).toHaveLength(0);
     expect(vi.getTimerCount()).toBe(0);
     act(() => renderer!.unmount());

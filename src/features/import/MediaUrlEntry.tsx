@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowRight, Link2, Loader2 } from "lucide-react";
+import { ArrowRight02Icon, Link02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -245,7 +247,11 @@ export default function MediaUrlEntry({
           >
             <div className="min-w-0 flex-1">
               <div className="relative">
-                <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <HugeiconsIcon
+                  icon={Link02Icon}
+                  strokeWidth={2}
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                />
                 <Input
                   type="url"
                   name="media-url"
@@ -280,7 +286,11 @@ export default function MediaUrlEntry({
               aria-busy={controller.submitting || undefined}
               className="size-10 rounded-lg"
             >
-              {controller.submitting ? <Loader2 className="animate-spin" /> : <ArrowRight />}
+              {controller.submitting ? (
+                <HugeiconsIcon icon={loaderCircleIcon} strokeWidth={2} className="animate-spin" />
+              ) : (
+                <HugeiconsIcon icon={ArrowRight02Icon} strokeWidth={2} />
+              )}
             </Button>
           </form>
         </div>

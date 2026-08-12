@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Music4, Upload } from "lucide-react";
+import { MusicNote01Icon, Upload01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { AUDIO_UPLOAD_ACCEPT } from "@/features/audio/audioFormat";
 import { cn } from "@/lib/utils";
 
@@ -109,10 +110,20 @@ export default function AudioImportDropzone({
         )}
       >
         {isDragging ? (
-          <Music4 aria-hidden="true" className="size-14 text-brand" />
+          <HugeiconsIcon
+            icon={MusicNote01Icon}
+            strokeWidth={2}
+            aria-hidden="true"
+            className="size-14 text-brand"
+          />
         ) : (
           <div className="flex size-16 items-center justify-center rounded-(--radius-hero-inner) bg-muted">
-            <Upload aria-hidden="true" className="size-7 text-muted-foreground" />
+            <HugeiconsIcon
+              icon={Upload01Icon}
+              strokeWidth={2}
+              aria-hidden="true"
+              className="size-7 text-muted-foreground"
+            />
           </div>
         )}
         <div className="select-none text-center">

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Menu } from "lucide-react";
+import { Menu01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import AlbumMetadataDialog from "@/features/editor/AlbumMetadataDialog";
 import DestructiveActionDialog from "@/features/workspace/DestructiveActionDialog";
@@ -114,7 +115,7 @@ export default function AudioTagger() {
       data-export-focus-fallback
       onClick={(event) => mobileNavigation.openDrawer(event.currentTarget)}
     >
-      <Menu />
+      <HugeiconsIcon icon={Menu01Icon} strokeWidth={2} />
     </Button>
   ) : null;
 

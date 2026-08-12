@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Music2 } from "lucide-react";
+import { MusicNote04Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 interface AlbumCoverThumbProps {
   picture?: { format: string; data: Uint8Array }[];
@@ -28,7 +29,11 @@ export function AlbumCoverThumb({ picture }: AlbumCoverThumbProps) {
   if (!src) {
     return (
       <div className="w-9 h-9 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-        <Music2 className="h-4 w-4 text-muted-foreground" />
+        <HugeiconsIcon
+          icon={MusicNote04Icon}
+          strokeWidth={2}
+          className="h-4 w-4 text-muted-foreground"
+        />
       </div>
     );
   }

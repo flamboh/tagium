@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { RefreshCw } from "lucide-react";
+import { Refresh04Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -235,7 +236,9 @@ export default function AlbumMetadataDialog({
                           disabled={coverSync.isSyncing || isProcessingCover}
                           onClick={coverSync.start}
                         >
-                          <RefreshCw
+                          <HugeiconsIcon
+                            icon={Refresh04Icon}
+                            strokeWidth={2}
                             data-icon="inline-start"
                             style={{
                               transform: `rotate(${coverSync.rotation}deg)`,

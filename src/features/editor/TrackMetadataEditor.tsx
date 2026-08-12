@@ -159,7 +159,7 @@ function TrackFilenameHeader({
                     {sanitizedFilename || filenamePlaceholder}
                   </span>
                 </TooltipTrigger>
-                <TooltipContent>filename follows the title</TooltipContent>
+                <TooltipContent>filename is synced with the title</TooltipContent>
               </Tooltip>
               <span className="shrink-0 select-none text-muted-foreground/70">.{extension}</span>
             </h2>

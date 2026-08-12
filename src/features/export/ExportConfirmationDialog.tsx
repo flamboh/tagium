@@ -1,4 +1,5 @@
-import { ChevronDown } from "lucide-react";
+import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,7 +43,9 @@ export function ExportPlanDisclosure({ group }: { group: ExportPlanGroup }) {
             {group.tracks.length} {group.tracks.length === 1 ? "track" : "tracks"}
           </span>
         </span>
-        <ChevronDown
+        <HugeiconsIcon
+          icon={ArrowDown01Icon}
+          strokeWidth={2}
           className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out group-data-[state=open]/disclosure:rotate-180 motion-reduce:transition-none"
           aria-hidden="true"
         />

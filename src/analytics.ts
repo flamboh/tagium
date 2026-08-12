@@ -722,7 +722,6 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
         name: event.type,
         properties: {
           ...commonProperties,
-          sync_filenames: event.syncFilenames,
           audio_bitrate: event.audioBitrate,
           apply_soundcloud_cover: event.applySoundCloudCover,
           advanced_metadata: event.advancedMetadata,

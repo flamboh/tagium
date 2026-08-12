@@ -690,6 +690,7 @@ describe("analytics", () => {
         artwork: false,
         albumArtist: true,
         trackNumber: true,
+        filename: false,
       },
     });
     analytics.capture({ type: "album_created", trackCount: 4, hasCover: true });

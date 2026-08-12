@@ -6,7 +6,8 @@ const sampleText = "abcdefghijklmnopqrstuvwx";
 
 const enableAdvancedMetadata = async (page: Page) => {
   await page.getByRole("button", { name: "settings" }).click();
-  await page.getByRole("checkbox", { name: "enable advanced metadata" }).click();
+  await page.getByRole("button", { name: "editing", exact: true }).click();
+  await page.getByRole("checkbox", { name: "show advanced fields" }).click();
   await page.getByRole("button", { name: "back to workspace" }).click();
 };
 

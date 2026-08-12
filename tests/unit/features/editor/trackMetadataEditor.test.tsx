@@ -48,6 +48,7 @@ function EditorHarness({
     artwork: true,
     albumArtist: true,
     trackNumber: true,
+    filename: true,
   },
   headerLeadingAction,
 }: {
@@ -206,6 +207,7 @@ describe("track metadata editor form seam", () => {
           artwork: true,
           albumArtist: true,
           trackNumber: true,
+          filename: true,
         }}
       />,
     );

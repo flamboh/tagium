@@ -25,7 +25,8 @@ const enableAdvancedMetadata = async (page: Page) => {
   } else {
     await page.getByRole("button", { name: "settings" }).click();
   }
-  await page.getByRole("checkbox", { name: "enable advanced metadata" }).click();
+  await page.getByRole("button", { name: "editing", exact: true }).click();
+  await page.getByRole("checkbox", { name: "show advanced fields" }).click();
   if (openedFromMobileLibrary) {
     await page.goBack();
   } else {

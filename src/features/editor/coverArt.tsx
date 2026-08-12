@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useId, useReducer, useRef, useState } from "react";
+import { CropIcon, Upload01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import ImageCropper from "@/components/ui/image-cropper";
-import { Crop, Upload } from "lucide-react";
 import { runCoverArtUploadTransaction } from "@/features/editor/coverArtProcessing";
 import {
   coverArtReducer,
@@ -209,7 +210,7 @@ export default function CoverArt({
                     aria-describedby={disabled && disabledReason ? disabledReasonId : undefined}
                     className="absolute top-2 right-2 size-10 p-0 max-lg:[@media(max-height:700px)]:top-1.5 max-lg:[@media(max-height:700px)]:right-1.5"
                   >
-                    <Crop className="h-4 w-4" />
+                    <HugeiconsIcon icon={CropIcon} strokeWidth={2} className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
               </PopoverTrigger>
@@ -273,7 +274,9 @@ export default function CoverArt({
               }
               onClick={() => fileInputRef.current?.click()}
             >
-              <Upload
+              <HugeiconsIcon
+                icon={Upload01Icon}
+                strokeWidth={2}
                 className={
                   isCompact
                     ? "h-4 w-4 text-muted-foreground"
