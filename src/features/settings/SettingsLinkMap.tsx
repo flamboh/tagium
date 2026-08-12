@@ -21,8 +21,8 @@ interface SettingsLinkMapProps {
 // `source` names what a row reads from, `synced` what it writes to. Both column headers are
 // prefixed with their role so the direction of every wire is readable without clicking one.
 const linkGroups = [
-  { id: "fromAlbum", source: "album", synced: "every track" },
-  { id: "fromTrack", source: "track", synced: "related fields" },
+  { id: "fromAlbum", source: "album", synced: "track" },
+  { id: "fromTrack", source: "track", synced: "related" },
 ] as const satisfies ReadonlyArray<{
   id: MetadataLinkGroup;
   source: string;
@@ -31,15 +31,13 @@ const linkGroups = [
 
 function LinkRow({
   descriptor,
-  first,
   settings,
   onChange,
-}: SettingsLinkMapProps & { descriptor: MetadataLinkDescriptor; first: boolean }) {
+}: SettingsLinkMapProps & { descriptor: MetadataLinkDescriptor }) {
   const linked = isMetadataLinkEnabled(settings, descriptor);
-  const nodeClassName = cn(
-    "hidden min-h-11 items-center bg-card px-3 text-sm sm:flex",
-    first ? "border-y" : "border-b",
-  );
+  // Both field names hug the wire — right-aligned on the left, left-aligned on the right — so every
+  // row sits the same distance from its chain no matter how long the names are.
+  const nodeClassName = "hidden min-h-11 items-center px-3 text-sm sm:flex";
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b py-3 last:border-b-0 sm:contents">
@@ -51,13 +49,8 @@ function LinkRow({
       >
         {descriptor.label}
       </span>
-      <div className={cn(nodeClassName, "border-l border-r-0")}>{descriptor.map.source}</div>
-      <div
-        className={cn(
-          "relative flex items-center justify-center sm:min-h-11 sm:bg-card",
-          first ? "sm:border-y" : "sm:border-b",
-        )}
-      >
+      <div className={cn(nodeClassName, "justify-end text-right")}>{descriptor.map.source}</div>
+      <div className="relative flex items-center justify-center sm:min-h-11">
         <div
           className={cn(
             "absolute inset-x-0 top-1/2 hidden border-t-2 transition-colors duration-150 motion-reduce:transition-none sm:block",
@@ -85,7 +78,7 @@ function LinkRow({
       <div
         className={cn(
           nodeClassName,
-          "border-r border-l-0 transition-colors motion-reduce:transition-none",
+          "transition-colors motion-reduce:transition-none",
           !linked && "text-muted-foreground",
         )}
       >
@@ -108,21 +101,25 @@ export default function SettingsLinkMap({ settings, onChange }: SettingsLinkMapP
         );
 
         return (
-          <section key={group.id} aria-label={`${group.source} synced to ${group.synced}`}>
+          <section
+            key={group.id}
+            aria-label={`${group.source} field synced to ${group.synced} field`}
+          >
             <div className="mb-2 text-[0.6875rem] tracking-widest text-muted-foreground sm:hidden">
-              {group.source} → {group.synced}
+              {group.source} field → {group.synced} field
             </div>
-            <div className="mb-2 hidden grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] text-center text-[0.6875rem] tracking-widest text-muted-foreground sm:grid lg:grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,1fr)]">
-              <span>source · {group.source}</span>
-              <span aria-hidden="true">→</span>
-              <span>synced · {group.synced}</span>
+            <div className="mb-3 hidden grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] text-[0.6875rem] tracking-widest text-muted-foreground sm:grid lg:grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,1fr)]">
+              <span className="px-3 text-right">source {group.source} field</span>
+              <span aria-hidden="true" className="text-center">
+                →
+              </span>
+              <span className="px-3">synced {group.synced} field</span>
             </div>
             <div className="border-y sm:grid sm:grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] sm:border-0 lg:grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,1fr)]">
-              {descriptors.map((descriptor, index) => (
+              {descriptors.map((descriptor) => (
                 <LinkRow
                   key={descriptor.id}
                   descriptor={descriptor}
-                  first={index === 0}
                   settings={settings}
                   onChange={onChange}
                 />
