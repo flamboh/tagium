@@ -147,8 +147,8 @@ describe("album metadata validation layout", () => {
     );
 
     for (const id of ["album-title", "album-artist", "album-genre", "album-year"]) {
-      findElement(tree, (element) => element.type === "label" && element.props.htmlFor === id);
-      findElement(tree, (element) => element.props.id === id);
+      const field = findElement(tree, (element) => element.props.id === id);
+      expect(field.props.label).toEqual(expect.any(String));
     }
 
     const titleInput = findElement(tree, (element) => element.props.id === "album-title");
@@ -158,14 +158,7 @@ describe("album metadata validation layout", () => {
     expect(titleInput.props["aria-required"]).toBe("true");
     expect(artistInput.props.required).toBe(true);
     expect(artistInput.props["aria-required"]).toBe("true");
-    expect(
-      textContent(
-        findElement(
-          tree,
-          (element) => element.type === "label" && element.props.htmlFor === "album-title",
-        ),
-      ),
-    ).toContain("required");
+    expect(titleInput.props.label).toBe("album title");
   });
 
   it.each([
@@ -275,10 +268,10 @@ describe("album metadata validation layout", () => {
 
     expect(
       findElement(tree, (element) => element.props.id === "album-title").props.placeholder,
-    ).toBe("placeholder album");
+    ).toBe("Placeholder Album");
     expect(
       findElement(tree, (element) => element.props.id === "album-artist").props.placeholder,
-    ).toBe("placeholder artist");
+    ).toBe("Placeholder Artist");
     expect(textContent(tree)).toContain("create album");
 
     const form = findElement(tree, (element) => element.type === "form");

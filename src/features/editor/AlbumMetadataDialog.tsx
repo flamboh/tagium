@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { FloatingLabelInput } from "@/components/ui/floating-label-field";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CoverArt from "@/features/editor/coverArt";
 import { useAlbumCoverSync } from "@/features/editor/useAlbumCoverSync";
@@ -58,7 +58,6 @@ export default function AlbumMetadataDialog({
   });
   const canSyncCoverToTracks =
     mode === "edit" && draft.cover && draft.cover.length > 0 && onSyncCoverToTracks;
-  const placeholderClassName = "placeholder:text-muted-foreground/45";
   const titleInvalid = !draft.title.trim();
   const artistInvalid = !draft.artist.trim();
   const formInvalid = titleInvalid || artistInvalid;
@@ -107,15 +106,9 @@ export default function AlbumMetadataDialog({
               <div className="order-2 min-w-0 h-full flex flex-col justify-between gap-3 md:order-2">
                 <div className="flex flex-col gap-0">
                   <div>
-                    <label htmlFor="album-title" className="block text-sm font-medium mb-1">
-                      album title:{" "}
-                      <span className="text-destructive" aria-hidden="true">
-                        *
-                      </span>
-                      <span className="sr-only"> required</span>
-                    </label>
-                    <Input
+                    <FloatingLabelInput
                       id="album-title"
+                      label="album title"
                       required
                       aria-required="true"
                       value={draft.title}
@@ -126,12 +119,11 @@ export default function AlbumMetadataDialog({
                         })
                       }
                       onBlur={() => setTouchedFields((current) => ({ ...current, title: true }))}
-                      placeholder={placeholder.title.toLowerCase()}
+                      placeholder={placeholder.title}
                       aria-invalid={touchedFields.title && titleInvalid}
                       aria-describedby={
                         touchedFields.title && titleInvalid ? "album-title-error" : undefined
                       }
-                      className={placeholderClassName}
                     />
                     <p
                       id="album-title-error"
@@ -142,15 +134,9 @@ export default function AlbumMetadataDialog({
                     </p>
                   </div>
                   <div>
-                    <label htmlFor="album-artist" className="block text-sm font-medium mb-1">
-                      artist:{" "}
-                      <span className="text-destructive" aria-hidden="true">
-                        *
-                      </span>
-                      <span className="sr-only"> required</span>
-                    </label>
-                    <Input
+                    <FloatingLabelInput
                       id="album-artist"
+                      label="artist"
                       required
                       aria-required="true"
                       value={draft.artist}
@@ -161,12 +147,11 @@ export default function AlbumMetadataDialog({
                         })
                       }
                       onBlur={() => setTouchedFields((current) => ({ ...current, artist: true }))}
-                      placeholder={placeholder.artist.toLowerCase()}
+                      placeholder={placeholder.artist}
                       aria-invalid={touchedFields.artist && artistInvalid}
                       aria-describedby={
                         touchedFields.artist && artistInvalid ? "album-artist-error" : undefined
                       }
-                      className={placeholderClassName}
                     />
                     <p
                       id="album-artist-error"
@@ -177,11 +162,9 @@ export default function AlbumMetadataDialog({
                     </p>
                   </div>
                   <div className="mb-3">
-                    <label htmlFor="album-genre" className="block text-sm font-medium mb-1">
-                      genre:
-                    </label>
-                    <Input
+                    <FloatingLabelInput
                       id="album-genre"
+                      label="genre"
                       value={draft.genre}
                       onChange={(event) =>
                         onChange({
@@ -189,31 +172,26 @@ export default function AlbumMetadataDialog({
                           genre: event.target.value,
                         })
                       }
-                      placeholder={placeholder.genre.toLowerCase()}
-                      className={placeholderClassName}
+                      placeholder={placeholder.genre}
                     />
                   </div>
-                  <div>
-                    <label htmlFor="album-year" className="block text-sm font-medium mb-1">
-                      year:
-                    </label>
-                    <Input
-                      id="album-year"
-                      type="number"
-                      min={0}
-                      max={9999}
-                      step={1}
-                      value={draft.year ?? ""}
-                      onChange={(event) =>
-                        onChange({
-                          ...draft,
-                          year: event.target.value ? Number(event.target.value) : undefined,
-                        })
-                      }
-                      placeholder={placeholder.year.toLowerCase()}
-                      className={`${placeholderClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-                    />
-                  </div>
+                  <FloatingLabelInput
+                    id="album-year"
+                    label="year"
+                    type="number"
+                    min={0}
+                    max={9999}
+                    step={1}
+                    value={draft.year ?? ""}
+                    onChange={(event) =>
+                      onChange({
+                        ...draft,
+                        year: event.target.value ? Number(event.target.value) : undefined,
+                      })
+                    }
+                    placeholder={placeholder.year}
+                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                 </div>
               </div>
               <CoverArt

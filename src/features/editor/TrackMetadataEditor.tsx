@@ -17,7 +17,7 @@ import {
   type UseFormSetFocus,
 } from "react-hook-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { FloatingLabelInput, FloatingLabelTextarea } from "@/components/ui/floating-label-field";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CoverArt from "@/features/editor/coverArt";
 import AudioImportDropzone from "@/features/import/AudioImportDropzone";
@@ -89,8 +89,6 @@ interface PendingTrackMetadataEditorProps extends Pick<
 const hasMetadata = (selectedFile: TagiumFile | null): selectedFile is LoadedTrack =>
   Boolean(selectedFile?.metadata);
 
-const fieldLabelClassName = "mb-1 block text-xs font-medium md:text-sm";
-const placeholderClassName = "placeholder:text-muted-foreground/45";
 const syncedInputClassName =
   "disabled:pointer-events-auto disabled:cursor-not-allowed disabled:border-dashed disabled:bg-muted/10 disabled:text-muted-foreground disabled:opacity-100 dark:disabled:bg-muted/10";
 
@@ -283,52 +281,41 @@ function TrackDetailsFields({
 
   return (
     <>
-      <div>
-        <label htmlFor="track-title" className={fieldLabelClassName}>
-          title:
-        </label>
-        <Input
-          {...titleInputRegistration}
-          id="track-title"
-          ref={titleInputRef}
-          aria-invalid={syncFilenames && filenameInvalid}
-          aria-describedby={syncFilenames && filenameInvalid ? "track-filename-error" : undefined}
-          placeholder={placeholder.title}
-          className={placeholderClassName}
-        />
-      </div>
-      <div>
-        <label htmlFor="track-artist" className={fieldLabelClassName}>
-          artist:
-        </label>
-        <DisabledReason
+      <FloatingLabelInput
+        {...titleInputRegistration}
+        id="track-title"
+        label="title"
+        ref={titleInputRef}
+        aria-invalid={syncFilenames && filenameInvalid}
+        aria-describedby={syncFilenames && filenameInvalid ? "track-filename-error" : undefined}
+        placeholder={placeholder.title}
+      />
+      <DisabledReason
+        disabled={inAlbum && metadataLinks.artist}
+        reason={getMetadataLinkDescriptor("artist").disabledReason}
+      >
+        <FloatingLabelInput
+          {...artistRegistration}
+          id="track-artist"
+          label="artist"
+          placeholder={placeholder.artist}
           disabled={inAlbum && metadataLinks.artist}
-          reason={getMetadataLinkDescriptor("artist").disabledReason}
-        >
-          <Input
-            {...artistRegistration}
-            id="track-artist"
-            placeholder={placeholder.artist}
-            disabled={inAlbum && metadataLinks.artist}
-            className={`${placeholderClassName} ${syncedInputClassName}`}
-          />
-        </DisabledReason>
-      </div>
+          className={syncedInputClassName}
+        />
+      </DisabledReason>
       <div>
-        <label htmlFor="track-album" className={fieldLabelClassName}>
-          album:
-        </label>
         <DisabledReason disabled={albumLinked} reason={albumFieldReason}>
-          <Input
+          <FloatingLabelInput
             key={singleAlbumLinked ? "linked" : "unlinked"}
             {...(singleAlbumLinked ? { name: albumRegistration.name } : albumRegistration)}
             id="track-album"
+            label="album"
             aria-describedby={albumLinked ? albumFieldReasonId : undefined}
             placeholder={placeholder.album}
             disabled={albumLinked}
             readOnly={albumLinked}
             value={singleAlbumLinked ? linkedAlbumValue : undefined}
-            className={`${placeholderClassName} ${syncedInputClassName}`}
+            className={syncedInputClassName}
           />
         </DisabledReason>
         {albumLinked && (
@@ -338,65 +325,53 @@ function TrackDetailsFields({
         )}
       </div>
       <div className="grid grid-cols-[minmax(4.5rem,0.8fr)_minmax(0,1.4fr)_minmax(4.5rem,0.8fr)] gap-2">
-        <div>
-          <label htmlFor="track-year" className={fieldLabelClassName}>
-            year:
-          </label>
-          <DisabledReason
+        <DisabledReason
+          disabled={inAlbum && metadataLinks.year}
+          reason={getMetadataLinkDescriptor("year").disabledReason}
+        >
+          <FloatingLabelInput
+            type="number"
+            min={0}
+            max={9999}
+            step={1}
+            {...register("year", { valueAsNumber: true })}
+            id="track-year"
+            label="year"
+            placeholder={placeholder.year}
             disabled={inAlbum && metadataLinks.year}
-            reason={getMetadataLinkDescriptor("year").disabledReason}
-          >
-            <Input
-              type="number"
-              min={0}
-              max={9999}
-              step={1}
-              {...register("year", { valueAsNumber: true })}
-              id="track-year"
-              placeholder={placeholder.year}
-              disabled={inAlbum && metadataLinks.year}
-              className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-            />
-          </DisabledReason>
-        </div>
-        <div>
-          <label htmlFor="track-genre" className={fieldLabelClassName}>
-            genre:
-          </label>
-          <DisabledReason
+            className={`${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+          />
+        </DisabledReason>
+        <DisabledReason
+          disabled={inAlbum && metadataLinks.genre}
+          reason={getMetadataLinkDescriptor("genre").disabledReason}
+        >
+          <FloatingLabelInput
+            {...register("genre")}
+            id="track-genre"
+            label="genre"
+            placeholder={placeholder.genre}
             disabled={inAlbum && metadataLinks.genre}
-            reason={getMetadataLinkDescriptor("genre").disabledReason}
-          >
-            <Input
-              {...register("genre")}
-              id="track-genre"
-              placeholder={placeholder.genre}
-              disabled={inAlbum && metadataLinks.genre}
-              className={`${placeholderClassName} ${syncedInputClassName}`}
-            />
-          </DisabledReason>
-        </div>
-        <div>
-          <label htmlFor="track-number" className={fieldLabelClassName}>
-            track:
-          </label>
-          <DisabledReason
+            className={syncedInputClassName}
+          />
+        </DisabledReason>
+        <DisabledReason
+          disabled={inAlbum && metadataLinks.trackNumber}
+          reason={getMetadataLinkDescriptor("trackNumber").disabledReason}
+        >
+          <FloatingLabelInput
+            type="number"
+            min={1}
+            max={65535}
+            step={1}
+            {...register("trackNumber", { valueAsNumber: true })}
+            id="track-number"
+            label="track"
+            placeholder={placeholder.trackNumber}
             disabled={inAlbum && metadataLinks.trackNumber}
-            reason={getMetadataLinkDescriptor("trackNumber").disabledReason}
-          >
-            <Input
-              type="number"
-              min={1}
-              max={65535}
-              step={1}
-              {...register("trackNumber", { valueAsNumber: true })}
-              id="track-number"
-              placeholder={placeholder.trackNumber}
-              disabled={inAlbum && metadataLinks.trackNumber}
-              className={`${placeholderClassName} ${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-            />
-          </DisabledReason>
-        </div>
+            className={`${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+          />
+        </DisabledReason>
       </div>
     </>
   );
@@ -433,22 +408,20 @@ function AdvancedTrackDetailsFields({
   return (
     <>
       <div>
-        <label htmlFor="track-album-artist" className={fieldLabelClassName}>
-          album artist:
-        </label>
         <DisabledReason disabled={albumArtistLinked} reason={albumArtistReason}>
-          <Input
+          <FloatingLabelInput
             key={albumArtistLinked ? "linked" : "unlinked"}
             {...(albumArtistLinked
               ? { name: registrations.albumArtist.name }
               : registrations.albumArtist)}
             id="track-album-artist"
+            label="album artist"
             aria-describedby={albumArtistLinked ? albumArtistReasonId : undefined}
             disabled={albumArtistLinked}
             readOnly={albumArtistLinked}
             value={albumArtistLinked ? linkedArtistValue : undefined}
             placeholder="album artist"
-            className={`${placeholderClassName} ${syncedInputClassName}`}
+            className={syncedInputClassName}
           />
         </DisabledReason>
         {albumArtistLinked && (
@@ -459,10 +432,7 @@ function AdvancedTrackDetailsFields({
       </div>
       <div ref={onFieldsMount} className="grid grid-cols-2 gap-2">
         <div>
-          <label htmlFor="track-disc-number" className={fieldLabelClassName}>
-            disc number:
-          </label>
-          <Input
+          <FloatingLabelInput
             type="number"
             inputMode="numeric"
             min={1}
@@ -470,10 +440,11 @@ function AdvancedTrackDetailsFields({
             step={1}
             {...registrations.discNumber}
             id="track-disc-number"
+            label="disc number"
             aria-invalid={Boolean(errors.discNumber)}
             aria-describedby={errors.discNumber ? "track-disc-number-error" : undefined}
             placeholder="1"
-            className={`${placeholderClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+            className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
           {errors.discNumber && (
             <p
@@ -486,10 +457,7 @@ function AdvancedTrackDetailsFields({
           )}
         </div>
         <div>
-          <label htmlFor="track-bpm" className={fieldLabelClassName}>
-            bpm:
-          </label>
-          <Input
+          <FloatingLabelInput
             type="number"
             inputMode="numeric"
             min={1}
@@ -497,10 +465,11 @@ function AdvancedTrackDetailsFields({
             step={1}
             {...registrations.bpm}
             id="track-bpm"
+            label="bpm"
             aria-invalid={Boolean(errors.bpm)}
             aria-describedby={errors.bpm ? "track-bpm-error" : undefined}
             placeholder="120"
-            className={`${placeholderClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+            className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
           {errors.bpm && (
             <p
@@ -513,29 +482,19 @@ function AdvancedTrackDetailsFields({
           )}
         </div>
       </div>
-      <div>
-        <label htmlFor="track-composer" className={fieldLabelClassName}>
-          composer:
-        </label>
-        <Input
-          {...registrations.composer}
-          id="track-composer"
-          placeholder="composer"
-          className={placeholderClassName}
-        />
-      </div>
-      <div>
-        <label htmlFor="track-comment" className={fieldLabelClassName}>
-          comment:
-        </label>
-        <textarea
-          {...registrations.comment}
-          id="track-comment"
-          rows={2}
-          placeholder="add a comment"
-          className="border-input placeholder:text-muted-foreground/45 selection:bg-brand selection:text-background focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 flex min-h-16 w-full resize-y rounded-md border bg-transparent px-3 py-2 text-base shadow-xs outline-none focus-visible:ring-[3px] md:text-sm"
-        />
-      </div>
+      <FloatingLabelInput
+        {...registrations.composer}
+        id="track-composer"
+        label="composer"
+        placeholder="composer"
+      />
+      <FloatingLabelTextarea
+        {...registrations.comment}
+        id="track-comment"
+        label="comment"
+        rows={2}
+        placeholder="add a comment"
+      />
     </>
   );
 }
@@ -804,7 +763,7 @@ function LoadedTrackMetadataEditor({
           syncFilenames={syncFilenames}
           watchedFilename={watchedFilename}
           sanitizedFilename={sanitizeFilenameBase(filenameValue)}
-          filenamePlaceholder={placeholder.filename.toLowerCase()}
+          filenamePlaceholder={placeholder.filename}
           filenameInvalid={filenameInvalid}
           filenameRegistration={filenameRegistration}
           failure={failure}
@@ -851,13 +810,13 @@ function LoadedTrackMetadataEditor({
                     focusedTitleFileIdRef={focusedTitleFileIdRef}
                     register={register}
                     placeholder={{
-                      filename: placeholder.filename.toLowerCase(),
-                      title: placeholder.title.toLowerCase(),
-                      artist: placeholder.artist.toLowerCase(),
-                      album: placeholder.album.toLowerCase(),
-                      year: placeholder.year.toLowerCase(),
-                      genre: placeholder.genre.toLowerCase(),
-                      trackNumber: placeholder.trackNumber.toLowerCase(),
+                      filename: placeholder.filename,
+                      title: placeholder.title,
+                      artist: placeholder.artist,
+                      album: placeholder.album,
+                      year: placeholder.year,
+                      genre: placeholder.genre,
+                      trackNumber: placeholder.trackNumber,
                     }}
                     inAlbum={Boolean(selectedFileAlbum)}
                     linkedAlbumValue={watchedTitle}

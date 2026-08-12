@@ -222,13 +222,14 @@ describe("track metadata editor form seam", () => {
     expect(unlinkedInput).not.toContain("aria-describedby");
   });
 
-  it("lowercases metadata placeholders", () => {
+  it("preserves sample metadata placeholder casing", () => {
     const markup = renderToStaticMarkup(<EditorHarness />);
 
+    expect(markup).toContain('placeholder="Died But Came Back"');
+    expect(markup).toContain('placeholder="Digicore"');
     expect(markup).toContain('placeholder="album artist"');
     expect(markup).toContain('placeholder="composer"');
     expect(markup).toContain('placeholder="add a comment"');
-    expect(markup).not.toMatch(/placeholder="[A-Z]/);
   });
 
   it("describes a synced filename error from the title field", () => {
