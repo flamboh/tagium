@@ -29,6 +29,15 @@ import { EDITABLE_METADATA_FIELDS } from "@/features/audio/metadataFields";
 
 type PreviewField = "filename" | "title" | "artist";
 
+// Keep keystrokes local to the form while coalescing the more expensive library/sidebar preview.
+const PREVIEW_COMMIT_DELAY_MS = 150;
+
+interface PendingPreview {
+  fileId: string;
+  field: PreviewField;
+  value: string;
+}
+
 const hasOwn = <Key extends PropertyKey>(object: object, key: Key) =>
   Object.prototype.hasOwnProperty.call(object, key);
 
@@ -151,6 +160,8 @@ export const useTrackEditorSession = ({
   const lastResetFileIdRef = useRef<string | null>(null);
   const lastResetMetadataRef = useRef<AudioMetadata | null>(null);
   const formDirtyRef = useRef(false);
+  const pendingPreviewRef = useRef<PendingPreview | null>(null);
+  const previewTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const latestMetadataWritesRef = useRef(new Map<string, symbol>());
   const [isCoverProcessing, setCoverProcessing] = useState(false);
   const {
@@ -275,8 +286,57 @@ export const useTrackEditorSession = ({
     [applyCurrentFormMetadataToFiles, library],
   );
 
+  const cancelPendingPreview = useCallback(() => {
+    if (previewTimerRef.current !== null) {
+      globalThis.clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    pendingPreviewRef.current = null;
+  }, []);
+
+  const commitPendingPreview = useCallback(() => {
+    if (previewTimerRef.current !== null) {
+      globalThis.clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    const pendingPreview = pendingPreviewRef.current;
+    pendingPreviewRef.current = null;
+    if (!pendingPreview || selectedFileIdRef.current !== pendingPreview.fileId) return;
+
+    const snapshot = library.getSnapshot();
+    const currentFile = snapshot.files.find((file) => file.id === pendingPreview.fileId);
+    if (!currentFile) return;
+    const formValues = { ...getValues(), [pendingPreview.field]: pendingPreview.value };
+    const submittedData = getProjectableAudioMetadata(
+      getSubmittedMetadata(formValues),
+      currentFile.metadata,
+      formValues,
+    );
+    const metadataPatch = createCurrentMetadataPatch(submittedData, dirtyFieldsRef.current, [
+      pendingPreview.field,
+    ]);
+    if (!metadataPatch) return;
+    const nextFiles = snapshot.files.map((file) =>
+      file.id === pendingPreview.fileId
+        ? withMergedPendingMetadataPatch(
+            {
+              ...file,
+              filename: getFilenameFromPatch(file, metadataPatch),
+              metadata: file.metadata
+                ? applyMetadataPatch(file.metadata, metadataPatch)
+                : submittedData,
+              status: file.status === "saved" ? "pending" : file.status,
+            },
+            metadataPatch,
+          )
+        : file,
+    );
+    library.dispatch({ type: "content-replaced", files: nextFiles });
+  }, [createCurrentMetadataPatch, getSubmittedMetadata, getValues, library]);
+
   const flush = useCallback(
     (trackIds?: string[]) => {
+      cancelPendingPreview();
       const currentFiles = library.getSnapshot().files;
       const nextFiles = projectFiles(trackIds);
       if (nextFiles !== currentFiles) {
@@ -284,7 +344,7 @@ export const useTrackEditorSession = ({
       }
       return nextFiles;
     },
-    [library, projectFiles],
+    [cancelPendingPreview, library, projectFiles],
   );
 
   const preview = useCallback(
@@ -293,38 +353,20 @@ export const useTrackEditorSession = ({
       if (!selectedId) return;
 
       formDirtyRef.current = true;
-      const currentFiles = library.getSnapshot().files;
-      const currentFile = currentFiles.find((file) => file.id === selectedId);
-      if (!currentFile) return;
-      const formValues = { ...getValues(), [field]: value };
-      const submittedData = getProjectableAudioMetadata(
-        getSubmittedMetadata(formValues),
-        currentFile.metadata,
-        formValues,
+      dirtyFieldsRef.current = { ...dirtyFieldsRef.current, [field]: true };
+      pendingPreviewRef.current = { fileId: selectedId, field, value };
+      if (previewTimerRef.current !== null) {
+        globalThis.clearTimeout(previewTimerRef.current);
+      }
+      previewTimerRef.current = globalThis.setTimeout(
+        commitPendingPreview,
+        PREVIEW_COMMIT_DELAY_MS,
       );
-      const metadataPatch = createCurrentMetadataPatch(submittedData, dirtyFieldsRef.current, [
-        field,
-      ]);
-      if (!metadataPatch) return;
-      const nextFiles = currentFiles.map((file) =>
-        file.id === selectedId
-          ? withMergedPendingMetadataPatch(
-              {
-                ...file,
-                filename: getFilenameFromPatch(file, metadataPatch),
-                metadata: file.metadata
-                  ? applyMetadataPatch(file.metadata, metadataPatch)
-                  : submittedData,
-                status: file.status === "saved" ? "pending" : file.status,
-              },
-              metadataPatch,
-            )
-          : file,
-      );
-      library.dispatch({ type: "content-replaced", files: nextFiles });
     },
-    [createCurrentMetadataPatch, getSubmittedMetadata, getValues, library],
+    [commitPendingPreview],
   );
+
+  useLayoutEffect(() => cancelPendingPreview, [cancelPendingPreview]);
 
   const updateTags = useCallback(
     async (fileToUpdate: TagiumFile, newTags: AudioMetadata) => {

@@ -68,6 +68,10 @@ describe("track editor session", () => {
       void title.onChange({ target: { name: "title", value: "Edited First" }, type: "change" });
     });
     act(() => hook.result.editor.commands.preview("title", "Edited First"));
+    expect(hook.result.library.getSnapshot().files[0]?.metadata?.title).toBe("First");
+    act(() => {
+      hook.result.editor.commands.flush();
+    });
     expect(hook.result.library.getSnapshot().files[0]).toMatchObject({
       status: "pending",
       hasBufferedChanges: true,
@@ -91,6 +95,46 @@ describe("track editor session", () => {
     expect(hook.result.editor.selectedFile?.id).toBe(second.id);
     expect(hook.result.library.getSnapshot().files[1].metadata?.title).toBe("Second");
     hook.unmount();
+  });
+
+  it("coalesces sidebar previews until typing pauses", () => {
+    vi.useFakeTimers();
+    const hook = renderHook(() => {
+      const library = useLibraryStore();
+      return { library, editor: useTrackEditorSession({ library, settings }) };
+    }, undefined);
+    const file = readyFile("track", "Original");
+    act(() => {
+      hook.result.library.dispatch({
+        type: "content-replaced",
+        files: [file],
+        looseTrackIds: [file.id],
+        selection: { selectedAlbumId: null, selectedFileId: file.id },
+      });
+    });
+
+    const title = hook.result.editor.form.register("title");
+    for (const value of ["E", "Ed", "Edited"] as const) {
+      act(() => {
+        void title.onChange({ target: { name: "title", value }, type: "change" });
+        hook.result.editor.commands.preview("title", value);
+      });
+    }
+
+    act(() => {
+      vi.advanceTimersByTime(149);
+    });
+    expect(hook.result.library.getSnapshot().files[0]?.metadata?.title).toBe("Original");
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(hook.result.library.getSnapshot().files[0]).toMatchObject({
+      status: "pending",
+      metadata: { title: "Edited" },
+      pendingMetadataPatch: { title: "Edited" },
+    });
+    hook.unmount();
+    vi.useRealTimers();
   });
 
   it("preserves pending edits while hydrating a downloaded file", async () => {
