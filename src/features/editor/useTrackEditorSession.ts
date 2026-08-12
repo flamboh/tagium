@@ -597,9 +597,10 @@ export const useTrackEditorSession = ({
               const latestFormPatch = latestFormMetadata
                 ? createCurrentMetadataPatch(latestFormMetadata, dirtyFieldsRef.current)
                 : undefined;
+              // Downloaded metadata is authoritative for untouched fields; only replay user edits.
               const latestMetadataForResolve =
-                latestFormPatch && latestFile.metadata
-                  ? applyMetadataPatch(latestFile.metadata, latestFormPatch)
+                latestFormPatch && hydratedFile.metadata
+                  ? applyMetadataPatch(hydratedFile.metadata, latestFormPatch)
                   : latestFormMetadata;
               const latestFileForResolve = latestFormPatch
                 ? withMergedPendingMetadataPatch(

@@ -200,7 +200,7 @@ describe("track editor session", () => {
   it.each([
     { field: "title", value: "Edited Title" },
     { field: "album", value: "Edited Album" },
-  ] as const)("shows downloaded cover art while $field is dirty", async ({ field, value }) => {
+  ] as const)("shows downloaded metadata while $field is dirty", async ({ field, value }) => {
     const hook = renderHook(() => {
       const library = useLibraryStore();
       return { library, editor: useTrackEditorSession({ library, settings }) };
@@ -239,7 +239,7 @@ describe("track editor session", () => {
       file: downloaded,
       originalFile: downloaded,
       filename: downloaded.name,
-      metadata: { ...metadata("Parsed"), picture: downloadedCover },
+      metadata: { ...metadata("Parsed"), year: 2025, picture: downloadedCover },
     };
     const backend = AudioBackend.of({
       downloadFromCobalt: () => Effect.fail(new Error("unused")),
@@ -257,6 +257,7 @@ describe("track editor session", () => {
     });
 
     expect(hook.result.library.getSnapshot().files[0]?.metadata?.picture).toEqual(downloadedCover);
+    expect(hook.result.library.getSnapshot().files[0]?.metadata?.year).toBe(2025);
     expect(hook.result.editor.form.getValues(field)).toBe(value);
     expect(hook.result.editor.form.getValues("picture")).toEqual(downloadedCover);
     hook.unmount();
