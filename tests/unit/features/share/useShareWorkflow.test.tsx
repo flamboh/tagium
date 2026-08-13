@@ -487,6 +487,35 @@ describe("share workflow publication lifecycle", () => {
     token: "old-token",
   };
 
+  it("skips form projection when the selected track has no active publication", () => {
+    const file: TagiumFile = structuredClone(creatorFile);
+    const state = {
+      ...createLibraryState(),
+      files: [file],
+      looseTrackIds: [file.id],
+      selectedFileId: file.id,
+    };
+    const library: LibraryStore = {
+      state,
+      getSnapshot: () => state,
+      dispatch: vi.fn(),
+    };
+    const editor = fakeEditor([file]);
+    const hook = renderHook(
+      () =>
+        useShareWorkflow({
+          library,
+          editor,
+          importing: fakeImporting(vi.fn()),
+          enabled: true,
+        }),
+      undefined,
+    );
+
+    expect(editor.form.subscribe).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
   it("replaces a stopped publication with a fresh link", async () => {
     const album = creatorAlbum({ ...oldPublication, status: "stopped" });
     const { hook } = creatorWorkflow(album, creatorFile);

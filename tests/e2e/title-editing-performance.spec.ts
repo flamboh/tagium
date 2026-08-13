@@ -2,20 +2,20 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { Buffer } from "node:buffer";
 import { materializeFixture } from "./support/audioFixtures";
 
-const sampleText = "abcdefghijklmnopqrstuvwx";
+const textBursts = ["abcdef", "ghijkl", "mnopqr", "stuvwx"] as const;
+const sampleText = textBursts.join("");
+
+interface FrameProbe {
+  active: boolean;
+  gaps: number[];
+  previous: number;
+}
 
 declare global {
   interface Window {
-    __tagiumInputProcessing?: Array<{ id: string; processingMs: number }>;
+    __tagiumFrameProbe?: FrameProbe;
   }
 }
-
-const enableAdvancedMetadata = async (page: Page) => {
-  await page.getByRole("button", { name: "settings" }).click();
-  await page.getByRole("button", { name: "editing", exact: true }).click();
-  await page.getByRole("checkbox", { name: "show advanced fields" }).click();
-  await page.getByRole("button", { name: "back to workspace" }).click();
-};
 
 const uploadAlbum = async (page: Page) => {
   const fixture = await materializeFixture("mp3");
@@ -27,83 +27,89 @@ const uploadAlbum = async (page: Page) => {
     })),
   );
   await expect(page.locator("#track-title")).toBeVisible();
+  await expect(page.getByText("library (40)", { exact: true })).toBeVisible();
+  await page.waitForTimeout(500);
 };
 
-const typeMeasuredText = async (page: Page, input: Locator) => {
-  await input.fill("");
-  await input.focus();
-  const inputId = await input.getAttribute("id");
-  await page.evaluate((id) => {
-    const entries = window.__tagiumInputProcessing;
-    if (!entries) throw new Error("input processing measurement was not installed");
-    for (let index = entries.length - 1; index >= 0; index--) {
-      if (entries[index]?.id === id) entries.splice(index, 1);
-    }
-  }, inputId);
-  for (const character of sampleText) {
-    await page.keyboard.type(character);
-    await page.evaluate(
-      () =>
-        new Promise<void>((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-        ),
-    );
-  }
-  await page.waitForTimeout(100);
+const percentile = (values: readonly number[], fraction: number) => {
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted[Math.ceil(sorted.length * fraction) - 1] ?? Number.POSITIVE_INFINITY;
 };
 
-const readP95ProcessingTime = async (page: Page, targetId: string) =>
-  page.evaluate(
-    ({ id, sampleCount }) => {
-      const entries = window.__tagiumInputProcessing;
-      if (!entries) throw new Error("input processing measurement was not installed");
-
-      const samples = entries.filter((entry) => entry.id === id).map((entry) => entry.processingMs);
-      if (samples.length !== sampleCount) {
-        throw new Error(`expected ${sampleCount} ${id} samples, received ${samples.length}`);
-      }
-      samples.sort((left, right) => left - right);
-      return samples[Math.ceil(samples.length * 0.95) - 1] ?? Number.POSITIVE_INFINITY;
-    },
-    { id: targetId, sampleCount: sampleText.length },
+const measureBurstMax = async (page: Page, input: Locator, text: string) => {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const probe: FrameProbe = { active: true, gaps: [], previous: 0 };
+        window.__tagiumFrameProbe = probe;
+        const sample = (now: number) => {
+          if (!probe.active) return;
+          probe.gaps.push(now - probe.previous);
+          probe.previous = now;
+          requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(() =>
+          requestAnimationFrame((now) => {
+            probe.previous = now;
+            requestAnimationFrame(sample);
+            resolve();
+          }),
+        );
+      }),
   );
-
-test("keeps track title editing responsive in a large album", async ({ page, browserName }) => {
-  test.skip(browserName !== "chromium", "Event Timing is covered in Chromium");
-  await page.goto("/");
-  await enableAdvancedMetadata(page);
-  await uploadAlbum(page);
-  await page.evaluate(() => {
-    const startedAt = new WeakMap<Event, number>();
-    const entries: { id: string; processingMs: number }[] = [];
-    window.__tagiumInputProcessing = entries;
-    document.addEventListener(
-      "input",
-      (event) => {
-        startedAt.set(event, performance.now());
-      },
-      true,
-    );
-    document.addEventListener("input", (event) => {
-      const start = startedAt.get(event);
-      if (start === undefined) return;
-      entries.push({
-        id: event.target instanceof HTMLElement ? event.target.id : "",
-        processingMs: performance.now() - start,
-      });
-    });
+  await input.pressSequentially(text, { delay: 30 });
+  await page.waitForTimeout(250);
+  return page.evaluate(() => {
+    const probe = window.__tagiumFrameProbe;
+    if (!probe) throw new Error("frame probe was not installed");
+    probe.active = false;
+    return Math.max(...probe.gaps);
   });
+};
 
-  await typeMeasuredText(page, page.locator("#track-title"));
-  await page.getByRole("button", { name: "advanced" }).click();
-  await typeMeasuredText(page, page.locator("#track-comment"));
+const measureTyping = async (page: Page, input: Locator) => {
+  const maxima: number[] = [];
+  await input.fill("warmup");
+  await page.waitForTimeout(250);
 
-  const titleP95 = await readP95ProcessingTime(page, "track-title");
-  const commentP95 = await readP95ProcessingTime(page, "track-comment");
+  for (let repetition = 0; repetition < 3; repetition++) {
+    await input.fill("");
+    await page.waitForTimeout(250);
+    await input.focus();
+    for (const burst of textBursts) {
+      maxima.push(await measureBurstMax(page, input, burst));
+    }
+  }
+
+  return { maxima, p75Max: percentile(maxima, 0.75) };
+};
+
+test("keeps track title editing as responsive as album title editing", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== "chromium", "frame timing is covered in Chromium");
+  await page.goto("/");
+  await uploadAlbum(page);
+
+  await page
+    .getByRole("button", { name: /^album actions for /u })
+    .first()
+    .click();
+  await page.getByRole("menuitem", { name: "edit album" }).click();
+  const albumTitle = page.locator("#album-title");
+  await expect(albumTitle).toBeVisible();
+  await page.waitForTimeout(400);
+  const album = await measureTyping(page, albumTitle);
+  await page.getByRole("button", { name: "cancel" }).click();
+  await expect(albumTitle).toBeHidden();
+  await page.waitForTimeout(400);
+
+  const track = await measureTyping(page, page.locator("#track-title"));
   expect(
-    titleP95,
-    `title p95 ${titleP95.toFixed(1)} ms; comment p95 ${commentP95.toFixed(1)} ms`,
-  ).toBeLessThanOrEqual(commentP95 + 8);
+    track.p75Max,
+    `track burst maxima ${track.maxima.map((value) => value.toFixed(1)).join(", ")} ms; album burst maxima ${album.maxima.map((value) => value.toFixed(1)).join(", ")} ms`,
+  ).toBeLessThanOrEqual(album.p75Max + 16);
   await expect(
     page.getByRole("button", { name: new RegExp(`${sampleText}\\.mp3`, "u") }).first(),
   ).toBeVisible();

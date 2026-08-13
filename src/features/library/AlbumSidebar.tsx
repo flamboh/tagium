@@ -26,11 +26,13 @@ import { useAlbumSidebarDragController } from "@/features/library/useAlbumSideba
 import type { ShareActionState } from "@/features/share/sharePublication";
 import { createAlbumActionItems } from "@/features/library/albumActionItems";
 import { createTrackActionItems } from "@/features/library/trackActionItems";
+import type { TrackFilenamePreviewStore } from "@/features/library/trackFilenamePreview";
 
 interface AlbumSidebarProps {
   albums: AlbumGroup[];
   looseTrackIds: string[];
   files: TagiumFile[];
+  filenamePreviewStore: TrackFilenamePreviewStore;
   selectedAlbumId: string | null;
   selectedFileId: string | null;
   selectedFileIds: Set<string>;
@@ -77,6 +79,7 @@ export default function AlbumSidebar({
   albums,
   looseTrackIds,
   files,
+  filenamePreviewStore,
   selectedAlbumId,
   selectedFileId,
   selectedFileIds,
@@ -197,6 +200,7 @@ export default function AlbumSidebar({
                 <SortableTrackRow
                   key={track.id}
                   track={track}
+                  filenamePreviewStore={filenamePreviewStore}
                   container="loose"
                   selectedTone={selectedTone(track.id)}
                   muted={track.downloadStatus === "downloading"}
@@ -281,6 +285,7 @@ export default function AlbumSidebar({
                             <SortableTrackRow
                               key={track.id}
                               track={track}
+                              filenamePreviewStore={filenamePreviewStore}
                               index={index + 1}
                               container="album"
                               albumId={album.id}

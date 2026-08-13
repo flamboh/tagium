@@ -7,6 +7,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { SortableTrackRow } from "@/features/library/AlbumSidebarDnd";
 import PlaylistDownloadQueuePanel from "@/features/import/PlaylistDownloadQueuePanel";
 import type { TagiumFile } from "@/features/library/types";
+import { createTrackFilenamePreviewStore } from "@/features/library/trackFilenamePreview";
 
 vi.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenu: ({ children }: { children?: ReactNode }) => <>{children}</>,
@@ -23,9 +24,11 @@ afterEach(() => {
 });
 
 describe("download presentation", () => {
+  const filenamePreviewStore = createTrackFilenamePreviewStore();
   const renderTrackRow = (track: TagiumFile) => (
     <SortableTrackRow
       track={track}
+      filenamePreviewStore={filenamePreviewStore}
       index={1}
       container="album"
       albumId="album-1"
@@ -67,6 +70,7 @@ describe("download presentation", () => {
     const markup = renderToStaticMarkup(
       <SortableTrackRow
         track={track}
+        filenamePreviewStore={filenamePreviewStore}
         index={15}
         container="album"
         albumId="album-1"

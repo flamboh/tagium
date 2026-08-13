@@ -16,6 +16,7 @@ import { allTracksReadyForDownload } from "@/features/export/downloadLibrary";
 import { isValidFilenameBase } from "@/features/library/filename";
 import type { ShareActionState } from "@/features/share/sharePublication";
 import { useTheme } from "@/features/theme/useTheme";
+import type { TrackFilenamePreviewStore } from "@/features/library/trackFilenamePreview";
 
 export interface TagSidebarPanelProps {
   mobileOpen?: boolean;
@@ -23,6 +24,7 @@ export interface TagSidebarPanelProps {
   onMobileClose?: () => void;
   loading: boolean;
   files: TagiumFile[];
+  filenamePreviewStore: TrackFilenamePreviewStore;
   albums: AlbumGroup[];
   looseTrackIds: string[];
   selectedAlbumId: string | null;
@@ -80,6 +82,7 @@ export default function TagSidebarPanel({
   onMobileClose,
   loading,
   files,
+  filenamePreviewStore,
   albums,
   looseTrackIds,
   selectedAlbumId,
@@ -239,6 +242,7 @@ export default function TagSidebarPanel({
         albums={albums}
         looseTrackIds={looseTrackIds}
         files={files}
+        filenamePreviewStore={filenamePreviewStore}
         selectedAlbumId={selectedAlbumId}
         selectedFileId={selectedFileId}
         selectedFileIds={selectedFileIds}

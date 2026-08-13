@@ -39,11 +39,16 @@ import {
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import type { AlbumActionItem, AlbumActionItemId } from "@/features/library/albumActionItems";
 import type { TrackActionItem } from "@/features/library/trackActionItems";
+import {
+  type TrackFilenamePreviewStore,
+  useTrackFilenamePreview,
+} from "@/features/library/trackFilenamePreview";
 
 const artistLabel = (artist: string) => (artist ? artist : "unknown");
 
 type TrackRowBaseProps = {
   track: TagiumFile;
+  filenamePreviewStore: TrackFilenamePreviewStore;
   selectedTone: "primary" | "secondary" | null;
   muted: boolean;
   actions: TrackActionItem[];
@@ -66,6 +71,7 @@ const sortableStyle = (
 
 export function SortableTrackRow({
   track,
+  filenamePreviewStore,
   index,
   container,
   albumId,
@@ -74,6 +80,7 @@ export function SortableTrackRow({
   actions,
   onSelect,
 }: TrackRowProps) {
+  const filename = useTrackFilenamePreview(filenamePreviewStore, track.id, track.filename);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const previousStatusRef = useRef(track.status);
   const successTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
@@ -158,7 +165,7 @@ export function SortableTrackRow({
             ) : (
               <span className="min-w-3 text-[11px] text-muted-foreground">{index}</span>
             )}
-            <span className="truncate text-sm flex-1">{track.filename}</span>
+            <span className="truncate text-sm flex-1">{filename}</span>
             {track.downloadStatus === "downloading" && (
               <HugeiconsIcon
                 icon={loaderCircleIcon}
@@ -205,7 +212,7 @@ export function SortableTrackRow({
             variant="ghost"
             size="icon"
             className="absolute right-2 top-1/2 size-7 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100 [@media(pointer:coarse)]:right-0 [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:opacity-100"
-            aria-label={`track actions for ${track.filename}`}
+            aria-label={`track actions for ${filename}`}
           >
             <HugeiconsIcon icon={MoreVerticalIcon} strokeWidth={2} className="size-3.5" />
           </Button>

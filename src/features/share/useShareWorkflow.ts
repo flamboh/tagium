@@ -141,9 +141,21 @@ export const useShareWorkflow = ({
     setProjectedFiles(projectFilesRef.current());
   }, [library.state.files]);
 
+  const selectedFileId = library.state.selectedFileId;
+  const selectedFileNeedsFingerprint = Boolean(
+    selectedFileId &&
+    (isActiveSharePublication(
+      library.state.files.find((file) => file.id === selectedFileId)?.sharePublication,
+    ) ||
+      library.state.albums.some(
+        (album) =>
+          album.trackIds.includes(selectedFileId) &&
+          isActiveSharePublication(album.sharePublication),
+      )),
+  );
   const subscribeToEditorForm = editor.form.subscribe;
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !selectedFileNeedsFingerprint) return;
     let timer: ReturnType<typeof globalThis.setTimeout> | undefined;
     const unsubscribe = subscribeToEditorForm({
       name: SHAREABLE_TRACK_METADATA_FIELDS,
@@ -160,7 +172,7 @@ export const useShareWorkflow = ({
       if (timer !== undefined) globalThis.clearTimeout(timer);
       unsubscribe();
     };
-  }, [enabled, subscribeToEditorForm]);
+  }, [enabled, selectedFileNeedsFingerprint, subscribeToEditorForm]);
 
   useEffect(() => {
     const expiries: number[] = [];

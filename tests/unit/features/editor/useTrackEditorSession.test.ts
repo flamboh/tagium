@@ -131,11 +131,13 @@ describe("track editor session", () => {
     hook.unmount();
   });
 
-  it("coalesces sidebar previews until typing pauses", () => {
-    vi.useFakeTimers();
+  it("previews a synced filename outside the library until flush", () => {
     const hook = renderHook(() => {
       const library = useLibraryStore();
-      return { library, editor: useTrackEditorSession({ library, settings }) };
+      return {
+        library,
+        editor: useTrackEditorSession({ library, settings: { ...settings, syncFilenames: true } }),
+      };
     }, undefined);
     const file = readyFile("track", "Original");
     act(() => {
@@ -155,20 +157,50 @@ describe("track editor session", () => {
       });
     }
 
-    act(() => {
-      vi.advanceTimersByTime(149);
-    });
     expect(hook.result.library.getSnapshot().files[0]?.metadata?.title).toBe("Original");
+    expect(hook.result.editor.filenamePreviewStore.getSnapshot(file.id)).toBe("Edited.mp3");
     act(() => {
-      vi.advanceTimersByTime(1);
+      hook.result.editor.commands.flush();
     });
     expect(hook.result.library.getSnapshot().files[0]).toMatchObject({
       status: "pending",
-      metadata: { title: "Edited" },
-      pendingMetadataPatch: { title: "Edited" },
+      filename: "Edited.mp3",
+      metadata: { filename: "Edited", title: "Edited" },
+      pendingMetadataPatch: { filename: "Edited", title: "Edited" },
     });
+    expect(hook.result.editor.filenamePreviewStore.getSnapshot(file.id)).toBeUndefined();
     hook.unmount();
-    vi.useRealTimers();
+  });
+
+  it("updates and clears filename previews when editor context changes", () => {
+    const syncedSettings = { ...settings, syncFilenames: true };
+    const hook = renderHook((currentSettings: AppSettings) => {
+      const library = useLibraryStore();
+      return { library, editor: useTrackEditorSession({ library, settings: currentSettings }) };
+    }, syncedSettings);
+    const file = readyFile("original", "Original");
+    act(() => {
+      hook.result.library.dispatch({
+        type: "content-replaced",
+        files: [file],
+        looseTrackIds: [file.id],
+        selection: { selectedAlbumId: null, selectedFileId: file.id },
+      });
+    });
+
+    const title = hook.result.editor.form.register("title");
+    act(() => {
+      void title.onChange({ target: { name: "title", value: "Edited" }, type: "change" });
+      hook.result.editor.commands.preview("title", "Edited");
+    });
+    expect(hook.result.editor.filenamePreviewStore.getSnapshot(file.id)).toBe("Edited.mp3");
+
+    hook.rerender(settings);
+    expect(hook.result.editor.filenamePreviewStore.getSnapshot(file.id)).toBe("original.mp3");
+
+    act(() => hook.result.library.dispatch({ type: "selection-cleared" }));
+    expect(hook.result.editor.filenamePreviewStore.getSnapshot(file.id)).toBeUndefined();
+    hook.unmount();
   });
 
   it("preserves pending edits while hydrating a downloaded file", async () => {

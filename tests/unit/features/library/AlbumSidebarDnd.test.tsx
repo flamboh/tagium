@@ -12,6 +12,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { createAlbumActionItems } from "@/features/library/albumActionItems";
 import { createTrackActionItems } from "@/features/library/trackActionItems";
 import type { TagiumFile } from "@/features/library/types";
+import { createTrackFilenamePreviewStore } from "@/features/library/trackFilenamePreview";
 
 vi.mock("@dnd-kit/sortable", () => ({
   useSortable: () => ({
@@ -33,6 +34,7 @@ import {
 } from "@/features/library/AlbumSidebarDnd";
 
 const noOp = () => {};
+const filenamePreviewStore = createTrackFilenamePreviewStore();
 const renderIconContents = (icon: IconSvgElement) =>
   renderToStaticMarkup(<HugeiconsIcon icon={icon} strokeWidth={2} />)
     .replace(/^<svg[^>]*>/, "")
@@ -155,6 +157,7 @@ describe("SortableTrackRow action menu", () => {
     const markup = renderToStaticMarkup(
       <SortableTrackRow
         track={track}
+        filenamePreviewStore={filenamePreviewStore}
         container="loose"
         selectedTone={null}
         muted={false}
