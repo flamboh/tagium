@@ -5,7 +5,7 @@ export type Theme = "light" | "dark";
 const isTheme = (value: string | null): value is Theme => value === "light" || value === "dark";
 
 export const resolveInitialTheme = (): Theme => {
-  if (typeof window === "undefined") return "dark";
+  if (!("window" in globalThis)) return "dark";
 
   try {
     const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);

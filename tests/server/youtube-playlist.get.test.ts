@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { Schema } from "effect";
+import { mockEvent } from "h3";
 import handler from "../../server/api/youtube-playlist.get";
 
 const sourceUrl = "https://www.youtube.com/playlist?list=PLESiES1i-ThqUjxot6jWLDu90fxtkcpA0";
@@ -7,7 +9,7 @@ const makeEvent = (url = sourceUrl) => {
   const request = new Request(
     `https://tagium.test/api/youtube-playlist?url=${encodeURIComponent(url)}`,
   );
-  return { req: request } as unknown as Parameters<typeof handler>[0];
+  return mockEvent(request);
 };
 
 const lockupVideo = (videoId: string, title: string, duration: string) => ({
@@ -97,8 +99,8 @@ describe("youtube playlist endpoint", () => {
         return new Response(html);
       }
       if (url.startsWith("https://www.youtube.com/youtubei/v1/next?")) {
-        expect(typeof init?.body).toBe("string");
-        expect(JSON.parse(init?.body as string)).toMatchObject({ videoId: "first-video" });
+        const body = Schema.decodeUnknownSync(Schema.String)(init?.body);
+        expect(JSON.parse(body)).toMatchObject({ videoId: "first-video" });
         return Response.json({
           contents: {
             twoColumnWatchNextResults: {
@@ -115,8 +117,8 @@ describe("youtube playlist endpoint", () => {
       }
 
       expect(url).toContain("https://www.youtube.com/youtubei/v1/browse?key=api-key");
-      expect(typeof init?.body).toBe("string");
-      expect(JSON.parse(init?.body as string)).toMatchObject({ continuation: "next-page" });
+      const body = Schema.decodeUnknownSync(Schema.String)(init?.body);
+      expect(JSON.parse(body)).toMatchObject({ continuation: "next-page" });
       return Response.json({
         continuationContents: {
           playlistVideoListContinuation: {

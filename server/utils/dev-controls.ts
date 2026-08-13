@@ -78,10 +78,7 @@ export const getRequestHostname = (request: Request) => {
 export const isLocalHostname = (hostname: string) =>
   hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 
-export const getDeployEnv = (
-  request: Request,
-  runtimeEnv: CobaltRuntimeEnv,
-): { deployEnv: DeployEnv; detectedFrom: string } => {
+export const getDeployEnv = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
   if (
     runtimeEnv.TAGIUM_DEPLOY_ENV === "local" ||
     runtimeEnv.TAGIUM_DEPLOY_ENV === "preview" ||

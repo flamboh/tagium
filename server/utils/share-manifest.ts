@@ -4,6 +4,7 @@ import {
   manifestTrackCount,
   type Manifest,
   type ManifestArtwork,
+  type ManifestTrack,
 } from "../../src/features/share/shareManifest";
 import { createShareSlug, SHARE_SLUG_PATTERN } from "../../src/features/share/shareSlug";
 
@@ -87,6 +88,17 @@ export type ShareArtworkUpdate =
   | { kind: "retain" }
   | { kind: "remove" }
   | { kind: "replace"; artwork: ShareArtwork };
+interface AlbumWithArtwork {
+  title: string;
+  artist: string;
+  genre: string;
+  year?: number;
+  sourceUrl?: string;
+  artwork?: ManifestArtwork;
+}
+interface TrackWithArtwork extends ManifestTrack {
+  artwork?: ManifestArtwork;
+}
 export type ShareManifestUpdateResult =
   | { kind: "updated"; slug: string; expiresAt: number }
   | ShareManifestUnavailable;
@@ -118,7 +130,7 @@ const randomToken = (bytes = 32) => {
 };
 
 export class ShareManifestValidationError extends Error {}
-export const isShareManifestValidationError = (error: unknown) =>
+export const isShareManifestValidationError = (error: Error): boolean =>
   error instanceof ShareManifestValidationError;
 
 export const parseShareArtwork = async (
@@ -164,7 +176,7 @@ const detectImageType = (bytes: Uint8Array): ShareArtwork["type"] | undefined =>
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return undefined;
   let dimensions: { width: number; height: number } | undefined;
   let sawScan = false;
-  for (let index = 2; index + 1 < bytes.length; ) {
+  for (let index = 2; index + 1 < bytes.length;) {
     if (bytes[index] !== 0xff) return undefined;
     while (bytes[index] === 0xff) index++;
     const marker = bytes[index++];
@@ -233,16 +245,20 @@ const withArtworkDescriptor = (
   artwork: ManifestArtwork | undefined,
 ): ShareManifest => {
   if (manifest.kind === "album") {
-    const { artwork: _artwork, ...album } = manifest.album;
+    const { artwork: _artwork, ...albumFields } = manifest.album;
+    const album: AlbumWithArtwork = albumFields;
+    if (artwork) album.artwork = artwork;
     return decodeManifest({
       ...manifest,
-      album: { ...album, ...(artwork ? { artwork } : {}) },
+      album,
     });
   }
-  const { artwork: _artwork, ...track } = manifest.track;
+  const { artwork: _artwork, ...trackFields } = manifest.track;
+  const track: TrackWithArtwork = trackFields;
+  if (artwork) track.artwork = artwork;
   return decodeManifest({
     ...manifest,
-    track: { ...track, ...(artwork ? { artwork } : {}) },
+    track,
   });
 };
 

@@ -170,6 +170,7 @@ export default function AudioTagger() {
           onMobileClose={mobileNavigation.closeDrawer}
           loading={busy}
           files={files}
+          filenamePreviewStore={editor.filenamePreviewStore}
           albums={albums}
           looseTrackIds={looseTrackIds}
           selectedAlbumId={activeView === "settings" ? null : selectedAlbumId}

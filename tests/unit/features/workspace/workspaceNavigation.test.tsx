@@ -1,6 +1,7 @@
 import { act } from "react-test-renderer";
 import { describe, expect, it, vi } from "vite-plus/test";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
+import { createLibraryState } from "@/features/library/libraryState";
 import {
   transitionWorkspaceDestination,
   useWorkspaceNavigation,
@@ -37,11 +38,14 @@ describe("workspace destination transitions", () => {
 describe("workspace navigation", () => {
   it("flushes editor work before Home clears selection", () => {
     const calls: string[] = [];
-    const library = {
+    const state = createLibraryState();
+    const library: LibraryStore = {
+      state,
+      getSnapshot: () => state,
       dispatch: vi.fn(() => {
         calls.push("clear");
       }),
-    } as unknown as LibraryStore;
+    };
     const hook = renderHook(
       () =>
         useWorkspaceNavigation({
@@ -71,7 +75,12 @@ describe("workspace navigation", () => {
   });
 
   it("blocks destination changes while cover art is processing", () => {
-    const library = { dispatch: vi.fn() } as unknown as LibraryStore;
+    const state = createLibraryState();
+    const library: LibraryStore = {
+      state,
+      getSnapshot: () => state,
+      dispatch: vi.fn(),
+    };
     const hook = renderHook(
       () =>
         useWorkspaceNavigation({

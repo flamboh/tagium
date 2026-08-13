@@ -41,7 +41,7 @@ export const shouldStartDrawerSwipe = (
   )
     return false;
   if (
-    typeof Element !== "undefined" &&
+    "Element" in globalThis &&
     target instanceof Element &&
     (target.closest(
       "[data-drawer-swipe-optout], input, textarea, select, [contenteditable='true']",

@@ -20,6 +20,7 @@ import type { DestructiveActionDialogProps } from "@/features/workspace/Destruct
 import type { TagSidebarPanelProps } from "@/features/library/TagSidebarPanel";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
+import type { LibraryAction } from "@/features/library/libraryState";
 import type { AppSettings } from "@/features/library/types";
 
 type AlbumEditor = {
@@ -32,6 +33,12 @@ type AlbumSidebarProps = Pick<
   "onAddAlbum" | "onEditAlbum" | "onDeleteAlbum" | "onPromptCreateAlbumFromLooseTracks"
 >;
 
+interface WorkspaceAlbumDialogBindings {
+  dialogProps: AlbumMetadataDialogProps;
+  deletionDialogProps: DestructiveActionDialogProps;
+  sidebarProps: AlbumSidebarProps;
+}
+
 export const useWorkspaceAlbumDialog = ({
   library,
   editor,
@@ -42,11 +49,7 @@ export const useWorkspaceAlbumDialog = ({
   editor: AlbumEditor;
   settings: AppSettings;
   removeDownloads: (trackIds: string[]) => void;
-}): {
-  dialogProps: AlbumMetadataDialogProps;
-  deletionDialogProps: DestructiveActionDialogProps;
-  sidebarProps: AlbumSidebarProps;
-} => {
+}): WorkspaceAlbumDialogBindings => {
   const [dialog, dispatchDialog] = useReducer(
     albumDialogReducer,
     undefined,
@@ -178,20 +181,19 @@ export const useWorkspaceAlbumDialog = ({
         });
       }
     }
-    library.dispatch({
+    const replacement: Extract<LibraryAction, { type: "content-replaced" }> = {
       type: "content-replaced",
       files: finalFiles,
       albums: created.albums,
       looseTrackIds: created.looseTrackIds,
-      ...(created.newAlbumId
-        ? {
-            selection: {
-              selectedAlbumId: created.newAlbumId,
-              selectedFileId: submission.seedTrackIds[0] ?? null,
-            },
-          }
-        : {}),
-    });
+    };
+    if (created.newAlbumId) {
+      replacement.selection = {
+        selectedAlbumId: created.newAlbumId,
+        selectedFileId: submission.seedTrackIds[0] ?? null,
+      };
+    }
+    library.dispatch(replacement);
     dispatchDialog({ type: "saved" });
   }, [dialog, library]);
 

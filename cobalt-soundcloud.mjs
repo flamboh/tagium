@@ -27,21 +27,18 @@ const fetchText = async (url, stage) => {
   }
   const contentType = response.headers.get("content-type") ?? undefined;
   if (!response.ok) {
-    return failure(stage, {
-      upstreamStatus: response.status,
-      ...(contentType ? { contentType } : {}),
-      ...(response.headers.get("retry-after")
-        ? { retryAfter: response.headers.get("retry-after") }
-        : {}),
-    });
+    const details = { upstreamStatus: response.status };
+    if (contentType) details.contentType = contentType;
+    const retryAfter = response.headers.get("retry-after");
+    if (retryAfter) details.retryAfter = retryAfter;
+    return failure(stage, details);
   }
   try {
     return { value: await response.text() };
   } catch (error) {
-    return failure(`${stage}_body`, {
-      ...(contentType ? { contentType } : {}),
-      errorType: error instanceof Error ? error.name : "UnknownError",
-    });
+    const details = { errorType: error instanceof Error ? error.name : "UnknownError" };
+    if (contentType) details.contentType = contentType;
+    return failure(`${stage}_body`, details);
   }
 };
 
@@ -56,21 +53,18 @@ const fetchJson = async (url, stage) => {
   }
   const contentType = response.headers.get("content-type") ?? undefined;
   if (!response.ok) {
-    return failure(stage, {
-      upstreamStatus: response.status,
-      ...(contentType ? { contentType } : {}),
-      ...(response.headers.get("retry-after")
-        ? { retryAfter: response.headers.get("retry-after") }
-        : {}),
-    });
+    const details = { upstreamStatus: response.status };
+    if (contentType) details.contentType = contentType;
+    const retryAfter = response.headers.get("retry-after");
+    if (retryAfter) details.retryAfter = retryAfter;
+    return failure(stage, details);
   }
   try {
     return { value: await response.json() };
   } catch (error) {
-    return failure(`${stage}_parse`, {
-      ...(contentType ? { contentType } : {}),
-      errorType: error instanceof Error ? error.name : "UnknownError",
-    });
+    const details = { errorType: error instanceof Error ? error.name : "UnknownError" };
+    if (contentType) details.contentType = contentType;
+    return failure(`${stage}_parse`, details);
   }
 };
 

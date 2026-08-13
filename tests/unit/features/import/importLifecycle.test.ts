@@ -130,11 +130,12 @@ describe("import lifecycle", () => {
       });
       tracker.resolve(operationId, { trackIds: ["track-1", "track-2"], hasCover: false });
       tracker.settle(operationId, { trackId: "track-1", outcome: settlements[0] });
-      tracker.settle(operationId, {
+      const secondSettlement: Parameters<typeof tracker.settle>[1] = {
         trackId: "track-2",
         outcome: settlements[1],
-        ...(settlements[1] === "failed" ? { error: new Error("failed") } : {}),
-      });
+      };
+      if (settlements[1] === "failed") secondSettlement.error = new Error("failed");
+      tracker.settle(operationId, secondSettlement);
 
       expect(captured.at(-1)).toEqual(
         expect.objectContaining({ outcome: expectedOutcome, ...expectedCounts }),

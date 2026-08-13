@@ -1,4 +1,14 @@
+import { Schema } from "effect";
+
 export type DeployEnvironment = "preview" | "production";
+
+const wranglerBindingSchema = Schema.Struct({
+  name: Schema.optionalKey(Schema.String),
+  namespace_id: Schema.optionalKey(Schema.String),
+  simple: Schema.optionalKey(Schema.Struct({ limit: Schema.Number, period: Schema.Number })),
+});
+const optionalMutableKey = <S extends Schema.Constraint>(schema: S) =>
+  Schema.optionalKey(Schema.mutableKey(schema));
 
 /** Stable, provisioned Cloudflare resources. Keep this as the sole target map. */
 export const SHARE_DEPLOYMENT_RESOURCES = {
@@ -27,14 +37,18 @@ export const SHARE_DEPLOYMENT_RESOURCES = {
 export const getShareDeploymentResources = (environment: DeployEnvironment) =>
   SHARE_DEPLOYMENT_RESOURCES[environment];
 
-export type WranglerConfig = {
-  name?: string;
-  vars?: Record<string, string>;
-  d1_databases?: unknown[];
-  r2_buckets?: unknown[];
-  ratelimits?: unknown[];
-  env?: unknown;
-};
+export const wranglerConfigSchema = Schema.Struct({
+  name: optionalMutableKey(Schema.String),
+  vars: optionalMutableKey(Schema.Record(Schema.String, Schema.String)),
+  d1_databases: optionalMutableKey(Schema.Array(Schema.Unknown)),
+  r2_buckets: optionalMutableKey(Schema.Array(Schema.Unknown)),
+  ratelimits: optionalMutableKey(Schema.Array(wranglerBindingSchema)),
+  env: optionalMutableKey(Schema.Unknown),
+});
+export type WranglerConfig = Schema.Schema.Type<typeof wranglerConfigSchema>;
+export const decodeWranglerConfig = Schema.decodeUnknownSync(wranglerConfigSchema, {
+  onExcessProperty: "preserve",
+});
 
 /** Materialize one target into the top-level config used by both Wrangler commands. */
 export const configureShareDeploymentBindings = (
@@ -79,13 +93,8 @@ export const configureShareDeploymentBindings = (
       simple: { limit: 20, period: 60 },
     },
   ];
-  const cobalt = (config.ratelimits ?? []).filter(
-    (binding) =>
-      binding &&
-      typeof binding === "object" &&
-      ["COBALT_SESSION_RATE_LIMITER", "COBALT_CLIENT_RATE_LIMITER"].includes(
-        (binding as { name?: string }).name ?? "",
-      ),
+  const cobalt = (config.ratelimits ?? []).filter((binding) =>
+    ["COBALT_SESSION_RATE_LIMITER", "COBALT_CLIENT_RATE_LIMITER"].includes(binding.name ?? ""),
   );
   config.ratelimits = [...cobalt, ...shareRateLimits];
   return config;

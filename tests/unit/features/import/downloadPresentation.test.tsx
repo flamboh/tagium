@@ -7,6 +7,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { SortableTrackRow } from "@/features/library/AlbumSidebarDnd";
 import PlaylistDownloadQueuePanel from "@/features/import/PlaylistDownloadQueuePanel";
 import type { TagiumFile } from "@/features/library/types";
+import { createTrackFilenamePreviewStore } from "@/features/library/trackFilenamePreview";
 
 vi.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenu: ({ children }: { children?: ReactNode }) => <>{children}</>,
@@ -23,9 +24,11 @@ afterEach(() => {
 });
 
 describe("download presentation", () => {
+  const filenamePreviewStore = createTrackFilenamePreviewStore();
   const renderTrackRow = (track: TagiumFile) => (
     <SortableTrackRow
       track={track}
+      filenamePreviewStore={filenamePreviewStore}
       index={1}
       container="album"
       albumId="album-1"
@@ -58,15 +61,16 @@ describe("download presentation", () => {
   });
 
   it("keeps canceled track rows compact without a repeated status line", () => {
-    const track = {
+    const track: TagiumFile = {
       id: "track-1",
       filename: "Summer Fling.mp3",
       status: "pending",
       downloadStatus: "canceled",
-    } as TagiumFile;
+    };
     const markup = renderToStaticMarkup(
       <SortableTrackRow
         track={track}
+        filenamePreviewStore={filenamePreviewStore}
         index={15}
         container="album"
         albumId="album-1"
@@ -121,12 +125,12 @@ describe("download presentation", () => {
 
   it("shows saved feedback for three seconds after a status transition and cleans timers up", () => {
     vi.useFakeTimers();
-    const pendingTrack = {
+    const pendingTrack: TagiumFile = {
       id: "track-saved-feedback",
       filename: "Saved Track.mp3",
       status: "pending",
       downloadStatus: "ready",
-    } as TagiumFile;
+    };
     let renderer: ReactTestRenderer;
 
     act(() => {
@@ -168,12 +172,12 @@ describe("download presentation", () => {
 
   it("does not announce an initially saved track", () => {
     vi.useFakeTimers();
-    const savedTrack = {
+    const savedTrack: TagiumFile = {
       id: "already-saved-track",
       filename: "Already Saved.mp3",
       status: "saved",
       downloadStatus: "ready",
-    } as TagiumFile;
+    };
     let renderer: ReactTestRenderer;
 
     act(() => {

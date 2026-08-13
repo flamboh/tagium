@@ -6,6 +6,7 @@ import {
 } from "@/features/import/downloadTrack";
 import { applySoundCloudSetImportedCover } from "@/features/library/fileMetadataOps";
 import type { SoundCloudSet } from "@/features/import/soundcloudSet";
+import { toPublicAudioError } from "@/features/audio/audioErrors";
 import type { AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
 
 interface SoundCloudSetImportDeps extends SoundCloudSetDownloadWorkflowDeps {
@@ -16,7 +17,7 @@ interface SoundCloudSetImportDeps extends SoundCloudSetDownloadWorkflowDeps {
   createId: () => string;
   fetchImportedCover: (coverUrl: string) => Promise<AudioMetadata["picture"]>;
   updateTags: (file: TagiumFile, metadata: AudioMetadata) => Promise<void>;
-  warn: (message: string, error: unknown) => void;
+  warn: (message: string, error: Error) => void;
   getSelectedFileId?: () => string | null;
   setSelectedMetadata?: (metadata: AudioMetadata) => void;
 }
@@ -82,7 +83,7 @@ const startSoundCloudSetCoverImport = (
       }
       await Promise.all(tagUpdates);
     } catch (error) {
-      deps.warn("failed to import album cover:", error);
+      deps.warn("failed to import album cover:", toPublicAudioError(error));
     }
   })();
 };

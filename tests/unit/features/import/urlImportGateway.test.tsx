@@ -1,6 +1,7 @@
-import type { ReactElement, ReactNode } from "react";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import MediaUrlEntry from "@/features/import/MediaUrlEntry";
+import { reactChildren, reactText } from "../../../support/reactTestNodes";
 
 const reactHookMocks = vi.hoisted(() => ({
   useEffect: vi.fn(),
@@ -27,16 +28,22 @@ vi.mock("@/features/workspace/systemFailure", async (importOriginal) => {
   return { ...actual, reportSystemFailure };
 });
 
-type TestElement = ReactElement<Record<string, unknown> & { children?: ReactNode }>;
-
-const isElement = (node: ReactNode): node is TestElement =>
-  typeof node === "object" && node !== null && "props" in node;
-
-const childNodes = (node: TestElement) => {
-  const { children } = node.props;
-  if (children === undefined || children === null || typeof children === "boolean") return [];
-  return Array.isArray(children) ? children : [children];
+type SubmitEvent = { preventDefault: () => void };
+type TestElementProps = {
+  children?: ReactNode;
+  id?: string;
+  name?: string;
+  onChange?: (event: { target: { value: string } }) => void;
+  onSubmit?: (event: SubmitEvent) => Promise<void>;
+  "aria-busy"?: boolean;
+  "aria-label"?: string;
+  "data-layout"?: string;
 };
+type TestElement = ReactElement<TestElementProps>;
+
+const isElement = (node: ReactNode): node is TestElement => isValidElement<TestElementProps>(node);
+
+const childNodes = (node: TestElement) => reactChildren(node);
 
 const findElement = (
   node: ReactNode,
@@ -57,11 +64,7 @@ const findElement = (
   throw new Error("element not found");
 };
 
-const textContent = (node: ReactNode): string => {
-  if (typeof node === "string" || typeof node === "number") return String(node);
-  if (!isElement(node)) return "";
-  return childNodes(node).map(textContent).join("");
-};
+const textContent = reactText;
 
 const createHookHarness = () => {
   const states: unknown[] = [];
@@ -71,18 +74,19 @@ const createHookHarness = () => {
 
   reactHookMocks.useLayoutEffect.mockImplementation(() => undefined);
   reactHookMocks.useEffect.mockImplementation(() => undefined);
-  reactHookMocks.useRef.mockImplementation((initial: unknown) => {
+  reactHookMocks.useRef.mockImplementation(<Value,>(initial: Value) => {
     const index = refCursor++;
     refs[index] ??= { current: initial };
     return refs[index];
   });
-  reactHookMocks.useState.mockImplementation((initial: unknown) => {
+  reactHookMocks.useState.mockImplementation(<Value,>(initial: Value | (() => Value)) => {
     const index = stateCursor++;
-    if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
+    if (!(index in states)) states[index] = initial instanceof Function ? initial() : initial;
     return [
       states[index],
-      (next: unknown) => {
-        states[index] = typeof next === "function" ? next(states[index]) : next;
+      (next: Value | ((previous: Value) => Value)) => {
+        const previous = states[index] as Value;
+        states[index] = next instanceof Function ? next(previous) : next;
       },
     ];
   });
@@ -98,8 +102,7 @@ const createHookHarness = () => {
 
 const changeInputValue = (tree: ReactNode, value: string) => {
   const input = findElement(tree, (element) => element.props.name === "media-url");
-  const onChange = input.props.onChange as (event: { target: { value: string } }) => void;
-  onChange({ target: { value } });
+  input.props.onChange?.({ target: { value } });
 };
 
 afterEach(() => vi.clearAllMocks());
@@ -117,7 +120,7 @@ describe("media URL entry", () => {
 
     expect(tree.props["data-layout"]).toBe("editor");
     const form = findElement(tree, (element) => element.type === "form");
-    await (form.props.onSubmit as (event: { preventDefault: () => void }) => Promise<void>)({
+    await form.props.onSubmit?.({
       preventDefault: vi.fn(),
     });
 
@@ -139,9 +142,7 @@ describe("media URL entry", () => {
     changeInputValue(tree, "https://soundcloud.com/user/track");
     tree = render();
     const form = findElement(tree, (element) => element.type === "form");
-    const submit = (
-      form.props.onSubmit as (event: { preventDefault: () => void }) => Promise<void>
-    )({
+    const submit = form.props.onSubmit?.({
       preventDefault: vi.fn(),
     });
 
@@ -168,7 +169,7 @@ describe("media URL entry", () => {
     changeInputValue(tree, "not a url");
     tree = render();
     const form = findElement(tree, (element) => element.type === "form");
-    await (form.props.onSubmit as (event: { preventDefault: () => void }) => Promise<void>)({
+    await form.props.onSubmit?.({
       preventDefault: vi.fn(),
     });
 
@@ -192,7 +193,7 @@ describe("media URL entry", () => {
     changeInputValue(tree, "https://youtube.com/watch?v=abc");
     tree = render();
     const form = findElement(tree, (element) => element.type === "form");
-    await (form.props.onSubmit as (event: { preventDefault: () => void }) => Promise<void>)({
+    await form.props.onSubmit?.({
       preventDefault: vi.fn(),
     });
 
@@ -214,7 +215,7 @@ describe("media URL entry", () => {
     changeInputValue(tree, "https://soundcloud.com/user/sets/missing");
     tree = render();
     const form = findElement(tree, (element) => element.type === "form");
-    await (form.props.onSubmit as (event: { preventDefault: () => void }) => Promise<void>)({
+    await form.props.onSubmit?.({
       preventDefault: vi.fn(),
     });
 

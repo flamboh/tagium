@@ -1,20 +1,15 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { argv, exit } from "node:process";
-import { configureShareDeploymentBindings } from "./share-deployment-bindings";
+import {
+  configureShareDeploymentBindings,
+  decodeWranglerConfig,
+} from "./share-deployment-bindings";
 
 const WRANGLER_CONFIG_PATH = ".output/server/wrangler.json";
 const WRANGLER_VERSION = "wrangler@4.110.0";
 
-type WranglerConfig = {
-  name?: string;
-  vars?: Record<string, string>;
-  d1_databases?: unknown[];
-  r2_buckets?: unknown[];
-  ratelimits?: unknown[];
-};
-
-const config = JSON.parse(readFileSync(WRANGLER_CONFIG_PATH, "utf8")) as WranglerConfig;
+const config = decodeWranglerConfig(JSON.parse(readFileSync(WRANGLER_CONFIG_PATH, "utf8")));
 try {
   configureShareDeploymentBindings(config, "preview");
 } catch (error) {

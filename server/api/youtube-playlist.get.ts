@@ -55,7 +55,21 @@ const decodeLegacyVideoOption = Schema.decodeUnknownOption(legacyVideoSchema);
 const decodeLockupVideoOption = Schema.decodeUnknownOption(lockupVideoSchema);
 const decodeThumbnailOption = Schema.decodeUnknownOption(thumbnailSchema);
 
-type JsonRecord = Record<string, unknown>;
+interface JsonRecord {
+  [key: string]: JsonValue;
+}
+type JsonValue = string | number | boolean | null | JsonRecord | readonly JsonValue[];
+const jsonValueSchema: Schema.Codec<JsonValue> = Schema.suspend(() =>
+  Schema.Union([
+    Schema.String,
+    Schema.Finite,
+    Schema.Boolean,
+    Schema.Null,
+    Schema.Array(jsonValueSchema),
+    Schema.Record(Schema.String, jsonValueSchema),
+  ]),
+);
+const jsonRecordSchema = Schema.Record(Schema.String, jsonValueSchema);
 
 interface YouTubeTrack {
   title: string;
@@ -63,11 +77,20 @@ interface YouTubeTrack {
   duration?: number;
   trackNumber: number;
 }
+interface YouTubePlaylist {
+  title: string;
+  artist: string;
+  genre: string;
+  isAlbum: false;
+  year?: number;
+  coverUrl?: string;
+  tracks: YouTubeTrack[];
+}
 
-const isRecord = (value: unknown): value is JsonRecord =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+const isRecord = Schema.is(jsonRecordSchema);
+const isString = Schema.is(Schema.String);
 
-const getText = (value: unknown) => {
+const getText = (value: JsonValue | undefined) => {
   const parsed = decodeTextOption(value);
   if (Option.isNone(parsed)) return undefined;
   if (parsed.value.simpleText) return parsed.value.simpleText;
@@ -76,7 +99,7 @@ const getText = (value: unknown) => {
   return runs || undefined;
 };
 
-const findFirstValue = (value: unknown, key: string): unknown => {
+const findFirstValue = (value: JsonValue, key: string): JsonValue | undefined => {
   if (Array.isArray(value)) {
     for (const entry of value) {
       const found = findFirstValue(entry, key);
@@ -101,7 +124,7 @@ const parseDuration = (value: string | undefined) => {
   return parts.reduce((seconds, part) => seconds * 60 + Number(part), 0);
 };
 
-const findDuration = (value: unknown): number | undefined => {
+const findDuration = (value: JsonValue): number | undefined => {
   if (Array.isArray(value)) {
     for (const entry of value) {
       const duration = findDuration(entry);
@@ -111,7 +134,7 @@ const findDuration = (value: unknown): number | undefined => {
   }
   if (!isRecord(value)) return undefined;
 
-  const directText = typeof value.text === "string" ? value.text : undefined;
+  const directText = isString(value.text) ? value.text : undefined;
   const parsedDuration = parseDuration(directText);
   if (parsedDuration !== undefined) return parsedDuration;
 
@@ -122,7 +145,7 @@ const findDuration = (value: unknown): number | undefined => {
   return undefined;
 };
 
-const collectTracks = (value: unknown, seenVideoIds: Set<string>, tracks: YouTubeTrack[]) => {
+const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouTubeTrack[]) => {
   if (Array.isArray(value)) {
     for (const entry of value) collectTracks(entry, seenVideoIds, tracks);
     return;
@@ -168,7 +191,7 @@ const collectTracks = (value: unknown, seenVideoIds: Set<string>, tracks: YouTub
   for (const entry of Object.values(value)) collectTracks(entry, seenVideoIds, tracks);
 };
 
-const collectContinuationTokens = (value: unknown, tokens: string[]) => {
+const collectContinuationTokens = (value: JsonValue, tokens: string[]) => {
   if (Array.isArray(value)) {
     for (const entry of value) collectContinuationTokens(entry, tokens);
     return;
@@ -176,24 +199,26 @@ const collectContinuationTokens = (value: unknown, tokens: string[]) => {
   if (!isRecord(value)) return;
 
   const continuationCommand = value.continuationCommand;
-  if (isRecord(continuationCommand) && typeof continuationCommand.token === "string") {
+  if (isRecord(continuationCommand) && isString(continuationCommand.token)) {
     tokens.push(continuationCommand.token);
   }
 
   for (const entry of Object.values(value)) collectContinuationTokens(entry, tokens);
 };
 
-const getPlaylistTitle = (initialData: unknown) => {
+const getPlaylistTitle = (initialData: JsonValue) => {
   const metadata = findFirstValue(initialData, "playlistMetadataRenderer");
-  return isRecord(metadata) && typeof metadata.title === "string" ? metadata.title.trim() : "";
+  return metadata !== undefined && isRecord(metadata) && isString(metadata.title)
+    ? metadata.title.trim()
+    : "";
 };
 
-const getPlaylistArtist = (initialData: unknown) => {
+const getPlaylistArtist = (initialData: JsonValue) => {
   const owner = findFirstValue(initialData, "videoOwnerRenderer");
-  return isRecord(owner) ? (getText(owner.title)?.trim() ?? "") : "";
+  return owner !== undefined && isRecord(owner) ? (getText(owner.title)?.trim() ?? "") : "";
 };
 
-const getPlaylistCover = (initialData: unknown) => {
+const getPlaylistCover = (initialData: JsonValue) => {
   const parsed = decodeThumbnailOption(
     findFirstValue(initialData, "playlistVideoThumbnailRenderer"),
   );
@@ -208,9 +233,11 @@ const getPlaylistCover = (initialData: unknown) => {
   return `${proxyUrl.pathname}${proxyUrl.search}`;
 };
 
-const getDeclaredTrackCount = (initialData: unknown) => {
+const getDeclaredTrackCount = (initialData: JsonValue) => {
   const primaryInfo = findFirstValue(initialData, "playlistSidebarPrimaryInfoRenderer");
-  if (!isRecord(primaryInfo) || !Array.isArray(primaryInfo.stats)) return undefined;
+  if (primaryInfo === undefined || !isRecord(primaryInfo) || !Array.isArray(primaryInfo.stats)) {
+    return undefined;
+  }
   for (const stat of primaryInfo.stats) {
     const match = getText(stat)?.match(/([\d,]+)\s+videos?/i);
     if (!match) continue;
@@ -224,7 +251,7 @@ const fetchContinuation = async (token: string, config: JsonRecord, signal: Abor
   const apiKey = config.INNERTUBE_API_KEY;
   const context = config.INNERTUBE_CONTEXT;
   const clientVersion = config.INNERTUBE_CLIENT_VERSION;
-  if (typeof apiKey !== "string" || !isRecord(context) || typeof clientVersion !== "string") {
+  if (!isString(apiKey) || !isRecord(context) || !isString(clientVersion)) {
     return undefined;
   }
 
@@ -246,7 +273,7 @@ const fetchContinuation = async (token: string, config: JsonRecord, signal: Abor
     { stage: "continuation" },
   );
   if (!response.ok) throw new Error(`youtube.continuation_failed (${response.status})`);
-  return response.json() as Promise<unknown>;
+  return Schema.decodeUnknownSync(jsonValueSchema)(await response.json());
 };
 
 const parseSourceUrl = (sourceUrl: string) => {
@@ -326,13 +353,14 @@ export default defineHandler(async (event) => {
     );
   }
 
-  return {
+  const playlist: YouTubePlaylist = {
     title,
     artist: getPlaylistArtist(initialData),
     genre: "",
     isAlbum: false,
-    ...(year === undefined ? {} : { year }),
     coverUrl: getPlaylistCover(initialData),
     tracks,
   };
+  if (year !== undefined) playlist.year = year;
+  return playlist;
 });

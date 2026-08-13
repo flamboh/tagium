@@ -42,7 +42,7 @@ const createRun = (count: number) => {
   return run;
 };
 
-const getAdmission = (run: object) => {
+const getAdmission = (run: ReturnType<typeof createRun>) => {
   const admission = admissionByRun.get(run);
   if (!admission) throw new Error("download admission not found for test run.");
   return admission;

@@ -28,7 +28,7 @@ export const getImportQueuePresentation = (
   if (snapshot.canceled && snapshot.failed === 0) status = "canceled";
   const settled = snapshot.completed + snapshot.failed + snapshot.canceledCount;
   const eta = formatEta(snapshot.etaMs);
-  return {
+  const presentation: PlaylistDownloadQueuePanelState = {
     id: snapshot.id,
     status,
     downloadedCount: snapshot.completed,
@@ -41,6 +41,7 @@ export const getImportQueuePresentation = (
     canRetry: Boolean(
       snapshot.active.length === 0 && retryCount > 0 && (snapshot.canceled || snapshot.failed > 0),
     ),
-    ...(eta ? { eta: `eta ${eta}` } : {}),
   };
+  if (eta) presentation.eta = `eta ${eta}`;
+  return presentation;
 };

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vite-plus/test";
 import TagSidebarPanel from "@/features/library/TagSidebarPanel";
+import { createTrackFilenamePreviewStore } from "@/features/library/trackFilenamePreview";
 
 vi.mock("@/features/library/AlbumSidebar", () => ({
   default: () => <div data-testid="album-sidebar" />,
@@ -18,6 +19,7 @@ vi.mock("@/components/ui/tooltip", () => ({
 }));
 
 const noOp = () => {};
+const filenamePreviewStore = createTrackFilenamePreviewStore();
 
 describe("TagSidebarPanel", () => {
   it("remains visible when the closed mobile drawer is rendered at desktop widths", () => {
@@ -25,6 +27,7 @@ describe("TagSidebarPanel", () => {
       <TagSidebarPanel
         loading={false}
         files={[]}
+        filenamePreviewStore={filenamePreviewStore}
         albums={[]}
         looseTrackIds={[]}
         selectedAlbumId={null}

@@ -1,5 +1,6 @@
 import { defineHandler } from "nitro";
 import { env as processEnv } from "node:process";
+import { Option, Schema } from "effect";
 import {
   isCobaltMachineId,
   isValidCobaltMachineSignature,
@@ -27,6 +28,11 @@ type TunnelObservabilityContext = {
   importId?: string;
   sourceFingerprint?: string;
   trackIndex?: number;
+};
+type TunnelLogContext = TunnelObservabilityContext & {
+  requestId: string;
+  machineId?: string;
+  tunnelId?: string;
 };
 
 const COBALT_TUNNEL_TIMEOUT_MS = 300_000;
@@ -60,6 +66,7 @@ const createTunnelRequestId = () => `tagium-tunnel-${crypto.randomUUID()}`;
 
 const getRuntimeEnv = (request: Request): CobaltRuntimeEnv => ({
   ...processEnv,
+  // SAFETY: Nitro's Cloudflare adapter supplies this request shape in the Cloudflare runtime.
   ...(request as CloudflareRequest).runtime?.cloudflare?.env,
 });
 
@@ -126,7 +133,7 @@ const getTunnelLogContext = (
   machineId: string | null | undefined,
   observability: TunnelObservabilityContext = {},
 ) => {
-  const context: Record<string, string | number> = { requestId, ...observability };
+  const context: TunnelLogContext = { requestId, ...observability };
   if (machineId) {
     context.machineId = machineId;
   }
@@ -167,32 +174,24 @@ const logTunnelFailure = (
   console.warn(JSON.stringify({ event: "cobalt_tunnel_failure", message, ...context }));
 };
 
+const cobaltCapacityErrorSchema = Schema.Struct({
+  status: Schema.Literal("error"),
+  error: Schema.Struct({ code: Schema.Literal("error.api.capacity_exceeded") }),
+});
+type CobaltCapacityError = Schema.Schema.Type<typeof cobaltCapacityErrorSchema>;
+const decodeCobaltCapacityError = Schema.decodeUnknownOption(cobaltCapacityErrorSchema);
+
 const tryParseCobaltCapacityError = (responseText: string) => {
   try {
-    const body = JSON.parse(responseText) as unknown;
-
-    if (
-      body &&
-      typeof body === "object" &&
-      "status" in body &&
-      body.status === "error" &&
-      "error" in body &&
-      body.error &&
-      typeof body.error === "object" &&
-      "code" in body.error &&
-      body.error.code === "error.api.capacity_exceeded"
-    ) {
-      return body;
-    }
+    const decoded = decodeCobaltCapacityError(JSON.parse(responseText));
+    return Option.isSome(decoded) ? decoded.value : undefined;
   } catch {
     return undefined;
   }
-
-  return undefined;
 };
 
 const cobaltCapacityErrorResponse = (
-  body: unknown,
+  body: CobaltCapacityError,
   retryAfter: string | null,
   attempts?: number,
 ) => {
@@ -208,6 +207,12 @@ const cobaltCapacityErrorResponse = (
     status: 503,
     headers,
   });
+};
+
+const tunnelFailureResponseInit = (attempts: number): ResponseInit => {
+  const init: ResponseInit = { status: 502 };
+  if (attempts > 0) init.headers = tunnelTelemetryHeaders("non_retryable", attempts);
+  return init;
 };
 
 const cobaltDevTunnelFaultResponse = (fault: ReturnType<typeof consumeTunnelDevFault>) => {
@@ -357,9 +362,13 @@ export default defineHandler(async (event) => {
       await new Promise<void>((resolve, reject) => {
         const onAbort = () => {
           clearTimeout(timer);
-          done(fetchSignal.reason);
+          done(
+            fetchSignal.reason instanceof Error
+              ? fetchSignal.reason
+              : new Error("tunnel retry aborted"),
+          );
         };
-        const done = (error?: unknown) => {
+        const done = (error?: Error) => {
           fetchSignal.removeEventListener("abort", onAbort);
           if (error === undefined) resolve();
           else reject(error);
@@ -444,17 +453,11 @@ export default defineHandler(async (event) => {
       });
       if (error.name === "TimeoutError" || error.name === "AbortError") {
         return new Response("Cobalt tunnel request timed out.", {
-          status: 502,
-          ...(upstreamAttempts > 0
-            ? { headers: tunnelTelemetryHeaders("non_retryable", upstreamAttempts) }
-            : {}),
+          ...tunnelFailureResponseInit(upstreamAttempts),
         });
       }
       return new Response(error.message, {
-        status: 502,
-        ...(upstreamAttempts > 0
-          ? { headers: tunnelTelemetryHeaders("non_retryable", upstreamAttempts) }
-          : {}),
+        ...tunnelFailureResponseInit(upstreamAttempts),
       });
     }
 
@@ -463,10 +466,7 @@ export default defineHandler(async (event) => {
       elapsedMs: Date.now() - startedAt,
     });
     return new Response("Cobalt tunnel request failed.", {
-      status: 502,
-      ...(upstreamAttempts > 0
-        ? { headers: tunnelTelemetryHeaders("non_retryable", upstreamAttempts) }
-        : {}),
+      ...tunnelFailureResponseInit(upstreamAttempts),
     });
   }
 });

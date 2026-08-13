@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import AlbumSidebar from "@/features/library/AlbumSidebar";
 import { LOOSE_CONTAINER_ID } from "@/features/library/sidebarDnd";
 import type { TrackActionItem } from "@/features/library/trackActionItems";
+import { createTrackFilenamePreviewStore } from "@/features/library/trackFilenamePreview";
 
 vi.mock("@dnd-kit/core", () => ({
   DndContext: ({ children }: { children?: ReactNode }) => <>{children}</>,
@@ -58,6 +59,7 @@ vi.mock("@/features/library/useAlbumSidebarDragController", () => ({
 }));
 
 const noOp = () => {};
+const filenamePreviewStore = createTrackFilenamePreviewStore();
 
 describe("AlbumSidebar", () => {
   it("does not add height to an empty loose area during a track drag", () => {
@@ -66,6 +68,7 @@ describe("AlbumSidebar", () => {
         albums={[{ id: "album-a", title: "Album A", artist: "Artist", genre: "", trackIds: [] }]}
         looseTrackIds={[]}
         files={[]}
+        filenamePreviewStore={filenamePreviewStore}
         selectedAlbumId={null}
         selectedFileId={null}
         selectedFileIds={new Set()}
@@ -124,6 +127,7 @@ describe("AlbumSidebar", () => {
             downloadStatus: "ready",
           },
         ]}
+        filenamePreviewStore={filenamePreviewStore}
         selectedAlbumId={null}
         selectedFileId={null}
         selectedFileIds={new Set()}

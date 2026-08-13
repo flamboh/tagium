@@ -141,9 +141,21 @@ export const useShareWorkflow = ({
     setProjectedFiles(projectFilesRef.current());
   }, [library.state.files]);
 
+  const selectedFileId = library.state.selectedFileId;
+  const selectedFileNeedsFingerprint = Boolean(
+    selectedFileId &&
+    (isActiveSharePublication(
+      library.state.files.find((file) => file.id === selectedFileId)?.sharePublication,
+    ) ||
+      library.state.albums.some(
+        (album) =>
+          album.trackIds.includes(selectedFileId) &&
+          isActiveSharePublication(album.sharePublication),
+      )),
+  );
   const subscribeToEditorForm = editor.form.subscribe;
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !selectedFileNeedsFingerprint) return;
     let timer: ReturnType<typeof globalThis.setTimeout> | undefined;
     const unsubscribe = subscribeToEditorForm({
       name: SHAREABLE_TRACK_METADATA_FIELDS,
@@ -160,7 +172,7 @@ export const useShareWorkflow = ({
       if (timer !== undefined) globalThis.clearTimeout(timer);
       unsubscribe();
     };
-  }, [enabled, subscribeToEditorForm]);
+  }, [enabled, selectedFileNeedsFingerprint, subscribeToEditorForm]);
 
   useEffect(() => {
     const expiries: number[] = [];
@@ -205,6 +217,7 @@ export const useShareWorkflow = ({
         try {
           const snapshot = await projectAlbumShareSnapshot(
             album,
+            // SAFETY: the preceding guard rejects every missing file entry.
             files as NonNullable<(typeof files)[number]>[],
           );
           return [album.id, snapshot.fingerprint] as const;
@@ -477,13 +490,17 @@ export const useShareWorkflow = ({
           ? (
               await projectAlbumShareSnapshot(
                 album,
+                // SAFETY: the preceding guard rejects every missing album file entry.
                 albumFiles as NonNullable<(typeof albumFiles)[number]>[],
               )
             ).fingerprint
           : (await projectTrackShareSnapshot(file!)).fingerprint;
       } catch (error) {
         toast.error(`this ${target.kind} cannot be shared`, {
-          description: sharePublicationErrorMessage(error, target.kind),
+          description: sharePublicationErrorMessage(
+            error instanceof Error ? error : new Error("unknown share publication failure"),
+            target.kind,
+          ),
         });
         return;
       }
@@ -669,7 +686,10 @@ export const useShareWorkflow = ({
         });
       }
     } catch (error) {
-      const createError = sharePublicationErrorMessage(error, target.kind).replace(/[.!?]+$/, "");
+      const createError = sharePublicationErrorMessage(
+        error instanceof Error ? error : new Error("unknown share publication failure"),
+        target.kind,
+      ).replace(/[.!?]+$/, "");
       setDialog({
         status: "error",
         preview: currentDialog.preview,

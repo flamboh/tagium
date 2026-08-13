@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { mockEvent } from "h3";
 import handler from "../../server/api/youtube-cover.get";
 
 const makeEvent = (coverUrl: string) => {
   const request = new Request(
     `https://tagium.test/api/youtube-cover?url=${encodeURIComponent(coverUrl)}`,
   );
-  return { req: request } as unknown as Parameters<typeof handler>[0];
+  return mockEvent(request);
 };
 
 describe("youtube cover endpoint", () => {

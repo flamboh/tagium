@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { Buffer } from "node:buffer";
 
-const uploadTrack = async (page: Page) => {
+const importTrack = async (page: Page) => {
   const mp3Bytes = new Uint8Array(834);
   mp3Bytes.set([0xff, 0xfb, 0x90, 0x00], 0);
   mp3Bytes.set([0xff, 0xfb, 0x90, 0x00], 417);
@@ -12,6 +12,10 @@ const uploadTrack = async (page: Page) => {
     mimeType: "audio/mpeg",
     buffer: Buffer.from(mp3Bytes),
   });
+};
+
+const uploadTrack = async (page: Page) => {
+  await importTrack(page);
   await expect(page.getByRole("button", { name: "remove track" })).toBeAttached();
 };
 
@@ -20,9 +24,8 @@ test("allows unloading an empty session", async ({ page }) => {
 
   const unloadWasPrevented = await page.evaluate(() => {
     const event = new Event("beforeunload", { cancelable: true });
-    const browserGlobal = globalThis as unknown as EventTarget;
     return {
-      dispatchResult: browserGlobal.dispatchEvent(event),
+      dispatchResult: window.dispatchEvent(event),
       defaultPrevented: event.defaultPrevented,
     };
   });
@@ -65,4 +68,18 @@ test("requires confirmation before removing an imported track", async ({ page })
   await page.getByRole("button", { name: "remove track" }).click();
   await confirmation.getByRole("button", { name: "remove track" }).click();
   await expect(page.getByText("no tracks yet", { exact: true })).toBeVisible();
+});
+
+test("keeps the selected track while deleting characters from its title", async ({ page }) => {
+  await importTrack(page);
+  const title = page.locator("#track-title");
+  await expect(title).toBeVisible();
+  await title.fill("track");
+  await title.press("Home");
+
+  await title.press("Delete");
+
+  await expect(title).toHaveValue("rack");
+  await expect(page.getByRole("dialog", { name: "remove track?" })).toBeHidden();
+  await expect(page.getByText("library (1)", { exact: true })).toBeVisible();
 });

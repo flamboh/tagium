@@ -1,4 +1,6 @@
-import { analytics, type MediaLinkShape } from "@/analytics";
+import { analytics, type MediaLinkKind } from "@/analytics";
+import { Option, Schema } from "effect";
+import { toPublicAudioError } from "@/features/audio/audioErrors";
 import type {
   CobaltAudioDownloadLifecycleEvent,
   CobaltAudioDownloadRequest,
@@ -33,6 +35,9 @@ import { createSharedContentDownloadPlan } from "@/features/share/sharedAlbumDow
 import { parseMediaLink } from "@/lib/media-link";
 
 type ManagedDownloadTrack = QueuedDownloadTrack & { importOperationId?: string };
+const decodeSoundCloudLinkResponse = Schema.decodeUnknownOption(
+  Schema.Struct({ canonicalUrl: Schema.String }),
+);
 const retryProvider = (
   tracks: readonly ManagedDownloadTrack[],
 ): "youtube" | "soundcloud" | "other" | "mixed" => {
@@ -58,24 +63,23 @@ type UrlImportEditor = Pick<
 >;
 
 const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
-const managedDownloadTrackFromFile = (file: TagiumFile): ManagedDownloadTrack | null =>
-  file.downloadRequest
-    ? {
-        fileId: file.id,
-        title: file.metadata?.title || file.filename,
-        downloadRequest: file.downloadRequest,
-        ...(file.downloadRequest.importId
-          ? { importOperationId: file.downloadRequest.importId }
-          : {}),
-      }
-    : null;
+const managedDownloadTrackFromFile = (file: TagiumFile): ManagedDownloadTrack | null => {
+  if (!file.downloadRequest) return null;
+  const track: ManagedDownloadTrack = {
+    fileId: file.id,
+    title: file.metadata?.title || file.filename,
+    downloadRequest: file.downloadRequest,
+  };
+  if (file.downloadRequest.importId) track.importOperationId = file.downloadRequest.importId;
+  return track;
+};
 const createPlaylistDownloadModelTrack = (track: ManagedDownloadTrack) => ({
   id: track.fileId,
   title: track.title,
   sourceUrl: track.downloadRequest.sourceUrl,
 });
 
-const mediaLinkShapeFromUrl = (sourceUrl: string): MediaLinkShape => {
+const mediaLinkKindFromUrl = (sourceUrl: string): MediaLinkKind => {
   try {
     const host = new URL(sourceUrl).hostname.toLowerCase();
     if (host === "youtu.be" || host === "on.soundcloud.com" || host === "snd.sc") {
@@ -96,7 +100,7 @@ const mediaLinkShapeFromUrl = (sourceUrl: string): MediaLinkShape => {
       return "canonical";
     }
   } catch {
-    // Invalid and generic inputs share the non-identifying "other" shape.
+    // Invalid and generic inputs share the non-identifying "other" kind.
   }
   return "other";
 };
@@ -148,7 +152,7 @@ export const createAudioUrlImportSession = ({
     now: () => Date.now(),
   });
 
-  const markDownloadError = (fileId: string, error: unknown) => {
+  const markDownloadError = (fileId: string, error: Error) => {
     const message = reportSystemFailure(error, "download").trackDescription;
     const nextFiles = library.getSnapshot().files.map((file) =>
       file.id === fileId
@@ -221,13 +225,15 @@ export const createAudioUrlImportSession = ({
       onTrackSettled: (event) => {
         const { track, outcome } = event;
         if (!track.importOperationId) return;
-        importLifecycleTracker.settle(track.importOperationId, {
+        const settlement: Parameters<typeof importLifecycleTracker.settle>[1] = {
           trackId: track.fileId,
           outcome,
-          ...(event.outcome === "failed"
-            ? { error: event.error, failureStage: event.failureStage }
-            : {}),
-        });
+        };
+        if (event.outcome === "failed") {
+          settlement.error = event.error;
+          settlement.failureStage = event.failureStage;
+        }
+        importLifecycleTracker.settle(track.importOperationId, settlement);
       },
       onAction: (event) => {
         if (event.type === "cancel_requested") {
@@ -425,12 +431,10 @@ export const createAudioUrlImportSession = ({
             endpoint.searchParams.set("url", trimmedUrl);
             const response = await fetch(endpoint);
             if (response.ok) {
-              const candidateResult = await response.json();
-              if (
-                candidateResult &&
-                typeof candidateResult === "object" &&
-                typeof candidateResult.canonicalUrl === "string"
-              ) {
+              const candidateResult = Option.getOrNull(
+                decodeSoundCloudLinkResponse(await response.json()),
+              );
+              if (candidateResult) {
                 const reparsed = parseMediaLink(candidateResult.canonicalUrl);
                 if (reparsed.kind !== "unsupported") {
                   parsed = reparsed;
@@ -459,7 +463,7 @@ export const createAudioUrlImportSession = ({
           type: "media_link_processed",
           sourceUrl: trimmedUrl,
           mediaKind: "unsupported",
-          shape: mediaLinkShapeFromUrl(trimmedUrl),
+          linkKind: mediaLinkKindFromUrl(trimmedUrl),
           normalized: false,
           redirected: false,
           outcome: "rejected",
@@ -479,7 +483,7 @@ export const createAudioUrlImportSession = ({
         type: "media_link_processed",
         sourceUrl: trimmedUrl,
         mediaKind: parsed.kind,
-        shape: mediaLinkShapeFromUrl(trimmedUrl),
+        linkKind: mediaLinkKindFromUrl(trimmedUrl),
         normalized: parsed.canonicalUrl !== trimmedUrl,
         redirected,
         outcome: "accepted",
@@ -502,7 +506,7 @@ export const createAudioUrlImportSession = ({
             // not carry request provenance.
             handlePlaylistDownload({ ...playlist, sourceUrl: normalizedUrl }, importOperationId);
           } catch (error) {
-            importLifecycleTracker.fail(importOperationId, error);
+            importLifecycleTracker.fail(importOperationId, toPublicAudioError(error));
             throw error;
           }
           return;

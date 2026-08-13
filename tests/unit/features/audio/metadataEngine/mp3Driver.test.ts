@@ -34,7 +34,7 @@ const commentFrame = (description: string, value: string, language = "eng") =>
     ),
   );
 const apeItem = (key: string, value: string | Uint8Array, flags = 0) => {
-  const bytes = typeof value === "string" ? encoder.encode(value) : value;
+  const bytes = value instanceof Uint8Array ? value : encoder.encode(value);
   return concat(
     uint32LE(bytes.length),
     uint32LE(flags),

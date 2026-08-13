@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { HTTPError } from "nitro";
+import { mockEvent } from "h3";
+import { Schema } from "effect";
 import handler from "../../../server/api/cobalt/audio.post";
 
 type RuntimeRequest = Request & {
@@ -21,6 +23,7 @@ type RateLimitBinding = {
 };
 
 const machineAffinitySecret = "test-machine-affinity-secret";
+const cobaltRequestSchema = Schema.Struct({ youtubeHLS: Schema.Boolean });
 
 const createRateLimitBinding = (limit: number): RateLimitBinding => {
   const counts = new Map<string, number>();
@@ -41,11 +44,15 @@ const makeAudioRequest = (signal?: AbortSignal, year: number | null = 2020) => {
       Origin: "https://tagium.test",
       "X-Tagium-Request-Id": "request-test",
     },
-    body: JSON.stringify({
-      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-      audioBitrate: "128",
-      ...(year === null ? {} : { year }),
-    }),
+    body: JSON.stringify(
+      Object.assign(
+        {
+          url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+          audioBitrate: "128",
+        },
+        year === null ? undefined : { year },
+      ),
+    ),
     signal,
   }) as RuntimeRequest;
 
@@ -63,7 +70,7 @@ const makeAudioRequest = (signal?: AbortSignal, year: number | null = 2020) => {
 };
 
 const makeEvent = (request: RuntimeRequest) => {
-  return { req: request } as unknown as Parameters<typeof handler>[0];
+  return mockEvent(request);
 };
 
 describe("cobalt audio endpoint", () => {
@@ -93,13 +100,14 @@ describe("cobalt audio endpoint", () => {
   });
 
   it("requests non-HLS Cobalt audio", async () => {
-    const cobaltBodies: unknown[] = [];
+    const cobaltBodies: Array<Schema.Schema.Type<typeof cobaltRequestSchema>> = [];
     const audioTunnel =
       "https://cobalt.test/tunnel?id=123456789012345678901&exp=1234567890123&sig=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&sec=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&iv=cccccccccccccccccccccc";
     const coverTunnel =
       "https://cobalt.test/tunnel?id=223456789012345678901&exp=1234567890123&sig=ddddddddddddddddddddddddddddddddddddddddddd&sec=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee&iv=ffffffffffffffffffffff";
     const fetchMock = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-      cobaltBodies.push(JSON.parse(init?.body as string));
+      const serializedBody = Schema.decodeUnknownSync(Schema.String)(init?.body);
+      cobaltBodies.push(Schema.decodeUnknownSync(cobaltRequestSchema)(JSON.parse(serializedBody)));
 
       return Response.json({
         status: "local-processing",

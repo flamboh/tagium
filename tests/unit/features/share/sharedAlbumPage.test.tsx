@@ -1,4 +1,5 @@
-import { createElement } from "react";
+import { createElement, type HTMLAttributes } from "react";
+import { Schema } from "effect";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import SharedAlbumPage from "@/features/share/SharedAlbumPage";
@@ -17,8 +18,8 @@ vi.mock("sonner", () => ({
 }));
 
 vi.mock("@/components/ui/dialog", () => {
-  const passthrough = ({ children, ...props }: { children?: unknown; [key: string]: unknown }) =>
-    createElement("div", props, children as never);
+  const passthrough = ({ children, ...props }: HTMLAttributes<HTMLDivElement>) =>
+    createElement("div", props, children);
   return {
     Dialog: passthrough,
     DialogContent: passthrough,
@@ -84,9 +85,9 @@ const artworkState = {
 
 const buttonText = (button: ReactTestRenderer["root"]) =>
   button
-    .findAll((node) => typeof node.type === "string")
+    .findAll((node) => Schema.is(Schema.String)(node.type))
     .flatMap((node) => node.children)
-    .filter((child): child is string => typeof child === "string")
+    .filter(Schema.is(Schema.String))
     .join("")
     .replace(/\s+/g, " ")
     .trim();

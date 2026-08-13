@@ -78,12 +78,10 @@ const getCobaltErrorContext = (responseHeaders, chunks, capturedBytes, responseB
     if (body?.status !== "error" || typeof body.error?.code !== "string") {
       return {};
     }
-    return {
-      errorCode: body.error.code,
-      ...(typeof body.error.context?.service === "string"
-        ? { service: body.error.context.service }
-        : {}),
-    };
+    const errorCode = body.error.code;
+    const service = body.error.context?.service;
+    if (typeof service === "string") return { errorCode, service };
+    return { errorCode };
   } catch {
     return {};
   }
@@ -244,10 +242,9 @@ export const createCobaltProxyServer = ({
 
     if (requestUrl.pathname === "/readyz") {
       const status = lifecycle.draining ? 503 : 200;
-      clientResponse.writeHead(status, {
-        "content-type": "text/plain;charset=UTF-8",
-        ...(lifecycle.draining ? { connection: "close" } : {}),
-      });
+      const headers = { "content-type": "text/plain;charset=UTF-8" };
+      if (lifecycle.draining) headers.connection = "close";
+      clientResponse.writeHead(status, headers);
       clientResponse.end(lifecycle.draining ? "draining" : "ready");
       return;
     }

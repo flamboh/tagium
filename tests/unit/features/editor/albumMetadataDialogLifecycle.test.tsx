@@ -77,7 +77,7 @@ describe("AlbumMetadataDialog cover sync lifecycle", () => {
     });
     expect(renderer!.root.findByProps({ "aria-busy": true })).toBeDefined();
 
-    const dialog = renderer!.root.find((node) => typeof node.props.onOpenChange === "function");
+    const dialog = renderer!.root.find((node) => node.props.onOpenChange !== undefined);
     act(() => {
       dialog.props.onOpenChange(false);
     });

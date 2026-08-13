@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Schema } from "effect";
 import {
   Alert02Icon,
   FlashIcon,
@@ -14,30 +15,40 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { devToastKinds, spawnDevToast } from "./devToast";
 
-type DevConfig = {
-  enabled: boolean;
-  deployEnv: "local" | "preview" | "production";
-  detectedFrom: string;
-  productionBranch: string;
-  rateLimit: {
-    windowMs: number;
-    maxRequests: number;
-    bucketCount: number;
-    client: {
-      key: string;
-      count: number;
-      remaining: number;
-      resetAt?: number;
-    };
-  };
-  faults: {
-    nextAudioFault?: AudioFault;
-    nextTunnelFault?: TunnelFault;
-  };
-};
-
 type AudioFault = "rate-limit" | "capacity" | "timeout" | "unreachable" | "malformed";
 type TunnelFault = "rate-limit" | "capacity" | "timeout" | "empty-body";
+
+const devConfigSchema = Schema.Struct({
+  enabled: Schema.Boolean,
+  deployEnv: Schema.Literals(["local", "preview", "production"]),
+  detectedFrom: Schema.String,
+  productionBranch: Schema.String,
+  rateLimit: Schema.Struct({
+    windowMs: Schema.Number,
+    maxRequests: Schema.Number,
+    bucketCount: Schema.Number,
+    client: Schema.Struct({
+      key: Schema.String,
+      count: Schema.Number,
+      remaining: Schema.Number,
+      resetAt: Schema.optionalKey(Schema.Number),
+    }),
+  }),
+  faults: Schema.Struct({
+    nextAudioFault: Schema.optionalKey(
+      Schema.Literals(["rate-limit", "capacity", "timeout", "unreachable", "malformed"]),
+    ),
+    nextTunnelFault: Schema.optionalKey(
+      Schema.Literals(["rate-limit", "capacity", "timeout", "empty-body"]),
+    ),
+  }),
+});
+type DevConfig = Schema.Schema.Type<typeof devConfigSchema>;
+type DevConfigPatch =
+  | { rateLimit: { windowMs: number; maxRequests: number } }
+  | { resetRateLimitBuckets: true };
+
+const decodeDevConfig = Schema.decodeUnknownSync(devConfigSchema);
 
 const audioFaults: Array<{ value: AudioFault; label: string }> = [
   { value: "rate-limit", label: "429" },
@@ -57,7 +68,7 @@ const tunnelFaults: Array<{ value: TunnelFault; label: string }> = [
 const readDevConfig = async (signal: AbortSignal) => {
   const response = await fetch("/api/dev/config", { signal });
   if (!response.ok) return null;
-  return (await response.json()) as DevConfig;
+  return decodeDevConfig(await response.json());
 };
 
 const formatReset = (resetAt: number | undefined) => {
@@ -105,7 +116,7 @@ export function DevPanel() {
 
   if (!config?.enabled) return null;
 
-  const patchConfig = async (body: unknown) => {
+  const patchConfig = async (body: DevConfigPatch) => {
     setBusy(true);
     try {
       const response = await fetch("/api/dev/config", {
@@ -114,7 +125,7 @@ export function DevPanel() {
         body: JSON.stringify(body),
       });
       if (response.ok) {
-        const nextConfig = (await response.json()) as DevConfig;
+        const nextConfig = decodeDevConfig(await response.json());
         setConfig(nextConfig);
         setWindowMs(String(nextConfig.rateLimit.windowMs));
         setMaxRequests(String(nextConfig.rateLimit.maxRequests));
@@ -133,7 +144,7 @@ export function DevPanel() {
         body: JSON.stringify({ target, fault }),
       });
       if (response.ok) {
-        setConfig((await response.json()) as DevConfig);
+        setConfig(decodeDevConfig(await response.json()));
       }
     } finally {
       setBusy(false);

@@ -13,7 +13,7 @@ import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 interface Deferred<T> {
   promise: Promise<T>;
   resolve: (value: T) => void;
-  reject: (error: unknown) => void;
+  reject: (error: Error) => void;
 }
 
 const deferred = <T>(): Deferred<T> => {

@@ -1,20 +1,30 @@
+import { Option, Schema } from "effect";
+
 const CHANNEL_NAME = "tagium-workspace-presence-v1";
 const TAB_ID = crypto.randomUUID();
 
+const presenceMessageSchema = Schema.Struct({
+  type: Schema.optionalKey(Schema.String),
+  from: Schema.optionalKey(Schema.String),
+  to: Schema.optionalKey(Schema.String),
+});
+
 export const detectAnotherTagiumTab = (waitMs = 180) =>
   new Promise<boolean>((resolve) => {
-    if (typeof BroadcastChannel === "undefined") {
+    if (!globalThis.BroadcastChannel) {
       resolve(false);
       return;
     }
-    const channel = new BroadcastChannel(CHANNEL_NAME);
+    const channel = new globalThis.BroadcastChannel(CHANNEL_NAME);
     let found = false;
     const finish = () => {
       channel.close();
       resolve(found);
     };
     channel.onmessage = (event) => {
-      const message = event.data as { type?: string; from?: string; to?: string };
+      const decoded = Schema.decodeUnknownOption(presenceMessageSchema)(event.data);
+      if (Option.isNone(decoded)) return;
+      const message = decoded.value;
       if (message.type !== "present" || message.to !== TAB_ID || message.from === TAB_ID) return;
       found = true;
       finish();
@@ -24,10 +34,12 @@ export const detectAnotherTagiumTab = (waitMs = 180) =>
   });
 
 export const listenForTagiumPresence = () => {
-  if (typeof BroadcastChannel === "undefined") return () => undefined;
-  const channel = new BroadcastChannel(CHANNEL_NAME);
+  if (!globalThis.BroadcastChannel) return () => undefined;
+  const channel = new globalThis.BroadcastChannel(CHANNEL_NAME);
   channel.onmessage = (event) => {
-    const message = event.data as { type?: string; from?: string };
+    const decoded = Schema.decodeUnknownOption(presenceMessageSchema)(event.data);
+    if (Option.isNone(decoded)) return;
+    const message = decoded.value;
     if (message.type === "presence?" && message.from && message.from !== TAB_ID) {
       channel.postMessage({ type: "present", from: TAB_ID, to: message.from });
     }

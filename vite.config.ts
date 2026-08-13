@@ -15,11 +15,11 @@ const libavDist = fileURLToPath(
 );
 const libavAssetFiles = ["libav-6.8.7.1-encode-cli.wasm.mjs", "libav-6.8.7.1-encode-cli.wasm.wasm"];
 
-const contentTypes: Record<string, string> = {
-  ".js": "text/javascript;charset=UTF-8",
-  ".mjs": "text/javascript;charset=UTF-8",
-  ".wasm": "application/wasm",
-};
+const contentTypes = new Map([
+  [".js", "text/javascript;charset=UTF-8"],
+  [".mjs", "text/javascript;charset=UTF-8"],
+  [".wasm", "application/wasm"],
+]);
 
 const libavAssets = (): Plugin => ({
   name: "tagium-libav-assets",
@@ -52,7 +52,7 @@ const libavAssets = (): Plugin => ({
             return;
           }
 
-          const contentType = contentTypes[extname(filePath)];
+          const contentType = contentTypes.get(extname(filePath));
           if (contentType) {
             response.setHeader("Content-Type", contentType);
           }
@@ -71,10 +71,16 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   fmt: {
-    ignorePatterns: [".repos/*", ".agents/**", ".claude/**"],
+    ignorePatterns: [".repos/**", ".agents/**", ".claude/**", "tools/oxlint/anti-slop/**"],
   },
   lint: {
     plugins: ["oxc", "typescript", "unicorn", "react"],
+    jsPlugins: [
+      {
+        name: "anti-slop",
+        specifier: "./tools/oxlint/anti-slop/index.ts",
+      },
+    ],
     categories: {
       correctness: "warn",
     },
@@ -88,11 +94,55 @@ export default defineConfig({
       "node_modules",
       "playwright-report",
       "test-results",
-      ".repos/*",
+      ".repos/**",
       ".agents/**",
       ".claude/**",
+      "tools/oxlint/anti-slop/**",
     ],
+    rules: {
+      "anti-slop/no-chained-type-assertions": "error",
+      "anti-slop/no-reflect-apply": "error",
+      "anti-slop/no-reflect-get": "error",
+      "anti-slop/no-unknown-returns": "error",
+      "anti-slop/no-unknown-type-aliases": "error",
+      "anti-slop/no-widen-then-assert": "error",
+      "anti-slop/require-safety-comment-for-type-assertion": "error",
+
+      // `typeof` is valid for capability checks, SSR guards, and narrowing known unions.
+      "anti-slop/no-runtime-typeof": "off",
+
+      // These opinionated rules expose existing design debt without forcing semantic rewrites.
+      "anti-slop/no-conditional-empty-object-spread": "warn",
+      "anti-slop/no-known-value-widening": "warn",
+      "anti-slop/no-module-mocking": "warn",
+      "anti-slop/no-object-parameters": "warn",
+      "anti-slop/no-shape-in-symbol-names": "warn",
+      "anti-slop/no-unknown-parameters": "warn",
+      "anti-slop/no-unsafe-dictionary-type": "warn",
+    },
     overrides: [
+      {
+        // These I/O adapters own parsers and predicates where unknown input is the honest contract.
+        files: [
+          "server/utils/share-manifest-request.ts",
+          "src/features/import/cobaltAudio.ts",
+          "src/features/import/localAudioProcessor.ts",
+          "src/features/import/playlist.ts",
+          "src/features/import/trackMetadata.ts",
+          "src/features/share/shareManifest.ts",
+          "src/features/workspace/mobileWorkspaceNavigation.ts",
+        ],
+        rules: {
+          "anti-slop/no-unknown-parameters": "off",
+        },
+      },
+      {
+        // Test fixtures often cross framework-owned types; comments on every fixture cast add noise.
+        files: ["tests/**/*.{ts,tsx}"],
+        rules: {
+          "anti-slop/require-safety-comment-for-type-assertion": "off",
+        },
+      },
       {
         files: ["**/*.{ts,tsx}"],
         rules: {

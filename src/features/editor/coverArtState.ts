@@ -34,13 +34,18 @@ export type CoverArtAction =
 
 export const coverArtReducer = (state: CoverArtState, action: CoverArtAction): CoverArtState => {
   switch (action.type) {
-    case "uploadStarted":
-      return {
+    case "uploadStarted": {
+      const next = {
         ...state,
         activeUploadId: action.uploadId,
         isProcessing: true,
-        ...(action.closeCropper ? { cropSource: null, isCropperOpen: false } : {}),
       };
+      if (action.closeCropper) {
+        next.cropSource = null;
+        next.isCropperOpen = false;
+      }
+      return next;
+    }
     case "uploadSucceeded":
       if (action.uploadId !== state.activeUploadId) return state;
       return {

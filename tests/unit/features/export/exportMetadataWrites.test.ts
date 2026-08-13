@@ -32,7 +32,7 @@ const readyFile = (id: string): TagiumFile => ({
 
 const deferred = () => {
   let resolve!: () => void;
-  let reject!: (error: unknown) => void;
+  let reject!: (error: Error) => void;
   const promise = new Promise<void>((promiseResolve, promiseReject) => {
     resolve = promiseResolve;
     reject = promiseReject;
@@ -109,7 +109,7 @@ describe("writeExportMetadata", () => {
         settled = true;
         return undefined;
       },
-      (error: unknown) => {
+      (error: Error) => {
         settled = true;
         return error;
       },
@@ -143,7 +143,7 @@ describe("writeExportMetadata", () => {
       },
     ).then(
       () => undefined,
-      (error: unknown) => error,
+      (error: Error) => error,
     );
     await flushMicrotasks();
 

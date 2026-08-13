@@ -23,6 +23,7 @@ export type ShareRuntimeEnv = {
 type CloudflareRequest = Request & { runtime?: { cloudflare?: { env?: ShareRuntimeEnv } } };
 
 export const getShareRuntimeEnv = (request: Request): ShareRuntimeEnv =>
+  // SAFETY: Nitro's Cloudflare adapter supplies this request shape in the Cloudflare runtime.
   (request as CloudflareRequest).runtime?.cloudflare?.env ?? {};
 
 export const getShareStore = (request: Request) => {

@@ -9,7 +9,7 @@ export type ShareLinkClassification =
 
 export const classifyShareLink = (
   value: string,
-  currentOrigin = typeof location === "undefined" ? "" : location.origin,
+  currentOrigin = globalThis.location?.origin ?? "",
 ): ShareLinkClassification => {
   let url: URL;
   try {
@@ -39,7 +39,7 @@ export const shareSlugFromPathname = (pathname: string) => {
 
 export const shareLinkForSlug = (
   slug: string,
-  origin = typeof location === "undefined" ? "https://tagium.app" : location.origin,
+  origin = globalThis.location?.origin ?? "https://tagium.app",
 ) => new URL(`/share/${slug}`, origin).toString();
 
 export class InvalidShareLinkError extends Error {

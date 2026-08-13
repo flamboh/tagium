@@ -47,6 +47,7 @@ interface UseAlbumSidebarDragControllerOptions extends AlbumSidebarDragActions {
 }
 
 const dragStartY = (event: Event) => {
+  // SAFETY: dnd-kit activator events are mouse, pointer, or touch events; access stays guarded.
   const sourceEvent = event as Event & {
     changedTouches?: TouchList;
     clientY?: number;
@@ -115,13 +116,16 @@ export function useAlbumSidebarDragController(options: UseAlbumSidebarDragContro
   };
 
   const handleDragStart = (event: DragStartEvent) => {
+    // SAFETY: sidebar draggables exclusively register SidebarDragData with dnd-kit.
     setActiveDrag((event.active.data.current as SidebarDragData | undefined) ?? null);
     recentLooseTargetRef.current = null;
     dragStartYRef.current = dragStartY(event.activatorEvent);
   };
 
   const handleDragOver = (event: DragOverEvent) => {
+    // SAFETY: sidebar draggables exclusively register SidebarDragData with dnd-kit.
     const active = event.active.data.current as SidebarDragData | undefined;
+    // SAFETY: sidebar droppables exclusively register SidebarDropData with dnd-kit.
     const over = event.over?.data.current as SidebarDropData | undefined;
     if (active?.type !== "track" || active.container !== "loose") return;
     if (over?.type !== "track" || over.container !== "loose") return;
@@ -130,7 +134,9 @@ export function useAlbumSidebarDragController(options: UseAlbumSidebarDragContro
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    // SAFETY: sidebar draggables exclusively register SidebarDragData with dnd-kit.
     const active = event.active.data.current as SidebarDragData | undefined;
+    // SAFETY: sidebar droppables exclusively register SidebarDropData with dnd-kit.
     const over = event.over?.data.current as SidebarDropData | undefined;
     if (active && over && event.over) {
       runCommand(

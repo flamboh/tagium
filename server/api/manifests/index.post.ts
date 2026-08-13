@@ -1,4 +1,5 @@
 import { defineHandler } from "nitro";
+import { Schema } from "effect";
 import {
   isShareManifestValidationError,
   parseShareArtwork,
@@ -43,16 +44,14 @@ export default defineHandler(async (event) => {
     if (
       manifests.length !== 1 ||
       covers.length > 1 ||
-      typeof manifests[0] !== "string" ||
+      !Schema.is(Schema.String)(manifests[0]) ||
       (covers[0] !== undefined && !(covers[0] instanceof File))
     )
       return badRequest();
     const rawManifest = manifests[0];
+    const cover = covers[0] instanceof File ? covers[0] : undefined;
     const manifest = decodePublishedManifest(JSON.parse(rawManifest));
-    const published = await store.publish(
-      manifest,
-      await parseShareArtwork(covers[0] as File | undefined),
-    );
+    const published = await store.publish(manifest, await parseShareArtwork(cover));
     const url = new URL(`/share/${published.slug}`, request.url).toString();
     return Response.json(
       { ...published, expiresAt: toShareExpiryIso(published.expiresAt), url },
@@ -60,10 +59,11 @@ export default defineHandler(async (event) => {
     );
   } catch (error) {
     if (
-      isShareManifestValidationError(error) ||
-      error instanceof SyntaxError ||
-      error instanceof TypeError ||
-      (error instanceof Error && /^share_request_too_large|manifest payload/.test(error.message))
+      error instanceof Error &&
+      (isShareManifestValidationError(error) ||
+        error instanceof SyntaxError ||
+        error instanceof TypeError ||
+        /^share_request_too_large|manifest payload/.test(error.message))
     )
       return badRequest();
     // The service deliberately returns no diagnostic payload for binding/storage failures.

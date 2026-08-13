@@ -112,7 +112,11 @@ const parseAtoms = (
         try {
           size = u64(header, 8);
         } catch (cause) {
-          return yield* Effect.fail(cause as AudioMetadataReadError);
+          return yield* Effect.fail(
+            cause instanceof AudioMetadataReadError
+              ? cause
+              : readError("unable to read extended atom size.", cause),
+          );
         }
       } else if (size32 === 0) {
         size = end - offset;
@@ -249,7 +253,11 @@ const parseAudioTrack = (source: ByteSource, moov: Atom) =>
     try {
       duration = fullBoxTiming(mdhdBytes, selected.mdhd.headerSize);
     } catch (cause) {
-      return yield* Effect.fail(cause as AudioMetadataReadError);
+      return yield* Effect.fail(
+        cause instanceof AudioMetadataReadError
+          ? cause
+          : readError("unable to read audio timing metadata.", cause),
+      );
     }
     return { duration, sampleRate };
   });
@@ -474,7 +482,11 @@ const parseMetadata = (
           try {
             decoded = payload.type === 2 ? decodeUtf16(payload.bytes) : decodeUtf8(payload.bytes);
           } catch (cause) {
-            return yield* Effect.fail(cause as AudioMetadataReadError);
+            return yield* Effect.fail(
+              cause instanceof AudioMetadataReadError
+                ? cause
+                : readError("unable to decode ilst text metadata.", cause),
+            );
           }
           const current = values.get(item.type) ?? [];
           current.push(decoded);

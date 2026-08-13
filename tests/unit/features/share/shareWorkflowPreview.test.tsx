@@ -1,6 +1,9 @@
 import { act } from "react-test-renderer";
+import { Effect } from "effect";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
+import type { AlbumGroup, TagiumFile } from "@/features/library/types";
+import { createLibraryState } from "@/features/library/libraryState";
 
 const { publishShare } = vi.hoisted(() => ({ publishShare: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -26,6 +29,36 @@ import { renderHook } from "../../support/hookTestHarness";
 import { useShareWorkflow } from "@/features/share/useShareWorkflow";
 import { projectAlbumShareSnapshot } from "@/features/share/sharePublication";
 
+type WorkflowOptions = Parameters<typeof useShareWorkflow>[0];
+const fakeEditor = (files: TagiumFile[]): WorkflowOptions["editor"] => ({
+  commands: {
+    projectFiles: () => files,
+    flush: () => files,
+    preview: vi.fn(),
+    uploadCover: vi.fn(),
+    setCoverProcessing: vi.fn(),
+    updateTags: vi.fn(async () => undefined),
+    hydrateDownloadedTrack: vi.fn(() => Effect.void),
+  },
+  form: { subscribe: vi.fn(() => () => undefined) },
+});
+const fakeImporting = (): WorkflowOptions["importing"] => ({
+  commands: {
+    upload: vi.fn(async () => undefined),
+    importUrl: vi.fn(async () => undefined),
+    retryTrack: vi.fn(),
+    cancelQueue: vi.fn(),
+    retryQueue: vi.fn(),
+    removeTracks: vi.fn(),
+    importSharedContent: vi.fn(async () => undefined),
+  },
+});
+
+const fakeLibraryStore = (album: AlbumGroup, files: TagiumFile[]): LibraryStore => {
+  const state = { ...createLibraryState(), albums: [album], files };
+  return { state, getSnapshot: () => state, dispatch: vi.fn() };
+};
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
@@ -38,7 +71,7 @@ describe("share creator preview state", () => {
     vi.stubGlobal("history", { state: {}, replaceState: vi.fn(), back: vi.fn() });
     vi.stubGlobal("window", new EventTarget());
 
-    const album = {
+    const album: AlbumGroup = {
       id: "album",
       title: "Received",
       artist: "Artist",
@@ -46,14 +79,17 @@ describe("share creator preview state", () => {
       trackIds: ["a"],
       sourceManifestSlug: "received-album",
     };
-    const files = [
+    const files: TagiumFile[] = [
       {
         id: "a",
         filename: "first.mp3",
+        status: "saved",
+        downloadStatus: "ready",
         metadata: {
           filename: "first.mp3",
           title: "First",
           artist: "Artist",
+          albumArtist: "Artist",
           album: "Received",
           year: null,
           genre: "Electronic",
@@ -62,23 +98,20 @@ describe("share creator preview state", () => {
           sampleRate: 44100,
           picture: [],
           trackNumber: 1,
+          composer: "",
+          comment: "",
+          discNumber: null,
+          bpm: null,
         },
       },
     ];
-    const library = {
-      state: { albums: [album], files },
-      getSnapshot: () => ({ albums: [album], files }),
-      dispatch: vi.fn(),
-    } as unknown as LibraryStore;
+    const library = fakeLibraryStore(album, files);
     const hook = renderHook(
       () =>
         useShareWorkflow({
           library,
-          editor: {
-            commands: { flush: vi.fn(), projectFiles: () => files },
-            form: { subscribe: () => () => undefined },
-          } as never,
-          importing: { commands: { importSharedContent: vi.fn() } } as never,
+          editor: fakeEditor(files),
+          importing: fakeImporting(),
           enabled: true,
         }),
       undefined,
@@ -105,28 +138,32 @@ describe("share creator preview state", () => {
     vi.stubGlobal("window", new EventTarget());
 
     const expiresAt = new Date(Date.now() + 86_400_000).toISOString();
-    const album = {
+    const publication = {
+      slug: "shared-album",
+      url: "https://tagium.app/share/shared-album",
+      expiresAt,
+      publishedFingerprint: "published",
+      status: "active" as const,
+    };
+    const album: AlbumGroup = {
       id: "album",
       title: "Snapshot",
       artist: "Artist",
       genre: "Electronic",
       trackIds: ["a"],
-      sharePublication: {
-        slug: "shared-album",
-        url: "https://tagium.app/share/shared-album",
-        expiresAt,
-        publishedFingerprint: "published",
-        status: "active" as const,
-      },
+      sharePublication: publication,
     };
-    const files = [
+    const files: TagiumFile[] = [
       {
         id: "a",
         filename: "first.mp3",
+        status: "saved",
+        downloadStatus: "ready",
         metadata: {
           filename: "first.mp3",
           title: "First",
           artist: "Artist",
+          albumArtist: "Artist",
           album: "Snapshot",
           year: null,
           genre: "Electronic",
@@ -135,27 +172,22 @@ describe("share creator preview state", () => {
           sampleRate: 44100,
           picture: [],
           trackNumber: 1,
+          composer: "",
+          comment: "",
+          discNumber: null,
+          bpm: null,
         },
         downloadRequest: { sourceUrl: "https://soundcloud.com/a/first", audioBitrate: "320" },
       },
     ];
-    album.sharePublication.publishedFingerprint = (
-      await projectAlbumShareSnapshot(album, files as never)
-    ).fingerprint;
-    const library = {
-      state: { albums: [album], files },
-      getSnapshot: () => ({ albums: [album], files }),
-      dispatch: vi.fn(),
-    } as unknown as LibraryStore;
+    publication.publishedFingerprint = (await projectAlbumShareSnapshot(album, files)).fingerprint;
+    const library = fakeLibraryStore(album, files);
     const hook = renderHook(
       () =>
         useShareWorkflow({
           library,
-          editor: {
-            commands: { flush: vi.fn(), projectFiles: () => files },
-            form: { subscribe: () => () => undefined },
-          } as never,
-          importing: { commands: { importSharedContent: vi.fn() } } as never,
+          editor: fakeEditor(files),
+          importing: fakeImporting(),
           enabled: true,
         }),
       undefined,
@@ -195,15 +227,24 @@ describe("share creator preview state", () => {
       }),
     );
 
-    const album = { id: "album", title: "Snapshot", artist: "", genre: "", trackIds: ["a", "a"] };
-    const files = [
+    const album: AlbumGroup = {
+      id: "album",
+      title: "Snapshot",
+      artist: "",
+      genre: "",
+      trackIds: ["a", "a"],
+    };
+    const files: TagiumFile[] = [
       {
         id: "a",
         filename: "first.mp3",
+        status: "saved",
+        downloadStatus: "ready",
         metadata: {
           filename: "first.mp3",
           title: "First",
           artist: "Artist",
+          albumArtist: "Artist",
           album: "Album",
           year: null,
           genre: "Electronic",
@@ -212,24 +253,21 @@ describe("share creator preview state", () => {
           sampleRate: 44100,
           picture: [],
           trackNumber: 1,
+          composer: "",
+          comment: "",
+          discNumber: null,
+          bpm: null,
         },
         downloadRequest: { sourceUrl: "https://soundcloud.com/a/first", audioBitrate: "320" },
       },
     ];
-    const library = {
-      state: { albums: [album], files },
-      getSnapshot: () => ({ albums: [album], files }),
-      dispatch: vi.fn(),
-    } as unknown as LibraryStore;
+    const library = fakeLibraryStore(album, files);
     const hook = renderHook(
       () =>
         useShareWorkflow({
           library,
-          editor: {
-            commands: { flush: vi.fn(), projectFiles: () => files },
-            form: { subscribe: () => () => undefined },
-          } as never,
-          importing: { commands: { importSharedContent: vi.fn() } } as never,
+          editor: fakeEditor(files),
+          importing: fakeImporting(),
           enabled: true,
         }),
       undefined,

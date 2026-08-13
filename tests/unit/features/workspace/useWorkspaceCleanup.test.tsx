@@ -13,6 +13,7 @@ vi.mock("sonner", () => ({ toast: toastMocks.toast }));
 import { renderHook } from "../../support/hookTestHarness";
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useWorkspaceCleanup } from "@/features/workspace/useWorkspaceCleanup";
+import { buttonElementFixture } from "../../../support/domFixtures";
 
 const settings: AppSettings = {
   ...DEFAULT_APP_SETTINGS,
@@ -84,7 +85,7 @@ describe("workspace title cleanup", () => {
     expect(hook.result.cleanup.cleanupSuggestionCountByAlbumId.get("album")).toBe(1);
     expect(toastMocks.toast).not.toHaveBeenCalled();
 
-    const focusTarget = { focus: vi.fn() } as unknown as HTMLButtonElement;
+    const focusTarget = buttonElementFixture(vi.fn());
     act(() => hook.result.cleanup.onReviewAlbum("album", focusTarget));
     expect(hook.result.cleanup.dialogProps).toMatchObject({
       open: true,

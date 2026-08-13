@@ -13,11 +13,12 @@ type KeyboardTarget = {
 };
 
 const isEditableTarget = (target: EventTarget | null) => {
-  const element = target as Pick<HTMLElement, "tagName" | "isContentEditable"> | null;
+  if (target === null) return false;
+  const tagName = "tagName" in target ? target.tagName : undefined;
   return (
-    element?.tagName === "INPUT" ||
-    element?.tagName === "TEXTAREA" ||
-    element?.isContentEditable === true
+    tagName === "INPUT" ||
+    tagName === "TEXTAREA" ||
+    ("isContentEditable" in target && target.isContentEditable === true)
   );
 };
 

@@ -1,9 +1,25 @@
+import { Schema } from "effect";
+
 export const YOUTUBE_ORIGIN = "https://www.youtube.com";
 export const YOUTUBE_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
 
-type JsonRecord = Record<string, unknown>;
+interface JsonRecord {
+  [key: string]: JsonValue;
+}
+type JsonValue = string | number | boolean | null | JsonRecord | readonly JsonValue[];
+const jsonValueSchema: Schema.Codec<JsonValue> = Schema.suspend(() =>
+  Schema.Union([
+    Schema.String,
+    Schema.Finite,
+    Schema.Boolean,
+    Schema.Null,
+    Schema.Array(jsonValueSchema),
+    Schema.Record(Schema.String, jsonValueSchema),
+  ]),
+);
+const jsonRecordSchema = Schema.Record(Schema.String, jsonValueSchema);
 
 type YouTubeRequestStage = "config" | "continuation" | "playlist" | "upload_year";
 
@@ -11,13 +27,13 @@ const MAX_YOUTUBE_FETCH_ATTEMPTS = 2;
 const YOUTUBE_RETRY_DELAY_MS = 100;
 const TRANSIENT_YOUTUBE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
-const isRecord = (value: unknown): value is JsonRecord =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+const isRecord = Schema.is(jsonRecordSchema);
+const isJsonArray = (value: JsonValue): value is readonly JsonValue[] => Array.isArray(value);
+const isString = Schema.is(Schema.String);
+const decodeJson = Schema.decodeUnknownSync(jsonValueSchema);
 
 const wait = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
-
-const isAbortError = (error: unknown) => error instanceof Error && error.name === "AbortError";
 
 const logYouTubeUpstreamFailure = (
   stage: YouTubeRequestStage,
@@ -58,7 +74,9 @@ export const fetchYouTubeWithRetry = async (
 
       await response.body?.cancel().catch(() => undefined);
     } catch (error) {
-      const retrying = attempt < MAX_YOUTUBE_FETCH_ATTEMPTS && !isAbortError(error);
+      const retrying =
+        attempt < MAX_YOUTUBE_FETCH_ATTEMPTS &&
+        !(error instanceof Error && error.name === "AbortError");
       logYouTubeUpstreamFailure(options.stage, attempt, retrying, {
         errorType: error instanceof Error ? error.name : "UnknownError",
       });
@@ -105,7 +123,7 @@ export const extractYouTubeJsonObject = (source: string, marker: string, startAt
       depth--;
       if (depth === 0) {
         return {
-          value: JSON.parse(source.slice(objectStart, index + 1)) as unknown,
+          value: decodeJson(JSON.parse(source.slice(objectStart, index + 1))),
           end: index + 1,
         };
       }
@@ -203,7 +221,7 @@ export const resolveYouTubeUploadYear = async (
   const apiKey = config.INNERTUBE_API_KEY;
   const context = config.INNERTUBE_CONTEXT;
   const clientVersion = config.INNERTUBE_CLIENT_VERSION;
-  if (typeof apiKey !== "string" || !isRecord(context) || typeof clientVersion !== "string") {
+  if (!isString(apiKey) || !isRecord(context) || !isString(clientVersion)) {
     return undefined;
   }
 
@@ -227,7 +245,7 @@ export const resolveYouTubeUploadYear = async (
   );
   if (!response.ok) throw new Error(`youtube.video_failed (${response.status})`);
 
-  const data = await response.json();
+  const data = decodeJson(await response.json());
   const primaryInfo = (() => {
     if (!isRecord(data)) return undefined;
     const contents = data.contents;
@@ -237,12 +255,15 @@ export const resolveYouTubeUploadYear = async (
     const results = watchResults.results;
     if (!isRecord(results) || !isRecord(results.results)) return undefined;
     const resultContents = results.results.contents;
-    if (!Array.isArray(resultContents)) return undefined;
-    return resultContents
-      .map((entry) => (isRecord(entry) ? entry.videoPrimaryInfoRenderer : undefined))
-      .find(isRecord);
+    if (!isJsonArray(resultContents)) return undefined;
+    for (const entry of resultContents) {
+      if (!isRecord(entry)) continue;
+      const candidate = entry.videoPrimaryInfoRenderer;
+      if (candidate !== undefined && isRecord(candidate)) return candidate;
+    }
+    return undefined;
   })();
   if (!primaryInfo || !isRecord(primaryInfo.dateText)) return undefined;
   const dateText = primaryInfo.dateText.simpleText;
-  return yearFromDate(typeof dateText === "string" ? dateText : undefined);
+  return yearFromDate(isString(dateText) ? dateText : undefined);
 };

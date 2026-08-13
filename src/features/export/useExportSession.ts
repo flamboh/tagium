@@ -53,6 +53,9 @@ type ConfirmationFocusTarget = {
 const canRestoreFocus = (target: ConfirmationFocusTarget) =>
   target.isConnected !== false && (target.checkVisibility?.() ?? true);
 
+const canReceiveFocus = (element: Element | null): element is Element & ConfirmationFocusTarget =>
+  element !== null && "focus" in element && typeof element.focus === "function";
+
 const planTrackIds = (plan: ExportPlan) =>
   plan.groups.flatMap((group) => group.tracks.map((track) => track.id));
 
@@ -282,7 +285,11 @@ export const useExportSession = ({
         });
         return "success";
       } catch (error) {
-        analytics.capture({ type: "export_failed", exportKind: target.kind, error });
+        analytics.capture({
+          type: "export_failed",
+          exportKind: target.kind,
+          error: error instanceof Error ? error : new Error(),
+        });
         reportSystemFailure(error, "export");
         return "error";
       } finally {
@@ -295,8 +302,8 @@ export const useExportSession = ({
   const rememberConfirmationTrigger = useCallback(() => {
     if (typeof document === "undefined") return;
     const activeElement = document.activeElement;
-    if (activeElement && "focus" in activeElement && typeof activeElement.focus === "function") {
-      confirmationTriggerRef.current = activeElement as ConfirmationFocusTarget;
+    if (canReceiveFocus(activeElement)) {
+      confirmationTriggerRef.current = activeElement;
     }
   }, []);
 
@@ -393,7 +400,11 @@ export const useExportSession = ({
           sizeBytes: updatedFile.file.size,
         });
       } catch (error) {
-        analytics.capture({ type: "export_failed", exportKind: "track", error });
+        analytics.capture({
+          type: "export_failed",
+          exportKind: "track",
+          error: error instanceof Error ? error : new Error(),
+        });
         reportSystemFailure(error, "export");
       } finally {
         setExporting(false);

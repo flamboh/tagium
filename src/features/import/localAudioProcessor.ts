@@ -12,6 +12,7 @@ import {
   inspectAudioFile,
   patchAudioFileWithChanges,
 } from "@/features/audio/metadataEngine/engine";
+import type { MetadataChanges } from "@/features/audio/metadataEngine/types";
 
 type LocalAudioPlan = Extract<CobaltDownloadPlan, { status: "local-processing" }>;
 
@@ -102,15 +103,13 @@ const decodeCobaltLocalProcessingMessage = Effect.fn("decodeCobaltLocalProcessin
   },
 );
 
-const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
+const isObjectState = (value: unknown): value is object =>
   typeof value === "object" && value !== null;
 
 const isMalformedTerminalLocalProcessingMessage = (data: unknown) => {
-  if (!isObjectRecord(data) || !isObjectRecord(data.cobaltLocalProcessing)) {
-    return false;
-  }
-
-  return "blob" in data.cobaltLocalProcessing || "error" in data.cobaltLocalProcessing;
+  if (!isObjectState(data) || !("cobaltLocalProcessing" in data)) return false;
+  const message = data.cobaltLocalProcessing;
+  return isObjectState(message) && ("blob" in message || "error" in message);
 };
 
 const runLocalProcessingWorker = (request: LocalAudioProcessingRequest, signal?: AbortSignal) =>
@@ -264,43 +263,32 @@ const tagCobaltAudioFile = async (
 ) => {
   const { metadata } = await Effect.runPromise(inspectAudioFile(file));
   const supplied = plan.output.metadata;
-  const tagged = await Effect.runPromise(
-    patchAudioFileWithChanges(
-      file,
+  const changes: MetadataChanges = {};
+  if (supplied?.title) changes.title = stripMetadataControlCharacters(supplied.title);
+  if (supplied?.artist) changes.artist = stripMetadataControlCharacters(supplied.artist);
+  if (supplied?.album) changes.album = stripMetadataControlCharacters(supplied.album);
+  if (supplied?.date) changes.dateText = stripMetadataControlCharacters(supplied.date);
+  if (supplied?.genre) changes.genre = stripMetadataControlCharacters(supplied.genre);
+  if (supplied?.track) changes.trackText = stripMetadataControlCharacters(supplied.track);
+  if (supplied?.album_artist)
+    changes.albumArtist = stripMetadataControlCharacters(supplied.album_artist);
+  if (supplied?.composer) changes.composer = stripMetadataControlCharacters(supplied.composer);
+  if (supplied?.copyright) changes.copyright = stripMetadataControlCharacters(supplied.copyright);
+  if (supplied?.sublanguage) {
+    changes.language = stripMetadataControlCharacters(supplied.sublanguage);
+  }
+  if (coverFile) {
+    changes.picture = [
       {
-        ...(supplied?.title ? { title: stripMetadataControlCharacters(supplied.title) } : {}),
-        ...(supplied?.artist ? { artist: stripMetadataControlCharacters(supplied.artist) } : {}),
-        ...(supplied?.album ? { album: stripMetadataControlCharacters(supplied.album) } : {}),
-        ...(supplied?.date ? { dateText: stripMetadataControlCharacters(supplied.date) } : {}),
-        ...(supplied?.genre ? { genre: stripMetadataControlCharacters(supplied.genre) } : {}),
-        ...(supplied?.track ? { trackText: stripMetadataControlCharacters(supplied.track) } : {}),
-        ...(supplied?.album_artist
-          ? { albumArtist: stripMetadataControlCharacters(supplied.album_artist) }
-          : {}),
-        ...(supplied?.composer
-          ? { composer: stripMetadataControlCharacters(supplied.composer) }
-          : {}),
-        ...(supplied?.copyright
-          ? { copyright: stripMetadataControlCharacters(supplied.copyright) }
-          : {}),
-        ...(supplied?.sublanguage
-          ? { language: stripMetadataControlCharacters(supplied.sublanguage) }
-          : {}),
-        ...(coverFile
-          ? {
-              picture: [
-                {
-                  format: coverFile.type || "image/jpeg",
-                  type: 3,
-                  description: "cover",
-                  data: new Uint8Array(await coverFile.arrayBuffer()),
-                },
-              ],
-            }
-          : {}),
+        format: coverFile.type || "image/jpeg",
+        type: 3,
+        description: "cover",
+        data: new Uint8Array(await coverFile.arrayBuffer()),
       },
-      metadata.filename,
-    ),
+    ];
+  }
+  const tagged = await Effect.runPromise(
+    patchAudioFileWithChanges(file, changes, metadata.filename),
   );
   return new File([tagged], plan.output.filename, {
     type: tagged.type,

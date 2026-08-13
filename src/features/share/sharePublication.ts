@@ -4,6 +4,7 @@ import type {
   SharePublication,
   TagiumFile,
 } from "@/features/library/types";
+import { Schema } from "effect";
 import {
   projectAlbumManifest,
   projectTrackManifest,
@@ -11,9 +12,21 @@ import {
   type ManifestArtwork,
 } from "@/features/share/shareManifest";
 
-const canonicalJson = (value: unknown): string => {
+type CanonicalJson =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly CanonicalJson[]
+  | { readonly [key: string]: CanonicalJson };
+const isCanonicalPrimitive = Schema.is(
+  Schema.Union([Schema.String, Schema.Number, Schema.Boolean, Schema.Null]),
+);
+const isSupportedArtworkFormat = Schema.is(Schema.Literals(["image/jpeg", "image/png"]));
+
+const canonicalJson = (value: CanonicalJson): string => {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value && typeof value === "object") {
+  if (!isCanonicalPrimitive(value)) {
     return `{${Object.entries(value)
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`)
@@ -45,10 +58,10 @@ export interface ShareSnapshot {
 }
 
 const projectArtwork = (firstPicture: AudioMetadata["picture"][number] | undefined) => {
+  const supportedFormat =
+    firstPicture && isSupportedArtworkFormat(firstPicture.format) ? firstPicture.format : undefined;
   const supportedPicture =
-    firstPicture && (firstPicture.format === "image/jpeg" || firstPicture.format === "image/png")
-      ? { ...firstPicture, format: firstPicture.format as "image/jpeg" | "image/png" }
-      : undefined;
+    firstPicture && supportedFormat ? { ...firstPicture, format: supportedFormat } : undefined;
   const artwork: ManifestArtwork | undefined = supportedPicture
     ? {
         kind: "stored",

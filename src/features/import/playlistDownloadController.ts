@@ -1,4 +1,5 @@
 import { Cause, Effect, Exit, Fiber } from "effect";
+import { toPublicAudioError } from "@/features/audio/audioErrors";
 import {
   cancelActivePlaylistDownloadTracks,
   cancelPendingPlaylistDownloadTracks,
@@ -21,6 +22,7 @@ import type { PlaylistDownloadQueueTrack as PlaylistDownloadQueueModelTrack } fr
 import { createDownloadAdmissionWindow } from "@/features/import/downloadAdmissionWindow";
 import {
   importFailureStageFromDownloadError,
+  ImportStageError,
   type ImportTrackOutcome,
 } from "@/features/import/importLifecycle";
 import type { ImportFailureStage, ImportOutcome } from "@/analytics";
@@ -41,7 +43,7 @@ export type PlaylistDownloadTrackSettled<Track extends PlaylistDownloadRuntimeTr
   | {
       track: Track;
       outcome: "failed";
-      error: unknown;
+      error: Error;
       failureStage: ImportFailureStage;
     };
 
@@ -76,7 +78,7 @@ export interface PlaylistDownloadControllerDeps<Track extends PlaylistDownloadRu
   getFileErrorTrackIds: () => Set<string>;
   markQueued: (tracks: Track[]) => void;
   markCanceled: (trackIds: string[]) => void;
-  markFailed: (trackId: string, error: unknown) => void;
+  markFailed: (trackId: string, error: Error) => void;
   onTrackSettled?: (event: PlaylistDownloadTrackSettled<Track>) => void;
   onAction?: (event: PlaylistDownloadControllerAction<Track>) => void;
   emitSnapshot: (snapshot: PlaylistDownloadControllerSnapshot) => void;
@@ -91,32 +93,34 @@ export interface PlaylistDownloadController<Track extends PlaylistDownloadRuntim
   getSnapshot: () => PlaylistDownloadControllerSnapshot | null;
 }
 
-const isPlaylistDownloadAbort = (error: unknown) => {
+const isPlaylistDownloadAbort = (error: Error): boolean => {
   if (error instanceof DOMException && error.name === "AbortError") return true;
   if (error instanceof Error) {
     if (error.name === "AbortError") return true;
-    if (error.cause !== undefined) return isPlaylistDownloadAbort(error.cause);
+    if (error.cause !== undefined) return isPlaylistDownloadAbort(toPublicAudioError(error.cause));
   }
   return false;
 };
 
-const toErrorMessage = (error: unknown) => {
-  if (error instanceof Error) return error.message;
-  return "download failed.";
-};
+const toErrorMessage = (error: Error) => error.message || "download failed.";
 
-const firstCauseError = (cause: Cause.Cause<unknown>) => {
+const firstCauseError = (cause: Cause.Cause<unknown>): Error => {
   for (const reason of cause.reasons) {
-    if (Cause.isFailReason(reason)) return reason.error;
-    if (Cause.isDieReason(reason)) return reason.defect;
+    if (Cause.isFailReason(reason)) return toPublicAudioError(reason.error);
+    if (Cause.isDieReason(reason)) return toPublicAudioError(reason.defect);
   }
-  return cause;
+  return new Error(Cause.pretty(cause));
 };
 
-type StagedDownloadFailure = { stage: ImportFailureStage; error: unknown };
+class StagedDownloadFailure extends Error {
+  readonly stage: ImportFailureStage;
 
-const isStagedDownloadFailure = (failure: unknown): failure is StagedDownloadFailure =>
-  typeof failure === "object" && failure !== null && "stage" in failure && "error" in failure;
+  constructor(stage: ImportFailureStage, cause: Error) {
+    super(cause.message, { cause });
+    this.name = "StagedDownloadFailure";
+    this.stage = stage;
+  }
+}
 
 const retryOutcomeFrom = (counts: {
   completedCount: number;
@@ -284,18 +288,20 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
       }
 
       const downloadedFile = yield* deps.downloadTrack(track).pipe(
-        Effect.mapError(
-          (error): StagedDownloadFailure => ({
-            stage: importFailureStageFromDownloadError(error),
-            error,
-          }),
-        ),
+        Effect.mapError((error) => {
+          const failure = toPublicAudioError(error);
+          return new StagedDownloadFailure(importFailureStageFromDownloadError(failure), failure);
+        }),
       );
       if (currentRun !== run || !isCurrentExecution(run, track.fileId, execution)) return;
 
       yield* deps
         .hydrateTrack(track, downloadedFile)
-        .pipe(Effect.mapError((error): StagedDownloadFailure => ({ stage: "hydration", error })));
+        .pipe(
+          Effect.mapError(
+            (error) => new StagedDownloadFailure("hydration", toPublicAudioError(error)),
+          ),
+        );
       if (currentRun !== run || !isCurrentExecution(run, track.fileId, execution)) return;
 
       yield* Effect.sync(() => {
@@ -320,8 +326,11 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
 
     if (Exit.isFailure(exit)) {
       const failure = firstCauseError(exit.cause);
-      const stagedFailure = isStagedDownloadFailure(failure) ? failure : undefined;
-      const error = stagedFailure?.error ?? failure;
+      const stagedFailure =
+        failure instanceof ImportStageError || failure instanceof StagedDownloadFailure
+          ? failure
+          : undefined;
+      const error = stagedFailure ? toPublicAudioError(stagedFailure.cause) : failure;
       if (trackWasRemoved) {
         notifyTrackSettled(run, { track, outcome: "canceled" }, retryAttemptId);
       } else if (Exit.hasInterrupts(exit) || isPlaylistDownloadAbort(error)) {

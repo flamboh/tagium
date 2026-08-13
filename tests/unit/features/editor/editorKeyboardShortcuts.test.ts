@@ -28,19 +28,28 @@ const keyboardEvent = (
     target?: Pick<HTMLElement, "tagName" | "isContentEditable">;
   } = {},
 ) => {
-  const preventDefault = vi.fn();
-  const event = {
-    key,
-    ctrlKey: false,
-    metaKey: false,
-    target: null,
-    preventDefault,
-    ...options,
-  } as unknown as KeyboardEvent;
+  const event = new Event("keydown", { cancelable: true }) as KeyboardEvent;
+  Object.defineProperties(event, {
+    key: { value: key },
+    ctrlKey: { value: options.ctrlKey ?? false },
+    metaKey: { value: options.metaKey ?? false },
+    target: { value: options.target ?? null },
+  });
+  const preventDefault = vi.spyOn(event, "preventDefault");
   preventDefaultMocks.set(event, preventDefault);
   return event;
 };
 const preventDefaultFor = (event: KeyboardEvent) => preventDefaultMocks.get(event);
+
+class InheritedInputTarget {
+  get tagName() {
+    return "INPUT";
+  }
+
+  get isContentEditable() {
+    return false;
+  }
+}
 
 const actions = (
   overrides: Partial<EditorKeyboardShortcutActions> = {},
@@ -165,6 +174,18 @@ describe("editor keyboard shortcuts", () => {
     const target = createKeyboardTarget();
     const currentActions = actions({ selectedFileCount: 1 });
     const event = keyboardEvent("Delete", { target: targetElement });
+    subscribeToEditorKeyboardShortcuts(target, () => currentActions);
+
+    target.dispatch(event);
+
+    expect(preventDefaultFor(event)).not.toHaveBeenCalled();
+    expect(currentActions.requestRemoveSelectedFiles).not.toHaveBeenCalled();
+  });
+
+  it("ignores Delete from an input whose DOM properties live on its prototype", () => {
+    const target = createKeyboardTarget();
+    const currentActions = actions({ selectedFileCount: 1 });
+    const event = keyboardEvent("Delete", { target: new InheritedInputTarget() });
     subscribeToEditorKeyboardShortcuts(target, () => currentActions);
 
     target.dispatch(event);

@@ -2,7 +2,6 @@ import filenamify from "filenamify";
 import { audioFilename, getAudioFormat } from "@/features/audio/audioFormat";
 import {
   EDITABLE_METADATA_FIELDS,
-  NULLABLE_NUMERIC_METADATA_FIELDS,
   validateAdvancedMetadataNumber,
 } from "@/features/audio/metadataFields";
 import type { Playlist } from "@/features/import/playlist";
@@ -32,33 +31,54 @@ interface ReconciledDownloadedTrackMetadata {
 const patchFields =
   EDITABLE_METADATA_FIELDS satisfies readonly DownloadedTrackWritableMetadataField[];
 
-const nullableNumericPatchFields = new Set<DownloadedTrackWritableMetadataField>(
-  NULLABLE_NUMERIC_METADATA_FIELDS,
-);
-
-const hasOwn = <Key extends PropertyKey>(object: object, key: Key) =>
-  Object.prototype.hasOwnProperty.call(object, key);
+const hasOwn = <Value extends object>(value: Value, key: PropertyKey) =>
+  Object.prototype.hasOwnProperty.call(value, key);
 
 export const sanitizePendingMetadataPatch = (
   patch: DownloadedTrackMetadataPatch,
   dropLegacyNumericFields = false,
 ): DownloadedTrackMetadataPatch | undefined => {
   const sanitized: DownloadedTrackMetadataPatch = {};
-  const writableSanitized = sanitized as Record<
-    DownloadedTrackWritableMetadataField,
-    MetadataPatch[DownloadedTrackWritableMetadataField]
-  >;
-
-  for (const field of patchFields) {
-    if (!hasOwn(patch, field) || patch[field] === undefined) continue;
-    if (
-      (field === "discNumber" || field === "bpm") &&
-      validateAdvancedMetadataNumber(field, patch[field] as number | null | undefined)
-    ) {
-      continue;
-    }
-    if (dropLegacyNumericFields && nullableNumericPatchFields.has(field)) continue;
-    writableSanitized[field] = patch[field];
+  if (hasOwn(patch, "filename") && patch.filename !== undefined) {
+    sanitized.filename = patch.filename;
+  }
+  if (hasOwn(patch, "title") && patch.title !== undefined) sanitized.title = patch.title;
+  if (hasOwn(patch, "artist") && patch.artist !== undefined) sanitized.artist = patch.artist;
+  if (hasOwn(patch, "albumArtist") && patch.albumArtist !== undefined) {
+    sanitized.albumArtist = patch.albumArtist;
+  }
+  if (hasOwn(patch, "album") && patch.album !== undefined) sanitized.album = patch.album;
+  if (!dropLegacyNumericFields && hasOwn(patch, "year") && patch.year !== undefined) {
+    sanitized.year = patch.year;
+  }
+  if (hasOwn(patch, "genre") && patch.genre !== undefined) sanitized.genre = patch.genre;
+  if (hasOwn(patch, "picture") && patch.picture !== undefined) {
+    sanitized.picture = patch.picture;
+  }
+  if (!dropLegacyNumericFields && hasOwn(patch, "trackNumber") && patch.trackNumber !== undefined) {
+    sanitized.trackNumber = patch.trackNumber;
+  }
+  if (hasOwn(patch, "composer") && patch.composer !== undefined) {
+    sanitized.composer = patch.composer;
+  }
+  if (hasOwn(patch, "comment") && patch.comment !== undefined) {
+    sanitized.comment = patch.comment;
+  }
+  if (
+    !dropLegacyNumericFields &&
+    hasOwn(patch, "discNumber") &&
+    patch.discNumber !== undefined &&
+    !validateAdvancedMetadataNumber("discNumber", patch.discNumber)
+  ) {
+    sanitized.discNumber = patch.discNumber;
+  }
+  if (
+    !dropLegacyNumericFields &&
+    hasOwn(patch, "bpm") &&
+    patch.bpm !== undefined &&
+    !validateAdvancedMetadataNumber("bpm", patch.bpm)
+  ) {
+    sanitized.bpm = patch.bpm;
   }
 
   return Object.keys(sanitized).length > 0 ? sanitized : undefined;
@@ -395,13 +415,18 @@ export function applyAlbumCoverToFiles(
   );
 }
 
+interface AlbumCoverApplication {
+  files: TagiumFile[];
+  selectedMetadata?: AudioMetadata;
+}
+
 export function applyAlbumCoverToFilesWithSelectedMetadata(
   files: TagiumFile[],
   trackIds: string[],
   cover: AudioMetadata["picture"],
   selectedFileId: string | null,
   settings?: MetadataPolicySettings,
-): { files: TagiumFile[]; selectedMetadata?: AudioMetadata } {
+): AlbumCoverApplication {
   const coveredFiles = applyAlbumCoverToFiles(files, trackIds, cover, settings);
   if (!selectedFileId) {
     return { files: coveredFiles };

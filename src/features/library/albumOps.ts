@@ -85,7 +85,7 @@ export function mergeUploadedTracksIntoAlbums(
     return {
       albums: nextAlbums,
       firstSelectedAlbumId: createdAlbum.id,
-      unassignedTrackIds: [] as string[],
+      unassignedTrackIds: new Array<string>(),
       albumsToSync: syncTrackNumbers ? [createdAlbum.id] : [],
     };
   }
@@ -205,14 +205,14 @@ export function moveTrackInSidebar(
       return {
         albums: pruneEmptyAlbums(albums),
         looseTrackIds,
-        albumsToSync: [] as string[],
+        albumsToSync: new Array<string>(),
       };
     }
     if (target.placement !== "append" && target.referenceTrackId === trackId) {
       return {
         albums: pruneEmptyAlbums(albums),
         looseTrackIds,
-        albumsToSync: [] as string[],
+        albumsToSync: new Array<string>(),
       };
     }
     const insertIndex = resolveInsertIndex(
@@ -226,7 +226,7 @@ export function moveTrackInSidebar(
       return {
         albums: pruneEmptyAlbums(albums),
         looseTrackIds,
-        albumsToSync: [] as string[],
+        albumsToSync: new Array<string>(),
       };
     }
     const insertIndex = resolveInsertIndex(

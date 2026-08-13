@@ -244,14 +244,17 @@ export const createQueuedDownloadTracks = (
 const createPlaylistPendingMetadataPatch = (
   playlist: Playlist,
   track: Playlist["tracks"][number],
-): MetadataPatch => ({
-  title: track.title,
-  artist: playlist.artist,
-  album: playlist.title,
-  genre: playlist.genre,
-  ...(playlist.year !== undefined ? { year: playlist.year } : {}),
-  ...(track.trackNumber !== undefined ? { trackNumber: track.trackNumber } : {}),
-});
+): MetadataPatch => {
+  const patch: MetadataPatch = {
+    title: track.title,
+    artist: playlist.artist,
+    album: playlist.title,
+    genre: playlist.genre,
+  };
+  if (playlist.year !== undefined) patch.year = playlist.year;
+  if (track.trackNumber !== undefined) patch.trackNumber = track.trackNumber;
+  return patch;
+};
 
 export const createSingleUrlDownloadPlan = ({
   sourceUrl,
@@ -262,6 +265,8 @@ export const createSingleUrlDownloadPlan = ({
 }: CreateSingleUrlDownloadPlanInput): SingleUrlDownloadPlan => {
   const id = createId();
   const title = metadata?.title || titleFromSourceUrl(sourceUrl);
+  const downloadRequest: DownloadRequest = { sourceUrl, audioBitrate };
+  if (importId) downloadRequest.importId = importId;
   const pendingFile = createPendingDownloadTrack(
     id,
     createDownloadMetadata({
@@ -271,7 +276,7 @@ export const createSingleUrlDownloadPlan = ({
       genre: "",
     }),
     false,
-    { sourceUrl, audioBitrate, ...(importId ? { importId } : {}) },
+    downloadRequest,
   );
 
   return {
@@ -295,8 +300,15 @@ export const createPlaylistDownloadPlan = ({
   importId,
 }: CreatePlaylistDownloadPlanInput): PlaylistDownloadPlan => {
   const albumId = createId();
-  const pendingFiles = playlist.tracks.map((track) =>
-    createPendingDownloadTrack(
+  const pendingFiles = playlist.tracks.map((track) => {
+    const downloadRequest: DownloadRequest = {
+      sourceUrl: track.url,
+      audioBitrate,
+      trackIndex: track.trackNumber,
+    };
+    if (importId) downloadRequest.importId = importId;
+    if (playlist.year !== undefined) downloadRequest.year = playlist.year;
+    return createPendingDownloadTrack(
       createId(),
       createDownloadMetadata({
         title: track.title,
@@ -308,16 +320,10 @@ export const createPlaylistDownloadPlan = ({
         trackNumber: track.trackNumber,
       }),
       true,
-      {
-        sourceUrl: track.url,
-        audioBitrate,
-        ...(importId ? { importId } : {}),
-        trackIndex: track.trackNumber,
-        ...(playlist.year === undefined ? {} : { year: playlist.year }),
-      },
+      downloadRequest,
       createPlaylistPendingMetadataPatch(playlist, track),
-    ),
-  );
+    );
+  });
   const album: AlbumGroup = {
     id: albumId,
     title: playlist.title,
@@ -325,8 +331,8 @@ export const createPlaylistDownloadPlan = ({
     genre: playlist.genre,
     trackIds: pendingFiles.map((file) => file.id),
     year: playlist.year,
-    ...(playlist.sourceUrl === undefined ? {} : { sourceUrl: playlist.sourceUrl }),
   };
+  if (playlist.sourceUrl !== undefined) album.sourceUrl = playlist.sourceUrl;
   const firstPendingFileId = pendingFiles[0]?.id ?? null;
 
   return {
@@ -377,8 +383,10 @@ export function startDownloadTrackPlan(
   deps.setFiles(nextFiles);
 
   if (plan.source === "playlist") {
-    const albumDeps = deps as PlaylistDownloadWorkflowDeps;
-    albumDeps.setAlbums([...albumDeps.getAlbums(), plan.album]);
+    if (!("setAlbums" in deps) || !("getAlbums" in deps)) {
+      throw new Error("playlist downloads require album workflow dependencies");
+    }
+    deps.setAlbums([...deps.getAlbums(), plan.album]);
   } else {
     deps.addLooseTrackIds?.(plan.looseTrackIds);
   }

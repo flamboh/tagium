@@ -1,7 +1,9 @@
-import type { ReactNode } from "react";
+import type { FocusEvent, ReactNode } from "react";
+import { Schema } from "effect";
 import { act, create, type ReactTestInstance } from "react-test-renderer";
 import { describe, expect, it, vi } from "vite-plus/test";
 import type { MetadataCleanupSuggestion } from "@/features/library/metadataCleanup";
+import { buttonElementFixture } from "../../../support/domFixtures";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -13,11 +15,14 @@ vi.mock("@/components/ui/dialog", () => ({
   }: {
     children?: ReactNode;
     onCloseAutoFocus?: (event: { preventDefault: () => void }) => void;
-  }) => (
-    <div data-dialog-content onBlur={onCloseAutoFocus as never}>
-      {children}
-    </div>
-  ),
+  }) => {
+    const handleBlur = (event: FocusEvent<HTMLDivElement>) => onCloseAutoFocus?.(event);
+    return (
+      <div data-dialog-content onBlur={handleBlur}>
+        {children}
+      </div>
+    );
+  },
   DialogDescription: ({ children }: { children?: ReactNode }) => <p>{children}</p>,
   DialogFooter: ({ children }: { children?: ReactNode }) => <footer>{children}</footer>,
   DialogHeader: ({ children }: { children?: ReactNode }) => <header>{children}</header>,
@@ -42,7 +47,9 @@ const suggestion = (trackId: string): MetadataCleanupSuggestion => ({
 });
 
 const textContent = (node: ReactTestInstance): string =>
-  node.children.map((child) => (typeof child === "string" ? child : textContent(child))).join("");
+  node.children
+    .map((child) => (Schema.is(Schema.String)(child) ? child : textContent(child)))
+    .join("");
 
 describe("MetadataCleanupDialog", () => {
   it("keeps populated suggestions rendered while the dialog closes", () => {
@@ -108,7 +115,7 @@ describe("MetadataCleanupDialog", () => {
 
   it("names an album, explains an empty live state, and restores menu focus on close", () => {
     const focus = vi.fn();
-    const returnFocusTarget = { focus } as unknown as HTMLButtonElement;
+    const returnFocusTarget = buttonElementFixture(focus);
     let renderer: ReturnType<typeof create>;
     act(() => {
       renderer = create(

@@ -23,7 +23,7 @@ vi.mock("@/analytics", async (importOriginal) => ({
 }));
 vi.mock("@/features/audio/audioBackend", () => ({
   downloadFromCobalt: mocks.downloadFromCobalt,
-  provideAudioBackend: (operation: unknown) => operation,
+  provideAudioBackend: <Operation>(operation: Operation) => operation,
   parseUploads: vi.fn(),
   runAudioBackendEffect: mocks.runAudioBackendEffect,
   writeTags: mocks.writeTags,
@@ -145,7 +145,7 @@ describe("audio URL import session", () => {
       type: "media_link_processed",
       sourceUrl: "https://www.youtube.com/watch?v=abcdefghijk",
       mediaKind: "track",
-      shape: "canonical",
+      linkKind: "canonical",
       normalized: false,
       redirected: false,
       outcome: "accepted",
@@ -158,7 +158,7 @@ describe("audio URL import session", () => {
       type: "media_link_processed",
       sourceUrl: "https://soundcloud.com/discover",
       mediaKind: "unsupported",
-      shape: "canonical",
+      linkKind: "canonical",
       normalized: false,
       redirected: false,
       outcome: "rejected",
@@ -192,7 +192,7 @@ describe("audio URL import session", () => {
       type: "media_link_processed",
       sourceUrl: "https://on.soundcloud.com/private-token",
       mediaKind: "unsupported",
-      shape: "short",
+      linkKind: "short",
       normalized: false,
       redirected: false,
       outcome: "rejected",
@@ -218,7 +218,7 @@ describe("audio URL import session", () => {
     ["https://youtube.com:444/watch?v=abcdefghijk", "invalid", "canonical"],
   ] as const)(
     "rejects unsupported providers before starting an import (%s)",
-    async (sourceUrl, failureReason, shape) => {
+    async (sourceUrl, failureReason, linkForm) => {
       const hook = renderHook(() => {
         const library = useLibraryStore();
         const editor = useTrackEditorSession({ library, settings: settings("320") });
@@ -238,7 +238,7 @@ describe("audio URL import session", () => {
         type: "media_link_processed",
         sourceUrl,
         mediaKind: "unsupported",
-        shape,
+        linkKind: linkForm,
         normalized: false,
         redirected: false,
         outcome: "rejected",

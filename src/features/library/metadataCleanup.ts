@@ -30,7 +30,12 @@ export interface MetadataCleanupUndoEntry {
   pendingFilename: { present: boolean; value?: string };
 }
 
-const hasOwn = <Key extends PropertyKey>(object: object, key: Key) =>
+interface MetadataCleanupApplication {
+  files: TagiumFile[];
+  undoEntries: MetadataCleanupUndoEntry[];
+}
+
+const hasOwn = <Value, Key extends PropertyKey>(object: Value, key: Key) =>
   Object.prototype.hasOwnProperty.call(object, key);
 
 const normalizeComparable = (value: string) =>
@@ -88,7 +93,7 @@ const removeTrailingNoise = (title: string, albumTitle?: string) => {
       annotation &&
       annotationValue !== undefined &&
       annotationRemainder &&
-      removableLabels.includes(normalizeComparable(annotationValue) as never)
+      removableLabels.some((label) => label === normalizeComparable(annotationValue))
     ) {
       nextTitle = annotationRemainder;
       removedLabel = true;
@@ -186,7 +191,7 @@ export function applyMetadataCleanupSuggestions(
   files: TagiumFile[],
   suggestions: MetadataCleanupSuggestion[],
   syncFilenames: boolean,
-): { files: TagiumFile[]; undoEntries: MetadataCleanupUndoEntry[] } {
+): MetadataCleanupApplication {
   const suggestionsById = new Map(
     suggestions.map((suggestion) => [suggestion.trackId, suggestion]),
   );
@@ -215,18 +220,20 @@ export function applyMetadataCleanupSuggestions(
     const pendingMetadataPatch: MetadataPatch = {
       ...file.pendingMetadataPatch,
       title: suggestion.afterTitle,
-      ...(syncFilenames ? { filename: sanitizeFilenameBase(suggestion.afterTitle) } : {}),
     };
+    if (syncFilenames) pendingMetadataPatch.filename = sanitizeFilenameBase(suggestion.afterTitle);
+
+    const metadata = {
+      ...file.metadata,
+      title: suggestion.afterTitle,
+    };
+    if (syncFilenames) metadata.filename = sanitizeFilenameBase(suggestion.afterTitle);
 
     return {
       ...file,
       status: file.status === "saved" ? "pending" : file.status,
       filename: syncFilenames ? suggestion.afterFilename : file.filename,
-      metadata: {
-        ...file.metadata,
-        title: suggestion.afterTitle,
-        ...(syncFilenames ? { filename: sanitizeFilenameBase(suggestion.afterTitle) } : {}),
-      },
+      metadata,
       pendingMetadataPatch,
       hasBufferedChanges: true,
     };

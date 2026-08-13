@@ -113,6 +113,9 @@ export const manifestTracks = (manifest: Manifest): readonly ManifestTrack[] =>
 export const manifestTrackCount = (manifest: Manifest) => manifestTracks(manifest).length;
 
 export const SHARE_ANALYTICS_ID_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+export const shareAnalyticsIdSchema = Schema.String.check(
+  Schema.isPattern(SHARE_ANALYTICS_ID_PATTERN),
+);
 export const isShareAnalyticsId = (value: unknown): value is string =>
   typeof value === "string" && SHARE_ANALYTICS_ID_PATTERN.test(value);
 
@@ -133,6 +136,12 @@ export interface ShareManifestResponse {
 
 export const toShareExpiryIso = (expiresAt: number) => new Date(expiresAt).toISOString();
 
+export const shareExpiryIsoSchema = Schema.String.pipe(
+  Schema.refine(
+    (value): value is string =>
+      Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value,
+  ),
+);
 export const isShareExpiryIso = (value: unknown): value is string =>
   typeof value === "string" &&
   Number.isFinite(Date.parse(value)) &&
@@ -145,8 +154,9 @@ export const isManifestPayloadWithinLimit = (manifest: Manifest) =>
   manifestPayloadBytes(manifest) <= MAX_MANIFEST_PAYLOAD_BYTES;
 
 /** Decodes only the supported version and rejects an oversized persisted payload. */
+const decodeManifestInput = Schema.decodeUnknownSync(manifestSchema);
 export const decodeManifest = (input: unknown): Manifest => {
-  const manifest = Schema.decodeUnknownSync(manifestSchema)(input);
+  const manifest = decodeManifestInput(input);
   if (!isManifestPayloadWithinLimit(manifest)) {
     throw new Error(`manifest payload must be ${MAX_MANIFEST_PAYLOAD_BYTES} bytes or smaller`);
   }
@@ -181,29 +191,32 @@ export const toManifestReplayInput = (
   options: { sourceManifestSlug?: string } = {},
 ): ManifestReplayInput => {
   if (manifest.kind !== "album") throw new Error("track manifests cannot replay as albums");
-  return {
-    ...(options.sourceManifestSlug === undefined
-      ? {}
-      : { sourceManifestSlug: options.sourceManifestSlug }),
-    playlist: {
-      title: manifest.album.title,
-      artist: manifest.album.artist,
-      genre: manifest.album.genre,
-      ...(manifest.album.year === undefined ? {} : { year: manifest.album.year }),
-      ...(manifest.album.sourceUrl === undefined ? {} : { sourceUrl: manifest.album.sourceUrl }),
-      isAlbum: true,
-      tracks: manifest.tracks.map((track) => ({
-        title: track.metadata.title,
-        url: track.sourceUrl,
-        trackNumber: track.metadata.trackNumber ?? 1,
-      })),
-    },
+  const playlist: ManifestReplayInput["playlist"] = {
+    title: manifest.album.title,
+    artist: manifest.album.artist,
+    genre: manifest.album.genre,
+    isAlbum: true,
+    tracks: manifest.tracks.map((track) => ({
+      title: track.metadata.title,
+      url: track.sourceUrl,
+      trackNumber: track.metadata.trackNumber ?? 1,
+    })),
+  };
+  if (manifest.album.year !== undefined) playlist.year = manifest.album.year;
+  if (manifest.album.sourceUrl !== undefined) playlist.sourceUrl = manifest.album.sourceUrl;
+
+  const replay: ManifestReplayInput = {
+    playlist,
     tracks: manifest.tracks.map((track) => ({
       sourceUrl: track.sourceUrl,
       audioBitrate: track.audioBitrate,
       metadata: track.metadata,
     })),
   };
+  if (options.sourceManifestSlug !== undefined) {
+    replay.sourceManifestSlug = options.sourceManifestSlug;
+  }
+  return replay;
 };
 
 /** Projects current effective (including buffered) library metadata into a v1 manifest. */
@@ -247,57 +260,78 @@ export interface ManifestTrackProjection {
   downloadRequest?: { sourceUrl: string; audioBitrate: ManifestAudioBitrate };
 }
 
+interface ProjectedTrackMetadata {
+  filename: string;
+  title: string;
+  artist: string;
+  album: string;
+  genre: string;
+  year?: number;
+  trackNumber?: number;
+}
+interface ProjectedManifestTrack extends ManifestTrack {
+  artwork?: ManifestArtwork;
+}
+
 export const projectManifestTrack = (file: ManifestTrackProjection): ManifestTrack => {
   if (!file.downloadRequest || !file.metadata) {
     throw new Error("only downloaded-source tracks with metadata can be shared");
   }
   const metadata = { ...file.metadata, ...file.pendingMetadataPatch };
+  const projectedMetadata: ProjectedTrackMetadata = {
+    filename: metadata.filename || file.filename.replace(/\.mp3$/i, ""),
+    title: metadata.title,
+    artist: metadata.artist,
+    album: metadata.album,
+    genre: typeof metadata.genre === "string" ? metadata.genre : metadata.genre.join(", "),
+  };
+  if (metadata.year !== null) projectedMetadata.year = metadata.year;
+  if (metadata.trackNumber !== null) projectedMetadata.trackNumber = metadata.trackNumber;
   return {
     sourceUrl:
       supportedProvenance(file.downloadRequest.sourceUrl) ?? file.downloadRequest.sourceUrl,
     audioBitrate: file.downloadRequest.audioBitrate,
-    metadata: {
-      filename: metadata.filename || file.filename.replace(/\.mp3$/i, ""),
-      title: metadata.title,
-      artist: metadata.artist,
-      album: metadata.album,
-      genre: typeof metadata.genre === "string" ? metadata.genre : metadata.genre.join(", "),
-      ...(metadata.year === null ? {} : { year: metadata.year }),
-      ...(metadata.trackNumber === null ? {} : { trackNumber: metadata.trackNumber }),
-    },
+    metadata: projectedMetadata,
   };
 };
 
 export const projectTrackManifest = (
   file: ManifestTrackProjection,
   artwork?: ManifestArtwork,
-): TrackManifest =>
-  decodeManifest({
+): TrackManifest => {
+  const track: ProjectedManifestTrack = {
+    ...projectManifestTrack(file),
+  };
+  if (artwork !== undefined) track.artwork = artwork;
+  const manifest = decodeManifest({
     version: MANIFEST_VERSION,
     kind: "track",
-    track: {
-      ...projectManifestTrack(file),
-      ...(artwork === undefined ? {} : { artwork }),
-    },
-  }) as TrackManifest;
+    track,
+  });
+  if (manifest.kind !== "track") throw new Error("projected track manifest had the wrong kind");
+  return manifest;
+};
 
 export const projectAlbumManifest = (
   album: ManifestAlbumProjection,
   files: readonly ManifestTrackProjection[],
   artwork?: ManifestArtwork,
-): AlbumManifest =>
-  decodeManifest({
+): AlbumManifest => {
+  const projectedAlbum: ManifestAlbumProjection & { artwork?: ManifestArtwork } = {
+    title: album.title,
+    artist: album.artist,
+    genre: album.genre,
+  };
+  if (album.year !== undefined) projectedAlbum.year = album.year;
+  const sourceUrl = supportedProvenance(album.sourceUrl);
+  if (sourceUrl !== undefined) projectedAlbum.sourceUrl = sourceUrl;
+  if (artwork !== undefined) projectedAlbum.artwork = artwork;
+  const manifest = decodeManifest({
     version: MANIFEST_VERSION,
     kind: "album",
-    album: {
-      title: album.title,
-      artist: album.artist,
-      genre: album.genre,
-      ...(album.year === undefined ? {} : { year: album.year }),
-      ...(supportedProvenance(album.sourceUrl) === undefined
-        ? {}
-        : { sourceUrl: supportedProvenance(album.sourceUrl) }),
-      ...(artwork === undefined ? {} : { artwork }),
-    },
+    album: projectedAlbum,
     tracks: files.map(projectManifestTrack),
-  }) as AlbumManifest;
+  });
+  if (manifest.kind !== "album") throw new Error("projected album manifest had the wrong kind");
+  return manifest;
+};
