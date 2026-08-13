@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { mockEvent } from "h3";
 import artworkHandler from "../../server/api/manifests/[slug]/artwork.get";
 import previewArtworkHandler from "../../server/api/manifests/[slug]/preview-artwork.get";
 import { createShareSocialCardHandler } from "../../server/api/manifests/[slug]/social-card.get";
@@ -165,9 +166,7 @@ const createRuntime = () => {
 };
 
 const event = (request: Request, slug?: string) =>
-  ({ req: request, context: { params: { slug } } }) as unknown as Parameters<
-    typeof publishHandler
-  >[0];
+  Object.assign(mockEvent(request), { context: { params: slug === undefined ? {} : { slug } } });
 
 const request = (
   url: string,

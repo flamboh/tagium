@@ -16,6 +16,7 @@ import { useAudioWorkspace } from "@/features/workspace/useAudioWorkspace";
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import { useWorkspaceNavigation } from "@/features/workspace/workspaceNavigation";
+import { buttonElementFixture } from "../../../support/domFixtures";
 
 const initialSettings: AppSettings = {
   ...DEFAULT_APP_SETTINGS,
@@ -160,10 +161,7 @@ describe("audio workspace", () => {
     act(() => hook.result.workspace.albumDialogProps.onSave());
     const albumId = hook.result.library.getSnapshot().albums[0].id;
     act(() => hook.result.workspace.sidebarProps.onMoveTrackToAlbum(track.id, albumId, "append"));
-    const returnFocusTarget = {
-      focus: vi.fn(),
-      isConnected: true,
-    } as unknown as HTMLButtonElement;
+    const returnFocusTarget = buttonElementFixture(vi.fn());
 
     act(() => hook.result.workspace.sidebarProps.onDeleteAlbum(albumId, returnFocusTarget));
     expect(hook.result.workspace.albumDeletionDialogProps).toMatchObject({
@@ -217,8 +215,8 @@ describe("audio workspace", () => {
       });
     });
 
-    const cleanupToast = toastMocks.toast.mock.calls.find(
-      ([message]) => typeof message === "string" && message.includes("cleaned up"),
+    const cleanupToast = toastMocks.toast.mock.calls.find(([message]) =>
+      String(message).includes("cleaned up"),
     );
     expect(cleanupToast).toBeDefined();
     void act(() => {

@@ -9,8 +9,7 @@ const userFacingMessages = new Set([
 ]);
 
 /** Converts implementation-level publish failures into copy safe for the share dialog. */
-export const sharePublicationErrorMessage = (error: unknown, kind: "album" | "track" = "album") => {
-  if (!(error instanceof Error)) return "the share link could not be created";
+export const sharePublicationErrorMessage = (error: Error, kind: "album" | "track" = "album") => {
   if (metadataContractError(error.message))
     return `this ${kind} contains too much metadata to share.`;
   if (error.message === "only downloaded-source tracks with metadata can be shared") {

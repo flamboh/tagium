@@ -95,6 +95,7 @@ export function ExportConfirmationDialogView({
         className="max-h-[calc(100dvh-1rem)] min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden p-4 sm:max-h-[calc(100dvh-2rem)] sm:max-w-lg sm:p-6"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
+          // SAFETY: the dialog focus event currentTarget is the DialogContent HTMLElement.
           const content = event.currentTarget as HTMLElement | null;
           content?.querySelector<HTMLElement>("[data-export-cancel]")?.focus();
         }}

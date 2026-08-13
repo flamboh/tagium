@@ -170,7 +170,7 @@ const includes = (haystack: Uint8Array, needle: Uint8Array) => {
 
 const topAtoms = (bytes: Uint8Array) => {
   const result: { type: string; start: number; size: number }[] = [];
-  for (let offset = 0; offset < bytes.length; ) {
+  for (let offset = 0; offset < bytes.length;) {
     const size =
       bytes[offset]! * 0x1000000 +
       bytes[offset + 1]! * 0x10000 +

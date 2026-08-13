@@ -51,30 +51,6 @@ const hashArtworkBytes = (bytes: Uint8Array) => {
   return `${bytes.byteLength}:${(firstHash >>> 0).toString(16).padStart(8, "0")}:${(secondHash >>> 0).toString(16).padStart(8, "0")}`;
 };
 
-const normalizeFingerprintValue = (
-  value: unknown,
-  artworkFingerprints: WeakMap<Uint8Array, string>,
-): unknown => {
-  if (value instanceof Uint8Array) {
-    const cached = artworkFingerprints.get(value);
-    if (cached) return cached;
-    const fingerprint = hashArtworkBytes(value);
-    artworkFingerprints.set(value, fingerprint);
-    return fingerprint;
-  }
-  if (Array.isArray(value)) {
-    return value.map((entry) => normalizeFingerprintValue(entry, artworkFingerprints));
-  }
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, entry]) => [key, normalizeFingerprintValue(entry, artworkFingerprints)]),
-    );
-  }
-  return value;
-};
-
 const indexFilesById = (files: TagiumFile[]) => {
   const filesById = new Map<string, TagiumFile>();
   for (const file of files) filesById.set(file.id, file);
@@ -228,20 +204,32 @@ export const planExport = (
       : null,
   }));
   const fingerprint = JSON.stringify(
-    normalizeFingerprintValue(
-      {
-        target,
-        settings: {
-          syncFilenames: settings.syncFilenames,
-          syncTrackNumbers: settings.syncTrackNumbers,
-        },
-        groups,
-        albums: albumFingerprint,
-        files: fileFingerprint,
-        entries: entries.map((entry) => ({ path: entry.path, size: entry.file.size })),
+    {
+      target,
+      settings: {
+        syncFilenames: settings.syncFilenames,
+        syncTrackNumbers: settings.syncTrackNumbers,
       },
-      artworkFingerprints,
-    ),
+      groups,
+      albums: albumFingerprint,
+      files: fileFingerprint,
+      entries: entries.map((entry) => ({ path: entry.path, size: entry.file.size })),
+    },
+    (_key, value) => {
+      if (value instanceof Uint8Array) {
+        const cached = artworkFingerprints.get(value);
+        if (cached) return cached;
+        const artworkFingerprint = hashArtworkBytes(value);
+        artworkFingerprints.set(value, artworkFingerprint);
+        return artworkFingerprint;
+      }
+      if (value instanceof Object && !Array.isArray(value)) {
+        return Object.fromEntries(
+          Object.entries(value).sort(([left], [right]) => left.localeCompare(right)),
+        );
+      }
+      return value;
+    },
   );
   planFingerprints.set(plan, fingerprint);
   return plan;

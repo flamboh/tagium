@@ -152,12 +152,12 @@ describe("shared album publication state", () => {
   });
 
   it("uses the same publication lifecycle labels for a track", () => {
-    const track = {
+    const track: TagiumFile = {
       id: "track",
       filename: "track.mp3",
       status: "saved",
       downloadStatus: "ready",
-    } as TagiumFile;
+    };
     expect(shareTrackActionState(track, undefined, false, 0)).toMatchObject({
       label: "share track",
       variant: "create",

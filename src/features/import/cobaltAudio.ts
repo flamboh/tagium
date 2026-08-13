@@ -10,6 +10,12 @@ import { ImportStageError } from "@/features/import/importLifecycle";
 
 export type AudioDownloadBitrate = "320" | "256" | "128" | "96" | "64";
 
+interface CobaltAudioRequestBody {
+  url: string;
+  audioBitrate: AudioDownloadBitrate;
+  year?: number;
+}
+
 export type CobaltAudioDownloadLifecycleEvent =
   | {
       type: "tunnel-budget-wait-started";
@@ -254,15 +260,16 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
         if (request.trackIndex !== undefined) {
           headers.set("X-Tagium-Track-Index", String(request.trackIndex));
         }
+        const body: CobaltAudioRequestBody = {
+          url: request.sourceUrl,
+          audioBitrate: request.audioBitrate,
+        };
+        if (request.year !== undefined) body.year = request.year;
         const response = await fetch("/api/cobalt/audio", {
           method: "POST",
           headers,
           signal: request.signal,
-          body: JSON.stringify({
-            url: request.sourceUrl,
-            audioBitrate: request.audioBitrate,
-            ...(request.year === undefined ? {} : { year: request.year }),
-          }),
+          body: JSON.stringify(body),
         });
 
         if (!response.ok) {

@@ -143,7 +143,7 @@ export default function CoverArt({
     }
 
     if (picture && picture.length > 0) {
-      const blob = new Blob([picture[0].data as unknown as BlobPart], { type: picture[0].format });
+      const blob = new Blob([Uint8Array.from(picture[0].data)], { type: picture[0].format });
       // The cleanup below revokes this exact URL when the picture changes or the component unmounts.
       // react-doctor-disable-next-line react-doctor/no-create-object-url-without-revoke
       const url = URL.createObjectURL(blob);

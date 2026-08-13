@@ -102,6 +102,25 @@ type CobaltAudioResult = {
   failureStage?: "cobalt.resolve_fetch" | "cobalt.resolve_parse";
   failureReason?: "fetch_threw" | "non_json" | "invalid_json_or_schema" | "invalid_machine_id";
 };
+interface CobaltAudioLogDetails {
+  stage?: string;
+  elapsedMs: number;
+  errorCode?: string;
+  outcome?: string;
+  upstreamStatus?: number;
+  contentType?: string;
+  retryAfter?: string;
+  machineId?: string;
+  failureReason?: string;
+  errorType?: string;
+}
+interface CobaltAudioLogEntry extends CobaltAudioLogDetails {
+  event: "cobalt_audio_completion" | "cobalt_audio_failure";
+  requestId: string;
+  sourceFingerprint: string;
+  importId?: string;
+  trackIndex?: number;
+}
 type CobaltRuntimeEnv = {
   COBALT_ALLOWED_ORIGIN?: string;
   COBALT_API_KEY?: string;
@@ -122,6 +141,7 @@ const COBALT_REQUEST_TIMEOUT_MS = 300_000;
 
 const getRuntimeEnv = (request: Request): CobaltRuntimeEnv => ({
   ...processEnv,
+  // SAFETY: Nitro's Cloudflare adapter supplies this request shape in the Cloudflare runtime.
   ...(request as CloudflareRequest).runtime?.cloudflare?.env,
 });
 
@@ -138,19 +158,19 @@ const getCobaltHeaders = (
   context: RequestLogContext,
   sourceFingerprint: string,
 ) => {
-  const headers: Record<string, string> = {
+  const headers = new Headers({
     Accept: "application/json",
     "Content-Type": "application/json",
     "X-Tagium-Request-Id": context.requestId,
     "X-Tagium-Source-Fingerprint": sourceFingerprint,
-  };
+  });
 
-  if (context.importId) headers["X-Tagium-Import-Id"] = context.importId;
+  if (context.importId) headers.set("X-Tagium-Import-Id", context.importId);
   if (context.trackIndex !== undefined) {
-    headers["X-Tagium-Track-Index"] = String(context.trackIndex);
+    headers.set("X-Tagium-Track-Index", String(context.trackIndex));
   }
   if (runtimeEnv.COBALT_API_KEY) {
-    headers.Authorization = `Api-Key ${runtimeEnv.COBALT_API_KEY}`;
+    headers.set("Authorization", `Api-Key ${runtimeEnv.COBALT_API_KEY}`);
   }
 
   return headers;
@@ -294,16 +314,16 @@ const logCobaltAudioEvent = (
   event: "cobalt_audio_completion" | "cobalt_audio_failure",
   context: RequestLogContext,
   sourceFingerprint: string,
-  details: Record<string, unknown>,
+  details: CobaltAudioLogDetails,
 ) => {
-  const entry = {
+  const entry: CobaltAudioLogEntry = {
     event,
     requestId: context.requestId,
-    ...(context.importId ? { importId: context.importId } : {}),
-    ...(context.trackIndex !== undefined ? { trackIndex: context.trackIndex } : {}),
     sourceFingerprint,
     ...details,
   };
+  if (context.importId) entry.importId = context.importId;
+  if (context.trackIndex !== undefined) entry.trackIndex = context.trackIndex;
   const serialized = JSON.stringify(entry);
   if (event === "cobalt_audio_failure") {
     console.warn(serialized);
@@ -534,27 +554,39 @@ export default defineHandler(async (event) => {
     const cobaltResponse = cobaltResult.response;
 
     if (cobaltResponse.status === CobaltResponseType.Error) {
-      logCobaltAudioEvent("cobalt_audio_failure", context, requestSourceFingerprint, {
+      const failureDetails: CobaltAudioLogDetails = {
         stage: cobaltResult.failureStage ?? "cobalt.resolve_error",
         elapsedMs: Date.now() - startedAt,
         errorCode: cobaltResponse.error.code,
-        ...(cobaltResult.upstreamStatus === undefined
-          ? {}
-          : { upstreamStatus: cobaltResult.upstreamStatus }),
-        ...(cobaltResult.contentType ? { contentType: cobaltResult.contentType } : {}),
-        ...(cobaltResult.retryAfter ? { retryAfter: cobaltResult.retryAfter } : {}),
-        ...(cobaltResult.machineId ? { machineId: cobaltResult.machineId } : {}),
-        ...(cobaltResult.failureReason ? { failureReason: cobaltResult.failureReason } : {}),
-      });
+      };
+      if (cobaltResult.upstreamStatus !== undefined) {
+        failureDetails.upstreamStatus = cobaltResult.upstreamStatus;
+      }
+      if (cobaltResult.contentType) failureDetails.contentType = cobaltResult.contentType;
+      if (cobaltResult.retryAfter) failureDetails.retryAfter = cobaltResult.retryAfter;
+      if (cobaltResult.machineId) failureDetails.machineId = cobaltResult.machineId;
+      if (cobaltResult.failureReason) failureDetails.failureReason = cobaltResult.failureReason;
+      logCobaltAudioEvent(
+        "cobalt_audio_failure",
+        context,
+        requestSourceFingerprint,
+        failureDetails,
+      );
     } else {
-      logCobaltAudioEvent("cobalt_audio_completion", context, requestSourceFingerprint, {
+      const completionDetails: CobaltAudioLogDetails = {
         elapsedMs: Date.now() - startedAt,
         outcome: cobaltResponse.status,
-        ...(cobaltResult.upstreamStatus === undefined
-          ? {}
-          : { upstreamStatus: cobaltResult.upstreamStatus }),
-        ...(cobaltResult.machineId ? { machineId: cobaltResult.machineId } : {}),
-      });
+      };
+      if (cobaltResult.upstreamStatus !== undefined) {
+        completionDetails.upstreamStatus = cobaltResult.upstreamStatus;
+      }
+      if (cobaltResult.machineId) completionDetails.machineId = cobaltResult.machineId;
+      logCobaltAudioEvent(
+        "cobalt_audio_completion",
+        context,
+        requestSourceFingerprint,
+        completionDetails,
+      );
     }
 
     if (isCobaltCapacityError(cobaltResponse)) {

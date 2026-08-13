@@ -38,19 +38,19 @@ export type AudioError =
   | AudioMetadataReadError
   | AudioMetadataWriteError;
 
-export const toPublicAudioError = (error: unknown): Error => {
-  if (error instanceof Error) {
-    return error;
+export const toPublicAudioError = (cause: unknown): Error => {
+  if (cause instanceof Error) {
+    return cause;
   }
 
   if (
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof error.message === "string"
+    typeof cause === "object" &&
+    cause !== null &&
+    "message" in cause &&
+    typeof cause.message === "string"
   ) {
-    return new Error(error.message);
+    return new Error(cause.message);
   }
 
-  return new Error(String(error));
+  return new Error(String(cause));
 };

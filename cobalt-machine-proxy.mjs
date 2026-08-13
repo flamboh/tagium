@@ -244,10 +244,9 @@ export const createCobaltProxyServer = ({
 
     if (requestUrl.pathname === "/readyz") {
       const status = lifecycle.draining ? 503 : 200;
-      clientResponse.writeHead(status, {
-        "content-type": "text/plain;charset=UTF-8",
-        ...(lifecycle.draining ? { connection: "close" } : {}),
-      });
+      const headers = { "content-type": "text/plain;charset=UTF-8" };
+      if (lifecycle.draining) headers.connection = "close";
+      clientResponse.writeHead(status, headers);
       clientResponse.end(lifecycle.draining ? "draining" : "ready");
       return;
     }

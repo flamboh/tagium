@@ -130,6 +130,7 @@ const encodeText = (value: string, version: Id3Version) => {
 
 const parseId3 = (bytes: Uint8Array<ArrayBuffer>): ParsedTag | undefined => {
   if (bytes.length < 10 || ascii(bytes, 0, 3) !== "ID3") return undefined;
+  // SAFETY: the range check immediately below rejects every byte outside the supported versions.
   const version = bytes[3] as Id3Version;
   if (![2, 3, 4].includes(version)) throw readFailure(`unsupported ID3v2.${version} tag.`);
   const flags = bytes[5]!;
@@ -227,7 +228,7 @@ const parseId3 = (bytes: Uint8Array<ArrayBuffer>): ParsedTag | undefined => {
           : readUint32BE(bytes, offset + 4);
     const frameEnd = offset + headerSize + size;
     if (size <= 0 || frameEnd > 10 + payloadSize) throw readFailure(`truncated ID3 frame ${id}.`);
-    const owned = Object.values(ids).some((frameIds) => frameIds.includes(id as never));
+    const owned = Object.values(ids).some((frameIds) => frameIds.some((ownedId) => ownedId === id));
     const formatFlags = version === 2 ? 0 : bytes[offset + 9]!;
     const unsupportedOwnedFlags =
       version === 3
@@ -474,6 +475,7 @@ const encodeApeItem = (key: string, value: string) => {
 
 const patchApe = (ape: ParsedApe, changes: MetadataChanges) => {
   if (ape.size === 0) return undefined;
+  // SAFETY: apeKeys is a closed, locally declared record, so Object.keys preserves its key union.
   const changedFields = (Object.keys(apeKeys) as Array<keyof typeof apeKeys>).filter(
     (field) => changes[field] !== undefined,
   );
@@ -496,6 +498,7 @@ const patchApe = (ape: ParsedApe, changes: MetadataChanges) => {
     } else if (field === "bpm") {
       if (change !== null) value = String(change);
     } else {
+      // SAFETY: discNumber and bpm were handled above; every remaining APE field is textual.
       const textChange = change as string | undefined;
       if (textChange && textChange.length > 0) value = textChange;
     }
@@ -626,8 +629,10 @@ const buildTag = (parsed: ParsedTag | undefined, changes: MetadataChanges) => {
   const revision = parsed?.revision ?? 0;
   const flags = parsed?.flags ?? 0;
   const changedIds = new Set<string>();
+  // SAFETY: MetadataChanges owns every enumerable key in this closed application object.
   for (const key of Object.keys(changes) as Array<keyof MetadataChanges>) {
     if (key !== "comment" && key in ids) {
+      // SAFETY: the key-in-ids check establishes that this MetadataChanges key is an ID3 text key.
       for (const id of ids[key as keyof typeof ids]) changedIds.add(id);
     }
   }
@@ -639,6 +644,7 @@ const buildTag = (parsed: ParsedTag | undefined, changes: MetadataChanges) => {
   const addText = (key: Exclude<keyof typeof ids, "picture">, value: string) => {
     if (value.length > 0)
       frames.push(
+        // SAFETY: addText only accepts keys from ids except picture, which idFor supports.
         makeFrame(idFor(key as keyof typeof ids, version), encodeText(value, version), version),
       );
   };
@@ -773,6 +779,7 @@ export const mp3Driver: FormatDriver = {
             : readFailure("unable to parse APEv2 metadata.", cause),
       });
       const get = (key: keyof typeof ids, apeKey: string = key): string | number | undefined => {
+        // SAFETY: ParsedId3v1 fields indexed here are the textual/number metadata keys in ids.
         const legacy = (v1 as Record<string, string | number | undefined>)[key];
         return firstText(parsed, idSets[key]) ?? ape.values.get(apeKey.toLowerCase()) ?? legacy;
       };

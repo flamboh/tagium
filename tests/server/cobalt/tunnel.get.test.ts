@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { mockEvent } from "h3";
 import handler from "../../../server/api/cobalt/tunnel.get";
 import { setDevFault } from "../../../server/utils/dev-controls";
 
@@ -71,7 +72,7 @@ const withObservability = (request: RuntimeRequest) => {
 };
 
 const makeEvent = (request: RuntimeRequest) => {
-  return { req: request } as unknown as Parameters<typeof handler>[0];
+  return mockEvent(request);
 };
 
 describe("cobalt tunnel endpoint", () => {

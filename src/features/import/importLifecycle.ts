@@ -27,7 +27,7 @@ interface ImportOperation {
     string,
     {
       outcome: ImportTrackOutcome;
-      error?: unknown;
+      error?: Error;
       failureStage?: ImportFailureStage;
     }
   >;
@@ -42,32 +42,32 @@ interface ImportLifecycleDependencies {
 export interface ImportLifecycleTracker {
   start: (input: { sourceUrl: string; importKind: ImportKind }) => string;
   resolve: (operationId: string, resolution: { trackIds: string[]; hasCover: boolean }) => void;
-  fail: (operationId: string, error: unknown) => void;
+  fail: (operationId: string, error: Error) => void;
   settle: (
     operationId: string,
     settlement: {
       trackId: string;
       outcome: ImportTrackOutcome;
-      error?: unknown;
+      error?: Error;
       failureStage?: ImportFailureStage;
     },
   ) => void;
 }
 
-const errorMessage = (error: unknown) => {
-  if (error instanceof Error) return error.message;
+const errorMessage = (cause: unknown) => {
+  if (cause instanceof Error) return cause.message;
   if (
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof error.message === "string"
+    typeof cause === "object" &&
+    cause !== null &&
+    "message" in cause &&
+    typeof cause.message === "string"
   ) {
-    return error.message;
+    return cause.message;
   }
   return "";
 };
 
-export const importFailureCodeFrom = (error: unknown): ImportFailureCode => {
+export const importFailureCodeFrom = (error: Error): ImportFailureCode => {
   const message = errorMessage(error).toLowerCase();
   if (message.includes("error.api.capacity_exceeded")) return "capacity";
   if (
@@ -97,7 +97,7 @@ export const importFailureCodeFrom = (error: unknown): ImportFailureCode => {
   return "unknown";
 };
 
-export const importFailureStageFromDownloadError = (error: unknown): ImportFailureStage =>
+export const importFailureStageFromDownloadError = (error: Error): ImportFailureStage =>
   error instanceof ImportStageError ? error.stage : "plan";
 
 const deriveOutcome = (counts: {
@@ -185,7 +185,7 @@ export const createImportLifecycleTracker = (
         if (result.outcome === "failed") {
           failed += 1;
           const stage = result.failureStage ?? "plan";
-          const code = importFailureCodeFrom(result.error);
+          const code = result.error ? importFailureCodeFrom(result.error) : "unknown";
           const key = `${stage}:${code}`;
           const aggregate = failures.get(key);
           if (aggregate) aggregate.count += 1;

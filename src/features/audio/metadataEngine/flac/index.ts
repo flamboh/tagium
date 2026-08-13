@@ -241,7 +241,13 @@ const parseReadableBlock = <A>(
 ) =>
   effect.pipe(
     Effect.flatMap((bytes) =>
-      Effect.try({ try: () => parse(bytes), catch: (error) => error as AudioMetadataReadError }),
+      Effect.try({
+        try: () => parse(bytes),
+        catch: (error) =>
+          error instanceof AudioMetadataReadError
+            ? error
+            : readFailure("unable to parse FLAC metadata block.", error),
+      }),
     ),
   );
 

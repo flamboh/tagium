@@ -134,12 +134,12 @@ describe("SortableAlbumCard action menu", () => {
 });
 
 describe("SortableTrackRow action menu", () => {
-  const track = {
+  const track: TagiumFile = {
     id: "track-1",
     filename: "Night Drive.mp3",
     status: "saved",
     downloadStatus: "ready",
-  } as TagiumFile;
+  };
   const actions = createTrackActionItems({
     retryable: false,
     canShare: true,

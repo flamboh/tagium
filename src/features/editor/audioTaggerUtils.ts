@@ -1,4 +1,5 @@
 import type { TrackSourceMix } from "@/analytics";
+import type { FieldNamesMarkedBoolean } from "react-hook-form";
 import {
   EDITABLE_METADATA_FIELDS,
   getAdvancedMetadataValidationErrors,
@@ -9,7 +10,7 @@ import type { UploadedTrack } from "@/features/audio/mp3Utils";
 import type { AudioMetadata, MetadataPatch, TagiumFile } from "@/features/library/types";
 
 type MetadataPatchField = keyof MetadataPatch;
-type DirtyMetadataFields = Partial<Record<keyof AudioMetadata, unknown>>;
+export type DirtyMetadataFields = FieldNamesMarkedBoolean<AudioMetadata>;
 
 const metadataPatchFields = EDITABLE_METADATA_FIELDS satisfies readonly MetadataPatchField[];
 

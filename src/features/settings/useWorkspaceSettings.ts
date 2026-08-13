@@ -31,10 +31,8 @@ export const useWorkspaceSettings = ({
         previous.applySoundCloudAlbumCoverToTracks !==
           nextSettings.applySoundCloudAlbumCoverToTracks ||
         previous.advancedMetadata !== nextSettings.advancedMetadata ||
-        Object.keys(previous.metadataLinks).some(
-          (key) =>
-            previous.metadataLinks[key as keyof typeof previous.metadataLinks] !==
-            nextSettings.metadataLinks[key as keyof typeof nextSettings.metadataLinks],
+        Object.values(previous.metadataLinks).some(
+          (enabled, index) => enabled !== Object.values(nextSettings.metadataLinks)[index],
         );
       const saved = saveAppSettings(nextSettings);
       setSettings(nextSettings);

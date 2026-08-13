@@ -79,7 +79,7 @@ describe("bounded SoundCloud short links", () => {
     await expect(
       resolveSoundCloudShortLink("http://snd.sc/x", {
         fetch: async (url) => {
-          seen = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+          seen = url instanceof URL ? url.href : url instanceof Request ? url.url : url;
           return response(200);
         },
       }),

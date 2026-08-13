@@ -1,3 +1,5 @@
+import { Option, Schema } from "effect";
+
 export type EditorKeyboardShortcutActions = {
   enabled?: boolean;
   selectedFileCount: number;
@@ -13,11 +15,13 @@ type KeyboardTarget = {
 };
 
 const isEditableTarget = (target: EventTarget | null) => {
-  const element = target as Pick<HTMLElement, "tagName" | "isContentEditable"> | null;
+  const element = Option.getOrNull(
+    Schema.decodeUnknownOption(
+      Schema.Struct({ tagName: Schema.String, isContentEditable: Schema.Boolean }),
+    )(target),
+  );
   return (
-    element?.tagName === "INPUT" ||
-    element?.tagName === "TEXTAREA" ||
-    element?.isContentEditable === true
+    element?.tagName === "INPUT" || element?.tagName === "TEXTAREA" || element?.isContentEditable
   );
 };
 

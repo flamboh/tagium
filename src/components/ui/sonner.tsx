@@ -10,6 +10,7 @@ const Toaster = ({ className, ...props }: ToasterProps) => (
     duration={12_000}
     className={cn("toaster tagium-toaster group", className)}
     style={
+      // SAFETY: Sonner forwards CSS custom properties through its style object.
       {
         "--normal-bg": "var(--popover)",
         "--normal-text": "var(--popover-foreground)",

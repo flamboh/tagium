@@ -1,6 +1,7 @@
-import type { ReactElement, ReactNode } from "react";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { Schema } from "effect";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -17,15 +18,34 @@ import ExportConfirmationDialog, {
   ExportPlanDisclosure,
 } from "@/features/export/ExportConfirmationDialog";
 import { Button } from "@/components/ui/button";
+import { reactChildren, reactText } from "../../../support/reactTestNodes";
 
-type TestElement = ReactElement<Record<string, unknown> & { children?: ReactNode }>;
-const isElement = (node: ReactNode): node is TestElement =>
-  typeof node === "object" && node !== null && "props" in node;
-const childrenOf = (node: TestElement): ReactNode[] => {
-  const children = node.props.children;
-  if (children === undefined || children === null || typeof children === "boolean") return [];
-  return Array.isArray(children) ? children : [children];
+type FocusEventFixture = {
+  preventDefault: () => void;
+  currentTarget?: { querySelector: () => { focus: () => void } };
 };
+type TestElementProps = {
+  children?: ReactNode;
+  group?: (typeof plan.groups)[number];
+  disabled?: boolean;
+  role?: string;
+  className?: string;
+  id?: string;
+  inert?: boolean;
+  "aria-busy"?: boolean;
+  "aria-expanded"?: boolean;
+  "aria-controls"?: string;
+  "aria-hidden"?: boolean;
+  "data-testid"?: string;
+  onClick?: () => void;
+  onEscapeKeyDown?: (event: FocusEventFixture) => void;
+  onInteractOutside?: (event: FocusEventFixture) => void;
+  onOpenAutoFocus?: (event: FocusEventFixture) => void;
+  onCloseAutoFocus?: (event: FocusEventFixture) => void;
+};
+type TestElement = ReactElement<TestElementProps>;
+const isElement = (node: ReactNode): node is TestElement => isValidElement<TestElementProps>(node);
+const childrenOf = (node: TestElement): ReactNode[] => reactChildren(node);
 const findAll = (node: ReactNode, predicate: (element: TestElement) => boolean): TestElement[] => {
   if (!isElement(node)) return [];
   return [
@@ -33,13 +53,11 @@ const findAll = (node: ReactNode, predicate: (element: TestElement) => boolean):
     ...childrenOf(node).flatMap((child) => findAll(child, predicate)),
   ];
 };
-const textContent = (node: ReactNode): string => {
-  if (typeof node === "string" || typeof node === "number") return String(node);
-  if (!isElement(node)) return "";
-  return childrenOf(node).map(textContent).join("");
-};
+const textContent = reactText;
 const renderedText = (node: ReactTestInstance): string =>
-  node.children.map((child) => (typeof child === "string" ? child : renderedText(child))).join("");
+  node.children
+    .map((child) => (Schema.is(Schema.String)(child) ? child : renderedText(child)))
+    .join("");
 
 const plan = {
   target: { kind: "library" as const },
@@ -165,13 +183,10 @@ describe("ExportConfirmationDialog", () => {
   it("focuses cancel, restores focus, and confines mobile scrolling to the manifest", () => {
     const onRestoreFocus = vi.fn();
     const tree = render({ onRestoreFocus });
-    const content = findAll(
-      tree,
-      (element) => typeof element.props.onOpenAutoFocus === "function",
-    )[0]!;
+    const content = findAll(tree, (element) => element.props.onOpenAutoFocus !== undefined)[0]!;
     const focus = vi.fn();
     const preventOpen = vi.fn();
-    (content.props.onOpenAutoFocus as (event: unknown) => void)({
+    content.props.onOpenAutoFocus?.({
       preventDefault: preventOpen,
       currentTarget: { querySelector: () => ({ focus }) },
     });
@@ -179,7 +194,7 @@ describe("ExportConfirmationDialog", () => {
     expect(focus).toHaveBeenCalledOnce();
 
     const preventClose = vi.fn();
-    (content.props.onCloseAutoFocus as (event: unknown) => void)({ preventDefault: preventClose });
+    content.props.onCloseAutoFocus?.({ preventDefault: preventClose });
     expect(preventClose).toHaveBeenCalledOnce();
     expect(onRestoreFocus).toHaveBeenCalledOnce();
     expect(content.props.className).toContain("overflow-hidden");

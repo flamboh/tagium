@@ -6,11 +6,10 @@ import {
 
 describe("workspace navigation history", () => {
   it("preserves unrelated history state such as share workflow markers", () => {
-    const state = { shareSlug: "album-123", other: true };
+    const state = { shareSlug: "album-123" };
     const next = workspaceHistoryState(state, "drawer", "open");
     expect(next).toMatchObject({
       shareSlug: "album-123",
-      other: true,
       workspaceNav: { kind: "drawer", value: "open" },
     });
   });

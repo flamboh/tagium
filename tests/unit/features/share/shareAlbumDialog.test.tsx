@@ -1,48 +1,59 @@
-import { createElement, useEffect } from "react";
+import {
+  createElement,
+  Children,
+  isValidElement,
+  useEffect,
+  type ButtonHTMLAttributes,
+  type HTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+} from "react";
+import { Schema } from "effect";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import ShareAlbumDialog from "@/features/share/ShareAlbumDialog";
 
-const lifecycle = vi.hoisted(() => ({
-  mounts: 0,
-  unmounts: 0,
-  rootMounts: 0,
-  rootUnmounts: 0,
-  dialogOpens: [] as boolean[],
-  contentKeys: [] as string[],
-  footerStructures: [] as number[],
-}));
+const lifecycle = vi.hoisted(() => {
+  const dialogOpens: boolean[] = [];
+  const contentKeys: string[] = [];
+  const footerStructures: number[] = [];
+  return {
+    mounts: 0,
+    unmounts: 0,
+    rootMounts: 0,
+    rootUnmounts: 0,
+    dialogOpens,
+    contentKeys,
+    footerStructures,
+  };
+});
 
 vi.mock("@/components/ui/dialog", () => {
-  const DialogPanel = ({ children, ...props }: { children?: unknown; [key: string]: unknown }) => {
+  const DialogPanel = ({ children, ...props }: HTMLAttributes<HTMLDivElement>) => {
     useEffect(() => {
       lifecycle.mounts += 1;
       return () => {
         lifecycle.unmounts += 1;
       };
     }, []);
-    return createElement("div", props, children as never);
+    return createElement("div", props, children);
   };
   const DialogContent = ({
     children,
     contentKey,
     ...props
-  }: {
-    children?: unknown;
+  }: HTMLAttributes<HTMLDivElement> & {
     contentKey?: string;
-    [key: string]: unknown;
   }) => {
     lifecycle.contentKeys.push(contentKey ?? "");
-    return createElement(DialogPanel, { ...props, key: contentKey }, children as never);
+    return createElement(DialogPanel, { ...props, key: contentKey }, children);
   };
   const Dialog = ({
     children,
     open,
     ...props
-  }: {
-    children?: unknown;
+  }: HTMLAttributes<HTMLDivElement> & {
     open?: boolean;
-    [key: string]: unknown;
   }) => {
     useEffect(() => {
       lifecycle.rootMounts += 1;
@@ -51,15 +62,16 @@ vi.mock("@/components/ui/dialog", () => {
       };
     }, []);
     lifecycle.dialogOpens.push(Boolean(open));
-    return createElement("div", props, children as never);
+    return createElement("div", props, children);
   };
-  const passthrough = ({ children, ...props }: { children?: unknown; [key: string]: unknown }) =>
-    createElement("div", props, children as never);
-  const DialogFooter = ({ children, ...props }: { children?: unknown; [key: string]: unknown }) => {
-    const fragment = children as { props?: { children?: unknown } } | undefined;
-    const nested = fragment?.props?.children;
-    lifecycle.footerStructures.push(Array.isArray(nested) ? nested.length : 1);
-    return createElement("div", props, children as never);
+  const passthrough = ({ children, ...props }: HTMLAttributes<HTMLDivElement>) =>
+    createElement("div", props, children);
+  const DialogFooter = ({ children, ...props }: HTMLAttributes<HTMLDivElement>) => {
+    const nested = isValidElement<{ children?: ReactNode }>(children)
+      ? children.props.children
+      : children;
+    lifecycle.footerStructures.push(Children.count(nested));
+    return createElement("div", props, children);
   };
   return {
     Dialog,
@@ -70,11 +82,11 @@ vi.mock("@/components/ui/dialog", () => {
   };
 });
 vi.mock("@/components/ui/button", () => ({
-  Button: ({ children, ...props }: { children?: unknown; [key: string]: unknown }) =>
-    createElement("button", props, children as never),
+  Button: ({ children, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) =>
+    createElement("button", props, children),
 }));
 vi.mock("@/components/ui/input", () => ({
-  Input: (props: Record<string, unknown>) => createElement("input", props),
+  Input: (props: InputHTMLAttributes<HTMLInputElement>) => createElement("input", props),
 }));
 
 const preview = {
@@ -122,8 +134,8 @@ const render = (status: "confirm" | "published" | "link" | "error" = "confirm") 
 
 const text = (renderer: ReactTestRenderer) =>
   renderer.root
-    .findAll((node) => typeof node.type === "string")
-    .map((node) => node.children.filter((child): child is string => typeof child === "string"))
+    .findAll((node) => Schema.is(Schema.String)(node.type))
+    .map((node) => node.children.filter(Schema.is(Schema.String)))
     .flat()
     .join(" ");
 
@@ -181,8 +193,8 @@ describe("share album dialog", () => {
     const footer = () =>
       renderer.root.findAll(
         (node) =>
-          typeof node.type === "string" &&
-          typeof node.props.className === "string" &&
+          Schema.is(Schema.String)(node.type) &&
+          Schema.is(Schema.String)(node.props.className) &&
           node.props.className.includes("border-t p-4"),
       )[0];
     const before = footer();
@@ -194,9 +206,7 @@ describe("share album dialog", () => {
     expect(after.props.className).toBe(before.props.className);
     const directChildren = (instance: typeof before) => {
       const child = instance.children[0];
-      return child && typeof child === "object" && "props" in child
-        ? child.props.children
-        : instance.children;
+      return child && !Schema.is(Schema.String)(child) ? child.props.children : instance.children;
     };
     expect(directChildren(after)).toHaveLength(directChildren(before).length);
     expect(lifecycle.footerStructures.at(-1)).toBe(lifecycle.footerStructures[0]);
@@ -307,9 +317,7 @@ describe("share album dialog", () => {
     );
     const buttonText = renderer.root
       .findAllByType("button")
-      .flatMap((button) =>
-        button.children.filter((child): child is string => typeof child === "string"),
-      );
+      .flatMap((button) => button.children.filter(Schema.is(Schema.String)));
     expect(buttonText).toEqual(expect.arrayContaining(["copy link", "stop sharing", "done"]));
   });
 
@@ -340,9 +348,7 @@ describe("share album dialog", () => {
     expect(
       renderer.root
         .findAllByType("button")
-        .flatMap((button) =>
-          button.children.filter((child): child is string => typeof child === "string"),
-        ),
+        .flatMap((button) => button.children.filter(Schema.is(Schema.String))),
     ).toEqual(expect.arrayContaining(["copy link", "done"]));
 
     const copy = renderer.root
@@ -357,8 +363,8 @@ describe("share album dialog", () => {
     const dialogContent = () =>
       renderer.root.findAll(
         (node) =>
-          typeof node.type === "string" &&
-          typeof node.props.className === "string" &&
+          Schema.is(Schema.String)(node.type) &&
+          Schema.is(Schema.String)(node.props.className) &&
           node.props.className.includes("max-h-[calc(100dvh-2rem)]"),
       )[0];
     expect(dialogContent().props.showCloseButton).toBe(true);
@@ -389,8 +395,8 @@ describe("share album dialog", () => {
     expect(cover.props.className).toContain("sm:size-32");
     const preview = renderer.root.findAll(
       (node) =>
-        typeof node.type === "string" &&
-        typeof node.props.className === "string" &&
+        Schema.is(Schema.String)(node.type) &&
+        Schema.is(Schema.String)(node.props.className) &&
         node.props.className.includes("gap-4") &&
         node.props.className.includes("px-5"),
     );
@@ -420,8 +426,8 @@ describe("share album dialog", () => {
 
     const previewRow = renderer.root.findAll(
       (node) =>
-        typeof node.type === "string" &&
-        typeof node.props.className === "string" &&
+        Schema.is(Schema.String)(node.type) &&
+        Schema.is(Schema.String)(node.props.className) &&
         node.props.className.includes("gap-4") &&
         node.props.className.includes("px-5"),
     )[0];
@@ -430,7 +436,7 @@ describe("share album dialog", () => {
     const titleText = title.find(
       (node) =>
         node.type === "span" &&
-        typeof node.props.className === "string" &&
+        Schema.is(Schema.String)(node.props.className) &&
         node.props.className.includes("truncate"),
     );
 

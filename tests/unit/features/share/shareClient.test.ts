@@ -6,8 +6,9 @@ import {
   SharedContentVersionError,
   updateShare,
 } from "@/features/share/shareClient";
+import type { Manifest } from "@/features/share/shareManifest";
 
-const manifest = {
+const manifest: Manifest = {
   version: 1,
   kind: "album",
   album: { title: "Signal", artist: "June", genre: "Electronic" },
@@ -103,7 +104,7 @@ describe("shared content client", () => {
       }),
     );
     await expect(
-      updateShare("k7m4q2", "private-secret", manifest as never, null, {
+      updateShare("k7m4q2", "private-secret", manifest, null, {
         fetch,
       }),
     ).resolves.toMatchObject({ slug: "k7m4q2" });

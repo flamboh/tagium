@@ -1,10 +1,30 @@
 import { describe, expect, it } from "vite-plus/test";
 import { buildShareAlbumPreview, buildShareTrackPreview } from "@/features/share/sharePreview";
+import type { AudioMetadata } from "@/features/library/types";
+
+const metadata = (title: string): AudioMetadata => ({
+  filename: "track.mp3",
+  title,
+  artist: "",
+  albumArtist: "",
+  album: "",
+  year: null,
+  genre: "",
+  duration: 0,
+  bitrate: 0,
+  sampleRate: 0,
+  picture: [],
+  trackNumber: null,
+  composer: "",
+  comment: "",
+  discNumber: null,
+  bpm: null,
+});
 
 const file = (id: string, filename: string, title?: string) => ({
   id,
   filename,
-  metadata: title === undefined ? undefined : ({ title } as never),
+  metadata: title === undefined ? undefined : metadata(title),
 });
 
 describe("buildShareAlbumPreview", () => {
@@ -25,7 +45,7 @@ describe("buildShareAlbumPreview", () => {
     const preview = buildShareTrackPreview({
       id: "track",
       filename: "original.mp3",
-      metadata: { title: "Original", filename: "original", picture: [] } as never,
+      metadata: { ...metadata("Original"), filename: "original" },
       pendingMetadataPatch: { title: "Edited" },
     });
 

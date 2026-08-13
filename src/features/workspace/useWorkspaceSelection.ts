@@ -39,6 +39,11 @@ type SelectionSidebarProps = Pick<
   | "onReorderAlbums"
 >;
 
+interface WorkspaceSelectionBindings {
+  removalDialogProps: DestructiveActionDialogProps;
+  sidebarProps: SelectionSidebarProps;
+}
+
 export const useWorkspaceSelection = ({
   library,
   editor,
@@ -51,10 +56,7 @@ export const useWorkspaceSelection = ({
   settings: AppSettings;
   navigation: Pick<WorkspaceNavigation, "destination" | "showEditor" | "goHome">;
   removeDownloads: (trackIds: string[]) => void;
-}): {
-  removalDialogProps: DestructiveActionDialogProps;
-  sidebarProps: SelectionSidebarProps;
-} => {
+}): WorkspaceSelectionBindings => {
   const [removalDialog, setRemovalDialog] = useState<{
     open: boolean;
     trackIds: string[];

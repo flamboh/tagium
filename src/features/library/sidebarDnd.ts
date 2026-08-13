@@ -31,6 +31,7 @@ export const emptyLooseDropCollision = ({
   droppableRects,
   pointerCoordinates,
 }: Parameters<CollisionDetection>[0]): Collision[] | null => {
+  // SAFETY: every sidebar draggable registers SidebarDragData in dnd-kit's data.current slot.
   const activeData = active.data.current as SidebarDragData | undefined;
   if (activeData?.type !== "track" || !pointerCoordinates) return null;
 
@@ -39,12 +40,14 @@ export const emptyLooseDropCollision = ({
   if (!looseContainer || !looseRect) return null;
 
   const hasLooseTracks = droppableContainers.some(({ data }) => {
+    // SAFETY: every sidebar droppable registers SidebarDropData in dnd-kit's data.current slot.
     const dropData = data.current as SidebarDropData | undefined;
     return dropData?.type === "track" && dropData.container === "loose";
   });
   if (hasLooseTracks) return null;
 
   const firstAlbumTop = droppableContainers.reduce<number | null>((top, container) => {
+    // SAFETY: every container in this sidebar context is registered with SidebarDropData.
     const data = container.data.current as SidebarDropData | undefined;
     if (data?.type !== "album") return top;
     const rect = droppableRects.get(container.id);

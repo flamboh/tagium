@@ -2,6 +2,7 @@ import filenamify from "filenamify";
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import { isValidFilenameBase } from "@/features/library/filename";
 import { replaceAudioExtension, getAudioFormat } from "@/features/audio/audioFormat";
+import { toPublicAudioError } from "@/features/audio/audioErrors";
 
 export interface DownloadZipEntry {
   path: string;
@@ -37,7 +38,7 @@ export async function createZipBlob(entries: DownloadZipEntry[]) {
   return new Promise<Blob>((resolve, reject) => {
     const chunks: Uint8Array<ArrayBuffer>[] = [];
     let settled = false;
-    const settleWithError = (error: unknown) => {
+    const settleWithError = (error: Error) => {
       if (settled) return;
       settled = true;
       archive.terminate();
@@ -45,7 +46,7 @@ export async function createZipBlob(entries: DownloadZipEntry[]) {
     };
     const archive = new Zip((error, chunk, final) => {
       if (error) {
-        settleWithError(error);
+        settleWithError(toPublicAudioError(error));
         return;
       }
       if (chunk.length > 0) chunks.push(Uint8Array.from(chunk));
@@ -77,7 +78,7 @@ export async function createZipBlob(entries: DownloadZipEntry[]) {
         }
         archive.end();
       } catch (error) {
-        settleWithError(error);
+        settleWithError(toPublicAudioError(error));
       }
     })();
   });

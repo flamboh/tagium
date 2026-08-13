@@ -117,7 +117,7 @@ export const createSatoshiFontLoader = (
       } finally {
         clearTimeout(timeout);
       }
-    })().catch((error: unknown) => {
+    })().catch((error) => {
       fontPromise = undefined;
       throw error;
     });
@@ -365,11 +365,10 @@ export const renderShareSocialCardPng = async (
   try {
     return await rasterize(artwork);
   } catch (error) {
-    if (!isArtworkDecodeError(error)) throw error;
+    if (!(error instanceof Error) || !isArtworkDecodeError(error)) throw error;
     return rasterize(undefined);
   }
 };
 
-const isArtworkDecodeError = (error: unknown) =>
-  error instanceof Error &&
+const isArtworkDecodeError = (error: Error) =>
   /art|image|png|jpeg|decode|parse|invalid|unsupported/iu.test(error.message);

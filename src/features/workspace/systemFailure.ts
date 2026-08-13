@@ -140,15 +140,15 @@ const FALLBACKS = {
   Pick<SystemFailurePresentation, "title" | "description" | "trackDescription">
 >;
 
-const errorMessage = (error: unknown) => {
-  if (error instanceof Error) return error.message;
+const errorMessage = (cause: unknown) => {
+  if (cause instanceof Error) return cause.message;
   if (
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof error.message === "string"
+    typeof cause === "object" &&
+    cause !== null &&
+    "message" in cause &&
+    typeof cause.message === "string"
   ) {
-    return error.message;
+    return cause.message;
   }
   return "";
 };
@@ -206,12 +206,12 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
 };
 
 export const getSystemFailurePresentation = (
-  error: unknown,
+  cause: unknown,
   context: SystemFailureContext,
 ): SystemFailurePresentation => {
   const known =
     context === "download" || context === "import"
-      ? knownDownloadFailureFrom(errorMessage(error))
+      ? knownDownloadFailureFrom(errorMessage(cause))
       : null;
   if (known) return known;
 
@@ -225,10 +225,10 @@ export const getSystemFailurePresentation = (
 };
 
 export const reportSystemFailure = (
-  error: unknown,
+  cause: unknown,
   context: SystemFailureContext,
 ): SystemFailurePresentation => {
-  const presentation = getSystemFailurePresentation(error, context);
+  const presentation = getSystemFailurePresentation(cause, context);
 
   if (context === "download") {
     const now = Date.now();

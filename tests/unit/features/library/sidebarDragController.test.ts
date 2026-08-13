@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import type { Active, CollisionDetection, DroppableContainer } from "@dnd-kit/core";
 import {
   resolveSidebarDragCommand,
   type SidebarDropPosition,
@@ -8,6 +9,7 @@ import {
   LOOSE_APPEND_CONTAINER_ID,
   LOOSE_CONTAINER_ID,
 } from "@/features/library/sidebarDnd";
+import type { SidebarDragData, SidebarDropData } from "@/features/library/sidebarDnd";
 
 const albums = [
   { id: "album-a", trackIds: ["a-1", "a-2"] },
@@ -36,29 +38,45 @@ const resolve = (overrides: Partial<Parameters<typeof resolveSidebarDragCommand>
 
 describe("sidebar drag controller", () => {
   it("keeps an empty loose drop target available at the first album without reserving space", () => {
-    const looseContainer = {
-      id: LOOSE_CONTAINER_ID,
-      data: { current: { type: "container", container: "loose" } },
+    const rect = { top: 100, left: 0, right: 100, bottom: 140, width: 100, height: 40 };
+    const container = (id: string, current: SidebarDropData): DroppableContainer => ({
+      id,
+      key: id,
+      data: { current },
+      disabled: false,
+      node: { current: null },
+      rect: { current: rect },
+    });
+    const looseContainer = container(LOOSE_CONTAINER_ID, {
+      type: "container",
+      container: "loose",
+    });
+    const firstAlbum = container("album:album-a", {
+      type: "album",
+      albumId: "album-a",
+    });
+    const activeData: SidebarDragData = {
+      type: "track",
+      trackId: "a-1",
+      container: "album",
+      albumId: "album-a",
     };
-    const firstAlbum = {
-      id: "album:album-a",
-      data: { current: { type: "album", albumId: "album-a" } },
+    const active: Active = {
+      id: LOOSE_CONTAINER_ID,
+      data: { current: activeData },
+      rect: { current: { initial: rect, translated: rect } },
     };
 
-    const collisionArgs = (y: number) =>
-      ({
-        active: {
-          data: {
-            current: { type: "track", trackId: "a-1", container: "album", albumId: "album-a" },
-          },
-        },
-        droppableContainers: [looseContainer, firstAlbum],
-        droppableRects: new Map([
-          [LOOSE_CONTAINER_ID, { top: 100 }],
-          ["album:album-a", { top: 100 }],
-        ]),
-        pointerCoordinates: { x: 10, y },
-      }) as never;
+    const collisionArgs = (y: number): Parameters<CollisionDetection>[0] => ({
+      active,
+      collisionRect: rect,
+      droppableContainers: [looseContainer, firstAlbum],
+      droppableRects: new Map([
+        [LOOSE_CONTAINER_ID, rect],
+        ["album:album-a", rect],
+      ]),
+      pointerCoordinates: { x: 10, y },
+    });
 
     expect(emptyLooseDropCollision(collisionArgs(112))).toEqual([{ id: LOOSE_CONTAINER_ID }]);
     expect(emptyLooseDropCollision(collisionArgs(125))).toBeNull();

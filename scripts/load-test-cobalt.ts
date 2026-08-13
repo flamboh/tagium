@@ -42,6 +42,7 @@
 import { readFileSync } from "node:fs";
 import { argv, env, exit } from "node:process";
 import { fileURLToPath } from "node:url";
+import { Schema } from "effect";
 import { assertTunnelMatchesLoadTestTarget, parseLoadTestTarget } from "./load-test-cobalt-safety";
 
 // Last-resort fallback if scripts/load-test-urls.txt is missing or unreadable.
@@ -49,12 +50,25 @@ const FALLBACK_URLS = ["https://www.youtube.com/watch?v=YE7VzlLtp-4"];
 const DEFAULT_URLS_FILE = fileURLToPath(new URL("./load-test-urls.txt", import.meta.url));
 const REQUEST_TIMEOUT_MS = 120_000;
 
-type CobaltPlan =
-  | { status: "error"; error: { code: string } }
-  | { status: "picker"; audio?: string; audioFilename?: string }
-  | { status: "redirect"; url: string; filename: string }
-  | { status: "tunnel"; url: string; filename: string }
-  | { status: "local-processing"; tunnel: string[] };
+const cobaltPlanSchema = Schema.Union([
+  Schema.Struct({ status: Schema.Literal("error"), error: Schema.Struct({ code: Schema.String }) }),
+  Schema.Struct({
+    status: Schema.Literal("picker"),
+    audio: Schema.optionalKey(Schema.String),
+    audioFilename: Schema.optionalKey(Schema.String),
+  }),
+  Schema.Struct({
+    status: Schema.Literal("redirect"),
+    url: Schema.String,
+    filename: Schema.String,
+  }),
+  Schema.Struct({ status: Schema.Literal("tunnel"), url: Schema.String, filename: Schema.String }),
+  Schema.Struct({
+    status: Schema.Literal("local-processing"),
+    tunnel: Schema.Array(Schema.String),
+  }),
+]);
+type CobaltPlan = Schema.Schema.Type<typeof cobaltPlanSchema>;
 
 interface DownloadResult {
   ok: boolean;
@@ -157,7 +171,7 @@ const parseArgs = (argv: string[]): CliOptions => {
 // Real downloads fetch every tunnel Cobalt returns concurrently (audio + cover art when
 // present) - see src/features/import/localAudioProcessor.ts's Effect.all([audio, cover]).
 // A single "download" therefore usually means 2 concurrent /tunnel requests, not 1.
-const pickTunnelUrls = (plan: CobaltPlan): string[] => {
+const pickTunnelUrls = (plan: CobaltPlan): readonly string[] => {
   switch (plan.status) {
     case "local-processing":
       return plan.tunnel;
@@ -192,16 +206,17 @@ const fetchTunnel = async (url: string) => {
 
     return { ok: true as const, bytes };
   } catch (error) {
-    return { ok: false as const, errorCode: describeError(error), bytes: 0 };
+    return {
+      ok: false as const,
+      errorCode: describeError(
+        error instanceof Error ? error : new Error("unknown stream failure"),
+      ),
+      bytes: 0,
+    };
   }
 };
 
-const describeError = (error: unknown) => {
-  if (error instanceof Error) {
-    return error.name === "TimeoutError" ? "timeout" : error.message;
-  }
-  return "unknown-error";
-};
+const describeError = (error: Error) => (error.name === "TimeoutError" ? "timeout" : error.message);
 
 const performOneDownload = async (
   target: URL,
@@ -213,13 +228,14 @@ const performOneDownload = async (
   let response: Response;
 
   try {
+    const headers = new Headers({
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    });
+    if (apiKey) headers.set("Authorization", `Api-Key ${apiKey}`);
     response = await fetch(new URL("/", target), {
       method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        ...(apiKey ? { Authorization: `Api-Key ${apiKey}` } : {}),
-      },
+      headers,
       body: JSON.stringify({
         url: sourceUrl,
         downloadMode: "audio",
@@ -235,7 +251,9 @@ const performOneDownload = async (
   } catch (error) {
     return {
       ok: false,
-      errorCode: describeError(error),
+      errorCode: describeError(
+        error instanceof Error ? error : new Error("unknown resolve failure"),
+      ),
       resolveMs: performance.now() - resolveStart,
     };
   }
@@ -248,7 +266,7 @@ const performOneDownload = async (
 
   let plan: CobaltPlan;
   try {
-    plan = (await response.json()) as CobaltPlan;
+    plan = Schema.decodeUnknownSync(cobaltPlanSchema)(await response.json());
   } catch {
     return { ok: false, errorCode: "invalid-json", resolveMs };
   }

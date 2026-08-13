@@ -55,4 +55,22 @@ describe("local sharing permission", () => {
     expect(getRevocationReceipt("old", storage)).toBeNull();
     vi.useRealTimers();
   });
+
+  it("preserves valid permissions beside malformed stored entries", () => {
+    vi.setSystemTime(new Date("2026-07-22T12:00:00Z"));
+    const storage = new MemoryStorage();
+    const receipt = {
+      slug: "k7m4q2",
+      expiresAt: "2026-10-20T12:00:00Z",
+      token: "private-revocation-secret",
+    };
+    storage.setItem(
+      "tagium.share-revocations.v1",
+      JSON.stringify([receipt, { slug: "legacy", expiresAt: null, token: 42 }]),
+    );
+
+    expect(getRevocationReceipt(receipt.slug, storage)).toEqual(receipt);
+    expect(getRevocationReceipt("legacy", storage)).toBeNull();
+    vi.useRealTimers();
+  });
 });

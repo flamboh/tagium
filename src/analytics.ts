@@ -1,3 +1,6 @@
+import { Schema } from "effect";
+import type { CaptureResult, PostHogConfig } from "posthog-js";
+
 export type AudioUploadTargetKind = "loose" | "album";
 export type ImportKind = "single" | "set";
 export type ImportOutcome = "completed" | "partial" | "failed" | "canceled";
@@ -16,7 +19,7 @@ export type ImportFailureCode =
   | "parse_failed"
   | "metadata_write_failed"
   | "unknown";
-export type MediaLinkShape = "canonical" | "short" | "mobile" | "nocookie" | "other";
+export type MediaLinkKind = "canonical" | "short" | "mobile" | "nocookie" | "other";
 export type CobaltTunnelOutcome = "ready" | "recovered" | "exhausted" | "non_retryable";
 export type CobaltTunnelElapsedBucket =
   | "under_1_second"
@@ -32,6 +35,8 @@ export type AnalyticsErrorCode =
   | "metadata_write_failed"
   | "unknown";
 
+const MEDIA_LINK_KIND_PROPERTY = "shape";
+
 export type AnalyticsEvent =
   | {
       type: "audio_upload_completed";
@@ -45,7 +50,7 @@ export type AnalyticsEvent =
       type: "media_link_processed";
       sourceUrl: string;
       mediaKind: "track" | "playlist" | "unsupported";
-      shape: MediaLinkShape;
+      linkKind: MediaLinkKind;
       normalized: boolean;
       redirected: boolean;
       outcome: "accepted" | "rejected";
@@ -111,7 +116,7 @@ export type AnalyticsEvent =
   | {
       type: "export_failed";
       exportKind: ExportKind;
-      error: unknown;
+      error: Error;
     }
   | {
       type: "settings_changed";
@@ -177,8 +182,8 @@ export interface AnalyticsConfig {
 }
 
 interface AnalyticsClient {
-  init: (key: string, options: Record<string, unknown>) => void;
-  capture: (event: string, properties?: Record<string, unknown>) => void;
+  init: (key: string, options: Partial<PostHogConfig>) => void;
+  capture: (event: string, properties?: AnalyticsProperties) => void;
 }
 
 interface AnalyticsDependencies {
@@ -225,8 +230,8 @@ export const analyticsProviderFromUrl = (sourceUrl: string): AnalyticsProvider =
   return "other";
 };
 
-const errorCodeFrom = (error: unknown): AnalyticsErrorCode => {
-  const message = error instanceof Error ? error.message : "";
+const errorCodeFrom = (error: Error): AnalyticsErrorCode => {
+  const message = error.message;
   if (message.includes("error.api.capacity_exceeded")) return "capacity";
   if (
     message.includes("error.api.rate_exceeded") ||
@@ -249,20 +254,18 @@ const errorCodeFrom = (error: unknown): AnalyticsErrorCode => {
   return "unknown";
 };
 
-type BeforeSendEvent = {
-  uuid?: string;
-  event: string;
-  properties: Record<string, unknown>;
-  timestamp?: Date;
-};
+type AnalyticsProperty = string | number | boolean | Date | null | undefined;
+interface AnalyticsProperties {
+  [key: string]: AnalyticsProperty;
+}
 
 const COMMON_CUSTOM_PROPERTIES = ["event_version", "deploy_env", "release_sha"];
-const CUSTOM_EVENT_PROPERTIES: Record<string, ReadonlySet<string>> = {
+const CUSTOM_EVENT_PROPERTIES = {
   media_link_processed: new Set([
     ...COMMON_CUSTOM_PROPERTIES,
     "provider",
     "media_kind",
-    "shape",
+    MEDIA_LINK_KIND_PROPERTY,
     "normalized",
     "redirected",
     "outcome",
@@ -375,7 +378,7 @@ const CUSTOM_EVENT_PROPERTIES: Record<string, ReadonlySet<string>> = {
     "viewer",
   ]),
   share_added: new Set([...COMMON_CUSTOM_PROPERTIES, "share_id", "share_kind", "track_count"]),
-};
+} satisfies Partial<Record<AnalyticsEvent["type"], ReadonlySet<string>>>;
 const SAFE_SDK_EVENTS = new Set(["$pageview", "$pageleave", "$autocapture"]);
 const SAFE_SDK_PROPERTIES = new Set([
   "token",
@@ -409,13 +412,16 @@ const SAFE_SDK_PROPERTIES = new Set([
 const SENSITIVE_PROPERTY_NAME =
   /(?:url|href|referrer|pathname|host|filename|artist|album|artwork|message|response|body|tunnel|text|elements)/i;
 const URL_VALUE = /https?:\/\//i;
+const isString = Schema.is(Schema.String);
+const isNumber = Schema.is(Schema.Number);
+const isBoolean = Schema.is(Schema.Boolean);
+type AnalyticsPropertyValidator = (value: AnalyticsProperty) => boolean;
 const isOneOf =
   <Value extends string>(values: readonly Value[]) =>
-  (value: unknown): value is Value =>
-    typeof value === "string" && values.includes(value as Value);
-const isBoolean = (value: unknown) => typeof value === "boolean";
-const isBoundedTunnelAttempt = (value: unknown) =>
-  typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 7;
+  (value: AnalyticsProperty): value is Value =>
+    isString(value) && values.some((candidate) => candidate === value);
+const isBoundedTunnelAttempt = (value: AnalyticsProperty) =>
+  isNumber(value) && Number.isInteger(value) && value >= 1 && value <= 7;
 const isAnalyticsProvider = isOneOf(["youtube", "soundcloud", "other"] as const);
 const isAnalyticsProviderScope = isOneOf(["youtube", "soundcloud", "other", "mixed"] as const);
 const isImportKind = isOneOf(["single", "set"] as const);
@@ -432,14 +438,14 @@ const isImportFailureCode = isOneOf([
   "metadata_write_failed",
   "unknown",
 ] as const);
-const isNonNegativeInteger = (value: unknown) =>
-  typeof value === "number" && Number.isInteger(value) && value >= 0;
-const isPositiveInteger = (value: unknown) =>
-  typeof value === "number" && Number.isInteger(value) && value > 0;
-const isNonNegativeNumber = (value: unknown) =>
-  typeof value === "number" && Number.isFinite(value) && value >= 0;
+const isNonNegativeInteger = (value: AnalyticsProperty) =>
+  isNumber(value) && Number.isInteger(value) && value >= 0;
+const isPositiveInteger = (value: AnalyticsProperty) =>
+  isNumber(value) && Number.isInteger(value) && value > 0;
+const isNonNegativeNumber = (value: AnalyticsProperty) =>
+  isNumber(value) && Number.isFinite(value) && value >= 0;
 const isMediaKind = isOneOf(["track", "playlist", "unsupported"] as const);
-const isMediaLinkShape = isOneOf(["canonical", "short", "mobile", "nocookie", "other"] as const);
+const isMediaLinkKind = isOneOf(["canonical", "short", "mobile", "nocookie", "other"] as const);
 const isMediaLinkOutcome = isOneOf(["accepted", "rejected"] as const);
 const isMediaLinkFailure = isOneOf(["invalid", "unsupported", "resolution_failed"] as const);
 const isCobaltTunnelOutcome = isOneOf([
@@ -457,14 +463,11 @@ const isCobaltTunnelElapsedBucket = isOneOf([
 const isShareKind = isOneOf(["album", "track"] as const);
 const isShareViewer = isOneOf(["creator", "recipient"] as const);
 
-const CUSTOM_PROPERTY_VALIDATORS: Record<
-  string,
-  Readonly<Record<string, (value: unknown) => boolean>>
-> = {
+const CUSTOM_PROPERTY_VALIDATORS = {
   media_link_processed: {
     provider: isAnalyticsProvider,
     media_kind: isMediaKind,
-    shape: isMediaLinkShape,
+    [MEDIA_LINK_KIND_PROPERTY]: isMediaLinkKind,
     normalized: isBoolean,
     redirected: isBoolean,
     outcome: isMediaLinkOutcome,
@@ -529,23 +532,31 @@ const CUSTOM_PROPERTY_VALIDATORS: Record<
     share_kind: isShareKind,
     track_count: isPositiveInteger,
   },
-};
+} satisfies Partial<
+  Record<AnalyticsEvent["type"], Readonly<Record<string, AnalyticsPropertyValidator>>>
+>;
 
-const redactAndValidateEvent = (event: BeforeSendEvent): BeforeSendEvent | null => {
-  const customAllowedProperties = CUSTOM_EVENT_PROPERTIES[event.event];
-  const customPropertyValidators = CUSTOM_PROPERTY_VALIDATORS[event.event];
+const redactAndValidateEvent = (event: CaptureResult): CaptureResult | null => {
+  const customAllowedProperties = Object.entries(CUSTOM_EVENT_PROPERTIES).find(
+    ([eventName]) => eventName === event.event,
+  )?.[1];
+  const customPropertyValidators = Object.entries(CUSTOM_PROPERTY_VALIDATORS).find(
+    ([eventName]) => eventName === event.event,
+  )?.[1];
   const isSdkEvent = SAFE_SDK_EVENTS.has(event.event);
   if (!customAllowedProperties && !isSdkEvent) return null;
 
-  const properties: Record<string, unknown> = {};
+  const properties: AnalyticsProperties = {};
   for (const [property, value] of Object.entries(event.properties ?? {})) {
     const isAllowedCustomProperty = customAllowedProperties?.has(property) ?? false;
     const isAllowedSdkProperty = SAFE_SDK_PROPERTIES.has(property);
     if (!isAllowedCustomProperty && !isAllowedSdkProperty) continue;
-    const customValidator = customPropertyValidators?.[property];
+    const customValidator = Object.entries(customPropertyValidators ?? {}).find(
+      ([propertyName]) => propertyName === property,
+    )?.[1];
     if (customValidator && !customValidator(value)) continue;
     if (!isAllowedCustomProperty && SENSITIVE_PROPERTY_NAME.test(property)) continue;
-    if (!isAllowedCustomProperty && typeof value === "string" && URL_VALUE.test(value)) continue;
+    if (!isAllowedCustomProperty && isString(value) && URL_VALUE.test(value)) continue;
     properties[property] = value;
   }
 
@@ -556,10 +567,10 @@ const redactAndValidateEvent = (event: BeforeSendEvent): BeforeSendEvent | null 
     const failedCount = properties.failed_count;
     const canceledCount = properties.canceled_count;
     if (
-      typeof expectedCount !== "number" ||
-      typeof completedCount !== "number" ||
-      typeof failedCount !== "number" ||
-      typeof canceledCount !== "number" ||
+      !isNumber(expectedCount) ||
+      !isNumber(completedCount) ||
+      !isNumber(failedCount) ||
+      !isNumber(canceledCount) ||
       completedCount + failedCount + canceledCount !== expectedCount
     ) {
       return null;
@@ -567,12 +578,13 @@ const redactAndValidateEvent = (event: BeforeSendEvent): BeforeSendEvent | null 
   }
 
   if (isSdkEvent) properties.app_view = "tagium";
-  return {
-    ...(event.uuid === undefined ? {} : { uuid: event.uuid }),
+  const normalizedEvent: CaptureResult = {
+    uuid: event.uuid,
     event: event.event,
     properties,
-    ...(event.timestamp === undefined ? {} : { timestamp: event.timestamp }),
   };
+  if (event.timestamp !== undefined) normalizedEvent.timestamp = event.timestamp;
+  return normalizedEvent;
 };
 
 const sizeBucket = (sizeBytes: number) => {
@@ -584,26 +596,27 @@ const sizeBucket = (sizeBytes: number) => {
 };
 
 const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
-  const commonProperties = {
+  const commonProperties: AnalyticsProperties = {
     event_version: 1,
     deploy_env: config.deployEnv,
-    ...(config.releaseSha ? { release_sha: config.releaseSha } : {}),
   };
+  if (config.releaseSha) commonProperties.release_sha = config.releaseSha;
 
   switch (event.type) {
     case "media_link_processed": {
+      const properties: AnalyticsProperties = {
+        ...commonProperties,
+        provider: analyticsProviderFromUrl(event.sourceUrl),
+        media_kind: event.mediaKind,
+        [MEDIA_LINK_KIND_PROPERTY]: event.linkKind,
+        normalized: event.normalized,
+        redirected: event.redirected,
+        outcome: event.outcome,
+      };
+      if (event.failureReason) properties.failure_reason = event.failureReason;
       return {
         name: event.type,
-        properties: {
-          ...commonProperties,
-          provider: analyticsProviderFromUrl(event.sourceUrl),
-          media_kind: event.mediaKind,
-          shape: event.shape,
-          normalized: event.normalized,
-          redirected: event.redirected,
-          outcome: event.outcome,
-          ...(event.failureReason ? { failure_reason: event.failureReason } : {}),
-        },
+        properties,
       };
     }
     case "cobalt_tunnel_readiness": {
@@ -687,27 +700,31 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
           code: event.code,
         },
       };
-    case "export_started":
+    case "export_started": {
+      const properties: AnalyticsProperties = {
+        ...commonProperties,
+        export_kind: event.exportKind,
+        track_count: event.trackCount,
+      };
+      if (event.albumCount !== undefined) properties.album_count = event.albumCount;
       return {
         name: event.type,
-        properties: {
-          ...commonProperties,
-          export_kind: event.exportKind,
-          track_count: event.trackCount,
-          ...(event.albumCount === undefined ? {} : { album_count: event.albumCount }),
-        },
+        properties,
       };
-    case "export_prepared":
+    }
+    case "export_prepared": {
+      const properties: AnalyticsProperties = {
+        ...commonProperties,
+        export_kind: event.exportKind,
+        track_count: event.trackCount,
+        size_bucket: sizeBucket(event.sizeBytes),
+      };
+      if (event.albumCount !== undefined) properties.album_count = event.albumCount;
       return {
         name: event.type,
-        properties: {
-          ...commonProperties,
-          export_kind: event.exportKind,
-          track_count: event.trackCount,
-          ...(event.albumCount === undefined ? {} : { album_count: event.albumCount }),
-          size_bucket: sizeBucket(event.sizeBytes),
-        },
+        properties,
       };
+    }
     case "export_failed":
       return {
         name: event.type,
@@ -857,7 +874,7 @@ export const createAnalytics = (
             enable_heatmaps: false,
             disable_surveys: true,
             person_profiles: "identified_only",
-            before_send: redactAndValidateEvent,
+            before_send: (event) => (event ? redactAndValidateEvent(event) : null),
           });
           client = loadedClient;
           flush();

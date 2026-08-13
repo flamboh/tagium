@@ -11,7 +11,7 @@ export type R2BucketBinding = {
     key: string,
     value: Uint8Array,
     options: { httpMetadata: { contentType: string }; customMetadata: Record<string, string> },
-  ) => Promise<unknown>;
+  ) => Promise<void>;
   get: (key: string) => Promise<{
     body: ReadableStream<Uint8Array>;
     httpMetadata?: { contentType?: string };

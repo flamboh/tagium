@@ -1,3 +1,5 @@
+import { Option, Schema } from "effect";
+
 const STORAGE_KEY = "tagium.share-revocations.v1";
 
 export interface LocalRevocationReceipt {
@@ -6,19 +8,25 @@ export interface LocalRevocationReceipt {
   token: string;
 }
 
+const localRevocationReceiptSchema = Schema.Struct({
+  slug: Schema.String,
+  expiresAt: Schema.String,
+  token: Schema.String,
+});
+const storedReceiptListSchema = Schema.Array(Schema.Unknown);
+
 const parseReceipts = (value: string | null): LocalRevocationReceipt[] => {
   if (!value) return [];
   try {
-    const input: unknown = JSON.parse(value);
-    if (!Array.isArray(input)) return [];
-    return input.filter(
-      (entry): entry is LocalRevocationReceipt =>
-        typeof entry === "object" &&
-        entry !== null &&
-        typeof entry.slug === "string" &&
-        typeof entry.expiresAt === "string" &&
-        typeof entry.token === "string",
-    );
+    const storedEntries = Schema.decodeUnknownOption(storedReceiptListSchema)(JSON.parse(value));
+    if (Option.isNone(storedEntries)) return [];
+
+    const receipts: LocalRevocationReceipt[] = [];
+    for (const entry of storedEntries.value) {
+      const receipt = Schema.decodeUnknownOption(localRevocationReceiptSchema)(entry);
+      if (Option.isSome(receipt)) receipts.push(receipt.value);
+    }
+    return receipts;
   } catch {
     return [];
   }

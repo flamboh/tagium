@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vite-plus/test";
+import type { BeforeSendFn } from "posthog-js";
 import { createAnalytics } from "@/analytics";
+
+type AnalyticsInitOptions = { before_send: BeforeSendFn };
 
 describe("analytics", () => {
   it.each([
@@ -204,14 +207,14 @@ describe("analytics", () => {
       ["https://youtube.com.evil/private-id", "other", "other"],
     ] as const;
 
-    for (const [sourceUrl, provider, shape] of linkCases) {
+    for (const [sourceUrl, provider, linkForm] of linkCases) {
       analytics.capture({
         type: "media_link_processed",
         sourceUrl,
         mediaKind: "track",
-        shape,
-        normalized: shape !== "canonical",
-        redirected: shape === "short",
+        linkKind: linkForm,
+        normalized: linkForm !== "canonical",
+        redirected: linkForm === "short",
         outcome: "accepted",
       });
       expect(capture.mock.calls.at(-1)).toEqual([
@@ -219,9 +222,9 @@ describe("analytics", () => {
         expect.objectContaining({
           provider,
           media_kind: "track",
-          shape,
-          normalized: shape !== "canonical",
-          redirected: shape === "short",
+          ["shape"]: linkForm,
+          normalized: linkForm !== "canonical",
+          redirected: linkForm === "short",
           outcome: "accepted",
         }),
       ]);
@@ -231,7 +234,7 @@ describe("analytics", () => {
       type: "media_link_processed",
       sourceUrl: "https://on.soundcloud.com/private-token",
       mediaKind: "unsupported",
-      shape: "short",
+      linkKind: "short",
       normalized: false,
       redirected: false,
       outcome: "rejected",
@@ -285,13 +288,9 @@ describe("analytics", () => {
       expect(serialized).not.toContain(sensitiveValue);
     }
 
-    const options = init.mock.calls[0]?.[1] as {
-      before_send: (event: {
-        event: string;
-        properties: Record<string, unknown>;
-      }) => { properties: Record<string, unknown> } | null;
-    };
+    const options = init.mock.calls[0]?.[1] as AnalyticsInitOptions;
     const redacted = options.before_send({
+      uuid: "capture-uuid",
       event: "cobalt_tunnel_readiness",
       properties: {
         event_version: 1,
@@ -398,20 +397,7 @@ describe("analytics", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    const options = init.mock.calls[0]?.[1] as {
-      before_send: (event: {
-        uuid?: string;
-        event: string;
-        properties: Record<string, unknown>;
-        timestamp?: Date;
-        $set?: Record<string, unknown>;
-      }) => {
-        uuid?: string;
-        event: string;
-        properties: Record<string, unknown>;
-        timestamp?: Date;
-      } | null;
-    };
+    const options = init.mock.calls[0]?.[1] as AnalyticsInitOptions;
     const timestamp = new Date("2026-07-09T00:00:00.000Z");
     const custom = options.before_send({
       uuid: "capture-uuid",
@@ -437,6 +423,7 @@ describe("analytics", () => {
       },
     });
     const pageview = options.before_send({
+      uuid: "capture-uuid",
       event: "$pageview",
       properties: {
         $browser: "Chrome",
@@ -465,6 +452,7 @@ describe("analytics", () => {
       },
     });
     expect(pageview).toEqual({
+      uuid: "capture-uuid",
       event: "$pageview",
       properties: {
         $browser: "Chrome",
@@ -473,10 +461,15 @@ describe("analytics", () => {
       },
     });
     expect(
-      options.before_send({ event: "made_up_event", properties: { private: "value" } }),
+      options.before_send({
+        uuid: "capture-uuid",
+        event: "made_up_event",
+        properties: { private: "value" },
+      }),
     ).toBeNull();
     expect(
       options.before_send({
+        uuid: "capture-uuid",
         event: "import_failure_category",
         properties: {
           provider: "soundcloud",
@@ -487,11 +480,13 @@ describe("analytics", () => {
         },
       }),
     ).toEqual({
+      uuid: "capture-uuid",
       event: "import_failure_category",
       properties: { provider: "soundcloud", import_kind: "set", track_count: 1 },
     });
     expect(
       options.before_send({
+        uuid: "capture-uuid",
         event: "share_opened",
         properties: {
           share_id: "a".repeat(43),
@@ -502,6 +497,7 @@ describe("analytics", () => {
         },
       }),
     ).toEqual({
+      uuid: "capture-uuid",
       event: "share_opened",
       properties: {
         share_id: "a".repeat(43),
@@ -512,15 +508,18 @@ describe("analytics", () => {
     });
     expect(
       options.before_send({
+        uuid: "capture-uuid",
         event: "share_opened",
         properties: { share_id: "k7m4q2", share_kind: "album", track_count: 4 },
       }),
     ).toEqual({
+      uuid: "capture-uuid",
       event: "share_opened",
       properties: { share_kind: "album", track_count: 4 },
     });
     expect(
       options.before_send({
+        uuid: "capture-uuid",
         event: "import_retry_finished",
         properties: {
           provider: "mixed",

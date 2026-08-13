@@ -10,8 +10,8 @@ import {
   type AlbumManifest,
 } from "@/features/share/shareManifest";
 
-const manifest = (): AlbumManifest =>
-  decodeManifest({
+const manifest = (): AlbumManifest => {
+  const decoded = decodeManifest({
     version: 1,
     kind: "album",
     album: {
@@ -55,7 +55,10 @@ const manifest = (): AlbumManifest =>
         },
       },
     ],
-  }) as AlbumManifest;
+  });
+  if (decoded.kind !== "album") throw new Error("expected an album manifest fixture");
+  return decoded;
+};
 
 describe("share manifests", () => {
   it("round-trips the supported v1 transport DTO without client artwork size or hash", () => {

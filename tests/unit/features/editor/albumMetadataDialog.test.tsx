@@ -1,8 +1,9 @@
-import type { ReactElement, ReactNode } from "react";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import AlbumMetadataDialog, {
   type AlbumMetadataDraft,
 } from "@/features/editor/AlbumMetadataDialog";
+import { reactChildren, reactText } from "../../../support/reactTestNodes";
 
 const reactHookMocks = vi.hoisted(() => ({
   useEffect: vi.fn(),
@@ -20,16 +21,33 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 
-type TestElement = ReactElement<Record<string, unknown> & { children?: ReactNode }>;
-
-const isElement = (node: ReactNode): node is TestElement =>
-  typeof node === "object" && node !== null && "props" in node;
-
-const childrenOf = (node: TestElement): ReactNode[] => {
-  const children = node.props.children;
-  if (children === undefined || children === null || typeof children === "boolean") return [];
-  return Array.isArray(children) ? children : [children];
+type SubmitEvent = { preventDefault: () => void };
+type TestElementProps = {
+  children?: ReactNode;
+  className?: string;
+  disabled?: boolean;
+  id?: string;
+  label?: string;
+  onBlur?: () => void;
+  onClick?: () => void;
+  onCoverUpload?: (picture: NonNullable<AlbumMetadataDraft["cover"]>) => void;
+  onOpenChange?: (open: boolean) => void;
+  onProcessingChange?: (processing: boolean) => void;
+  onSubmit?: (event: SubmitEvent) => void;
+  open?: boolean;
+  placeholder?: string;
+  required?: boolean;
+  type?: string;
+  "aria-busy"?: boolean;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
+  "aria-required"?: string;
 };
+type TestElement = ReactElement<TestElementProps>;
+
+const isElement = (node: ReactNode): node is TestElement => isValidElement<TestElementProps>(node);
+
+const childrenOf = (node: TestElement): ReactNode[] => reactChildren(node);
 
 const findElement = (
   node: ReactNode,
@@ -48,24 +66,21 @@ const findElement = (
   throw new Error("element not found");
 };
 
-const textContent = (node: ReactNode): string => {
-  if (typeof node === "string" || typeof node === "number") return String(node);
-  if (!isElement(node)) return "";
-  return childrenOf(node).map(textContent).join("");
-};
+const textContent = reactText;
 
 const createHookHarness = () => {
   const states: unknown[] = [];
   let cursor = 0;
   reactHookMocks.useEffect.mockImplementation(() => undefined);
-  reactHookMocks.useRef.mockImplementation((initial: unknown) => ({ current: initial }));
-  reactHookMocks.useState.mockImplementation((initial: unknown) => {
+  reactHookMocks.useRef.mockImplementation(<Value,>(initial: Value) => ({ current: initial }));
+  reactHookMocks.useState.mockImplementation(<Value,>(initial: Value | (() => Value)) => {
     const index = cursor++;
-    if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
+    if (!(index in states)) states[index] = initial instanceof Function ? initial() : initial;
     return [
       states[index],
-      (next: unknown) => {
-        states[index] = typeof next === "function" ? next(states[index]) : next;
+      (next: Value | ((previous: Value) => Value)) => {
+        const previous = states[index] as Value;
+        states[index] = next instanceof Function ? next(previous) : next;
       },
     ];
   });
@@ -123,7 +138,7 @@ describe("album metadata validation layout", () => {
 
     const dialog = findElement(
       tree,
-      (element) => element.props.open === true && typeof element.props.onOpenChange === "function",
+      (element) => element.props.open === true && element.props.onOpenChange !== undefined,
     );
     (dialog.props.onOpenChange as (open: boolean) => void)(false);
     tree = render();
@@ -199,10 +214,7 @@ describe("album metadata validation layout", () => {
       );
 
     let tree = render();
-    const coverArt = findElement(
-      tree,
-      (element) => typeof element.props.onProcessingChange === "function",
-    );
+    const coverArt = findElement(tree, (element) => element.props.onProcessingChange !== undefined);
     (coverArt.props.onProcessingChange as (processing: boolean) => void)(true);
 
     tree = render();
@@ -226,10 +238,7 @@ describe("album metadata validation layout", () => {
         placeholder: { title: "Album", artist: "Artist", genre: "Genre", year: "2026" },
       }),
     );
-    const coverArt = findElement(
-      tree,
-      (element) => typeof element.props.onCoverUpload === "function",
-    );
+    const coverArt = findElement(tree, (element) => element.props.onCoverUpload !== undefined);
     const cover = [{ format: "image/jpeg", data: new Uint8Array([1]) }];
 
     (coverArt.props.onCoverUpload as (picture: typeof cover) => void)(cover);
@@ -282,7 +291,7 @@ describe("album metadata validation layout", () => {
 
     const cancel = findElement(
       tree,
-      (element) => textContent(element) === "cancel" && typeof element.props.onClick === "function",
+      (element) => textContent(element) === "cancel" && element.props.onClick !== undefined,
     );
     (cancel.props.onClick as () => void)();
     expect(onClose).toHaveBeenCalledOnce();

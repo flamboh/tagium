@@ -10,6 +10,7 @@ import {
 } from "@/features/library/fileMetadataOps";
 import {
   createDirtyMetadataPatch,
+  type DirtyMetadataFields,
   getProjectableAudioMetadata,
   getNullableNumericMetadataValue,
   getNullableNumericPatchValue,
@@ -38,7 +39,7 @@ interface PendingPreview {
   value: string;
 }
 
-const hasOwn = <Key extends PropertyKey>(object: object, key: Key) =>
+const hasOwn = <Value, Key extends PropertyKey>(object: Value, key: Key) =>
   Object.prototype.hasOwnProperty.call(object, key);
 
 const getPendingMetadataPatch = (file: TagiumFile) => file.pendingMetadataPatch;
@@ -67,26 +68,27 @@ const createSubmittedMetadataPatch = (metadata: AudioMetadata): MetadataPatch =>
   comment: metadata.comment,
 });
 
-const applyMetadataPatch = (metadata: AudioMetadata, patch: MetadataPatch): AudioMetadata => ({
-  ...metadata,
-  ...(hasOwn(patch, "filename") ? { filename: patch.filename } : {}),
-  ...(hasOwn(patch, "title") ? { title: patch.title } : {}),
-  ...(hasOwn(patch, "artist") ? { artist: patch.artist } : {}),
-  ...(hasOwn(patch, "albumArtist") ? { albumArtist: patch.albumArtist } : {}),
-  ...(hasOwn(patch, "album") ? { album: patch.album } : {}),
-  ...(hasOwn(patch, "year") ? { year: getNullableNumericMetadataValue(patch.year) } : {}),
-  ...(hasOwn(patch, "genre") ? { genre: patch.genre } : {}),
-  ...(hasOwn(patch, "picture") ? { picture: patch.picture } : {}),
-  ...(hasOwn(patch, "trackNumber")
-    ? { trackNumber: getNullableNumericMetadataValue(patch.trackNumber) }
-    : {}),
-  ...(hasOwn(patch, "discNumber")
-    ? { discNumber: getNullableNumericMetadataValue(patch.discNumber) }
-    : {}),
-  ...(hasOwn(patch, "composer") ? { composer: patch.composer } : {}),
-  ...(hasOwn(patch, "bpm") ? { bpm: getNullableNumericMetadataValue(patch.bpm) } : {}),
-  ...(hasOwn(patch, "comment") ? { comment: patch.comment } : {}),
-});
+const applyMetadataPatch = (metadata: AudioMetadata, patch: MetadataPatch): AudioMetadata => {
+  const next = { ...metadata };
+  if (patch.filename !== undefined) next.filename = patch.filename;
+  if (patch.title !== undefined) next.title = patch.title;
+  if (patch.artist !== undefined) next.artist = patch.artist;
+  if (patch.albumArtist !== undefined) next.albumArtist = patch.albumArtist;
+  if (patch.album !== undefined) next.album = patch.album;
+  if (patch.year !== undefined) next.year = getNullableNumericMetadataValue(patch.year);
+  if (patch.genre !== undefined) next.genre = patch.genre;
+  if (patch.picture !== undefined) next.picture = patch.picture;
+  if (patch.trackNumber !== undefined) {
+    next.trackNumber = getNullableNumericMetadataValue(patch.trackNumber);
+  }
+  if (patch.discNumber !== undefined) {
+    next.discNumber = getNullableNumericMetadataValue(patch.discNumber);
+  }
+  if (patch.composer !== undefined) next.composer = patch.composer;
+  if (patch.bpm !== undefined) next.bpm = getNullableNumericMetadataValue(patch.bpm);
+  if (patch.comment !== undefined) next.comment = patch.comment;
+  return next;
+};
 
 const getMetadataPatchDifference = (metadata: AudioMetadata, patch?: MetadataPatch) => {
   if (!patch) return undefined;
@@ -241,7 +243,7 @@ export const useTrackEditorSession = ({
   const createCurrentMetadataPatch = useCallback(
     (
       metadata: AudioMetadata,
-      dirtyFields: Partial<Record<keyof AudioMetadata, unknown>>,
+      dirtyFields: DirtyMetadataFields,
       fileId: string | null,
       extraFields: Iterable<keyof MetadataPatch> = [],
     ) => {

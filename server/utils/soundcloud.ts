@@ -1,4 +1,8 @@
-import { logSoundCloudFailure, type SoundCloudLogContext } from "./soundcloud-observability";
+import {
+  logSoundCloudFailure,
+  type SoundCloudLogContext,
+  type SoundCloudLogDetails,
+} from "./soundcloud-observability";
 
 const cachedClient = { version: "", id: "" };
 
@@ -23,32 +27,21 @@ const fetchText = async (
   }
   const contentType = response.headers.get("content-type") ?? undefined;
   if (!response.ok) {
-    await logSoundCloudFailure(
-      stage,
-      context,
-      {
-        upstreamStatus: response.status,
-        ...(contentType ? { contentType } : {}),
-        ...(response.headers.get("retry-after")
-          ? { retryAfter: response.headers.get("retry-after") }
-          : {}),
-      },
-      startedAt,
-    );
+    const details: SoundCloudLogDetails = { upstreamStatus: response.status };
+    if (contentType) details.contentType = contentType;
+    const retryAfter = response.headers.get("retry-after");
+    if (retryAfter) details.retryAfter = retryAfter;
+    await logSoundCloudFailure(stage, context, details, startedAt);
     throw new Error(`soundcloud.${stage}.http_${response.status}`);
   }
   try {
     return await response.text();
   } catch (error) {
-    await logSoundCloudFailure(
-      stage.replace("_fetch", "_parse"),
-      context,
-      {
-        ...(contentType ? { contentType } : {}),
-        errorType: error instanceof Error ? error.name : "UnknownError",
-      },
-      startedAt,
-    );
+    const details: SoundCloudLogDetails = {
+      errorType: error instanceof Error ? error.name : "UnknownError",
+    };
+    if (contentType) details.contentType = contentType;
+    await logSoundCloudFailure(stage.replace("_fetch", "_parse"), context, details, startedAt);
     throw error;
   }
 };
@@ -73,7 +66,7 @@ export const getSoundCloudClientId = async (
   }
 
   let foundSoundCloudScript = false;
-  let lastScriptError: unknown;
+  let lastScriptError: Error | undefined;
   for (const script of html.matchAll(/<script.+src="(.+)">/g)) {
     const scriptUrl = script[1];
     if (!scriptUrl?.startsWith("https://a-v2.sndcdn.com/")) continue;
@@ -85,7 +78,7 @@ export const getSoundCloudClientId = async (
         url: scriptUrl,
       });
     } catch (error) {
-      lastScriptError = error;
+      lastScriptError = error instanceof Error ? error : new Error("unknown script fetch failure");
       continue;
     }
     const scriptClientId = scriptText.match(/,client_id:"([A-Za-z0-9]{32})",/)?.[1];

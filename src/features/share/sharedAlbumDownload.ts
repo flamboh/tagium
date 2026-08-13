@@ -25,6 +25,11 @@ const restoreSharedTrack = (
 ) => {
   const metadata = track.metadata;
   const picture = hasSharedArtwork && cover?.length ? cover : [];
+  const downloadRequest: SingleUrlDownloadPlan["pendingFiles"][number]["downloadRequest"] = {
+    sourceUrl: track.sourceUrl,
+    audioBitrate: track.audioBitrate,
+  };
+  if (metadata.year !== undefined) downloadRequest.year = metadata.year;
   return {
     ...file,
     filename: `${metadata.filename}.mp3`,
@@ -35,11 +40,7 @@ const restoreSharedTrack = (
       trackNumber: metadata.trackNumber ?? null,
       picture,
     },
-    downloadRequest: {
-      sourceUrl: track.sourceUrl,
-      audioBitrate: track.audioBitrate,
-      ...(metadata.year === undefined ? {} : { year: metadata.year }),
-    },
+    downloadRequest,
     pendingMetadataPatch: {
       ...metadata,
       picture,
@@ -75,6 +76,16 @@ export const createSharedAlbumDownloadPlan = (
       cover,
     );
   });
+  const album = {
+    ...plan.album,
+    title: manifest.album.title,
+    artist: manifest.album.artist,
+    genre: manifest.album.genre,
+    sourceManifestSlug,
+  };
+  if (manifest.album.year !== undefined) album.year = manifest.album.year;
+  if (manifest.album.sourceUrl !== undefined) album.sourceUrl = manifest.album.sourceUrl;
+  if (cover?.length) album.cover = cover;
 
   return {
     ...plan,
@@ -84,16 +95,7 @@ export const createSharedAlbumDownloadPlan = (
       title: file.metadata.title || file.filename.replace(/\.mp3$/i, ""),
       downloadRequest: file.downloadRequest,
     })),
-    album: {
-      ...plan.album,
-      title: manifest.album.title,
-      artist: manifest.album.artist,
-      genre: manifest.album.genre,
-      ...(manifest.album.year === undefined ? {} : { year: manifest.album.year }),
-      ...(manifest.album.sourceUrl === undefined ? {} : { sourceUrl: manifest.album.sourceUrl }),
-      ...(cover?.length ? { cover } : {}),
-      sourceManifestSlug,
-    },
+    album,
   };
 };
 

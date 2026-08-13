@@ -58,12 +58,12 @@ describe("download presentation", () => {
   });
 
   it("keeps canceled track rows compact without a repeated status line", () => {
-    const track = {
+    const track: TagiumFile = {
       id: "track-1",
       filename: "Summer Fling.mp3",
       status: "pending",
       downloadStatus: "canceled",
-    } as TagiumFile;
+    };
     const markup = renderToStaticMarkup(
       <SortableTrackRow
         track={track}
@@ -121,12 +121,12 @@ describe("download presentation", () => {
 
   it("shows saved feedback for three seconds after a status transition and cleans timers up", () => {
     vi.useFakeTimers();
-    const pendingTrack = {
+    const pendingTrack: TagiumFile = {
       id: "track-saved-feedback",
       filename: "Saved Track.mp3",
       status: "pending",
       downloadStatus: "ready",
-    } as TagiumFile;
+    };
     let renderer: ReactTestRenderer;
 
     act(() => {
@@ -168,12 +168,12 @@ describe("download presentation", () => {
 
   it("does not announce an initially saved track", () => {
     vi.useFakeTimers();
-    const savedTrack = {
+    const savedTrack: TagiumFile = {
       id: "already-saved-track",
       filename: "Already Saved.mp3",
       status: "saved",
       downloadStatus: "ready",
-    } as TagiumFile;
+    };
     let renderer: ReactTestRenderer;
 
     act(() => {

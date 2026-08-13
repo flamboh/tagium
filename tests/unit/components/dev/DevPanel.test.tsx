@@ -1,6 +1,7 @@
-import type { ReactElement, ReactNode } from "react";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { DevPanel } from "@/components/dev/DevPanel";
+import { reactChildren } from "../../../support/reactTestNodes";
 
 const reactHookMocks = vi.hoisted(() => ({
   useCallback: vi.fn(),
@@ -20,17 +21,20 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 
-type TestElement = ReactElement<Record<string, unknown> & { children?: ReactNode }>;
+type TestElementProps = {
+  children?: ReactNode;
+  onClick?: () => void;
+  step?: number;
+  type?: string;
+  value?: string;
+  "aria-label"?: string;
+};
+type TestElement = ReactElement<TestElementProps>;
 type EffectSetup = () => void | (() => void);
 
-const isElement = (node: ReactNode): node is TestElement =>
-  typeof node === "object" && node !== null && "props" in node;
+const isElement = (node: ReactNode): node is TestElement => isValidElement<TestElementProps>(node);
 
-const childrenOf = (node: TestElement): ReactNode[] => {
-  const children = node.props.children;
-  if (children === undefined || children === null || typeof children === "boolean") return [];
-  return Array.isArray(children) ? children : [children];
-};
+const childrenOf = (node: TestElement): ReactNode[] => reactChildren(node);
 
 const findElement = (
   node: ReactNode,
@@ -56,22 +60,23 @@ const createHookHarness = () => {
   let refCursor = 0;
   let effect: EffectSetup | undefined;
 
-  reactHookMocks.useCallback.mockImplementation((callback: unknown) => callback);
+  reactHookMocks.useCallback.mockImplementation(<Callback,>(callback: Callback) => callback);
   reactHookMocks.useEffect.mockImplementation((setup: EffectSetup) => {
     effect = setup;
   });
-  reactHookMocks.useRef.mockImplementation((initial: unknown) => {
+  reactHookMocks.useRef.mockImplementation(<Value,>(initial: Value) => {
     const index = refCursor++;
     refs[index] ??= { current: initial };
     return refs[index];
   });
-  reactHookMocks.useState.mockImplementation((initial: unknown) => {
+  reactHookMocks.useState.mockImplementation(<Value,>(initial: Value | (() => Value)) => {
     const index = stateCursor++;
-    if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
+    if (!(index in states)) states[index] = initial instanceof Function ? initial() : initial;
     return [
       states[index],
-      (next: unknown) => {
-        states[index] = typeof next === "function" ? next(states[index]) : next;
+      (next: Value | ((previous: Value) => Value)) => {
+        const previous = states[index] as Value;
+        states[index] = next instanceof Function ? next(previous) : next;
       },
     ];
   });
@@ -91,12 +96,10 @@ const createHookHarness = () => {
 
 const createDeferred = <T,>() => {
   let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+  const promise = new Promise<T>((resolvePromise) => {
     resolve = resolvePromise;
-    reject = rejectPromise;
   });
-  return { promise, resolve, reject };
+  return { promise, resolve };
 };
 
 const config = (windowMs: number) => ({
@@ -113,12 +116,11 @@ const config = (windowMs: number) => ({
   faults: {},
 });
 
-const response = (body: unknown, ok = true) =>
-  ({ ok, json: vi.fn(async () => body) }) as unknown as Response;
+const response = (body: ReturnType<typeof config> | undefined, ok = true) =>
+  Response.json(body ?? null, { status: ok ? 200 : 500 });
 
 const flushPromises = async () => {
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let index = 0; index < 8; index += 1) await Promise.resolve();
 };
 
 const refreshButton = (tree: ReactNode) =>
@@ -145,8 +147,9 @@ describe("DevPanel config loading", () => {
 
     expect(hooks.render()).toBeNull();
     const cleanup = hooks.runEffect();
-    expect(typeof cleanup).toBe("function");
-    cleanup?.();
+    expect(cleanup).toBeInstanceOf(Function);
+    if (!cleanup) throw new Error("effect cleanup was not registered");
+    cleanup();
     hooks.runEffect();
 
     const firstSignal = (fetchMock.mock.calls[0][1] as RequestInit).signal;
@@ -176,8 +179,8 @@ describe("DevPanel config loading", () => {
     await flushPromises();
     const button = refreshButton(hooks.render());
 
-    (button.props.onClick as () => void)();
-    (button.props.onClick as () => void)();
+    button.props.onClick?.();
+    button.props.onClick?.();
 
     const firstRefreshSignal = (fetchMock.mock.calls[1][1] as RequestInit).signal;
     expect(firstRefreshSignal?.aborted).toBe(true);
@@ -218,7 +221,7 @@ describe("DevPanel config loading", () => {
     hooks.runEffect();
     await flushPromises();
     const button = refreshButton(hooks.render());
-    (button.props.onClick as () => void)();
+    button.props.onClick?.();
     await flushPromises();
 
     expect(windowInput(hooks.render()).props.value).toBe("1000");

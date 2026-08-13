@@ -1,10 +1,12 @@
 import { act } from "react-test-renderer";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
+import { createLibraryState } from "@/features/library/libraryState";
 
 const mocks = vi.hoisted(() => ({
   fetchSharedContent: vi.fn(),
@@ -55,8 +57,50 @@ import {
   projectTrackShareSnapshot,
 } from "@/features/share/sharePublication";
 
+type WorkflowOptions = Parameters<typeof useShareWorkflow>[0];
+const fakeEditor = (
+  files: TagiumFile[],
+  flush: (trackIds?: string[]) => TagiumFile[] = () => files,
+): WorkflowOptions["editor"] => ({
+  commands: {
+    projectFiles: () => files,
+    flush,
+    preview: vi.fn(),
+    uploadCover: vi.fn(),
+    setCoverProcessing: vi.fn(),
+    updateTags: vi.fn(async () => undefined),
+    hydrateDownloadedTrack: vi.fn(() => Effect.void),
+  },
+  form: { subscribe: vi.fn(() => () => undefined) },
+});
+const fakeImporting = (
+  importSharedContent = mocks.importSharedContent,
+): WorkflowOptions["importing"] => ({
+  commands: {
+    upload: vi.fn(async () => undefined),
+    importUrl: vi.fn(async () => undefined),
+    retryTrack: vi.fn(),
+    cancelQueue: vi.fn(),
+    retryQueue: vi.fn(),
+    removeTracks: vi.fn(),
+    importSharedContent,
+  },
+});
+
 const slug = "k7m4q2";
 const analyticsId = "a".repeat(43);
+type ShareHistoryState = { shareSlug?: string };
+type ShareHistory = {
+  state: ShareHistoryState;
+  replaceState: (state: ShareHistoryState, title: string, path: string) => void;
+  back: ReturnType<typeof vi.fn>;
+};
+type FormTarget = {
+  name: "genre" | "year" | "trackNumber";
+  value: string;
+  type?: string;
+  valueAsNumber?: number;
+};
 const sharedManifest = {
   version: 1 as const,
   kind: "album" as const,
@@ -76,24 +120,42 @@ const sharedManifest = {
   ],
 };
 
+const fakeLibraryStore = (
+  albums: AlbumGroup[],
+  files: TagiumFile[],
+  dispatch: LibraryStore["dispatch"],
+): LibraryStore => {
+  const state = { ...createLibraryState(), albums, files };
+  return { state, getSnapshot: () => state, dispatch };
+};
+
 const workflow = (albums: Array<{ id: string; sourceManifestSlug?: string }> = []) => {
   const events: string[] = [];
-  const library = {
-    state: { albums, files: [] },
-    getSnapshot: () => ({ albums, files: [] }),
-    dispatch: vi.fn(() => events.push("select")),
-  } as unknown as LibraryStore;
-  const editor = {
-    commands: { flush: vi.fn(() => events.push("flush")), projectFiles: () => [] },
-    form: { subscribe: () => () => undefined },
-  };
-  const importing = { commands: { importSharedContent: mocks.importSharedContent } };
+  const albumGroups = albums.map(({ id, sourceManifestSlug }) => ({
+    id,
+    title: "",
+    artist: "",
+    genre: "",
+    trackIds: [],
+    sourceManifestSlug,
+  }));
+  const library = fakeLibraryStore(
+    albumGroups,
+    [],
+    vi.fn(() => events.push("select")),
+  );
+  const flush = vi.fn(() => {
+    events.push("flush");
+    return [];
+  });
+  const editor = fakeEditor([], flush);
+  const importing = fakeImporting();
   const hook = renderHook(
     () =>
       useShareWorkflow({
         library,
-        editor: editor as never,
-        importing: importing as never,
+        editor,
+        importing,
         enabled: true,
       }),
     undefined,
@@ -104,24 +166,21 @@ const workflow = (albums: Array<{ id: string; sourceManifestSlug?: string }> = [
 const creatorWorkflow = (album: AlbumGroup, file: TagiumFile) => {
   const albums = [album];
   const files = [file];
-  const library = {
-    state: { albums, files },
-    getSnapshot: () => ({ albums, files }),
-    dispatch: vi.fn((action: { type: string; albumId?: string; publication?: unknown }) => {
+  const library = fakeLibraryStore(
+    albums,
+    files,
+    vi.fn((action) => {
       if (action.type === "album-share-publication-set" && action.albumId === album.id) {
-        album.sharePublication = action.publication as AlbumGroup["sharePublication"];
+        album.sharePublication = action.publication;
       }
     }),
-  } as unknown as LibraryStore;
+  );
   const hook = renderHook(
     () =>
       useShareWorkflow({
         library,
-        editor: {
-          commands: { flush: vi.fn(), projectFiles: () => files },
-          form: { subscribe: () => () => undefined },
-        } as never,
-        importing: { commands: { importSharedContent: vi.fn() } } as never,
+        editor: fakeEditor(files),
+        importing: fakeImporting(vi.fn()),
         enabled: true,
       }),
     undefined,
@@ -131,24 +190,21 @@ const creatorWorkflow = (album: AlbumGroup, file: TagiumFile) => {
 
 const trackCreatorWorkflow = (file: TagiumFile, albums: AlbumGroup[] = [], flush = vi.fn()) => {
   const files = [file];
-  const library = {
-    state: { albums, files },
-    getSnapshot: () => ({ albums, files }),
-    dispatch: vi.fn((action: { type: string; fileId?: string; publication?: unknown }) => {
+  const library = fakeLibraryStore(
+    albums,
+    files,
+    vi.fn((action) => {
       if (action.type === "track-share-publication-set" && action.fileId === file.id) {
-        file.sharePublication = action.publication as TagiumFile["sharePublication"];
+        file.sharePublication = action.publication;
       }
     }),
-  } as unknown as LibraryStore;
+  );
   const hook = renderHook(
     () =>
       useShareWorkflow({
         library,
-        editor: {
-          commands: { flush, projectFiles: () => files },
-          form: { subscribe: () => () => undefined },
-        } as never,
-        importing: { commands: { importSharedContent: vi.fn() } } as never,
+        editor: fakeEditor(files, flush),
+        importing: fakeImporting(vi.fn()),
         enabled: true,
       }),
     undefined,
@@ -196,13 +252,9 @@ const creatorAlbum = (sharePublication?: AlbumGroup["sharePublication"]): AlbumG
 
 beforeEach(() => {
   const location = { pathname: "/", origin: "https://tagium.app" };
-  const fakeHistory: {
-    state: unknown;
-    replaceState: (state: unknown, title: string, path: string) => void;
-    back: ReturnType<typeof vi.fn>;
-  } = {
+  const fakeHistory: ShareHistory = {
     state: {},
-    replaceState: (state: unknown, _title: string, path: string) => {
+    replaceState: (state: ShareHistoryState, _title: string, path: string) => {
       fakeHistory.state = state;
       location.pathname = path;
     },
@@ -361,7 +413,7 @@ describe("share workflow pasted links", () => {
         },
       },
     };
-    const artworkFile = { name: "fresh.png", type: "image/png" } as File;
+    const artworkFile = new File(["artwork"], "fresh.png", { type: "image/png" });
     const convertedPicture = [
       {
         format: "image/jpeg",
@@ -402,20 +454,13 @@ describe("share workflow pasted links", () => {
   });
 
   it("rejects pasted links safely when sharing is disabled", async () => {
-    const library = {
-      state: { albums: [], files: [] },
-      getSnapshot: () => ({ albums: [], files: [] }),
-      dispatch: vi.fn(),
-    } as unknown as LibraryStore;
+    const library = fakeLibraryStore([], [], vi.fn());
     const hook = renderHook(
       () =>
         useShareWorkflow({
           library,
-          editor: {
-            commands: { flush: vi.fn(), projectFiles: () => [] },
-            form: { subscribe: () => () => undefined },
-          } as never,
-          importing: { commands: { importSharedContent: vi.fn() } } as never,
+          editor: fakeEditor([]),
+          importing: fakeImporting(vi.fn()),
           enabled: false,
         }),
       undefined,
@@ -630,7 +675,7 @@ describe("share workflow publication lifecycle", () => {
       const sharing = useShareWorkflow({
         library,
         editor,
-        importing: { commands: { importSharedContent: vi.fn() } } as never,
+        importing: fakeImporting(vi.fn()),
         enabled: true,
       });
       return { editor, library, sharing };
@@ -651,11 +696,14 @@ describe("share workflow publication lifecycle", () => {
       field,
       field === "genre" ? {} : { valueAsNumber: true },
     );
-    const target = {
+    const target: FormTarget = {
       name: field,
       value,
-      ...(field === "genre" ? {} : { type: "number", valueAsNumber: Number(value) }),
     };
+    if (field !== "genre") {
+      target.type = "number";
+      target.valueAsNumber = Number(value);
+    }
     act(() => {
       if (field !== "genre") {
         registration.ref(target as HTMLInputElement);

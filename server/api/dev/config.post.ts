@@ -19,6 +19,7 @@ type CloudflareRequest = Request & {
 
 const getRuntimeEnv = (request: Request): CobaltRuntimeEnv => ({
   ...processEnv,
+  // SAFETY: Nitro's Cloudflare adapter supplies this request shape in the dev runtime.
   ...(request as CloudflareRequest).runtime?.cloudflare?.env,
 });
 

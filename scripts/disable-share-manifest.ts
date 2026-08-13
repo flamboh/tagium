@@ -1,10 +1,23 @@
 import { spawnSync } from "node:child_process";
 import { argv, env, exit } from "node:process";
+import { Schema } from "effect";
 import { SHARE_SLUG_PATTERN } from "../server/utils/share-manifest";
 import { disableShareThenDeleteArtwork } from "../server/utils/share-manifest-maintenance";
 import { getShareDeploymentResources } from "./share-deployment-bindings";
 
 const [slug] = argv.slice(2);
+const lookupResponseSchema = Schema.Array(
+  Schema.Struct({
+    results: Schema.optionalKey(
+      Schema.Array(
+        Schema.Struct({
+          slug: Schema.optionalKey(Schema.String),
+          artwork_key: Schema.optionalKey(Schema.NullOr(Schema.String)),
+        }),
+      ),
+    ),
+  }),
+);
 const deployment = env.TAGIUM_DEPLOY_ENV;
 if (
   (deployment !== "preview" && deployment !== "production") ||
@@ -41,9 +54,7 @@ if (lookup.status !== 0) exit(lookup.status ?? 1);
 let artworkKey: string | undefined;
 let found = false;
 try {
-  const payload = JSON.parse(lookup.stdout) as Array<{
-    results?: Array<{ slug?: string; artwork_key?: string | null }>;
-  }>;
+  const payload = Schema.decodeUnknownSync(lookupResponseSchema)(JSON.parse(lookup.stdout));
   const record = payload.flatMap((entry) => entry.results ?? [])[0];
   found = record?.slug === slug;
   artworkKey = record?.artwork_key ?? undefined;

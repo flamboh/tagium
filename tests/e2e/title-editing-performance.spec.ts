@@ -4,6 +4,12 @@ import { materializeFixture } from "./support/audioFixtures";
 
 const sampleText = "abcdefghijklmnopqrstuvwx";
 
+declare global {
+  interface Window {
+    __tagiumInputProcessing?: Array<{ id: string; processingMs: number }>;
+  }
+}
+
 const enableAdvancedMetadata = async (page: Page) => {
   await page.getByRole("button", { name: "settings" }).click();
   await page.getByRole("button", { name: "editing", exact: true }).click();
@@ -28,10 +34,8 @@ const typeMeasuredText = async (page: Page, input: Locator) => {
   await input.focus();
   const inputId = await input.getAttribute("id");
   await page.evaluate((id) => {
-    const entries = Reflect.get(window, "__tagiumInputProcessing") as {
-      id: string;
-      processingMs: number;
-    }[];
+    const entries = window.__tagiumInputProcessing;
+    if (!entries) throw new Error("input processing measurement was not installed");
     for (let index = entries.length - 1; index >= 0; index--) {
       if (entries[index]?.id === id) entries.splice(index, 1);
     }
@@ -51,9 +55,7 @@ const typeMeasuredText = async (page: Page, input: Locator) => {
 const readP95ProcessingTime = async (page: Page, targetId: string) =>
   page.evaluate(
     ({ id, sampleCount }) => {
-      const entries = Reflect.get(window, "__tagiumInputProcessing") as
-        | { id: string; processingMs: number }[]
-        | undefined;
+      const entries = window.__tagiumInputProcessing;
       if (!entries) throw new Error("input processing measurement was not installed");
 
       const samples = entries.filter((entry) => entry.id === id).map((entry) => entry.processingMs);
@@ -74,7 +76,7 @@ test("keeps track title editing responsive in a large album", async ({ page, bro
   await page.evaluate(() => {
     const startedAt = new WeakMap<Event, number>();
     const entries: { id: string; processingMs: number }[] = [];
-    Reflect.set(window, "__tagiumInputProcessing", entries);
+    window.__tagiumInputProcessing = entries;
     document.addEventListener(
       "input",
       (event) => {

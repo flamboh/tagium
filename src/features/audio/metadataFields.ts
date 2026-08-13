@@ -51,8 +51,8 @@ export const getAdvancedMetadataValidationErrors = (
 ) => {
   const discNumber = validateAdvancedMetadataNumber("discNumber", metadata.discNumber);
   const bpm = validateAdvancedMetadataNumber("bpm", metadata.bpm);
-  return {
-    ...(discNumber ? { discNumber } : {}),
-    ...(bpm ? { bpm } : {}),
-  };
+  const errors: Partial<Record<AdvancedNumericMetadataField, string>> = {};
+  if (discNumber) errors.discNumber = discNumber;
+  if (bpm) errors.bpm = bpm;
+  return errors;
 };

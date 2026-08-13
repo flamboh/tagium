@@ -142,18 +142,25 @@ export const withMetadataLinkEnabled = (
 
 export const getMetadataLinkState = (
   settings: Pick<AppSettings, "metadataLinks" | "syncTrackNumbers" | "syncFilenames">,
-): MetadataLinkState =>
-  Object.fromEntries(
-    METADATA_LINK_DESCRIPTORS.map((descriptor) => [
-      descriptor.id,
-      isMetadataLinkEnabled(settings, descriptor),
-    ]),
-  ) as MetadataLinkState;
+) =>
+  ({
+    artist: isMetadataLinkEnabled(settings, descriptorById.artist),
+    year: isMetadataLinkEnabled(settings, descriptorById.year),
+    genre: isMetadataLinkEnabled(settings, descriptorById.genre),
+    artwork: isMetadataLinkEnabled(settings, descriptorById.artwork),
+    trackNumber: isMetadataLinkEnabled(settings, descriptorById.trackNumber),
+    filename: isMetadataLinkEnabled(settings, descriptorById.filename),
+    singleAlbum: isMetadataLinkEnabled(settings, descriptorById.singleAlbum),
+    albumArtist: isMetadataLinkEnabled(settings, descriptorById.albumArtist),
+  }) satisfies MetadataLinkState;
 
-export const serializeMetadataLinkAnalytics = (state: MetadataLinkState) =>
-  Object.fromEntries(
-    METADATA_LINK_DESCRIPTORS.map((descriptor) => [
-      descriptor.analyticsProperty,
-      state[descriptor.id],
-    ]),
-  ) as Record<(typeof METADATA_LINK_DESCRIPTORS)[number]["analyticsProperty"], boolean>;
+export const serializeMetadataLinkAnalytics = (state: MetadataLinkState) => ({
+  link_artist: state.artist,
+  link_year: state.year,
+  link_genre: state.genre,
+  link_artwork: state.artwork,
+  sync_track_numbers: state.trackNumber,
+  sync_filenames: state.filename,
+  link_single_album: state.singleAlbum,
+  link_album_artist: state.albumArtist,
+});

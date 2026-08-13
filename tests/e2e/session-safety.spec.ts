@@ -20,9 +20,8 @@ test("allows unloading an empty session", async ({ page }) => {
 
   const unloadWasPrevented = await page.evaluate(() => {
     const event = new Event("beforeunload", { cancelable: true });
-    const browserGlobal = globalThis as unknown as EventTarget;
     return {
-      dispatchResult: browserGlobal.dispatchEvent(event),
+      dispatchResult: window.dispatchEvent(event),
       defaultPrevented: event.defaultPrevented,
     };
   });

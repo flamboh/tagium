@@ -28,15 +28,14 @@ const keyboardEvent = (
     target?: Pick<HTMLElement, "tagName" | "isContentEditable">;
   } = {},
 ) => {
-  const preventDefault = vi.fn();
-  const event = {
-    key,
-    ctrlKey: false,
-    metaKey: false,
-    target: null,
-    preventDefault,
-    ...options,
-  } as unknown as KeyboardEvent;
+  const event = new Event("keydown", { cancelable: true }) as KeyboardEvent;
+  Object.defineProperties(event, {
+    key: { value: key },
+    ctrlKey: { value: options.ctrlKey ?? false },
+    metaKey: { value: options.metaKey ?? false },
+    target: { value: options.target ?? null },
+  });
+  const preventDefault = vi.spyOn(event, "preventDefault");
   preventDefaultMocks.set(event, preventDefault);
   return event;
 };

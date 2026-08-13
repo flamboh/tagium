@@ -12,11 +12,12 @@ const exportMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/analytics", () => ({ analytics: { capture: exportMocks.capture } }));
-vi.mock("@/features/workspace/systemFailure", () => ({
+vi.mock("@/features/workspace/systemFailure", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/workspace/systemFailure")>()),
   reportSystemFailure: exportMocks.reportFailure,
 }));
 vi.mock("@/features/export/downloadLibrary", () => {
-  const ready = (file: TagiumFile) =>
+  const ready = (file: TagiumFile): file is TagiumFile & { file: File; metadata: AudioMetadata } =>
     Boolean(file.file && file.metadata && file.metadata.filename.trim());
   return {
     allTracksReadyForDownload: (files: TagiumFile[]) => files.every(ready),
@@ -25,7 +26,7 @@ vi.mock("@/features/export/downloadLibrary", () => {
     downloadBlob: exportMocks.downloadBlob,
     getAlbumCoverDownload: () => null,
     getLibraryDownloadEntries: ({ files }: { files: TagiumFile[] }) =>
-      files.filter(ready).map((file) => ({ path: file.filename, file: file.file as File })),
+      files.filter(ready).map((file) => ({ path: file.filename, file: file.file })),
     isTrackReadyForDownload: ready,
   };
 });
@@ -128,15 +129,20 @@ describe("export session", () => {
   });
 
   it("restores the initiating control or a safe fallback", () => {
-    const trigger: {
+    type FocusTrigger = {
       focus: ReturnType<typeof vi.fn>;
       isConnected: boolean;
       checkVisibility?: () => boolean;
-    } = { focus: vi.fn(), isConnected: true };
+    };
+    const trigger: FocusTrigger = { focus: vi.fn(), isConnected: true };
     const fallback = {
       focus: vi.fn(),
       checkVisibility: () => true,
     };
+    class TestHTMLElement {}
+    Object.setPrototypeOf(trigger, TestHTMLElement.prototype);
+    Object.setPrototypeOf(fallback, TestHTMLElement.prototype);
+    vi.stubGlobal("HTMLElement", TestHTMLElement);
     vi.stubGlobal("document", {
       activeElement: trigger,
       querySelectorAll: vi.fn(() => [fallback]),

@@ -5,22 +5,34 @@ export type WorkspaceNavigationState = {
   [key: string]: unknown;
 };
 
-export const isWorkspaceNavigationState = (state: unknown): state is WorkspaceNavigationState => {
-  if (!state || typeof state !== "object") return false;
-  const nav = (state as WorkspaceNavigationState).workspaceNav;
-  return Boolean(
-    nav &&
-    (nav.kind === "drawer" || nav.kind === "view") &&
-    (nav.value === "open" || nav.value === "editor" || nav.value === "settings"),
+type WorkspaceNavigation = NonNullable<WorkspaceNavigationState["workspaceNav"]>;
+
+const isObjectState = (state: unknown): state is object =>
+  typeof state === "object" && state !== null;
+
+const isWorkspaceNavigation = (navigation: unknown): navigation is WorkspaceNavigation => {
+  if (navigation === null || (typeof navigation !== "object" && typeof navigation !== "function")) {
+    return false;
+  }
+  return (
+    "kind" in navigation &&
+    "value" in navigation &&
+    (navigation.kind === "drawer" || navigation.kind === "view") &&
+    (navigation.value === "open" ||
+      navigation.value === "editor" ||
+      navigation.value === "settings")
   );
 };
+
+export const isWorkspaceNavigationState = (state: unknown): state is WorkspaceNavigationState =>
+  isObjectState(state) && "workspaceNav" in state && isWorkspaceNavigation(state.workspaceNav);
 
 export const workspaceHistoryState = (
   state: unknown,
   kind: "drawer" | "view",
   value: "open" | "editor" | "settings",
 ): WorkspaceNavigationState => ({
-  ...(state && typeof state === "object" ? state : {}),
+  ...(isObjectState(state) ? state : {}),
   workspaceNav: { kind, value },
 });
 
@@ -50,9 +62,9 @@ export const useMobileWorkspaceNavigation = ({
   useEffect(() => {
     mobileRef.current = isMobile;
     if (!isMobile && drawerOpen) {
-      const state = (
-        history.state && typeof history.state === "object" ? { ...history.state } : {}
-      ) as WorkspaceNavigationState;
+      const state: WorkspaceNavigationState = isObjectState(history.state)
+        ? { ...history.state }
+        : {};
       delete state.workspaceNav;
       history.replaceState(state, "", location.href);
       currentWorkspaceNavRef.current = undefined;
@@ -74,7 +86,7 @@ export const useMobileWorkspaceNavigation = ({
       else if (
         !nav &&
         previousNav?.kind === "view" &&
-        !(event.state && typeof event.state === "object" && "shareSlug" in event.state)
+        !(isObjectState(event.state) && "shareSlug" in event.state)
       ) {
         setActiveView("editor");
       }

@@ -1,4 +1,3 @@
-import type { AudioMetadata } from "@/features/audio/metadata";
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 
 export interface SharePreviewTrack {
@@ -20,8 +19,6 @@ export interface SharePreview {
   cover: SharePreviewCover | null;
 }
 
-type Picture = AudioMetadata["picture"][number];
-
 /** Build the small, display-only snapshot retained by the sharing dialog. */
 export const buildShareAlbumPreview = (
   album: Pick<AlbumGroup, "title" | "trackIds" | "cover">,
@@ -36,7 +33,7 @@ export const buildShareAlbumPreview = (
     return { key: `${trackId}:${occurrence}`, title };
   });
 
-  const first = album.cover?.[0] as Picture | undefined;
+  const first = album.cover?.[0];
   const cover = first?.data?.byteLength
     ? {
         format: first.format,
@@ -62,7 +59,7 @@ export const buildShareTrackPreview = (
 ): SharePreview => {
   const metadata = file.metadata ? { ...file.metadata, ...file.pendingMetadataPatch } : undefined;
   const title = metadata?.title?.trim() || metadata?.filename?.trim() || file.filename;
-  const first = metadata?.picture?.[0] as Picture | undefined;
+  const first = metadata?.picture?.[0];
   const cover = first?.data?.byteLength
     ? {
         format: first.format,

@@ -1,4 +1,5 @@
 import { defineHandler } from "nitro";
+import { Schema } from "effect";
 import {
   isShareManifestValidationError,
   parseShareArtwork,
@@ -53,18 +54,20 @@ export default defineHandler(async (event) => {
       manifests.length !== 1 ||
       covers.length > 1 ||
       removals.length > 1 ||
-      typeof manifests[0] !== "string" ||
+      !Schema.is(Schema.String)(manifests[0]) ||
       (covers[0] !== undefined && !(covers[0] instanceof File)) ||
       (removals[0] !== undefined && removals[0] !== "true") ||
       (covers.length > 0 && removals.length > 0)
     )
       return badRequest();
-    const artworkUpdate: ShareArtworkUpdate =
-      removals.length > 0
-        ? { kind: "remove" }
-        : covers[0] instanceof File
-          ? { kind: "replace", artwork: (await parseShareArtwork(covers[0]))! }
-          : { kind: "retain" };
+    let artworkUpdate: ShareArtworkUpdate = { kind: "retain" };
+    if (removals.length > 0) {
+      artworkUpdate = { kind: "remove" };
+    } else if (covers[0] instanceof File) {
+      const artwork = await parseShareArtwork(covers[0]);
+      if (!artwork) return badRequest();
+      artworkUpdate = { kind: "replace", artwork };
+    }
     const result = await store.update(
       event.context.params?.slug ?? "",
       token,
@@ -82,10 +85,11 @@ export default defineHandler(async (event) => {
     );
   } catch (error) {
     if (
-      isShareManifestValidationError(error) ||
-      error instanceof SyntaxError ||
-      error instanceof TypeError ||
-      (error instanceof Error && /^share_request_too_large|manifest payload/.test(error.message))
+      error instanceof Error &&
+      (isShareManifestValidationError(error) ||
+        error instanceof SyntaxError ||
+        error instanceof TypeError ||
+        /^share_request_too_large|manifest payload/.test(error.message))
     )
       return badRequest();
     return infrastructureFailure();

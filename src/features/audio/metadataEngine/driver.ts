@@ -22,6 +22,7 @@ export const rejectUnsupportedMetadataChanges = (
   supported: ReadonlySet<keyof MetadataChanges>,
   format: AudioFormat["kind"],
 ) => {
+  // SAFETY: MetadataChanges owns every enumerable key in this closed application object.
   const unsupported = (Object.keys(changes) as Array<keyof MetadataChanges>).filter(
     (field) => changes[field] !== undefined && !supported.has(field),
   );

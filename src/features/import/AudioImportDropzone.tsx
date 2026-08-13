@@ -37,7 +37,7 @@ export default function AudioImportDropzone({
   };
 
   useEffect(() => {
-    if (!isDragging || typeof window === "undefined" || typeof document === "undefined") return;
+    if (!isDragging || !("window" in globalThis) || !("document" in globalThis)) return;
 
     const handleDocumentDragLeave = (event: DragEvent) => {
       if (!event.relatedTarget) resetDragState();

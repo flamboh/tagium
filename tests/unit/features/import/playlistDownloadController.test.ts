@@ -27,7 +27,7 @@ const flushEffects = async () => {
 
 const deferred = <Value>() => {
   let resolve!: (value: Value) => void;
-  let reject!: (error: unknown) => void;
+  let reject!: (error: Error) => void;
   const promise = new Promise<Value>((promiseResolve, promiseReject) => {
     resolve = promiseResolve;
     reject = promiseReject;

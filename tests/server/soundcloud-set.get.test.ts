@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { mockEvent } from "h3";
 import handler from "../../server/api/soundcloud-set.get";
 
 const makeEvent = (headers?: HeadersInit) => {
@@ -7,7 +8,7 @@ const makeEvent = (headers?: HeadersInit) => {
     { headers },
   );
 
-  return { req: request } as unknown as Parameters<typeof handler>[0];
+  return mockEvent(request);
 };
 
 describe("soundcloud set endpoint", () => {

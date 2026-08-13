@@ -1,9 +1,11 @@
 import {
   decodeManifest,
-  isShareAnalyticsId,
   MANIFEST_VERSION,
+  manifestSchema,
+  shareAnalyticsIdSchema,
   type Manifest,
 } from "@/features/share/shareManifest";
+import { Option, Schema } from "effect";
 
 const UNAVAILABLE_MESSAGE = "this share is no longer available";
 const SHARE_METADATA_TOO_LARGE_MESSAGE = "this share contains too much metadata to publish.";
@@ -46,6 +48,27 @@ const readJson = async (response: Response) => {
   }
 };
 
+const manifestVersionProbeSchema = Schema.Struct({
+  manifest: Schema.Struct({ version: Schema.Number }),
+});
+const sharedContentResponseSchema = Schema.Struct({
+  manifest: manifestSchema,
+  expiresAt: Schema.String,
+  analyticsId: shareAnalyticsIdSchema,
+});
+const createShareReceiptSchema = Schema.Struct({
+  slug: Schema.String,
+  url: Schema.String,
+  expiresAt: Schema.String,
+  revocationToken: Schema.String,
+  analyticsId: shareAnalyticsIdSchema,
+});
+const updateShareReceiptSchema = Schema.Struct({
+  slug: Schema.String,
+  url: Schema.String,
+  expiresAt: Schema.String,
+});
+
 export interface FetchedSharedContent {
   manifest: Manifest;
   expiresAt: string;
@@ -64,29 +87,15 @@ export const fetchSharedContent = async (
 
   try {
     const payload = await readJson(response);
-    if (
-      typeof payload !== "object" ||
-      payload === null ||
-      !("manifest" in payload) ||
-      !("expiresAt" in payload) ||
-      typeof payload.expiresAt !== "string" ||
-      !("analyticsId" in payload) ||
-      !isShareAnalyticsId(payload.analyticsId)
-    ) {
-      throw new SharedContentUnavailableError();
-    }
-    if (
-      typeof payload.manifest === "object" &&
-      payload.manifest !== null &&
-      "version" in payload.manifest &&
-      payload.manifest.version !== MANIFEST_VERSION
-    ) {
+    const versionProbe = Schema.decodeUnknownOption(manifestVersionProbeSchema)(payload);
+    if (Option.isSome(versionProbe) && versionProbe.value.manifest.version !== MANIFEST_VERSION) {
       throw new SharedContentVersionError();
     }
+    const decoded = Schema.decodeUnknownSync(sharedContentResponseSchema)(payload);
     return {
-      manifest: decodeManifest(payload.manifest),
-      expiresAt: payload.expiresAt,
-      analyticsId: payload.analyticsId,
+      manifest: decodeManifest(decoded.manifest),
+      expiresAt: decoded.expiresAt,
+      analyticsId: decoded.analyticsId,
     };
   } catch (error) {
     if (error instanceof SharedContentVersionError) throw error;
@@ -134,19 +143,11 @@ export const publishShare = async (
     if (response.status === 429) throw new Error("too many share requests; try again shortly");
     throw new Error("the share link could not be created");
   }
-  const receipt = await readJson(response);
-  if (
-    typeof receipt !== "object" ||
-    receipt === null ||
-    typeof receipt.slug !== "string" ||
-    typeof receipt.url !== "string" ||
-    typeof receipt.expiresAt !== "string" ||
-    typeof receipt.revocationToken !== "string" ||
-    !isShareAnalyticsId(receipt.analyticsId)
-  ) {
+  try {
+    return Schema.decodeUnknownSync(createShareReceiptSchema)(await readJson(response));
+  } catch {
     throw new Error("the share link could not be created");
   }
-  return receipt as CreatedSharePublicationReceipt;
 };
 
 export const updateShare = async (
@@ -174,17 +175,11 @@ export const updateShare = async (
     if (response.status === 429) throw new Error("too many update requests; try again shortly");
     throw new Error(`the shared ${manifest.kind} could not be updated`);
   }
-  const receipt = await readJson(response);
-  if (
-    typeof receipt !== "object" ||
-    receipt === null ||
-    typeof receipt.slug !== "string" ||
-    typeof receipt.url !== "string" ||
-    typeof receipt.expiresAt !== "string"
-  ) {
+  try {
+    return Schema.decodeUnknownSync(updateShareReceiptSchema)(await readJson(response));
+  } catch {
     throw new Error(`the shared ${manifest.kind} could not be updated`);
   }
-  return receipt as ShareUpdateReceipt;
 };
 
 export const revokeShare = async (

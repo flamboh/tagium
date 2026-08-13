@@ -102,7 +102,8 @@ export const useAudioTaggerMobileNavigation = ({
       if (event.key !== "Tab" || !drawer) return;
       const items = getItems();
       if (!items.length) return;
-      const index = items.indexOf(document.activeElement as HTMLElement);
+      const index =
+        document.activeElement instanceof HTMLElement ? items.indexOf(document.activeElement) : -1;
       const next = event.shiftKey
         ? index <= 0
           ? items.length - 1

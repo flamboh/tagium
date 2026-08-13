@@ -34,9 +34,10 @@ interface FakeMP3TagInstance {
   save: () => void;
 }
 
-const mp3tagMock = vi.hoisted(() => ({
-  instances: [] as FakeMP3TagInstance[],
-}));
+const mp3tagMock = vi.hoisted(() => {
+  const instances: FakeMP3TagInstance[] = [];
+  return { instances };
+});
 
 vi.mock("mp3tag.js", () => ({
   default: class FakeMP3Tag implements FakeMP3TagInstance {
@@ -56,6 +57,17 @@ vi.mock("mp3tag.js", () => ({
 }));
 
 type LocalAudioPlan = Extract<CobaltDownloadPlan, { status: "local-processing" }>;
+type LocalProcessingWorkerRequest = {
+  cobaltLocalProcessing: {
+    audioFile: File;
+    audio: { copy: boolean; format: string; bitrate: string };
+    output: {
+      type: string;
+      format: string;
+      metadata?: Record<string, string | undefined>;
+    };
+  };
+};
 
 const localAudioPlan = (overrides: Partial<LocalAudioPlan> = {}): LocalAudioPlan => ({
   status: "local-processing",
@@ -558,7 +570,7 @@ describe("CobaltAudio download", () => {
 
   it("processes local audio with cover art through the bounded metadata engine", async () => {
     const fetchedUrls: string[] = [];
-    const workerMessages: unknown[] = [];
+    const workerMessages: LocalProcessingWorkerRequest[] = [];
 
     vi.stubGlobal(
       "fetch",
@@ -598,7 +610,7 @@ describe("CobaltAudio download", () => {
         onmessage?: (event: MessageEvent) => void;
         onerror?: (event: ErrorEvent) => void;
 
-        postMessage(message: unknown) {
+        postMessage(message: LocalProcessingWorkerRequest) {
           workerMessages.push(message);
           queueMicrotask(() => {
             this.onmessage?.({
@@ -642,10 +654,7 @@ describe("CobaltAudio download", () => {
         },
       },
     });
-    expect(
-      (workerMessages[0] as { cobaltLocalProcessing: { audioFile: File } }).cobaltLocalProcessing
-        .audioFile,
-    ).toMatchObject({
+    expect(workerMessages[0]?.cobaltLocalProcessing.audioFile).toMatchObject({
       name: "input-0",
       type: "audio/mpeg",
     });
@@ -665,7 +674,7 @@ describe("CobaltAudio download", () => {
 
   it("returns non-mp3 local audio without fetching cover or using mp3tag", async () => {
     const fetchedUrls: string[] = [];
-    const workerMessages: unknown[] = [];
+    const workerMessages: LocalProcessingWorkerRequest[] = [];
 
     vi.stubGlobal(
       "fetch",
@@ -708,7 +717,7 @@ describe("CobaltAudio download", () => {
       class FakeWorker {
         onmessage?: (event: MessageEvent) => void;
 
-        postMessage(message: unknown) {
+        postMessage(message: LocalProcessingWorkerRequest) {
           workerMessages.push(message);
           queueMicrotask(() => {
             this.onmessage?.({

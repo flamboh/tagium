@@ -10,6 +10,7 @@ import {
   logSoundCloudCompletion,
   logSoundCloudFailure,
   type SoundCloudLogContext,
+  type SoundCloudLogDetails,
 } from "../utils/soundcloud-observability";
 import { urlStringSchema } from "../utils/schema";
 import { parseMediaLink } from "../../src/lib/media-link";
@@ -78,6 +79,17 @@ const getYear = (displayDate: string | undefined) => {
   return Number.isNaN(year) ? undefined : year;
 };
 
+const upstreamFailureDetails = (
+  response: Response,
+  contentType: string | undefined,
+): SoundCloudLogDetails => {
+  const details: SoundCloudLogDetails = { upstreamStatus: response.status };
+  if (contentType) details.contentType = contentType;
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter) details.retryAfter = retryAfter;
+  return details;
+};
+
 const resolveTrack = async (
   clientId: string,
   track: Schema.Schema.Type<typeof soundCloudTrackSchema>,
@@ -98,13 +110,7 @@ const resolveTrack = async (
       await logSoundCloudFailure(
         "track.resolve_fetch",
         context,
-        {
-          upstreamStatus: response.status,
-          ...(contentType ? { contentType } : {}),
-          ...(response.headers.get("retry-after")
-            ? { retryAfter: response.headers.get("retry-after") }
-            : {}),
-        },
+        upstreamFailureDetails(response, contentType),
         startedAt,
       );
       throw new SoundCloudTrackResolveError("track.resolve_fetch");
@@ -115,15 +121,11 @@ const resolveTrack = async (
       );
     } catch (error) {
       parseFailure = true;
-      await logSoundCloudFailure(
-        "track.resolve_parse",
-        context,
-        {
-          ...(contentType ? { contentType } : {}),
-          errorType: error instanceof Error ? error.name : "UnknownError",
-        },
-        startedAt,
-      );
+      const details: SoundCloudLogDetails = {
+        errorType: error instanceof Error ? error.name : "UnknownError",
+      };
+      if (contentType) details.contentType = contentType;
+      await logSoundCloudFailure("track.resolve_parse", context, details, startedAt);
       throw new SoundCloudTrackResolveError("track.resolve_parse", { cause: error });
     }
   } catch (error) {
@@ -238,13 +240,7 @@ export default defineHandler(async (event) => {
     await logSoundCloudFailure(
       "playlist.resolve_fetch",
       context,
-      {
-        upstreamStatus: playlistResponse.status,
-        ...(contentType ? { contentType } : {}),
-        ...(playlistResponse.headers.get("retry-after")
-          ? { retryAfter: playlistResponse.headers.get("retry-after") }
-          : {}),
-      },
+      upstreamFailureDetails(playlistResponse, contentType),
       playlistStartedAt,
     );
     throw new Error(`soundcloud.playlist.resolve_http_${playlistResponse.status}`);

@@ -119,7 +119,7 @@ const flacPayload = (bytes: Uint8Array) => {
 
 const mp4Payload = (bytes: Uint8Array) => {
   const payloads: Uint8Array[] = [];
-  for (let offset = 0; offset < bytes.length; ) {
+  for (let offset = 0; offset < bytes.length;) {
     const size = readU32be(bytes, offset) || bytes.length - offset;
     if (new TextDecoder("latin1").decode(bytes.subarray(offset + 4, offset + 8)) === "mdat") {
       payloads.push(bytes.slice(offset + 8, offset + size));

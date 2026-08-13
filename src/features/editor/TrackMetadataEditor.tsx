@@ -890,8 +890,7 @@ export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
     if (trackIsSelected || !retainedSelection) return;
 
     const reduceMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      "window" in globalThis && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     const timeoutId = globalThis.setTimeout(
       () => setRetainedSelection(null),
       reduceMotion ? 0 : 250,

@@ -2,23 +2,28 @@ import { useState } from "react";
 import { act } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 import { renderHook } from "../../support/hookTestHarness";
-import { useMobileWorkspaceNavigation } from "@/features/workspace/mobileWorkspaceNavigation";
+import {
+  useMobileWorkspaceNavigation,
+  type WorkspaceNavigationState,
+} from "@/features/workspace/mobileWorkspaceNavigation";
+
+type TestHistoryState = WorkspaceNavigationState & { shareSlug?: string };
 
 describe("mobile workspace navigation history integration", () => {
   it("queues drawer actions until the tagged pop completes", async () => {
     const events = new EventTarget();
-    let state: unknown = {};
-    const stack: unknown[] = [state];
+    let state: TestHistoryState | undefined = {};
+    const stack: TestHistoryState[] = [state];
     let backCalls = 0;
     const history = {
       get state() {
         return state;
       },
-      pushState(next: unknown) {
+      pushState(next: TestHistoryState) {
         state = next;
         stack.push(next);
       },
-      replaceState(next: unknown) {
+      replaceState(next: TestHistoryState) {
         state = next;
         stack[stack.length - 1] = next;
       },
