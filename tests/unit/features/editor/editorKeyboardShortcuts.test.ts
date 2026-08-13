@@ -41,7 +41,7 @@ const keyboardEvent = (
 };
 const preventDefaultFor = (event: KeyboardEvent) => preventDefaultMocks.get(event);
 
-class DomShapedInputTarget {
+class InheritedInputTarget {
   get tagName() {
     return "INPUT";
   }
@@ -185,7 +185,7 @@ describe("editor keyboard shortcuts", () => {
   it("ignores Delete from an input whose DOM properties live on its prototype", () => {
     const target = createKeyboardTarget();
     const currentActions = actions({ selectedFileCount: 1 });
-    const event = keyboardEvent("Delete", { target: new DomShapedInputTarget() });
+    const event = keyboardEvent("Delete", { target: new InheritedInputTarget() });
     subscribeToEditorKeyboardShortcuts(target, () => currentActions);
 
     target.dispatch(event);

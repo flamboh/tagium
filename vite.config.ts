@@ -127,6 +127,21 @@ export default defineConfig({
         },
       },
       {
+        // These I/O adapters own parsers and predicates where unknown input is the honest contract.
+        files: [
+          "server/utils/share-manifest-request.ts",
+          "src/features/import/cobaltAudio.ts",
+          "src/features/import/localAudioProcessor.ts",
+          "src/features/import/playlist.ts",
+          "src/features/import/trackMetadata.ts",
+          "src/features/share/shareManifest.ts",
+          "src/features/workspace/mobileWorkspaceNavigation.ts",
+        ],
+        rules: {
+          "anti-slop/no-unknown-parameters": "off",
+        },
+      },
+      {
         // Test fixtures often cross framework-owned types; comments on every fixture cast add noise.
         files: ["tests/**/*.{ts,tsx}"],
         rules: {
