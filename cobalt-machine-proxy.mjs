@@ -78,12 +78,10 @@ const getCobaltErrorContext = (responseHeaders, chunks, capturedBytes, responseB
     if (body?.status !== "error" || typeof body.error?.code !== "string") {
       return {};
     }
-    return {
-      errorCode: body.error.code,
-      ...(typeof body.error.context?.service === "string"
-        ? { service: body.error.context.service }
-        : {}),
-    };
+    const errorCode = body.error.code;
+    const service = body.error.context?.service;
+    if (typeof service === "string") return { errorCode, service };
+    return { errorCode };
   } catch {
     return {};
   }

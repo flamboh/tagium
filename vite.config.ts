@@ -108,24 +108,19 @@ export default defineConfig({
       "anti-slop/no-widen-then-assert": "error",
       "anti-slop/require-safety-comment-for-type-assertion": "error",
 
+      // `typeof` is valid for capability checks, SSR guards, and narrowing known unions.
+      "anti-slop/no-runtime-typeof": "off",
+
       // These opinionated rules expose existing design debt without forcing semantic rewrites.
       "anti-slop/no-conditional-empty-object-spread": "warn",
       "anti-slop/no-known-value-widening": "warn",
       "anti-slop/no-module-mocking": "warn",
       "anti-slop/no-object-parameters": "warn",
-      "anti-slop/no-runtime-typeof": "warn",
       "anti-slop/no-shape-in-symbol-names": "warn",
       "anti-slop/no-unknown-parameters": "warn",
       "anti-slop/no-unsafe-dictionary-type": "warn",
     },
     overrides: [
-      {
-        // These standalone JavaScript proxies perform their own allowlisted boundary validation.
-        files: ["cobalt-*.mjs"],
-        rules: {
-          "anti-slop/no-runtime-typeof": "off",
-        },
-      },
       {
         // These I/O adapters own parsers and predicates where unknown input is the honest contract.
         files: [

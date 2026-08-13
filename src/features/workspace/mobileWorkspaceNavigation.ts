@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-export type WorkspaceNavigationState = {
-  workspaceNav?: { kind: "drawer" | "view"; value: "open" | "editor" | "settings" };
-  [key: string]: unknown;
+type WorkspaceNavigation = {
+  kind: "drawer" | "view";
+  value: "open" | "editor" | "settings";
 };
 
-type WorkspaceNavigation = NonNullable<WorkspaceNavigationState["workspaceNav"]>;
+export type WorkspaceNavigationState = object & { workspaceNav?: WorkspaceNavigation };
 
 const isObjectState = (state: unknown): state is object =>
   typeof state === "object" && state !== null;
@@ -31,10 +31,11 @@ export const workspaceHistoryState = (
   state: unknown,
   kind: "drawer" | "view",
   value: "open" | "editor" | "settings",
-): WorkspaceNavigationState => ({
-  ...(isObjectState(state) ? state : {}),
-  workspaceNav: { kind, value },
-});
+): WorkspaceNavigationState => {
+  const nextState: WorkspaceNavigationState = isObjectState(state) ? { ...state } : {};
+  nextState.workspaceNav = { kind, value };
+  return nextState;
+};
 
 export const useMobileWorkspaceNavigation = ({
   activeView,
