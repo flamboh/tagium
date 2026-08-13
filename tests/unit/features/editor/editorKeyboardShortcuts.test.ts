@@ -41,6 +41,16 @@ const keyboardEvent = (
 };
 const preventDefaultFor = (event: KeyboardEvent) => preventDefaultMocks.get(event);
 
+class DomShapedInputTarget {
+  get tagName() {
+    return "INPUT";
+  }
+
+  get isContentEditable() {
+    return false;
+  }
+}
+
 const actions = (
   overrides: Partial<EditorKeyboardShortcutActions> = {},
 ): EditorKeyboardShortcutActions => ({
@@ -164,6 +174,18 @@ describe("editor keyboard shortcuts", () => {
     const target = createKeyboardTarget();
     const currentActions = actions({ selectedFileCount: 1 });
     const event = keyboardEvent("Delete", { target: targetElement });
+    subscribeToEditorKeyboardShortcuts(target, () => currentActions);
+
+    target.dispatch(event);
+
+    expect(preventDefaultFor(event)).not.toHaveBeenCalled();
+    expect(currentActions.requestRemoveSelectedFiles).not.toHaveBeenCalled();
+  });
+
+  it("ignores Delete from an input whose DOM properties live on its prototype", () => {
+    const target = createKeyboardTarget();
+    const currentActions = actions({ selectedFileCount: 1 });
+    const event = keyboardEvent("Delete", { target: new DomShapedInputTarget() });
     subscribeToEditorKeyboardShortcuts(target, () => currentActions);
 
     target.dispatch(event);
