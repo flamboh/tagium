@@ -30,7 +30,6 @@ const MAX_VORBIS_COMMENTS = 100_000;
 const MAX_PICTURES = 256;
 const MAX_PICTURE_BYTES = 32 * 1024 * 1024;
 const OGG_CRC_POLYNOMIAL = 0x04c1_1db7;
-const MAX_OGG_PAGE_BYTES = 27 + 255 + 255 * 255;
 const MAX_OGG_PAGE_PREFIX_BYTES = 27 + 255;
 const UINT32_MODULUS = 0x1_0000_0000;
 
@@ -374,21 +373,36 @@ const readLeadingPages = (source: ByteSource) =>
     return yield* failRead("OpusTags page count exceeds the safety limit.");
   });
 
-const findFinalPage = (source: ByteSource) =>
+const findFinalPage = (source: ByteSource, firstAudioPage: OggPage, previousPage: OggPage) =>
   Effect.gen(function* () {
-    const tailLength = Math.min(MAX_OGG_PAGE_BYTES, source.size);
-    const tailOffset = source.size - tailLength;
-    const tail = yield* source.read(tailOffset, tailLength);
-    for (let index = tail.length - 27; index >= 0; index--) {
-      if (ascii(tail, index, 4) !== "OggS") continue;
-      try {
-        const page = parseOggPagePrefix(tail.slice(index), tailOffset + index, -1, source.size);
-        if (page.offset + page.length === source.size) return page;
-      } catch {
-        // Audio packet bytes can contain a false OggS signature; keep searching backward.
+    // Pages are self-delimiting, so walking from the first audio page keeps
+    // packet bytes from being mistaken for a page header. Only the bounded
+    // page prefix is read; audio bodies are never copied or checksummed.
+    let offset = firstAudioPage.offset;
+    let index = 0;
+    let previous: StreamState | undefined = {
+      sequence: previousPage.sequence,
+      continues: pageContinues(previousPage, false),
+      ended: false,
+    };
+    let finalPage: OggPage | undefined;
+    while (offset < source.size) {
+      if (index >= MAX_OGG_PAGES) {
+        return yield* failRead("Ogg page count exceeds the safety limit.");
       }
+      const page = yield* readOggPage(source, offset, index);
+      if (page.serial !== firstAudioPage.serial) {
+        return yield* failRead("grouped or chained Ogg logical streams are not supported.");
+      }
+      previous = yield* parseReadable(
+        () => validateStreamPage(page, previous),
+        "Ogg page sequence",
+      );
+      finalPage = page;
+      offset += page.length;
+      index += 1;
     }
-    return yield* failRead("Ogg logical stream is missing its EOS page.");
+    return finalPage ?? (yield* failRead("Ogg logical stream is missing its EOS page."));
   });
 
 const parseMetadataStructure = (source: ByteSource, pages: OggPage[]) =>
@@ -461,6 +475,17 @@ const parseMetadataStructure = (source: ByteSource, pages: OggPage[]) =>
       packetOffset += part.length;
     }
     const tags = yield* parseReadable(() => parseTags(tagPacket), "OpusTags");
+    const firstAudioPage = streamPages[tagStreamEndIndex + 1]!;
+    if (
+      (firstAudioPage.headerType & 0x01) !== 0 ||
+      firstAudioPage.segments.length === 0 ||
+      firstAudioPage.segments[0] === 0
+    ) {
+      return yield* failRead("Opus stream begins with an empty audio packet.");
+    }
+    // An Opus packet always starts with a TOC byte. Reading just that byte
+    // rejects an empty laced packet without inspecting the audio payload.
+    yield* source.read(firstAudioPage.bodyOffset, 1);
     return {
       serial,
       preSkip,
@@ -470,7 +495,7 @@ const parseMetadataStructure = (source: ByteSource, pages: OggPage[]) =>
       tagStartIndex: firstTagPage.index,
       tagStreamEndIndex,
       streamPages,
-      firstAudioPage: streamPages[tagStreamEndIndex + 1]!,
+      firstAudioPage,
     } satisfies ParsedOpusMetadata;
   });
 
@@ -506,7 +531,8 @@ const inspectStructure = (source: ByteSource) =>
   Effect.gen(function* () {
     const pages = yield* readLeadingPages(source);
     const metadata = yield* parseMetadataStructure(source, pages);
-    const finalPage = yield* findFinalPage(source);
+    const previousPage = metadata.streamPages[metadata.tagStreamEndIndex]!;
+    const finalPage = yield* findFinalPage(source, metadata.firstAudioPage, previousPage);
     yield* parseReadable(
       () => validateFinalPage(finalPage, metadata.serial, metadata.preSkip),
       "Opus EOS page",

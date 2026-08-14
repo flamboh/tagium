@@ -131,6 +131,16 @@ describe("AudioMetadataIO", () => {
     ]);
   });
 
+  it("does not classify a truncated Ogg first page as unsupported codec", async () => {
+    const truncatedOgg = new Uint8Array(28);
+    truncatedOgg.set(new TextEncoder().encode("OggS"));
+    truncatedOgg[26] = 1;
+    truncatedOgg[27] = 7;
+    const [upload] = await parse([new File([truncatedOgg], "truncated.ogg")]);
+    expect(upload.file.downloadError).not.toBe("this ogg file does not use opus audio.");
+    expect(upload.file.downloadError).toContain("unsupported or corrupt audio file");
+  });
+
   it("writes ID3 metadata while preserving every original MPEG payload byte", async () => {
     const source = new File([validMp3Bytes()], "source.mp3", { type: "audio/mpeg" });
     const [parsed] = await parse([source]);

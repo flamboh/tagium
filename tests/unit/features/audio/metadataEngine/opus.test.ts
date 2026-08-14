@@ -121,6 +121,66 @@ describe("Opus metadata driver", () => {
     });
   });
 
+  it("uses the aligned EOS page when audio bytes contain an OggS-shaped suffix", async () => {
+    const embeddedPage = opusOggPage({
+      body: new Uint8Array(),
+      segments: new Uint8Array(),
+      sequence: 99,
+      headerType: 4,
+      granulePosition: 480_312n + 480_000n,
+    });
+    const bytes = validOpusBytes({ audioBodies: [embeddedPage] });
+    const inspected = await Effect.runPromise(
+      opusDriver.inspect(makeBlobByteSource(new Blob([bytes]))),
+    );
+    expect(inspected.metadata.duration).toBe(2);
+  });
+
+  it("rejects an empty first audio packet", async () => {
+    const zeroLengthLacing = validOpusBytes({ audioBodies: [new Uint8Array()] });
+    await expect(
+      Effect.runPromise(opusDriver.inspect(makeBlobByteSource(new Blob([zeroLengthLacing])))),
+    ).rejects.toMatchObject({ _tag: "AudioMetadataReadError" });
+
+    const serial = 0x5566_7788;
+    const head = opusHeadPacket();
+    const tags = opusTagsPacket(["TITLE=empty page"]);
+    const zeroSegmentPage = opusOggPage({
+      body: new Uint8Array(),
+      segments: new Uint8Array(),
+      serial,
+      sequence: 2,
+    });
+    const audioPage = opusOggPage({
+      body: Uint8Array.of(0xf8, 1, 2),
+      segments: Uint8Array.of(3),
+      serial,
+      sequence: 3,
+      headerType: 4,
+      granulePosition: 96_312n,
+    });
+    const followedByAudio = concatOpusFixtureBytes(
+      opusOggPage({
+        body: head,
+        segments: Uint8Array.of(head.length),
+        serial,
+        sequence: 0,
+        headerType: 2,
+      }),
+      opusOggPage({
+        body: tags,
+        segments: Uint8Array.of(tags.length),
+        serial,
+        sequence: 1,
+      }),
+      zeroSegmentPage,
+      audioPage,
+    );
+    await expect(
+      Effect.runPromise(opusDriver.inspect(makeBlobByteSource(new Blob([followedByAudio])))),
+    ).rejects.toMatchObject({ _tag: "AudioMetadataReadError" });
+  });
+
   it("accepts custom mappings whose decoded and output channel counts differ", async () => {
     const head = opusHeadPacket(312, {
       channels: 2,

@@ -18,11 +18,22 @@ const detectOggCodec = (bytes: Uint8Array) => {
   if (bytes.length < 27 || ascii(bytes, 0, 4) !== "OggS" || bytes[4] !== 0) return undefined;
   const segmentCount = bytes[26]!;
   const bodyOffset = 27 + segmentCount;
-  if (bodyOffset + 8 <= bytes.length && ascii(bytes, bodyOffset, 8) === "OpusHead") {
+  if (bodyOffset > bytes.length) return undefined;
+  let packetLength = 0;
+  let packetComplete = false;
+  for (let index = 0; index < segmentCount; index++) {
+    packetLength += bytes[27 + index]!;
+    if (bytes[27 + index]! < 255) {
+      packetComplete = true;
+      break;
+    }
+  }
+  if (!packetComplete || bodyOffset + packetLength > bytes.length) return undefined;
+  if (packetLength >= 8 && ascii(bytes, bodyOffset, 8) === "OpusHead") {
     return "opus" as const;
   }
   if (
-    bodyOffset + 7 <= bytes.length &&
+    packetLength >= 7 &&
     bytes[bodyOffset] === 1 &&
     ascii(bytes, bodyOffset + 1, 6) === "vorbis"
   ) {
