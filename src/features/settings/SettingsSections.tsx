@@ -130,8 +130,8 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
         </Popover>
         <p className="text-xs leading-5 text-muted-foreground">
           {settings.audioFormat === "best"
-            ? "used when a provider needs the mp3 fallback."
-            : "higher bitrates preserve more detail and make larger files."}
+            ? "used when a download falls back to mp3."
+            : "higher bitrates preserve more detail but result in larger files."}
         </p>
       </div>
       <label className={checkboxRowClassName}>
