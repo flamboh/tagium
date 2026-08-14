@@ -1,13 +1,13 @@
 # Tagium
 
-Local, lossless metadata editing for MP3, FLAC, and M4A music files.
+Local, lossless metadata editing for MP3, FLAC, and M4A audio files.
 
 [Open Tagium](https://tagium.app)
 
 ## Using it
 
 Drop audio files onto the page, or paste a YouTube or SoundCloud link to save a track,
-playlist, or set.
+playlist, or album.
 
 From there:
 
@@ -16,8 +16,7 @@ From there:
 - **Edit an album.** Album-level values can be linked so they flow down to every track in the
   album. Unlink one in settings and tracks keep their own value.
 - **Export.** Download your library as a zip, tagged and named.
-- **Share.** Publish a track or album as a link. The link carries your metadata and artwork —
-  never the audio — so whoever opens it can apply your work to their own copy of the music.
+- **Share.** Publish a track or album as a link. The link carries your metadata and artwork and the link to the original download. Whoever opens it can apply your work to their own copy of the music.
   Share links last 90 days, and you can update or stop one at any point.
 
 Your files stay in the browser. Audio is never uploaded anywhere; only your settings and
@@ -28,20 +27,14 @@ theme carry over between sessions.
 Tagium is a React single-page app powered by two things: [Cobalt](https://cobalt.tools)'s
 download API, and a custom metadata engine.
 
-Cobalt runs as our own deployment on Fly and is used strictly as a proxy — it hands back raw
-audio, and your browser does the rest. Downloads never touch a server that keeps them.
+Cobalt runs as our own deployment on Fly and is used strictly as a proxy, it hands back raw
+audio, and your browser does the rest. Downloads are never stored.
 
-The metadata engine reads and rewrites tags in the browser, one driver per format. It splices
-new tags in around the audio rather than re-encoding, so a file comes out the other side with
-the same bits it went in with. That's the lossless part.
+The metadata engine reads and rewrites tags in the browser, one driver per format. It writes
+new tags in around the audio rather than re-encoding, so tag editing is always lossless.
 
-A small server sits behind the app for the things a browser can't do on its own: reaching
-providers, and storing share links on Cloudflare. It deploys as a single Worker.
-
-Deeper notes live in [docs/](./docs) — download topology and scaling in
-[cobalt-audio-downloads.md](./docs/cobalt-audio-downloads.md), share-link storage and
-takedowns in [share-operations.md](./docs/share-operations.md). `CONTEXT.md` defines the
-vocabulary the code uses, which is worth a read before touching share or album metadata.
+Deeper notes live in [docs/](./docs) — downloading and scaling in
+[cobalt-audio-downloads.md](./docs/cobalt-audio-downloads.md), share-link storage in [share-operations.md](./docs/share-operations.md).
 
 ## Development
 
