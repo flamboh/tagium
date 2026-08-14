@@ -209,7 +209,7 @@ function ShareAlbumDialogSession({
             <div className="px-5 pb-4 text-left text-sm text-muted-foreground">
               {confirmStop ? (
                 <>
-                  {`the link will stop working immediately. anyone who already added the ${targetName} keeps their copy.`}
+                  the link will stop working immediately.
                   {stopError && (
                     <span role="alert" className="mt-1 block text-destructive">
                       {stopError}

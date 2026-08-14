@@ -227,7 +227,6 @@ describe("share album dialog", () => {
     expect(before.filter((value) => value.includes("w-full"))).toHaveLength(2);
     expect(after.filter((value) => value.includes("w-full"))).toHaveLength(2);
     expect(text(renderer)).toContain("the link will stop working immediately.");
-    expect(text(renderer)).toContain("anyone who already added the album keeps their copy.");
     expect(text(renderer)).not.toContain("cover");
   });
 
