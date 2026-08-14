@@ -122,6 +122,7 @@ export type AnalyticsEvent =
       type: "settings_changed";
       syncFilenames: boolean;
       audioBitrate: "320" | "256" | "128" | "96" | "64";
+      audioFormat: "best" | "mp3";
       applySoundCloudCover: boolean;
       advancedMetadata: boolean;
       metadataLinks: MetadataLinkState;
@@ -338,6 +339,7 @@ const CUSTOM_EVENT_PROPERTIES = {
     "sync_track_numbers",
     "sync_filenames",
     "audio_bitrate",
+    "audio_format",
     "apply_soundcloud_cover",
     "advanced_metadata",
     ...METADATA_LINK_DESCRIPTORS.map((descriptor) => descriptor.analyticsProperty),
@@ -740,6 +742,7 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
         properties: {
           ...commonProperties,
           audio_bitrate: event.audioBitrate,
+          audio_format: event.audioFormat,
           apply_soundcloud_cover: event.applySoundCloudCover,
           advanced_metadata: event.advancedMetadata,
           ...serializeMetadataLinkAnalytics(event.metadataLinks),

@@ -28,6 +28,7 @@ const restoreSharedTrack = (
   const downloadRequest: SingleUrlDownloadPlan["pendingFiles"][number]["downloadRequest"] = {
     sourceUrl: track.sourceUrl,
     audioBitrate: track.audioBitrate,
+    audioFormat: "mp3",
   };
   if (metadata.year !== undefined) downloadRequest.year = metadata.year;
   return {
@@ -64,6 +65,7 @@ export const createSharedAlbumDownloadPlan = (
   const plan = createPlaylistDownloadPlan({
     playlist: replay.playlist,
     audioBitrate: replay.tracks[0]!.audioBitrate,
+    audioFormat: "mp3",
     createId,
   });
   const pendingFiles = plan.pendingFiles.map((file, index) => {
@@ -112,6 +114,7 @@ export const createSharedTrackDownloadPlan = (
   const plan = createSingleUrlDownloadPlan({
     sourceUrl: manifest.track.sourceUrl,
     audioBitrate: manifest.track.audioBitrate,
+    audioFormat: "mp3",
     createId,
   });
   const pendingFiles = plan.pendingFiles.map((file) =>

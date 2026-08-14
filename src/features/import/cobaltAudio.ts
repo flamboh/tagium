@@ -9,10 +9,12 @@ import type { CobaltTunnelElapsedBucket, CobaltTunnelOutcome } from "@/analytics
 import { ImportStageError } from "@/features/import/importLifecycle";
 
 export type AudioDownloadBitrate = "320" | "256" | "128" | "96" | "64";
+export type AudioDownloadFormat = "best" | "mp3";
 
 interface CobaltAudioRequestBody {
   url: string;
   audioBitrate: AudioDownloadBitrate;
+  audioFormat: AudioDownloadFormat;
   year?: number;
 }
 
@@ -37,6 +39,7 @@ export type CobaltAudioDownloadLifecycleCallback = (
 export interface CobaltAudioDownloadRequest {
   sourceUrl: string;
   audioBitrate: AudioDownloadBitrate;
+  audioFormat: AudioDownloadFormat;
   importId?: string;
   trackIndex?: number;
   year?: number;
@@ -263,6 +266,7 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
         const body: CobaltAudioRequestBody = {
           url: request.sourceUrl,
           audioBitrate: request.audioBitrate,
+          audioFormat: request.audioFormat,
         };
         if (request.year !== undefined) body.year = request.year;
         const response = await fetch("/api/cobalt/audio", {

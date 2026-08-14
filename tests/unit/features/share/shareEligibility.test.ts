@@ -17,6 +17,7 @@ const importedTrack: TagiumFile = {
   downloadRequest: {
     sourceUrl: "https://soundcloud.com/artist/track",
     audioBitrate: "320" as const,
+    audioFormat: "mp3" as const,
   },
   metadata: {
     filename: "track",
@@ -72,7 +73,11 @@ describe("share eligibility", () => {
       shareEligibility(album, [
         {
           ...importedTrack,
-          downloadRequest: { sourceUrl: "https://example.com/audio", audioBitrate: "320" },
+          downloadRequest: {
+            sourceUrl: "https://example.com/audio",
+            audioBitrate: "320",
+            audioFormat: "mp3",
+          },
         },
       ]),
     ).toMatch(/cannot replay/i);

@@ -12,7 +12,11 @@ import type { AppSettings, AudioMetadata, TagiumFile } from "@/features/library/
 interface SoundCloudSetImportDeps extends SoundCloudSetDownloadWorkflowDeps {
   settings: Pick<
     AppSettings,
-    "audioBitrate" | "applySoundCloudAlbumCoverToTracks" | "metadataLinks" | "syncTrackNumbers"
+    | "audioBitrate"
+    | "audioFormat"
+    | "applySoundCloudAlbumCoverToTracks"
+    | "metadataLinks"
+    | "syncTrackNumbers"
   >;
   createId: () => string;
   fetchImportedCover: (coverUrl: string) => Promise<AudioMetadata["picture"]>;
@@ -95,6 +99,7 @@ export const startSoundCloudSetImport = (
   const plan = createSoundCloudSetDownloadPlan({
     set,
     audioBitrate: deps.settings.audioBitrate,
+    audioFormat: deps.settings.audioFormat,
     createId: deps.createId,
   });
 

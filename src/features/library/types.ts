@@ -1,4 +1,4 @@
-import type { AudioDownloadBitrate } from "@/features/import/cobaltAudio";
+import type { AudioDownloadBitrate, AudioDownloadFormat } from "@/features/import/cobaltAudio";
 import type { AudioMetadata, MetadataPatch } from "@/features/audio/metadata";
 import type { AudioFormat } from "@/features/audio/metadataEngine/types";
 
@@ -24,6 +24,7 @@ export interface TagiumFile {
   downloadRequest?: {
     sourceUrl: string;
     audioBitrate: AudioDownloadBitrate;
+    audioFormat: AudioDownloadFormat;
     importId?: string;
     trackIndex?: number;
     year?: number;
@@ -69,6 +70,7 @@ export interface AppSettings {
   syncTrackNumbers: boolean;
   syncFilenames: boolean;
   audioBitrate: AudioDownloadBitrate;
+  audioFormat: AudioDownloadFormat;
   applySoundCloudAlbumCoverToTracks: boolean;
   advancedMetadata: boolean;
   metadataLinks: MetadataLinks;

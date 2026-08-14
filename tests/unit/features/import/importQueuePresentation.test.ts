@@ -25,7 +25,11 @@ const retryableFile = (id: string): TagiumFile => ({
   filename: `${id}.mp3`,
   status: "error",
   downloadStatus: "error",
-  downloadRequest: { sourceUrl: `https://example.com/${id}`, audioBitrate: "320" },
+  downloadRequest: {
+    sourceUrl: `https://example.com/${id}`,
+    audioBitrate: "320",
+    audioFormat: "mp3",
+  },
 });
 
 describe("import queue presentation", () => {

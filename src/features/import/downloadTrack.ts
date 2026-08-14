@@ -67,6 +67,7 @@ export type DownloadTrackPlan = SingleUrlDownloadPlan | PlaylistDownloadPlan;
 export interface CreateSingleUrlDownloadPlanInput {
   sourceUrl: string;
   audioBitrate: AppSettings["audioBitrate"];
+  audioFormat: AppSettings["audioFormat"];
   createId: () => string;
   importId?: string;
   metadata?: TrackMetadata;
@@ -75,12 +76,14 @@ export interface CreateSingleUrlDownloadPlanInput {
 export interface CreateSoundCloudSetDownloadPlanInput {
   set: SoundCloudSet;
   audioBitrate: AppSettings["audioBitrate"];
+  audioFormat: AppSettings["audioFormat"];
   createId: () => string;
 }
 
 export interface CreatePlaylistDownloadPlanInput {
   playlist: Playlist;
   audioBitrate: AppSettings["audioBitrate"];
+  audioFormat: AppSettings["audioFormat"];
   createId: () => string;
   importId?: string;
 }
@@ -259,13 +262,14 @@ const createPlaylistPendingMetadataPatch = (
 export const createSingleUrlDownloadPlan = ({
   sourceUrl,
   audioBitrate,
+  audioFormat,
   createId,
   importId,
   metadata,
 }: CreateSingleUrlDownloadPlanInput): SingleUrlDownloadPlan => {
   const id = createId();
   const title = metadata?.title || titleFromSourceUrl(sourceUrl);
-  const downloadRequest: DownloadRequest = { sourceUrl, audioBitrate };
+  const downloadRequest: DownloadRequest = { sourceUrl, audioBitrate, audioFormat };
   if (importId) downloadRequest.importId = importId;
   const pendingFile = createPendingDownloadTrack(
     id,
@@ -296,6 +300,7 @@ export const createSingleUrlDownloadPlan = ({
 export const createPlaylistDownloadPlan = ({
   playlist,
   audioBitrate,
+  audioFormat,
   createId,
   importId,
 }: CreatePlaylistDownloadPlanInput): PlaylistDownloadPlan => {
@@ -304,6 +309,7 @@ export const createPlaylistDownloadPlan = ({
     const downloadRequest: DownloadRequest = {
       sourceUrl: track.url,
       audioBitrate,
+      audioFormat,
       trackIndex: track.trackNumber,
     };
     if (importId) downloadRequest.importId = importId;
@@ -360,9 +366,10 @@ export const createPlaylistDownloadPlan = ({
 export const createSoundCloudSetDownloadPlan = ({
   set,
   audioBitrate,
+  audioFormat,
   createId,
 }: CreateSoundCloudSetDownloadPlanInput): SoundCloudSetDownloadPlan =>
-  createPlaylistDownloadPlan({ playlist: set, audioBitrate, createId });
+  createPlaylistDownloadPlan({ playlist: set, audioBitrate, audioFormat, createId });
 
 export function startDownloadTrackPlan(
   plan: SingleUrlDownloadPlan,

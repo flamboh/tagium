@@ -220,6 +220,7 @@ const creatorFile: TagiumFile = {
   downloadRequest: {
     sourceUrl: "https://soundcloud.com/artist/one",
     audioBitrate: "320",
+    audioFormat: "mp3",
   },
   metadata: {
     filename: "one",

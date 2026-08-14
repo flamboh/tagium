@@ -215,7 +215,11 @@ describe("audioTagger metadata patches", () => {
           filename: "imported.mp3",
           status: "saved",
           downloadStatus: "ready",
-          downloadRequest: { sourceUrl: "https://soundcloud.com/private", audioBitrate: "320" },
+          downloadRequest: {
+            sourceUrl: "https://soundcloud.com/private",
+            audioBitrate: "320",
+            audioFormat: "mp3",
+          },
         },
       ]),
     ).toBe("mixed");

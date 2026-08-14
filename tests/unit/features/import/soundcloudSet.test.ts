@@ -254,12 +254,14 @@ describe("download track plans", () => {
     const singlePlan = createSingleUrlDownloadPlan({
       sourceUrl: "https://soundcloud.com/artist/direct-track",
       audioBitrate: "320",
+      audioFormat: "mp3",
       createId: () => "single-track",
     });
     const ids = ["album-1", "set-track-1", "set-track-2"];
     const setPlan = createSoundCloudSetDownloadPlan({
       set: soundCloudSet(),
       audioBitrate: "320",
+      audioFormat: "mp3",
       createId: () => {
         const id = ids.shift();
         if (!id) throw new Error("missing test id");
@@ -274,6 +276,7 @@ describe("download track plans", () => {
         downloadRequest: {
           sourceUrl: "https://soundcloud.com/artist/direct-track",
           audioBitrate: "320",
+          audioFormat: "mp3",
         },
       },
     ]);
@@ -307,6 +310,7 @@ describe("download track plans", () => {
         downloadRequest: {
           sourceUrl: "https://soundcloud.com/artist/first-track",
           audioBitrate: "320",
+          audioFormat: "mp3",
           trackIndex: 1,
           year: 2024,
         },
@@ -317,6 +321,7 @@ describe("download track plans", () => {
         downloadRequest: {
           sourceUrl: "https://soundcloud.com/artist/second-track",
           audioBitrate: "320",
+          audioFormat: "mp3",
           trackIndex: 2,
           year: 2024,
         },
@@ -351,12 +356,14 @@ describe("soundcloud set import", () => {
       {
         sourceUrl: "https://soundcloud.com/artist/first-track",
         audioBitrate: "320",
+        audioFormat: "mp3",
         trackIndex: 1,
         year: 2024,
       },
       {
         sourceUrl: "https://soundcloud.com/artist/second-track",
         audioBitrate: "320",
+        audioFormat: "mp3",
         trackIndex: 2,
         year: 2024,
       },
@@ -386,6 +393,7 @@ describe("soundcloud set import", () => {
         downloadRequest: {
           sourceUrl: "https://soundcloud.com/artist/first-track",
           audioBitrate: "320",
+          audioFormat: "mp3",
           trackIndex: 1,
           year: 2024,
         },
@@ -396,6 +404,7 @@ describe("soundcloud set import", () => {
         downloadRequest: {
           sourceUrl: "https://soundcloud.com/artist/second-track",
           audioBitrate: "320",
+          audioFormat: "mp3",
           trackIndex: 2,
           year: 2024,
         },

@@ -195,8 +195,8 @@ const runLocalProcessingWorker = (request: LocalAudioProcessingRequest, signal?:
   );
 
 export const validateLocalAudioPlan = (plan: LocalAudioPlan) => {
-  if (plan.type !== "audio") {
-    throw new Error("cobalt local processing response was not audio.");
+  if (plan.type !== "audio" && plan.type !== "proxy") {
+    throw new Error("cobalt local processing response was not audio or proxy.");
   }
   if (!plan.audio) {
     throw new Error("cobalt local processing response missing audio settings.");
@@ -273,8 +273,11 @@ const tagCobaltAudioFile = async (
   if (supplied?.album_artist)
     changes.albumArtist = stripMetadataControlCharacters(supplied.album_artist);
   if (supplied?.composer) changes.composer = stripMetadataControlCharacters(supplied.composer);
-  if (supplied?.copyright) changes.copyright = stripMetadataControlCharacters(supplied.copyright);
-  if (supplied?.sublanguage) {
+  const isMp3 = file.name.toLowerCase().endsWith(".mp3");
+  if (isMp3 && supplied?.copyright) {
+    changes.copyright = stripMetadataControlCharacters(supplied.copyright);
+  }
+  if (isMp3 && supplied?.sublanguage) {
     changes.language = stripMetadataControlCharacters(supplied.sublanguage);
   }
   if (coverFile) {
@@ -330,8 +333,8 @@ const makeLocalAudioProcessor = Effect.fn("makeLocalAudioProcessor")(() =>
                 );
               }
 
-              const shouldPostTagAsMp3 = outputFormat === "mp3";
-              const coverTunnel = shouldPostTagAsMp3 ? plan.tunnel[1] : undefined;
+              const canPostTag = outputFormat === "mp3" || outputFormat === "m4a";
+              const coverTunnel = canPostTag ? plan.tunnel[1] : undefined;
               const audioFileEffect = fetchTunnelFile(audioTunnel, "input-0");
               const audioAndCover = coverTunnel
                 ? Effect.all([audioFileEffect, fetchTunnelFile(coverTunnel, "input-1")], {
@@ -343,7 +346,7 @@ const makeLocalAudioProcessor = Effect.fn("makeLocalAudioProcessor")(() =>
                 {
                   audioFile,
                   audio: {
-                    copy: plan.audio.copy,
+                    copy: plan.type === "proxy" || plan.audio.copy,
                     format: plan.audio.format,
                     bitrate: plan.audio.bitrate,
                   },
@@ -363,7 +366,7 @@ const makeLocalAudioProcessor = Effect.fn("makeLocalAudioProcessor")(() =>
               });
 
               signal?.throwIfAborted();
-              if (!shouldPostTagAsMp3) {
+              if (!canPostTag || (!coverFile && !plan.output.metadata)) {
                 return file;
               }
 
