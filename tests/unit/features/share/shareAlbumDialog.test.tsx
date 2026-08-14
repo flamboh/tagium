@@ -227,7 +227,6 @@ describe("share album dialog", () => {
     expect(before.filter((value) => value.includes("w-full"))).toHaveLength(2);
     expect(after.filter((value) => value.includes("w-full"))).toHaveLength(2);
     expect(text(renderer)).toContain("the link will stop working immediately.");
-    expect(text(renderer)).toContain("anyone who already added the album keeps their copy.");
     expect(text(renderer)).not.toContain("cover");
   });
 
@@ -243,6 +242,41 @@ describe("share album dialog", () => {
     expect(renderer.root.findAllByProps({ "aria-label": "track preview" })).toHaveLength(1);
     expect(text(renderer)).toContain("Intro");
     expect(renderer.root.findAllByProps({ "aria-label": "no album cover" })).toHaveLength(1);
+  });
+
+  it("keeps long share titles within the dialog and truncates them", () => {
+    const longTitle = "TITLE".repeat(100);
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        createElement(ShareAlbumDialog, {
+          state: {
+            status: "confirm",
+            preview: { ...preview, title: longTitle },
+          },
+          onClose: vi.fn(),
+          onPublish: vi.fn(),
+          onStopSharing: vi.fn(async () => undefined),
+        }),
+      );
+    });
+
+    const header = renderer.root.find(
+      (node) =>
+        node.type === "div" &&
+        Schema.is(Schema.String)(node.props.className) &&
+        node.props.className.includes("border-b"),
+    );
+    const title = renderer.root.find(
+      (node) =>
+        node.type === "div" &&
+        Schema.is(Schema.String)(node.props.className) &&
+        node.props.className.includes("truncate") &&
+        node.children.includes(`share album: ${longTitle}`),
+    );
+
+    expect(header.props.className).toContain("min-w-0");
+    expect(title.props.className).toContain("truncate");
   });
 
   it("uses track-specific creator copy for a track publication", () => {

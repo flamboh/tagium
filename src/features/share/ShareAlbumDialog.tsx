@@ -148,7 +148,7 @@ function ShareAlbumDialogSession({
         showCloseButton={state.status !== "publishing" && !stopping}
       >
         <>
-          <DialogHeader className="border-b px-5 py-4 pr-12">
+          <DialogHeader className="min-w-0 border-b px-5 py-4 pr-12">
             <DialogTitle className="truncate text-left">
               {`share ${targetName}: ${state.preview.title}`}
             </DialogTitle>
@@ -209,7 +209,7 @@ function ShareAlbumDialogSession({
             <div className="px-5 pb-4 text-left text-sm text-muted-foreground">
               {confirmStop ? (
                 <>
-                  {`the link will stop working immediately. anyone who already added the ${targetName} keeps their copy.`}
+                  the link will stop working immediately.
                   {stopError && (
                     <span role="alert" className="mt-1 block text-destructive">
                       {stopError}
