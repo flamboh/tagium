@@ -8,14 +8,16 @@ import { makeBlobByteSource } from "../../src/features/audio/metadataEngine/byte
 import { mp3Driver } from "../../src/features/audio/metadataEngine/mp3/mp3Driver";
 import { flacDriver } from "../../src/features/audio/metadataEngine/flac";
 import { mp4Driver } from "../../src/features/audio/metadataEngine/mp4";
+import { opusDriver } from "../../src/features/audio/metadataEngine/opus";
 
 const formats = [
   { family: "mp3", name: "synthetic.mp3", mimeType: "audio/mpeg", extension: ".mp3" },
   { family: "flac", name: "synthetic.flac", mimeType: "audio/flac", extension: ".flac" },
   { family: "m4a", name: "synthetic.m4a", mimeType: "audio/mp4", extension: ".m4a" },
   { family: "m4a", name: "synthetic.mp4", mimeType: "audio/mp4", extension: ".mp4" },
+  { family: "opus", name: "synthetic.opus", mimeType: "audio/ogg", extension: ".opus" },
 ] as const;
-const drivers = { mp3: mp3Driver, flac: flacDriver, m4a: mp4Driver } as const;
+const drivers = { mp3: mp3Driver, flac: flacDriver, m4a: mp4Driver, opus: opusDriver } as const;
 const crc32 = (bytes: Buffer) => {
   let crc = 0xffffffff;
   for (const byte of bytes) {
@@ -66,22 +68,23 @@ test("imports, edits, and exports every supported container without changing for
         },
       ]);
 
-    const title = page.getByLabel("title:");
-    await expect(title).toBeVisible();
+    const title = page.getByLabel("title", { exact: true });
+    await expect(title, `${format.family} should open in the metadata editor`).toBeVisible();
     await title.fill(`Edited ${format.family}`);
-    await page.locator('input[accept="image/jpeg,image/png"]').first().setInputFiles({
+
+    await page.getByRole("button", { name: "album actions for Synthetic Album 1" }).click();
+    await page.getByRole("menuitem", { name: "edit album" }).click();
+    const albumDialog = page.getByRole("dialog");
+    await albumDialog.locator('input[accept="image/jpeg,image/png"]').setInputFiles({
       name: "replacement.png",
       mimeType: "image/png",
       buffer: replacementCover,
     });
-    await expect(page.getByRole("button", { name: "crop cover art" })).toBeVisible();
-
-    await page.getByLabel("edit Synthetic Album 1").click();
-    const albumDialog = page.getByRole("dialog");
-    await albumDialog.getByLabel("album title:").fill("Edited Album");
-    await albumDialog.getByLabel("artist:").fill("Edited Album Artist");
-    await albumDialog.getByLabel("genre:").fill("Edited Genre");
-    await albumDialog.getByLabel("year:").fill("2032");
+    await expect(albumDialog.getByRole("button", { name: "crop cover art" })).toBeVisible();
+    await albumDialog.locator("#album-title").fill("Edited Album");
+    await albumDialog.locator("#album-artist").fill("Edited Album Artist");
+    await albumDialog.locator("#album-genre").fill("Edited Genre");
+    await albumDialog.locator("#album-year").fill("2032");
     await albumDialog.getByRole("button", { name: "save album" }).click();
     await expect(page.getByText(format.extension, { exact: true }).first()).toBeVisible();
 

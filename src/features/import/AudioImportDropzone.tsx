@@ -131,7 +131,7 @@ export default function AudioImportDropzone({
             {isDragging ? "drop to import" : "drop your audio here"}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            mp3, flac, and m4a/mp4 · or click to browse
+            mp3, flac, m4a/mp4, and opus · or click to browse
           </p>
         </div>
       </button>

@@ -1,7 +1,8 @@
 import type { AudioFormat } from "@/features/audio/metadataEngine/types";
 import type { TagiumFile } from "@/features/library/types";
 
-export const AUDIO_UPLOAD_ACCEPT = ".mp3,.flac,.m4a,.mp4,audio/mpeg,audio/flac,audio/mp4";
+export const AUDIO_UPLOAD_ACCEPT =
+  ".mp3,.flac,.m4a,.mp4,.opus,.ogg,.oga,audio/mpeg,audio/flac,audio/mp4,audio/ogg";
 
 export const MP3_FORMAT = {
   kind: "mp3",
@@ -21,4 +22,4 @@ export const replaceAudioExtension = (filename: string, format: AudioFormat) => 
 };
 
 export const audioFilenameBase = (filename: string) =>
-  filename.replace(/\.(?:mp3|flac|m4a|mp4)$/iu, "") || "track";
+  filename.replace(/\.(?:mp3|flac|m4a|mp4|opus|ogg|oga)$/iu, "") || "track";

@@ -194,6 +194,14 @@ describe("cobalt audio endpoint", () => {
     },
     {
       sourceUrl: "https://soundcloud.com/artist/track",
+      expectedFormat: "best",
+    },
+    {
+      sourceUrl: "https://m.soundcloud.com/artist/track",
+      expectedFormat: "best",
+    },
+    {
+      sourceUrl: "https://soundcloud.com.example/artist/track",
       expectedFormat: "mp3",
     },
   ])("applies the compatible best format policy for $sourceUrl", async (testCase) => {

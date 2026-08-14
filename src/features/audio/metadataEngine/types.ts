@@ -1,11 +1,11 @@
 import type { AudioMetadata } from "@/features/audio/metadata";
 
-export type AudioFormatKind = "mp3" | "flac" | "m4a";
+export type AudioFormatKind = "mp3" | "flac" | "m4a" | "opus";
 
 export interface AudioFormat {
   kind: AudioFormatKind;
-  extension: "mp3" | "flac" | "m4a" | "mp4";
-  mime: "audio/mpeg" | "audio/flac" | "audio/mp4";
+  extension: "mp3" | "flac" | "m4a" | "mp4" | "opus";
+  mime: "audio/mpeg" | "audio/flac" | "audio/mp4" | "audio/ogg";
 }
 
 export interface ArtworkEntry {

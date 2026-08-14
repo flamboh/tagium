@@ -29,6 +29,7 @@ import {
 } from "../../utils/dev-controls";
 import { decodeRequestBody, urlStringSchema } from "../../utils/schema";
 import { getYouTubeVideoId, resolveYouTubeUploadYear } from "../../utils/youtube";
+import { isSoundCloudHost } from "../../../src/lib/media-link";
 
 enum CobaltResponseType {
   Error = "error",
@@ -107,11 +108,19 @@ type CobaltAudioResult = {
 type AudioDownloadFormat = Schema.Schema.Type<typeof audioRequestSchema>["audioFormat"];
 
 /**
- * Tagium can edit MP3 and M4A, while other Cobalt providers can return Opus for "best".
- * Limit source-format preservation to YouTube until the metadata engine supports more formats.
+ * Only request source formats from providers whose preferred output Tagium can edit.
  */
 const cobaltAudioFormat = (url: string, requestedFormat: AudioDownloadFormat) => {
-  return requestedFormat === "best" && getYouTubeVideoId(url) ? "best" : "mp3";
+  let isSoundCloud = false;
+  try {
+    const source = new URL(url);
+    isSoundCloud = source.protocol === "https:" && isSoundCloudHost(source.hostname);
+  } catch {
+    // The request schema reports invalid URLs before this policy is reached.
+  }
+  return requestedFormat === "best" && (Boolean(getYouTubeVideoId(url)) || isSoundCloud)
+    ? "best"
+    : "mp3";
 };
 interface CobaltAudioLogDetails {
   stage?: string;

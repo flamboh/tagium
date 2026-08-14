@@ -49,9 +49,13 @@ describe("AudioImportDropzone", () => {
       ".flac",
       ".m4a",
       ".mp4",
+      ".opus",
+      ".ogg",
+      ".oga",
       "audio/mpeg",
       "audio/flac",
       "audio/mp4",
+      "audio/ogg",
     ]) {
       expect(input.props.accept.split(",")).toContain(acceptedType);
     }

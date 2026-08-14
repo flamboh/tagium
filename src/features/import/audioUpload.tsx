@@ -52,7 +52,9 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
           strokeWidth={2}
           className="h-6 w-6 text-muted-foreground"
         />
-        <span className="text-xs text-muted-foreground">upload mp3, flac, or m4a/mp4 files</span>
+        <span className="text-xs text-muted-foreground">
+          upload mp3, flac, m4a/mp4, or opus files
+        </span>
       </Button>
     </div>
   );

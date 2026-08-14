@@ -23,7 +23,9 @@ describe("upload input attributes", () => {
     ];
 
     for (const input of inputs) {
-      expect(input).toContain('accept=".mp3,.flac,.m4a,.mp4,audio/mpeg,audio/flac,audio/mp4"');
+      expect(input).toContain(
+        'accept=".mp3,.flac,.m4a,.mp4,.opus,.ogg,.oga,audio/mpeg,audio/flac,audio/mp4,audio/ogg"',
+      );
       expect(input).toContain("multiple");
       expect(input).not.toContain("capture");
     }

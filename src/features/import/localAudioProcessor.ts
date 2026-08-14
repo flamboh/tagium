@@ -261,7 +261,7 @@ const tagCobaltAudioFile = async (
   coverFile: File | undefined,
   lastModified: number,
 ) => {
-  const { metadata } = await Effect.runPromise(inspectAudioFile(file));
+  const { inspection, metadata } = await Effect.runPromise(inspectAudioFile(file));
   const supplied = plan.output.metadata;
   const changes: MetadataChanges = {};
   if (supplied?.title) changes.title = stripMetadataControlCharacters(supplied.title);
@@ -273,11 +273,12 @@ const tagCobaltAudioFile = async (
   if (supplied?.album_artist)
     changes.albumArtist = stripMetadataControlCharacters(supplied.album_artist);
   if (supplied?.composer) changes.composer = stripMetadataControlCharacters(supplied.composer);
-  const isMp3 = file.name.toLowerCase().endsWith(".mp3");
-  if (isMp3 && supplied?.copyright) {
+  const supportsExtendedText =
+    inspection.format.kind === "mp3" || inspection.format.kind === "opus";
+  if (supportsExtendedText && supplied?.copyright) {
     changes.copyright = stripMetadataControlCharacters(supplied.copyright);
   }
-  if (isMp3 && supplied?.sublanguage) {
+  if (supportsExtendedText && supplied?.sublanguage) {
     changes.language = stripMetadataControlCharacters(supplied.sublanguage);
   }
   if (coverFile) {
@@ -333,7 +334,8 @@ const makeLocalAudioProcessor = Effect.fn("makeLocalAudioProcessor")(() =>
                 );
               }
 
-              const canPostTag = outputFormat === "mp3" || outputFormat === "m4a";
+              const canPostTag =
+                outputFormat === "mp3" || outputFormat === "m4a" || outputFormat === "opus";
               const coverTunnel = canPostTag ? plan.tunnel[1] : undefined;
               const audioFileEffect = fetchTunnelFile(audioTunnel, "input-0");
               const audioAndCover = coverTunnel

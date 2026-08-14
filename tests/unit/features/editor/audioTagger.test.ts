@@ -75,8 +75,25 @@ describe("audioTagger metadata patches", () => {
     );
 
     expect(getUploadRejectionMessage(rejectedUploads)).toBe(
-      "EMPTY.MP3 could not be imported. try a valid mp3, flac, or unencrypted m4a/mp4 file.\n" +
-        "song.wav could not be imported. try a valid mp3, flac, or unencrypted m4a/mp4 file.",
+      "EMPTY.MP3 could not be imported. try a valid mp3, flac, unencrypted m4a/mp4, or opus file.\n" +
+        "song.wav could not be imported. try a valid mp3, flac, unencrypted m4a/mp4, or opus file.",
+    );
+  });
+
+  it("surfaces a concise error when vorbis audio is rejected", () => {
+    const rejected = {
+      file: {
+        id: "vorbis",
+        filename: "mix.ogg",
+        status: "error",
+        downloadStatus: "ready",
+        downloadError: "this ogg file uses vorbis audio.",
+      },
+      albumSeed: { title: "", artist: "", genre: "" },
+    } satisfies UploadedTrack;
+
+    expect(getUploadRejectionMessage([rejected])).toBe(
+      "mix.ogg could not be imported. this ogg file uses vorbis audio.",
     );
   });
 

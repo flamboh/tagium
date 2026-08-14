@@ -9,6 +9,7 @@ import type { FormatDriver } from "@/features/audio/metadataEngine/driver";
 import { flacDriver } from "@/features/audio/metadataEngine/flac";
 import { mp3Driver } from "@/features/audio/metadataEngine/mp3/mp3Driver";
 import { mp4Driver } from "@/features/audio/metadataEngine/mp4";
+import { opusDriver } from "@/features/audio/metadataEngine/opus";
 import type {
   ArtworkEntry,
   AudioInspection,
@@ -19,6 +20,7 @@ const drivers = {
   mp3: mp3Driver,
   flac: flacDriver,
   m4a: mp4Driver,
+  opus: opusDriver,
 } as const satisfies Record<string, FormatDriver>;
 
 const sourceFormat = (driver: FormatDriver, filename: string) =>
