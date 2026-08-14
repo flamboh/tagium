@@ -148,7 +148,7 @@ function ShareAlbumDialogSession({
         showCloseButton={state.status !== "publishing" && !stopping}
       >
         <>
-          <DialogHeader className="border-b px-5 py-4 pr-12">
+          <DialogHeader className="min-w-0 border-b px-5 py-4 pr-12">
             <DialogTitle className="truncate text-left">
               {`share ${targetName}: ${state.preview.title}`}
             </DialogTitle>

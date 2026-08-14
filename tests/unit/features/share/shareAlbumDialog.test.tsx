@@ -245,6 +245,41 @@ describe("share album dialog", () => {
     expect(renderer.root.findAllByProps({ "aria-label": "no album cover" })).toHaveLength(1);
   });
 
+  it("keeps long share titles within the dialog and truncates them", () => {
+    const longTitle = "TITLE".repeat(100);
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        createElement(ShareAlbumDialog, {
+          state: {
+            status: "confirm",
+            preview: { ...preview, title: longTitle },
+          },
+          onClose: vi.fn(),
+          onPublish: vi.fn(),
+          onStopSharing: vi.fn(async () => undefined),
+        }),
+      );
+    });
+
+    const header = renderer.root.find(
+      (node) =>
+        node.type === "div" &&
+        Schema.is(Schema.String)(node.props.className) &&
+        node.props.className.includes("border-b"),
+    );
+    const title = renderer.root.find(
+      (node) =>
+        node.type === "div" &&
+        Schema.is(Schema.String)(node.props.className) &&
+        node.props.className.includes("truncate") &&
+        node.children.includes(`share album: ${longTitle}`),
+    );
+
+    expect(header.props.className).toContain("min-w-0");
+    expect(title.props.className).toContain("truncate");
+  });
+
   it("uses track-specific creator copy for a track publication", () => {
     let renderer!: ReactTestRenderer;
     act(() => {
