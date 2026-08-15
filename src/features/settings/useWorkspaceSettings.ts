@@ -28,6 +28,7 @@ export const useWorkspaceSettings = ({
         previous.syncTrackNumbers !== nextSettings.syncTrackNumbers ||
         previous.syncFilenames !== nextSettings.syncFilenames ||
         previous.audioBitrate !== nextSettings.audioBitrate ||
+        previous.audioFormat !== nextSettings.audioFormat ||
         previous.applySoundCloudAlbumCoverToTracks !==
           nextSettings.applySoundCloudAlbumCoverToTracks ||
         previous.advancedMetadata !== nextSettings.advancedMetadata ||
@@ -45,6 +46,7 @@ export const useWorkspaceSettings = ({
           type: "settings_changed",
           syncFilenames: nextSettings.syncFilenames,
           audioBitrate: nextSettings.audioBitrate,
+          audioFormat: nextSettings.audioFormat,
           applySoundCloudCover: nextSettings.applySoundCloudAlbumCoverToTracks,
           advancedMetadata: nextSettings.advancedMetadata,
           metadataLinks: getMetadataLinkState(nextSettings),

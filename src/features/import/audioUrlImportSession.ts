@@ -290,6 +290,7 @@ export const createAudioUrlImportSession = ({
     const plan = createSingleUrlDownloadPlan({
       sourceUrl,
       audioBitrate: getSettings().audioBitrate,
+      audioFormat: getSettings().audioFormat,
       createId: () => crypto.randomUUID(),
       importId: importOperationId,
       metadata,
@@ -324,6 +325,7 @@ export const createAudioUrlImportSession = ({
     const plan = createPlaylistDownloadPlan({
       playlist,
       audioBitrate: getSettings().audioBitrate,
+      audioFormat: getSettings().audioFormat,
       createId: () => crypto.randomUUID(),
       importId: importOperationId,
     });

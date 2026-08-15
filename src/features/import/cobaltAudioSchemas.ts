@@ -10,7 +10,7 @@ const cobaltTunnelDownloadPlanSchema = Schema.Struct({
 
 const cobaltLocalDownloadPlanSchema = Schema.Struct({
   status: Schema.Literal("local-processing"),
-  type: Schema.Literal("audio"),
+  type: Schema.Literals(["audio", "proxy"]),
   tunnel: Schema.Array(Schema.String),
   output: Schema.Struct({
     type: Schema.String,

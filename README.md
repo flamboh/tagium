@@ -1,6 +1,6 @@
 # Tagium
 
-Local, lossless metadata editing for MP3, FLAC, and M4A audio files.
+Local, lossless metadata editing for MP3, FLAC, M4A, and Opus audio files.
 
 [Open Tagium](https://tagium.app)
 

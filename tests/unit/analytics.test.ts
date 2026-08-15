@@ -680,6 +680,7 @@ describe("analytics", () => {
       type: "settings_changed",
       syncFilenames: false,
       audioBitrate: "256",
+      audioFormat: "best",
       applySoundCloudCover: true,
       advancedMetadata: true,
       metadataLinks: {

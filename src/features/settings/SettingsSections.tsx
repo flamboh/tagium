@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { AppSettings } from "@/features/library/types";
 import SettingsLinkMap from "@/features/settings/SettingsLinkMap";
-import { AUDIO_BITRATE_OPTIONS } from "@/features/settings/settings";
+import { AUDIO_BITRATE_OPTIONS, AUDIO_FORMAT_OPTIONS } from "@/features/settings/settings";
 
 interface SettingsSectionProps {
   settings: AppSettings;
@@ -16,8 +16,18 @@ interface SettingsSectionProps {
 }
 
 const checkboxRowClassName = "flex cursor-pointer select-none items-start gap-3 py-1";
+const audioFormatLabels = {
+  best: "best compatible",
+  mp3: "mp3",
+} as const satisfies Record<AppSettings["audioFormat"], string>;
+
+const audioFormatDescriptions = {
+  best: "keeps youtube's m4a and soundcloud's opus when available.",
+  mp3: "converts every download to mp3 at the selected bitrate.",
+} as const satisfies Record<AppSettings["audioFormat"], string>;
 
 export function ImportingSettingsSection({ settings, onChange }: SettingsSectionProps) {
+  const [formatOpen, setFormatOpen] = useState(false);
   const [bitrateOpen, setBitrateOpen] = useState(false);
 
   return (
@@ -29,16 +39,61 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
         </p>
       </div>
       <div className="flex flex-col gap-2">
-        <span id="download-bitrate-label" className="text-sm font-medium">
-          download bitrate
-        </span>
+        <span className="text-sm font-medium">download format</span>
+        <Popover open={formatOpen} onOpenChange={setFormatOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9 w-full justify-between px-2 font-normal"
+              aria-label={`download format, ${audioFormatLabels[settings.audioFormat]}`}
+            >
+              <span>{audioFormatLabels[settings.audioFormat]}</span>
+              <HugeiconsIcon
+                icon={UnfoldMoreIcon}
+                strokeWidth={2}
+                className="size-4 text-muted-foreground"
+              />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="w-(--radix-popover-trigger-width) p-1"
+            role="group"
+            aria-label="download format"
+          >
+            {AUDIO_FORMAT_OPTIONS.map((format) => (
+              <Button
+                key={format}
+                type="button"
+                variant="ghost"
+                className={`h-auto min-h-10 w-full justify-start px-2 py-1.5 text-start font-normal ${settings.audioFormat === format ? "bg-accent text-accent-foreground" : ""}`}
+                aria-pressed={settings.audioFormat === format}
+                onClick={() => {
+                  onChange({ ...settings, audioFormat: format });
+                  setFormatOpen(false);
+                }}
+              >
+                <span className="min-w-0 space-y-0.5">
+                  <span className="block text-sm">{audioFormatLabels[format]}</span>
+                  <span className="block text-xs leading-4 text-muted-foreground">
+                    {audioFormatDescriptions[format]}
+                  </span>
+                </span>
+              </Button>
+            ))}
+          </PopoverContent>
+        </Popover>
+      </div>
+      <div className="flex flex-col gap-2">
+        <span className="text-sm font-medium">mp3 bitrate</span>
         <Popover open={bitrateOpen} onOpenChange={setBitrateOpen}>
           <PopoverTrigger asChild>
             <Button
               type="button"
               variant="outline"
               className="h-9 w-full justify-between px-2 font-normal"
-              aria-labelledby="download-bitrate-label"
+              aria-label={`mp3 bitrate, ${settings.audioBitrate} kbps`}
             >
               <span>
                 {settings.audioBitrate} <span className="text-muted-foreground">kbps</span>
@@ -53,7 +108,8 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
           <PopoverContent
             align="start"
             className="w-(--radix-popover-trigger-width) p-1"
-            role="listbox"
+            role="group"
+            aria-label="mp3 bitrate"
           >
             {AUDIO_BITRATE_OPTIONS.map((bitrate) => (
               <Button
@@ -61,8 +117,7 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
                 type="button"
                 variant="ghost"
                 className={`h-8 w-full justify-start px-2 font-normal ${settings.audioBitrate === bitrate ? "bg-accent text-accent-foreground" : ""}`}
-                aria-selected={settings.audioBitrate === bitrate}
-                role="option"
+                aria-pressed={settings.audioBitrate === bitrate}
                 onClick={() => {
                   onChange({ ...settings, audioBitrate: bitrate });
                   setBitrateOpen(false);
@@ -73,6 +128,11 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
             ))}
           </PopoverContent>
         </Popover>
+        <p className="text-xs leading-5 text-muted-foreground">
+          {settings.audioFormat === "best"
+            ? "used when a download falls back to mp3."
+            : "higher bitrates preserve more detail but result in larger files."}
+        </p>
       </div>
       <label className={checkboxRowClassName}>
         <Checkbox

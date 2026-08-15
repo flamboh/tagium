@@ -12,9 +12,13 @@ import {
 } from "@/features/import/localAudioProcessor";
 import { inspectAudioFile } from "@/features/audio/metadataEngine/engine";
 import { validMp3Bytes } from "../../support/mp3TestFixtures";
+import { validM4aBytes } from "../../support/m4aTestFixtures";
+import { validOpusBytes } from "../../support/opusTestFixtures";
 
-const runCobaltDownload = (request: CobaltAudioDownloadRequest) =>
-  runAudioBackendEffect(downloadFromCobalt(request));
+const runCobaltDownload = (
+  request: Omit<CobaltAudioDownloadRequest, "audioFormat"> &
+    Partial<Pick<CobaltAudioDownloadRequest, "audioFormat">>,
+) => runAudioBackendEffect(downloadFromCobalt({ audioFormat: "mp3", ...request }));
 
 interface FakeMP3TagInstance {
   buffer?: ArrayBuffer;
@@ -672,9 +676,10 @@ describe("CobaltAudio download", () => {
     expect(inspected.metadata.picture[0]?.data).toEqual(new TextEncoder().encode("audio-bytes"));
   });
 
-  it("returns non-mp3 local audio without fetching cover or using mp3tag", async () => {
+  it("preserves and tags compatible m4a audio from a Cobalt proxy plan", async () => {
     const fetchedUrls: string[] = [];
     const workerMessages: LocalProcessingWorkerRequest[] = [];
+    const m4aBytes = await validM4aBytes();
 
     vi.stubGlobal(
       "fetch",
@@ -683,31 +688,29 @@ describe("CobaltAudio download", () => {
         if (url === "/api/cobalt/audio") {
           return Response.json({
             status: "local-processing",
-            type: "audio",
-            service: "soundcloud",
+            type: "proxy",
+            service: "youtube",
             tunnel: ["/api/cobalt/tunnel?url=audio", "/api/cobalt/tunnel?url=cover"],
             output: {
               type: "audio/mp4",
               filename: "track.m4a",
               metadata: {
                 title: "Track",
+                copyright: "not supported by the m4a metadata driver",
               },
             },
             audio: {
               copy: false,
               format: "m4a",
               bitrate: "256",
+              cover: true,
             },
           });
         }
 
-        if (url === "/api/cobalt/tunnel?url=cover") {
-          return new Response("", { status: 500 });
-        }
-
         return new Response("audio-bytes", {
           headers: {
-            "Content-Type": "audio/mpeg",
+            "Content-Type": url.endsWith("cover") ? "image/jpeg" : "audio/mp4",
           },
         });
       }),
@@ -723,7 +726,7 @@ describe("CobaltAudio download", () => {
             this.onmessage?.({
               data: {
                 cobaltLocalProcessing: {
-                  blob: new Blob(["processed-audio"], { type: "audio/mp4" }),
+                  blob: new Blob([m4aBytes], { type: "audio/mp4" }),
                 },
               },
             } as MessageEvent);
@@ -735,14 +738,20 @@ describe("CobaltAudio download", () => {
     );
 
     const file = await runCobaltDownload({
-      sourceUrl: "https://soundcloud.com/artist/track",
+      sourceUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
       audioBitrate: "256",
+      audioFormat: "best",
     });
 
-    expect(fetchedUrls).toEqual(["/api/cobalt/audio", "/api/cobalt/tunnel?url=audio"]);
+    expect(fetchedUrls).toEqual([
+      "/api/cobalt/audio",
+      "/api/cobalt/tunnel?url=audio",
+      "/api/cobalt/tunnel?url=cover",
+    ]);
     expect(workerMessages[0]).toMatchObject({
       cobaltLocalProcessing: {
         audio: {
+          copy: true,
           format: "m4a",
           bitrate: "256",
         },
@@ -759,6 +768,121 @@ describe("CobaltAudio download", () => {
       name: "track.m4a",
       type: "audio/mp4",
     });
+    const inspected = await Effect.runPromise(inspectAudioFile(file));
+    expect(inspected.metadata.title).toBe("Track");
+    expect(inspected.metadata.picture[0]).toMatchObject({
+      format: "image/jpeg",
+      type: 3,
+      description: "",
+    });
+    expect(mp3tagMock.instances).toEqual([]);
+  });
+
+  it("preserves and tags compatible opus audio from a SoundCloud best-format plan", async () => {
+    const fetchedUrls: string[] = [];
+    const workerMessages: LocalProcessingWorkerRequest[] = [];
+    const opusBytes = validOpusBytes();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        fetchedUrls.push(url);
+        if (url === "/api/cobalt/audio") {
+          return Response.json({
+            status: "local-processing",
+            type: "audio",
+            service: "soundcloud",
+            tunnel: ["/api/cobalt/tunnel?url=audio", "/api/cobalt/tunnel?url=cover"],
+            output: {
+              type: "audio/ogg",
+              filename: "track.opus",
+              metadata: {
+                title: "SoundCloud track",
+                artist: "SoundCloud artist",
+                copyright: "all rights reserved",
+              },
+            },
+            audio: {
+              copy: true,
+              format: "opus",
+              bitrate: "128",
+              cover: true,
+            },
+          });
+        }
+
+        return new Response("cover-bytes", {
+          headers: {
+            "Content-Type": url.endsWith("cover") ? "image/jpeg" : "audio/ogg",
+          },
+        });
+      }),
+    );
+    vi.stubGlobal(
+      "Worker",
+      class FakeWorker {
+        onmessage?: (event: MessageEvent) => void;
+
+        postMessage(message: LocalProcessingWorkerRequest) {
+          workerMessages.push(message);
+          queueMicrotask(() => {
+            this.onmessage?.({
+              data: {
+                cobaltLocalProcessing: {
+                  blob: new Blob([opusBytes], { type: "audio/ogg" }),
+                },
+              },
+            } as MessageEvent);
+          });
+        }
+
+        terminate() {}
+      },
+    );
+
+    const file = await runCobaltDownload({
+      sourceUrl: "https://soundcloud.com/artist/track",
+      audioBitrate: "128",
+      audioFormat: "best",
+    });
+
+    expect(fetchedUrls).toEqual([
+      "/api/cobalt/audio",
+      "/api/cobalt/tunnel?url=audio",
+      "/api/cobalt/tunnel?url=cover",
+    ]);
+    expect(workerMessages[0]).toMatchObject({
+      cobaltLocalProcessing: {
+        audio: {
+          copy: true,
+          format: "opus",
+          bitrate: "128",
+        },
+        output: {
+          type: "audio/ogg",
+          format: "opus",
+          metadata: {
+            title: "SoundCloud track",
+            artist: "SoundCloud artist",
+          },
+        },
+      },
+    });
+    expect(file).toMatchObject({ name: "track.opus", type: "audio/ogg" });
+    const inspected = await Effect.runPromise(inspectAudioFile(file));
+    expect(inspected.metadata).toMatchObject({
+      title: "SoundCloud track",
+      artist: "SoundCloud artist",
+    });
+    expect(inspected.metadata.picture[0]).toMatchObject({
+      format: "image/jpeg",
+      type: 3,
+      description: "cover",
+      data: new TextEncoder().encode("cover-bytes"),
+    });
+    expect(new TextDecoder().decode(await file.arrayBuffer())).toContain(
+      "COPYRIGHT=all rights reserved",
+    );
     expect(mp3tagMock.instances).toEqual([]);
   });
 

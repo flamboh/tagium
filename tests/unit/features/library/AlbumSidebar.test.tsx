@@ -118,7 +118,11 @@ describe("AlbumSidebar", () => {
             filename: "loose.mp3",
             status: "error",
             downloadStatus: "error",
-            downloadRequest: { sourceUrl: "https://example.com/loose", audioBitrate: "320" },
+            downloadRequest: {
+              sourceUrl: "https://example.com/loose",
+              audioBitrate: "320",
+              audioFormat: "mp3",
+            },
           },
           {
             id: "album-track",

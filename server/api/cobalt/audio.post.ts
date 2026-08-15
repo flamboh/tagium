@@ -29,6 +29,7 @@ import {
 } from "../../utils/dev-controls";
 import { decodeRequestBody, urlStringSchema } from "../../utils/schema";
 import { getYouTubeVideoId, resolveYouTubeUploadYear } from "../../utils/youtube";
+import { isSoundCloudHost } from "../../../src/lib/media-link";
 
 enum CobaltResponseType {
   Error = "error",
@@ -41,6 +42,7 @@ enum CobaltResponseType {
 const audioRequestSchema = Schema.Struct({
   url: urlStringSchema,
   audioBitrate: Schema.Literals(["320", "256", "128", "96", "64"]),
+  audioFormat: Schema.Literals(["best", "mp3"]),
   year: Schema.optionalKey(
     Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1_000, maximum: 9_999 })),
   ),
@@ -101,6 +103,24 @@ type CobaltAudioResult = {
   contentType?: string;
   failureStage?: "cobalt.resolve_fetch" | "cobalt.resolve_parse";
   failureReason?: "fetch_threw" | "non_json" | "invalid_json_or_schema" | "invalid_machine_id";
+};
+
+type AudioDownloadFormat = Schema.Schema.Type<typeof audioRequestSchema>["audioFormat"];
+
+/**
+ * Only request source formats from providers whose preferred output Tagium can edit.
+ */
+const cobaltAudioFormat = (url: string, requestedFormat: AudioDownloadFormat) => {
+  let isSoundCloud = false;
+  try {
+    const source = new URL(url);
+    isSoundCloud = source.protocol === "https:" && isSoundCloudHost(source.hostname);
+  } catch {
+    // The request schema reports invalid URLs before this policy is reached.
+  }
+  return requestedFormat === "best" && (Boolean(getYouTubeVideoId(url)) || isSoundCloud)
+    ? "best"
+    : "mp3";
 };
 interface CobaltAudioLogDetails {
   stage?: string;
@@ -230,6 +250,7 @@ const requestCobaltAudio = async (
   runtimeEnv: CobaltRuntimeEnv,
   url: string,
   audioBitrate: string,
+  audioFormat: AudioDownloadFormat,
   requestSignal: AbortSignal,
   context: RequestLogContext,
   sourceFingerprint: string,
@@ -246,11 +267,12 @@ const requestCobaltAudio = async (
       body: JSON.stringify({
         url,
         downloadMode: "audio",
-        audioFormat: "mp3",
+        audioFormat: cobaltAudioFormat(url, audioFormat),
         audioBitrate,
         alwaysProxy: true,
         localProcessing: "forced",
         filenameStyle: "pretty",
+        youtubeVideoCodec: "h264",
         youtubeHLS: false,
       }),
     });
@@ -547,6 +569,7 @@ export default defineHandler(async (event) => {
       runtimeEnv,
       body.url,
       body.audioBitrate,
+      body.audioFormat,
       event.req.signal,
       context,
       requestSourceFingerprint,

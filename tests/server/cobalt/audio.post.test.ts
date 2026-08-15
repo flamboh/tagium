@@ -23,7 +23,11 @@ type RateLimitBinding = {
 };
 
 const machineAffinitySecret = "test-machine-affinity-secret";
-const cobaltRequestSchema = Schema.Struct({ youtubeHLS: Schema.Boolean });
+const cobaltRequestSchema = Schema.Struct({
+  audioFormat: Schema.String,
+  youtubeVideoCodec: Schema.String,
+  youtubeHLS: Schema.Boolean,
+});
 
 const createRateLimitBinding = (limit: number): RateLimitBinding => {
   const counts = new Map<string, number>();
@@ -36,7 +40,14 @@ const createRateLimitBinding = (limit: number): RateLimitBinding => {
   };
 };
 
-const makeAudioRequest = (signal?: AbortSignal, year: number | null = 2020) => {
+const makeAudioRequest = (
+  signal?: AbortSignal,
+  year: number | null = 2020,
+  options: {
+    sourceUrl?: string;
+    audioFormat?: "best" | "mp3";
+  } = {},
+) => {
   const request = new Request("https://tagium.test/api/cobalt/audio", {
     method: "POST",
     headers: {
@@ -47,8 +58,9 @@ const makeAudioRequest = (signal?: AbortSignal, year: number | null = 2020) => {
     body: JSON.stringify(
       Object.assign(
         {
-          url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+          url: options.sourceUrl ?? "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
           audioBitrate: "128",
+          audioFormat: options.audioFormat ?? "mp3",
         },
         year === null ? undefined : { year },
       ),
@@ -87,6 +99,7 @@ describe("cobalt audio endpoint", () => {
       body: JSON.stringify({
         url: "not a URL",
         audioBitrate: "lossless",
+        audioFormat: "flac",
         year: 99,
       }),
     }) as RuntimeRequest;
@@ -141,7 +154,9 @@ describe("cobalt audio endpoint", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(cobaltBodies).toMatchObject([{ youtubeHLS: false }]);
+    expect(cobaltBodies).toEqual([
+      { audioFormat: "mp3", youtubeVideoCodec: "h264", youtubeHLS: false },
+    ]);
     expect(body).toMatchObject({
       status: "local-processing",
       output: {
@@ -170,6 +185,55 @@ describe("cobalt audio endpoint", () => {
         /^sha256:[a-f0-9]{32}$/.test(url.searchParams.get("sourceFingerprint") ?? ""),
       ),
     ).toBe(true);
+  });
+
+  it.each([
+    {
+      sourceUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      expectedFormat: "best",
+    },
+    {
+      sourceUrl: "https://soundcloud.com/artist/track",
+      expectedFormat: "best",
+    },
+    {
+      sourceUrl: "https://m.soundcloud.com/artist/track",
+      expectedFormat: "best",
+    },
+    {
+      sourceUrl: "https://soundcloud.com.example/artist/track",
+      expectedFormat: "mp3",
+    },
+  ])("applies the compatible best format policy for $sourceUrl", async (testCase) => {
+    let cobaltBody: Schema.Schema.Type<typeof cobaltRequestSchema> | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        const serializedBody = Schema.decodeUnknownSync(Schema.String)(init?.body);
+        cobaltBody = Schema.decodeUnknownSync(cobaltRequestSchema)(JSON.parse(serializedBody));
+        return Response.json({
+          status: "tunnel",
+          url: "https://cobalt.test/tunnel?id=123456789012345678901",
+          filename: "download.m4a",
+        });
+      }),
+    );
+
+    const response = await handler(
+      makeEvent(
+        makeAudioRequest(undefined, 2020, {
+          sourceUrl: testCase.sourceUrl,
+          audioFormat: "best",
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(cobaltBody).toEqual({
+      audioFormat: testCase.expectedFormat,
+      youtubeVideoCodec: "h264",
+      youtubeHLS: false,
+    });
   });
 
   it("classifies malformed upstream payloads as gateway failures", async () => {

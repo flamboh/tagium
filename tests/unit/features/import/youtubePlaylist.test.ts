@@ -47,6 +47,7 @@ describe("YouTube playlist imports", () => {
     const plan = createPlaylistDownloadPlan({
       playlist,
       audioBitrate: "320",
+      audioFormat: "best",
       createId: () => ids.shift()!,
     });
 

@@ -177,7 +177,11 @@ describe("share creator preview state", () => {
           discNumber: null,
           bpm: null,
         },
-        downloadRequest: { sourceUrl: "https://soundcloud.com/a/first", audioBitrate: "320" },
+        downloadRequest: {
+          sourceUrl: "https://soundcloud.com/a/first",
+          audioBitrate: "320",
+          audioFormat: "mp3",
+        },
       },
     ];
     publication.publishedFingerprint = (await projectAlbumShareSnapshot(album, files)).fingerprint;
@@ -258,7 +262,11 @@ describe("share creator preview state", () => {
           discNumber: null,
           bpm: null,
         },
-        downloadRequest: { sourceUrl: "https://soundcloud.com/a/first", audioBitrate: "320" },
+        downloadRequest: {
+          sourceUrl: "https://soundcloud.com/a/first",
+          audioBitrate: "320",
+          audioFormat: "mp3",
+        },
       },
     ];
     const library = fakeLibraryStore(album, files);

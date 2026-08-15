@@ -63,6 +63,7 @@ describe("settings", () => {
         syncTrackNumbers: false,
         syncFilenames: "no",
         audioBitrate: "999",
+        audioFormat: "wav",
         applySoundCloudAlbumCoverToTracks: "yes",
       }),
     );
@@ -80,6 +81,7 @@ describe("settings", () => {
       syncTrackNumbers: false,
       syncFilenames: false,
       audioBitrate: "256",
+      audioFormat: "best",
       applySoundCloudAlbumCoverToTracks: false,
     };
 
@@ -100,6 +102,7 @@ describe("settings", () => {
       syncTrackNumbers: false,
       syncFilenames: false,
       audioBitrate: "256",
+      audioFormat: "best",
       applySoundCloudAlbumCoverToTracks: false,
     };
 

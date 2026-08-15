@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { AudioMetadataReadError } from "@/features/audio/audioErrors";
+import { AUDIO_IMPORT_ERROR_MESSAGES, AudioMetadataReadError } from "@/features/audio/audioErrors";
 import { ascii, readUint32BE } from "@/features/audio/metadataEngine/binary";
 import { synchsafeToNumber } from "@/features/audio/metadataEngine/binary";
 import { isMp3Bytes } from "@/features/audio/mp3Compatibility";
@@ -14,11 +14,55 @@ const fail = (message: string) =>
 // when the selected driver inspects the same region.
 const DETECTION_WINDOW = 32 * 1024;
 
+const detectOggCodec = (bytes: Uint8Array) => {
+  if (bytes.length < 27 || ascii(bytes, 0, 4) !== "OggS" || bytes[4] !== 0) return undefined;
+  const segmentCount = bytes[26]!;
+  const bodyOffset = 27 + segmentCount;
+  if (bodyOffset > bytes.length) return undefined;
+  let packetLength = 0;
+  let packetComplete = false;
+  for (let index = 0; index < segmentCount; index++) {
+    packetLength += bytes[27 + index]!;
+    if (bytes[27 + index]! < 255) {
+      packetComplete = true;
+      break;
+    }
+  }
+  if (!packetComplete || bodyOffset + packetLength > bytes.length) return undefined;
+  if (packetLength >= 8 && ascii(bytes, bodyOffset, 8) === "OpusHead") {
+    return "opus" as const;
+  }
+  if (
+    packetLength >= 7 &&
+    bytes[bodyOffset] === 1 &&
+    ascii(bytes, bodyOffset + 1, 6) === "vorbis"
+  ) {
+    return "vorbis" as const;
+  }
+  return "unsupported" as const;
+};
+
 export const detectAudioFormat = (source: ByteSource) =>
   Effect.gen(function* () {
     if (source.size === 0) return yield* fail("audio file is empty.");
     const head = yield* source.read(0, Math.min(source.size, DETECTION_WINDOW));
     if (head.length >= 4 && ascii(head, 0, 4) === "fLaC") return "flac" as const;
+    const oggCodec = detectOggCodec(head);
+    if (oggCodec === "opus") return "opus" as const;
+    if (oggCodec === "vorbis") return yield* fail(AUDIO_IMPORT_ERROR_MESSAGES.vorbisOgg);
+    if (oggCodec === "unsupported") {
+      return yield* fail(AUDIO_IMPORT_ERROR_MESSAGES.unsupportedOgg);
+    }
+    if (head.length >= 12 && ascii(head, 0, 4) === "RIFF" && ascii(head, 8, 4) === "WAVE") {
+      return yield* fail(AUDIO_IMPORT_ERROR_MESSAGES.wav);
+    }
+    if (
+      head.length >= 12 &&
+      ascii(head, 0, 4) === "FORM" &&
+      ["AIFF", "AIFC"].includes(ascii(head, 8, 4))
+    ) {
+      return yield* fail(AUDIO_IMPORT_ERROR_MESSAGES.aiff);
+    }
     if (head.length >= 12 && ascii(head, 4, 4) === "ftyp") {
       const declaredSize = readUint32BE(head, 0);
       if (declaredSize < 8 || declaredSize > source.size) {
@@ -45,6 +89,6 @@ export const detectAudioFormat = (source: ByteSource) =>
     }
     if (isMp3Bytes(head)) return "mp3" as const;
     return yield* fail(
-      "unsupported or corrupt audio file. Tagium supports MP3, FLAC, and unencrypted M4A/MP4 audio.",
+      "unsupported or corrupt audio file. tagium supports mp3, flac, unencrypted m4a/mp4, and opus audio.",
     );
   }) satisfies Effect.Effect<AudioFormatKind, AudioMetadataReadError>;

@@ -1,5 +1,5 @@
 import { Effect, Option, Schema } from "effect";
-import type { AudioDownloadBitrate } from "@/features/import/cobaltAudio";
+import type { AudioDownloadBitrate, AudioDownloadFormat } from "@/features/import/cobaltAudio";
 import type { AppSettings } from "@/features/library/types";
 
 export const AUDIO_BITRATE_OPTIONS = [
@@ -10,10 +10,16 @@ export const AUDIO_BITRATE_OPTIONS = [
   "64",
 ] as const satisfies readonly AudioDownloadBitrate[];
 
+export const AUDIO_FORMAT_OPTIONS = [
+  "best",
+  "mp3",
+] as const satisfies readonly AudioDownloadFormat[];
+
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   syncTrackNumbers: true,
   syncFilenames: true,
   audioBitrate: "320",
+  audioFormat: "mp3",
   applySoundCloudAlbumCoverToTracks: true,
   advancedMetadata: false,
   metadataLinks: {
@@ -40,6 +46,10 @@ const storedAppSettingsSchema = Schema.Struct({
   audioBitrate: Schema.Literals(AUDIO_BITRATE_OPTIONS).pipe(
     Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_APP_SETTINGS.audioBitrate))),
     Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_APP_SETTINGS.audioBitrate)),
+  ),
+  audioFormat: Schema.Literals(AUDIO_FORMAT_OPTIONS).pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_APP_SETTINGS.audioFormat))),
+    Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_APP_SETTINGS.audioFormat)),
   ),
   applySoundCloudAlbumCoverToTracks: booleanWithDefault(
     DEFAULT_APP_SETTINGS.applySoundCloudAlbumCoverToTracks,

@@ -93,7 +93,7 @@ describe("track metadata editor form seam", () => {
     const markup = renderToStaticMarkup(<EditorHarness selectedFile={null} />);
 
     expect(markup).toContain("drop your audio here");
-    expect(markup).toContain(".mp3,.flac,.m4a,.mp4");
+    expect(markup).toContain(".mp3,.flac,.m4a,.mp4,.opus");
     expect(markup).not.toContain('id="track-title"');
   });
 

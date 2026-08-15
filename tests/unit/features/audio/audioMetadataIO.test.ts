@@ -4,6 +4,7 @@ import { AudioMetadataIO, AudioMetadataIOLive } from "@/features/audio/audioMeta
 import { makeAudioRuntime } from "@/features/audio/audioRuntime";
 import type { AudioMetadata, TagiumFile } from "@/features/library/types";
 import { validMp3Bytes } from "../../support/mp3TestFixtures";
+import { validOpusBytes } from "../../support/opusTestFixtures";
 
 const runtime = makeAudioRuntime(AudioMetadataIOLive);
 const run = <A, E>(effect: Effect.Effect<A, E, AudioMetadataIO>) => runtime.runPromise(effect);
@@ -19,6 +20,16 @@ const write = (file: TagiumFile, metadata: AudioMetadata) =>
       return yield* (yield* AudioMetadataIO).writeMetadataToFile(file, metadata);
     }),
   );
+
+const oggVorbisHeader = () => {
+  const bytes = new Uint8Array(35);
+  bytes.set(new TextEncoder().encode("OggS"));
+  bytes[26] = 1;
+  bytes[27] = 7;
+  bytes[28] = 1;
+  bytes.set(new TextEncoder().encode("vorbis"), 29);
+  return bytes;
+};
 
 const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   filename: "track",
@@ -54,18 +65,80 @@ describe("AudioMetadataIO", () => {
     });
   });
 
-  it("returns actionable errors for empty, corrupt, and truncated format signatures", async () => {
+  it("detects and writes Opus without trusting or preserving a false extension", async () => {
+    const opusBytes = validOpusBytes();
+    const [upload] = await parse([
+      new File([opusBytes], "renamed.bin", {
+        type: "application/octet-stream",
+      }),
+    ]);
+
+    expect(upload.file.status).toBe("pending");
+    expect(upload.file.format).toEqual({
+      kind: "opus",
+      extension: "opus",
+      mime: "audio/ogg",
+    });
+    expect(upload.file.metadata).toMatchObject({
+      filename: "renamed.bin",
+      title: "fixture title",
+    });
+
+    const output = await write(upload.file, {
+      ...upload.file.metadata!,
+      filename: "written",
+      title: "Written title",
+    });
+    expect(output).toMatchObject({ name: "written.opus", type: "audio/ogg" });
+    const [roundTrip] = await parse([output]);
+    expect(roundTrip.file.metadata).toMatchObject({
+      filename: "written",
+      title: "Written title",
+    });
+  });
+
+  it("normalizes alternate Ogg Opus extensions on export", async () => {
+    const [upload] = await parse([
+      new File([validOpusBytes()], "alternate.ogg", { type: "audio/ogg" }),
+    ]);
+
+    expect(upload.file.metadata?.filename).toBe("alternate");
+    const output = await write(upload.file, upload.file.metadata!);
+    expect(output.name).toBe("alternate.opus");
+  });
+
+  it("returns actionable errors for unsupported, corrupt, and truncated formats", async () => {
     const uploads = await parse([
       new File([], "empty.mp3"),
       new File(["not audio"], "corrupt.mp3"),
       new File(["fLaC0000"], "truncated.flac"),
+      new File([oggVorbisHeader()], "vorbis.ogg"),
+      new File(["RIFF0000WAVE"], "audio.wav"),
     ]);
-    expect(uploads.map((upload) => upload.file.status)).toEqual(["error", "error", "error"]);
+    expect(uploads.map((upload) => upload.file.status)).toEqual([
+      "error",
+      "error",
+      "error",
+      "error",
+      "error",
+    ]);
     expect(uploads.map((upload) => upload.file.downloadError)).toEqual([
       "audio file is empty.",
-      "unsupported or corrupt audio file. Tagium supports MP3, FLAC, and unencrypted M4A/MP4 audio.",
+      "unsupported or corrupt audio file. tagium supports mp3, flac, unencrypted m4a/mp4, and opus audio.",
       "FLAC file is truncated.",
+      "this ogg file uses vorbis audio.",
+      "wav files are not supported.",
     ]);
+  });
+
+  it("does not classify a truncated Ogg first page as unsupported codec", async () => {
+    const truncatedOgg = new Uint8Array(28);
+    truncatedOgg.set(new TextEncoder().encode("OggS"));
+    truncatedOgg[26] = 1;
+    truncatedOgg[27] = 7;
+    const [upload] = await parse([new File([truncatedOgg], "truncated.ogg")]);
+    expect(upload.file.downloadError).not.toBe("this ogg file does not use opus audio.");
+    expect(upload.file.downloadError).toContain("unsupported or corrupt audio file");
   });
 
   it("writes ID3 metadata while preserving every original MPEG payload byte", async () => {

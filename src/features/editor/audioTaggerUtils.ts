@@ -5,6 +5,7 @@ import {
   getAdvancedMetadataValidationErrors,
   validateAdvancedMetadataNumber,
 } from "@/features/audio/metadataFields";
+import { getPublicAudioImportError } from "@/features/audio/audioErrors";
 import { sanitizeFilenameBase } from "@/features/library/filename";
 import type { UploadedTrack } from "@/features/audio/mp3Utils";
 import type { AudioMetadata, MetadataPatch, TagiumFile } from "@/features/library/types";
@@ -37,10 +38,12 @@ export const getAcceptedUploadParseResult = (uploads: UploadedTrack[]) => {
 
 export const getUploadRejectionMessage = (rejectedUploads: UploadedTrack[]) =>
   rejectedUploads
-    .map(
-      (upload) =>
-        `${upload.file.filename} could not be imported. try a valid mp3, flac, or unencrypted m4a/mp4 file.`,
-    )
+    .map((upload) => {
+      const recovery =
+        getPublicAudioImportError(upload.file.downloadError) ??
+        "try a valid mp3, flac, unencrypted m4a/mp4, or opus file.";
+      return `${upload.file.filename} could not be imported. ${recovery}`;
+    })
     .join("\n");
 
 export const getNullableNumericMetadataValue = (

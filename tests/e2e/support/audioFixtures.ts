@@ -4,8 +4,10 @@ import { makeBlobByteSource } from "../../../src/features/audio/metadataEngine/b
 import { flacDriver } from "../../../src/features/audio/metadataEngine/flac";
 import { mp3Driver } from "../../../src/features/audio/metadataEngine/mp3/mp3Driver";
 import { mp4Driver } from "../../../src/features/audio/metadataEngine/mp4";
+import { opusDriver } from "../../../src/features/audio/metadataEngine/opus";
+import { validOpusBytes } from "../../unit/support/opusTestFixtures";
 
-export type FixtureFamily = "mp3" | "flac" | "m4a";
+export type FixtureFamily = "mp3" | "flac" | "m4a" | "opus";
 
 const ascii = (value: string) => new TextEncoder().encode(value);
 const concat = (...parts: readonly Uint8Array[]) => {
@@ -81,8 +83,18 @@ const mp4Fixture = () => {
   );
 };
 
-const drivers = { mp3: mp3Driver, flac: flacDriver, m4a: mp4Driver } as const;
-const fixtures = { mp3: mp3Fixture, flac: flacFixture, m4a: mp4Fixture } as const;
+const drivers = {
+  mp3: mp3Driver,
+  flac: flacDriver,
+  m4a: mp4Driver,
+  opus: opusDriver,
+} as const;
+const fixtures = {
+  mp3: mp3Fixture,
+  flac: flacFixture,
+  m4a: mp4Fixture,
+  opus: validOpusBytes,
+} as const;
 
 export const materializeFixture = async (family: FixtureFamily) => {
   const plan = await Effect.runPromise(
@@ -129,12 +141,33 @@ const mp4Payload = (bytes: Uint8Array) => {
   return concat(...payloads);
 };
 
+const opusPayload = (bytes: Uint8Array) => {
+  const payloads: Uint8Array[] = [];
+  let completedPackets = 0;
+  for (let offset = 0; offset < bytes.length;) {
+    const isAudioPage = completedPackets >= 2;
+    const segmentCount = bytes[offset + 26]!;
+    const bodyOffset = offset + 27 + segmentCount;
+    let bodyLength = 0;
+    for (let index = 0; index < segmentCount; index++) {
+      const segmentLength = bytes[offset + 27 + index]!;
+      bodyLength += segmentLength;
+      if (segmentLength < 255) completedPackets++;
+    }
+    if (isAudioPage) payloads.push(bytes.slice(bodyOffset, bodyOffset + bodyLength));
+    offset = bodyOffset + bodyLength;
+  }
+  return concat(...payloads);
+};
+
 export const audioPayloadSha256 = (family: FixtureFamily, bytes: Uint8Array) => {
   const payload =
     family === "mp3"
       ? mp3Payload(bytes)
       : family === "flac"
         ? flacPayload(bytes)
-        : mp4Payload(bytes);
+        : family === "m4a"
+          ? mp4Payload(bytes)
+          : opusPayload(bytes);
   return createHash("sha256").update(payload).digest("hex");
 };

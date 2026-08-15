@@ -20,6 +20,7 @@ describe("playlist download plans", () => {
     const plan = createPlaylistDownloadPlan({
       playlist,
       audioBitrate: "320",
+      audioFormat: "best",
       createId: () => "id",
     });
     expect(plan.album.sourceUrl).toBe(playlist.sourceUrl);
@@ -31,6 +32,7 @@ describe("single URL download plans", () => {
     const plan = createSingleUrlDownloadPlan({
       sourceUrl: "https://youtube.com/watch?v=abcdefghijk",
       audioBitrate: "320",
+      audioFormat: "best",
       createId: () => "track-1",
       metadata: {
         title: "Burial - Archangel (Official Audio)",
@@ -48,6 +50,7 @@ describe("single URL download plans", () => {
       },
     });
     expect(plan.queuedTracks[0]?.title).toBe("Burial - Archangel (Official Audio)");
+    expect(plan.queuedTracks[0]?.downloadRequest.audioFormat).toBe("best");
   });
 });
 
