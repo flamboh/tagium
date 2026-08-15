@@ -378,7 +378,8 @@ describe("analytics", () => {
         disable_session_recording: true,
         enable_heatmaps: false,
         disable_surveys: true,
-        person_profiles: "identified_only",
+        cookieless_mode: "always",
+        person_profiles: "never",
         before_send: expect.any(Function),
       }),
     );

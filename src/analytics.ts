@@ -873,7 +873,8 @@ export const createAnalytics = (
             disable_session_recording: true,
             enable_heatmaps: false,
             disable_surveys: true,
-            person_profiles: "identified_only",
+            cookieless_mode: "always",
+            person_profiles: "never",
             before_send: (event) => (event ? redactAndValidateEvent(event) : null),
           });
           client = loadedClient;
