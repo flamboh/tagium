@@ -9,22 +9,9 @@ Local, lossless metadata editing for MP3, FLAC, M4A, and Opus audio files.
 Drop audio files onto the page, or paste a YouTube or SoundCloud link to save a track,
 playlist, or album.
 
-From there:
-
-- **Edit a track.** Title, artist, track number, genre, cover art, and the filename it will
-  export as.
-- **Edit an album.** Album-level values can be linked so they flow down to every track in the
-  album. Unlink one in settings and tracks keep their own value.
-- **Export.** Download your library as a zip, tagged and named.
-- **Share.** Publish a track or album as a link. The link carries your metadata and artwork and the link to the original download. Whoever opens it can apply your work to their own copy of the music.
-  Share links last 90 days, and you can update or stop one at any point.
-
-Your files stay in the browser. Audio is never uploaded anywhere; only your settings and
-theme carry over between sessions.
-
 ## How it works
 
-Tagium is a React single-page app powered by two things: [Cobalt](https://cobalt.tools)'s
+Tagium is a React app powered by [Cobalt](https://cobalt.tools)'s
 download API, and a custom metadata engine.
 
 Cobalt runs as our own deployment on Fly and is used strictly as a proxy, it hands back raw
