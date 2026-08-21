@@ -20,8 +20,7 @@ audio, and your browser does the rest. Downloads are never stored.
 The metadata engine reads and rewrites tags in the browser, one driver per format. It writes
 new tags in around the audio rather than re-encoding, so tag editing is always lossless.
 
-Deeper notes live in [docs/](./docs) — downloading and scaling in
-[cobalt-audio-downloads.md](./docs/cobalt-audio-downloads.md), share-link storage in [share-operations.md](./docs/share-operations.md).
+More docs in [docs/](./docs)
 
 ## Development
 
