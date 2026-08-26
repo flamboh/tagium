@@ -1,8 +1,17 @@
-# Tagium
+<div>
+  <p align="center">
+    <img src="public/icon-512.png" alt="" width="128" height="128" />
+  </p>
 
-Local, lossless metadata editing for MP3, FLAC, M4A, and Opus audio files.
+  <h1 align="center">Tagium</h1>
 
-[Open Tagium](https://tagium.app)
+  <p align="center">
+    Local, lossless metadata editing for MP3, FLAC, M4A, and Opus audio files. <br>
+    Bring your favorite tracks anywhere you listen.
+    <br />
+    <a href="https://tagium.app">tagium.app</a>
+  </p>
+</div>
 
 ## Using it
 
@@ -35,7 +44,7 @@ bun run typecheck
 bun run lint
 ```
 
-URL imports need a Cobalt instance — point `COBALT_API_URL` at one, or run a local checkout
+URL imports need a Cobalt instance. Point `COBALT_API_URL` at one, or run a local checkout
 with `bun run dev:cobalt`. Share links stay off unless `VITE_PUBLIC_SHARE_LINKS_ENABLED=true`
 and their Cloudflare bindings are present.
 
