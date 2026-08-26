@@ -1,6 +1,7 @@
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import MediaUrlEntry from "@/features/import/MediaUrlEntry";
+import { useMediaUrlEntryController } from "@/features/import/useMediaUrlEntryController";
+import MediaUrlEntry, { type MediaUrlEntryLayout } from "@/shared/media-url/MediaUrlEntry";
 import { reactChildren, reactText } from "../../../support/reactTestNodes";
 
 const reactHookMocks = vi.hoisted(() => ({
@@ -23,8 +24,8 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 
-vi.mock("@/features/workspace/systemFailure", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/features/workspace/systemFailure")>();
+vi.mock("@/shared/systemFailure", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/shared/systemFailure")>();
   return { ...actual, reportSystemFailure };
 });
 
@@ -105,6 +106,17 @@ const changeInputValue = (tree: ReactNode, value: string) => {
   input.props.onChange?.({ target: { value } });
 };
 
+function MediaUrlEntryHarness({
+  layout,
+  onUrlImport,
+}: {
+  layout: MediaUrlEntryLayout;
+  onUrlImport: (sourceUrl: string) => void | Promise<void>;
+}) {
+  const controller = useMediaUrlEntryController(onUrlImport);
+  return MediaUrlEntry({ layout, controller });
+}
+
 afterEach(() => vi.clearAllMocks());
 
 describe("media URL entry", () => {
@@ -112,7 +124,7 @@ describe("media URL entry", () => {
     const hooks = createHookHarness();
     const onUrlImport = vi.fn(async () => undefined);
     const render = (layout: "landing" | "editor") =>
-      hooks.render(() => MediaUrlEntry({ layout, onUrlImport }));
+      hooks.render(() => MediaUrlEntryHarness({ layout, onUrlImport }));
 
     let tree = render("landing");
     changeInputValue(tree, "  https://soundcloud.com/user/track  ");
@@ -136,7 +148,8 @@ describe("media URL entry", () => {
           resolveImport = resolve;
         }),
     );
-    const render = () => hooks.render(() => MediaUrlEntry({ layout: "landing", onUrlImport }));
+    const render = () =>
+      hooks.render(() => MediaUrlEntryHarness({ layout: "landing", onUrlImport }));
 
     let tree = render();
     changeInputValue(tree, "https://soundcloud.com/user/track");
@@ -163,7 +176,8 @@ describe("media URL entry", () => {
   it("keeps malformed URL feedback local to the input", async () => {
     const hooks = createHookHarness();
     const onUrlImport = vi.fn();
-    const render = () => hooks.render(() => MediaUrlEntry({ layout: "landing", onUrlImport }));
+    const render = () =>
+      hooks.render(() => MediaUrlEntryHarness({ layout: "landing", onUrlImport }));
 
     let tree = render();
     changeInputValue(tree, "not a url");
@@ -187,7 +201,8 @@ describe("media URL entry", () => {
     const onUrlImport = vi.fn(async () => {
       throw failure;
     });
-    const render = () => hooks.render(() => MediaUrlEntry({ layout: "editor", onUrlImport }));
+    const render = () =>
+      hooks.render(() => MediaUrlEntryHarness({ layout: "editor", onUrlImport }));
 
     let tree = render();
     changeInputValue(tree, "https://youtube.com/watch?v=abc");
@@ -209,7 +224,8 @@ describe("media URL entry", () => {
     const onUrlImport = vi.fn(async () => {
       throw new Error("soundcloud set request failed (404)");
     });
-    const render = () => hooks.render(() => MediaUrlEntry({ layout: "landing", onUrlImport }));
+    const render = () =>
+      hooks.render(() => MediaUrlEntryHarness({ layout: "landing", onUrlImport }));
 
     let tree = render();
     changeInputValue(tree, "https://soundcloud.com/user/sets/missing");

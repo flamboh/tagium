@@ -1,0 +1,184 @@
+import { expect, test } from "@playwright/test";
+
+test("keeps the tagium save logo fixed through download states", async ({ page, browserName }) => {
+  test.skip(browserName !== "chromium", "layout geometry is covered in Chromium");
+  await page.setViewportSize({ width: 320, height: 568 });
+
+  let releasePlan = () => {};
+  const planGate = new Promise<void>((resolve) => {
+    releasePlan = resolve;
+  });
+
+  await page.route("**/api/cobalt/download", async (route) => {
+    await planGate;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "tunnel",
+        url: "https://media.test/stable-layout.mp4",
+        filename: "stable-layout.mp4",
+      }),
+    });
+  });
+  await page.route("https://media.test/stable-layout.mp4", (route) =>
+    route.fulfill({
+      status: 200,
+      headers: {
+        "Content-Type": "video/mp4",
+        "Content-Length": "5",
+      },
+      body: "video",
+    }),
+  );
+
+  await page.goto("/?app=tagium-save");
+
+  const logo = page.getByRole("heading", { name: "tagium save" });
+  const readLogoTop = async () => {
+    const bounds = await logo.boundingBox();
+    if (!bounds) throw new Error("tagium logo bounds were not found");
+    return bounds.y;
+  };
+
+  const idleTop = await readLogoTop();
+  await page.getByRole("textbox", { name: "media url" }).fill("https://example.com/video");
+  await page.getByRole("button", { name: "start video download" }).click();
+  await expect(page.getByText("preparing", { exact: true })).toBeVisible();
+  expect(await readLogoTop()).toBe(idleTop);
+
+  releasePlan();
+  await expect(page.getByRole("button", { name: "download stable-layout.mp4" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "media url" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "media url" })).toHaveValue("");
+  expect(await readLogoTop()).toBe(idleTop);
+});
+
+test("reserves progress space above recent downloads", async ({ page, browserName }) => {
+  test.skip(browserName !== "chromium", "layout geometry is covered in Chromium");
+  await page.setViewportSize({ width: 320, height: 568 });
+
+  let requestNumber = 0;
+  let releaseSecondPlan = () => {};
+  const secondPlanGate = new Promise<void>((resolve) => {
+    releaseSecondPlan = resolve;
+  });
+
+  await page.route("**/api/cobalt/download", async (route) => {
+    requestNumber += 1;
+    if (requestNumber === 2) await secondPlanGate;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "tunnel",
+        url: `https://media.test/reserved-${requestNumber}.mp4`,
+        filename: `reserved-${requestNumber}.mp4`,
+      }),
+    });
+  });
+  await page.route("https://media.test/**", (route) =>
+    route.fulfill({
+      status: 200,
+      headers: {
+        "Content-Type": "video/mp4",
+        "Content-Length": "5",
+      },
+      body: "video",
+    }),
+  );
+
+  await page.goto("/?app=tagium-save");
+  const mediaUrl = page.getByRole("textbox", { name: "media url" });
+  await mediaUrl.fill("https://example.com/one");
+  await page.getByRole("button", { name: "start video download" }).click();
+
+  const firstDownload = page.locator("[data-save-download-item]");
+  await expect(firstDownload).toHaveText("reserved-1.mp4");
+  const settledBounds = await firstDownload.boundingBox();
+  if (!settledBounds) throw new Error("recent download bounds were not found");
+
+  await mediaUrl.fill("https://example.com/two");
+  await page.getByRole("button", { name: "start video download" }).click();
+  await expect(page.getByText("preparing", { exact: true })).toBeVisible();
+  expect((await firstDownload.boundingBox())?.y).toBe(settledBounds.y);
+
+  releaseSecondPlan();
+  await expect(page.getByRole("button", { name: "download reserved-2.mp4" })).toBeVisible();
+});
+
+test("keeps only the five most recent downloads", async ({ page }) => {
+  let downloadNumber = 0;
+
+  await page.route("**/api/cobalt/download", (route) => {
+    downloadNumber += 1;
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "tunnel",
+        url: `https://media.test/history-${downloadNumber}.mp4`,
+        filename: `history-${downloadNumber}.mp4`,
+      }),
+    });
+  });
+  await page.route("https://media.test/**", (route) =>
+    route.fulfill({
+      status: 200,
+      headers: {
+        "Content-Type": "video/mp4",
+        "Content-Length": "5",
+      },
+      body: "video",
+    }),
+  );
+
+  await page.goto("/?app=tagium-save");
+
+  for (let index = 1; index <= 6; index += 1) {
+    await page.getByRole("textbox", { name: "media url" }).fill(`https://example.com/${index}`);
+    await page.getByRole("button", { name: "start video download" }).click();
+    await expect(page.getByRole("button", { name: `download history-${index}.mp4` })).toBeVisible();
+  }
+
+  const downloads = page.locator("[data-save-download-item]");
+  await expect(downloads).toHaveCount(5);
+  await expect(downloads).toHaveText([
+    "history-6.mp4",
+    "history-5.mp4",
+    "history-4.mp4",
+    "history-3.mp4",
+    "history-2.mp4",
+  ]);
+  await expect(page.getByText("history-1.mp4", { exact: true })).not.toBeAttached();
+
+  const downloadEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: "download history-6.mp4" }).click();
+  expect((await downloadEvent).suggestedFilename()).toBe("history-6.mp4");
+});
+
+test("offers audio returned with picker media", async ({ page }) => {
+  await page.route("**/api/cobalt/download", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "picker",
+        picker: [{ type: "photo", url: "https://media.test/photo.jpg" }],
+        audio: "https://media.test/post-audio.mp3",
+        audioFilename: "post-audio.mp3",
+      }),
+    }),
+  );
+  await page.route("https://media.test/**", (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { "Content-Type": "audio/mpeg" },
+      body: "audio",
+    }),
+  );
+
+  await page.goto("/?app=tagium-save");
+  await page.getByRole("textbox", { name: "media url" }).fill("https://example.com/post");
+  await page.getByRole("button", { name: "start video download" }).click();
+  await page.getByRole("button", { name: "download post-audio.mp3" }).click();
+
+  await expect(page.getByRole("button", { name: "download post-audio.mp3" })).toBeVisible();
+  await expect(page.locator("[data-save-download-item]")).toHaveText("post-audio.mp3");
+});

@@ -1,5 +1,6 @@
 import { Context, Effect, Layer } from "effect";
 import { AudioDecodeError, toPublicAudioError } from "@/features/audio/audioErrors";
+import { cobaltDownloadScheduler } from "@/shared/cobalt/cobaltDownloadScheduler";
 import { decodeCobaltDownloadPlanEffect } from "@/features/import/cobaltAudioSchemas";
 import {
   LocalAudioProcessor,
@@ -47,151 +48,7 @@ export interface CobaltAudioDownloadRequest {
   signal?: AbortSignal;
 }
 
-const MAX_CONCURRENT_COBALT_DOWNLOADS = 4;
-const COBALT_TUNNEL_START_INTERVAL_MS = 1_600;
 const MAX_TUNNEL_ATTEMPTS = 7;
-let activeCobaltDownloads = 0;
-const pendingCobaltDownloads: (() => void)[] = [];
-let nextCobaltTunnelStartAt = 0;
-let cobaltTunnelStartQueue = Promise.resolve();
-let waitingCobaltTunnelStarts = 0;
-
-const delay = async (milliseconds: number, signal?: AbortSignal) => {
-  signal?.throwIfAborted();
-
-  await new Promise<void>((resolve, reject) => {
-    let timeout: ReturnType<typeof setTimeout>;
-    const onAbort = () => {
-      clearTimeout(timeout);
-      reject(signal?.reason);
-    };
-
-    timeout = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve();
-    }, milliseconds);
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
-};
-
-const reserveCobaltDownloadSlot = async (signal?: AbortSignal) => {
-  signal?.throwIfAborted();
-
-  if (activeCobaltDownloads < MAX_CONCURRENT_COBALT_DOWNLOADS) {
-    activeCobaltDownloads += 1;
-    return;
-  }
-
-  await new Promise<void>((resolve, reject) => {
-    const resolveSlot = () => {
-      signal?.removeEventListener("abort", onAbort);
-      if (signal?.aborted) {
-        releaseCobaltDownloadSlot();
-        reject(signal.reason);
-        return;
-      }
-      resolve();
-    };
-    const onAbort = () => {
-      const pendingIndex = pendingCobaltDownloads.indexOf(resolveSlot);
-      if (pendingIndex >= 0) {
-        pendingCobaltDownloads.splice(pendingIndex, 1);
-      }
-      reject(signal?.reason);
-    };
-
-    signal?.addEventListener("abort", onAbort, { once: true });
-    pendingCobaltDownloads.push(resolveSlot);
-  });
-};
-
-const releaseCobaltDownloadSlot = () => {
-  const next = pendingCobaltDownloads.shift();
-  if (next) {
-    next();
-    return;
-  }
-
-  activeCobaltDownloads -= 1;
-};
-
-const withCobaltDownloadSlot = <Value, Error, Requirements>(
-  download: Effect.Effect<Value, Error, Requirements>,
-  signal?: AbortSignal,
-) =>
-  Effect.acquireUseRelease(
-    Effect.tryPromise({
-      try: () => reserveCobaltDownloadSlot(signal),
-      catch: toPublicAudioError,
-    }),
-    () => download,
-    () =>
-      Effect.sync(() => {
-        releaseCobaltDownloadSlot();
-      }),
-  );
-
-const waitForCobaltTunnelStart = async (
-  onLifecycle?: CobaltAudioDownloadLifecycleCallback,
-  signal?: AbortSignal,
-) => {
-  signal?.throwIfAborted();
-
-  let releaseQueue = () => {};
-  const previousQueue = cobaltTunnelStartQueue;
-  cobaltTunnelStartQueue = new Promise<void>((resolve) => {
-    releaseQueue = resolve;
-  });
-  let isWaitingForBudget = false;
-  waitingCobaltTunnelStarts += 1;
-
-  try {
-    if (waitingCobaltTunnelStarts > 1 || nextCobaltTunnelStartAt > Date.now()) {
-      isWaitingForBudget = true;
-      onLifecycle?.({ type: "tunnel-budget-wait-started" });
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      const onAbort = () => {
-        signal?.removeEventListener("abort", onAbort);
-        reject(signal?.reason);
-      };
-
-      previousQueue.then(
-        () => {
-          signal?.removeEventListener("abort", onAbort);
-          resolve();
-        },
-        (error) => {
-          signal?.removeEventListener("abort", onAbort);
-          reject(error);
-        },
-      );
-      signal?.addEventListener("abort", onAbort, { once: true });
-    });
-
-    signal?.throwIfAborted();
-
-    const waitMs = nextCobaltTunnelStartAt - Date.now();
-    if (waitMs > 0) {
-      if (!isWaitingForBudget) {
-        onLifecycle?.({ type: "tunnel-budget-wait-started" });
-        isWaitingForBudget = true;
-      }
-
-      await delay(waitMs, signal);
-    }
-
-    signal?.throwIfAborted();
-    nextCobaltTunnelStartAt = Date.now() + COBALT_TUNNEL_START_INTERVAL_MS;
-  } finally {
-    waitingCobaltTunnelStarts -= 1;
-    releaseQueue();
-    if (isWaitingForBudget) {
-      onLifecycle?.({ type: "tunnel-budget-wait-ended" });
-    }
-  }
-};
 
 const getStableLastModified = (sourceUrl: string) =>
   Array.from(sourceUrl).reduce((hash, character) => {
@@ -298,7 +155,13 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
   ) =>
     Effect.tryPromise({
       try: async () => {
-        await waitForCobaltTunnelStart(onLifecycle, signal);
+        await cobaltDownloadScheduler.waitForTunnelStart({
+          signal,
+          onWaitChange: (waiting) =>
+            onLifecycle?.({
+              type: waiting ? "tunnel-budget-wait-started" : "tunnel-budget-wait-ended",
+            }),
+        });
 
         const startedAt = Date.now();
         const response = await fetch(url, { signal });
@@ -359,9 +222,14 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
 
   return CobaltAudio.of({
     download: (request) =>
-      withCobaltDownloadSlot(runDownload(request), request.signal).pipe(
-        Effect.mapError(toPublicAudioError),
-      ),
+      Effect.tryPromise({
+        try: () =>
+          cobaltDownloadScheduler.schedule(
+            () => Effect.runPromise(runDownload(request)),
+            request.signal,
+          ),
+        catch: toPublicAudioError,
+      }).pipe(Effect.mapError(toPublicAudioError)),
   });
 });
 

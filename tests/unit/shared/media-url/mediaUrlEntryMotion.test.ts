@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { getMediaUrlEntryMotionKeyframes } from "@/features/import/mediaUrlEntryMotion";
+import { getMediaUrlEntryMotionKeyframes } from "@/shared/media-url/mediaUrlEntryMotion";
 
 describe("media URL entry motion", () => {
   it("animates position and real width without scaling the form", () => {

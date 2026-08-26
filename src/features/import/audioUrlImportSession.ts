@@ -24,7 +24,7 @@ import {
 } from "@/features/import/playlistDownloadController";
 import type { Playlist } from "@/features/import/playlist";
 import { resolveSoundCloudSet } from "@/features/import/soundcloudSet";
-import { reportSystemFailure } from "@/features/workspace/systemFailure";
+import { reportSystemFailure } from "@/shared/systemFailure";
 import { resolveTrackMetadata, type TrackMetadata } from "@/features/import/trackMetadata";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { LibraryStore } from "@/features/library/useLibraryStore";

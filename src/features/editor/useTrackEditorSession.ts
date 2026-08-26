@@ -16,7 +16,7 @@ import {
   getNullableNumericPatchValue,
   getSubmittedAudioMetadata,
 } from "@/features/editor/audioTaggerUtils";
-import { getSystemFailurePresentation } from "@/features/workspace/systemFailure";
+import { getSystemFailurePresentation } from "@/shared/systemFailure";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type {
   AlbumGroup,

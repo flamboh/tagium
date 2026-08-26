@@ -2,6 +2,12 @@
 
 Tagium lets people prepare track and album metadata locally and share that work without sharing the downloaded audio files themselves.
 
+## Products
+
+**Tagium Save**:
+Tagium's companion app for saving public media supported by the configured download provider.
+_Avoid_: Video downloader, free-form downloader
+
 ## Shared content
 
 **Shared source**:

@@ -17,7 +17,7 @@ import type { PlaylistDownloadRuntimeTrack } from "@/features/import/playlistDow
 import {
   createDownloadAdmissionWindow,
   type DownloadAdmissionWindow,
-} from "@/features/import/downloadAdmissionWindow";
+} from "@/shared/cobalt/downloadAdmissionWindow";
 
 type Track = PlaylistDownloadRuntimeTrack & {
   sourceUrl: string;

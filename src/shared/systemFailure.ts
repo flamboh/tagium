@@ -63,7 +63,7 @@ const KNOWN_FAILURES = {
     code: "service_unavailable",
     title: "downloads are temporarily unavailable",
     description: "tagium could not reach the download service. try again soon.",
-    trackDescription: "audio downloads are temporarily unavailable.",
+    trackDescription: "downloads are temporarily unavailable.",
     retryable: true,
     dedupeKey: "system-download-service-unavailable",
   },
@@ -153,6 +153,21 @@ const errorMessage = (cause: unknown) => {
   return "";
 };
 
+const COBALT_UNSUPPORTED_CODES = [
+  "error.api.link.unsupported",
+  "error.api.service.unsupported",
+  "error.api.service.audio_not_supported",
+] as const;
+
+const COBALT_PRIVATE_OR_MISSING_CODES = [
+  "error.api.content.post.private",
+  "error.api.content.post.unavailable",
+  "error.api.content.post.age",
+  "error.api.content.video.private",
+  "error.api.content.video.unavailable",
+  "error.api.content.video.age",
+] as const;
+
 const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | null => {
   const lower = message.toLowerCase();
 
@@ -161,6 +176,7 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
     lower.includes("error.api.rate_exceeded") ||
     lower.includes("rate limit") ||
     lower.includes("rate-limit") ||
+    lower.includes("too many downloads") ||
     /\b429\b/.test(lower)
   ) {
     return KNOWN_FAILURES.rate_limited;
@@ -176,10 +192,15 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
   ) {
     return KNOWN_FAILURES.service_unavailable;
   }
-  if (lower.includes("unsupported url") || lower.includes("not supported")) {
+  if (
+    COBALT_UNSUPPORTED_CODES.some((code) => lower.includes(code)) ||
+    lower.includes("unsupported url") ||
+    lower.includes("not supported")
+  ) {
     return KNOWN_FAILURES.unsupported_source;
   }
   if (
+    COBALT_PRIVATE_OR_MISSING_CODES.some((code) => lower.includes(code)) ||
     lower.includes("error.api.content_unavailable") ||
     lower.includes("error.api.private") ||
     lower.includes("error.api.not_found") ||
@@ -193,8 +214,10 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
     return KNOWN_FAILURES.private_or_missing;
   }
   if (
+    lower.includes("error.api.fetch.empty") ||
     lower.includes("malformed") ||
     lower.includes("invalid response") ||
+    lower.includes("invalid download plan") ||
     lower.includes("non-json") ||
     lower.includes("response was empty") ||
     lower.includes("missing audio") ||

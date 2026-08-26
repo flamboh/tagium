@@ -19,7 +19,7 @@ import {
   sortTrackIdsByTrackNumber,
   sortUploadedTracksByTrackNumber,
 } from "@/features/audio/mp3Utils";
-import { reportSystemFailure } from "@/features/workspace/systemFailure";
+import { reportSystemFailure } from "@/shared/systemFailure";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type {
   AlbumGroup,

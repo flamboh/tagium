@@ -3,7 +3,7 @@ import { analytics } from "@/analytics";
 import { saveAppSettings } from "@/features/settings/settings";
 import { getMetadataLinkState } from "@/features/library/metadataLinks";
 import type { SettingsPageProps } from "@/features/settings/SettingsPage";
-import { reportSystemFailure } from "@/features/workspace/systemFailure";
+import { reportSystemFailure } from "@/shared/systemFailure";
 import type { AppSettings } from "@/features/library/types";
 import type { WorkspaceNavigation } from "@/features/workspace/workspaceNavigation";
 

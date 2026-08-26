@@ -1,23 +1,15 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { ArrowRight02Icon, Link02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { MediaUrlEntryLayout } from "@/features/import/mediaUrlEntryPresentation";
-import { getMediaUrlEntryMotionKeyframes } from "@/features/import/mediaUrlEntryMotion";
-import {
-  getSystemFailurePresentation,
-  reportSystemFailure,
-} from "@/features/workspace/systemFailure";
-import {
-  SharedContentUnavailableError,
-  SharedContentVersionError,
-} from "@/features/share/shareClient";
-import { InvalidShareLinkError, ShareLinksDisabledError } from "@/features/share/shareLink";
+import { getMediaUrlEntryMotionKeyframes } from "@/shared/media-url/mediaUrlEntryMotion";
+
+export type MediaUrlEntryLayout = "landing" | "standalone" | "empty-editor" | "editor";
 
 export interface MediaUrlEntryController {
   sourceUrl: string;
@@ -29,19 +21,10 @@ export interface MediaUrlEntryController {
 
 type MediaUrlEntryProps = {
   layout: MediaUrlEntryLayout;
-  controller?: MediaUrlEntryController;
-  onUrlImport: (sourceUrl: string) => void | Promise<void>;
-};
-
-const validateMediaUrl = (value: string) => {
-  if (!value) return "enter a media url";
-  try {
-    const url = new URL(value);
-    if (url.protocol === "http:" || url.protocol === "https:") return null;
-  } catch {
-    // The local validation message below is intentionally more useful than URL's exception.
-  }
-  return "enter a complete http or https url";
+  controller: MediaUrlEntryController;
+  leadingAction?: ReactNode;
+  placeholder?: string;
+  submitAriaLabel?: string;
 };
 
 const prefersReducedMotion = () =>
@@ -59,75 +42,13 @@ const clearMotionStyles = (anchor: HTMLDivElement | null, motion: HTMLDivElement
   motion.style.zIndex = "";
 };
 
-export function useMediaUrlEntryController(
-  onUrlImport: (sourceUrl: string) => void | Promise<void>,
-): MediaUrlEntryController {
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const submit = async () => {
-    if (submitting) return true;
-    const trimmedUrl = sourceUrl.trim();
-    const localError = validateMediaUrl(trimmedUrl);
-    if (localError) {
-      setValidationError(localError);
-      return false;
-    }
-
-    setSubmitting(true);
-    setValidationError(null);
-    try {
-      await onUrlImport(trimmedUrl);
-      setSourceUrl("");
-      return true;
-    } catch (error) {
-      if (
-        error instanceof InvalidShareLinkError ||
-        error instanceof ShareLinksDisabledError ||
-        error instanceof SharedContentUnavailableError
-      ) {
-        setValidationError(error.message);
-        return false;
-      } else if (error instanceof SharedContentVersionError) {
-        setValidationError("this link was made by a newer tagium version");
-        return false;
-      } else {
-        const presentation = getSystemFailurePresentation(error, "import");
-        if (
-          presentation.code === "unsupported_source" ||
-          presentation.code === "private_or_missing"
-        ) {
-          setValidationError(presentation.description.toLowerCase().replace(/\.$/, ""));
-          return false;
-        } else {
-          reportSystemFailure(error, "import");
-          return true;
-        }
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return {
-    sourceUrl,
-    submitting,
-    validationError,
-    setSourceUrl: (nextSourceUrl) => {
-      setSourceUrl(nextSourceUrl);
-      setValidationError(null);
-    },
-    submit,
-  };
-}
-
 export default function MediaUrlEntry({
   layout,
-  controller: controlledController,
-  onUrlImport,
+  controller,
+  leadingAction,
+  placeholder = "soundcloud, youtube, or tagium share link",
+  submitAriaLabel = "start media import",
 }: MediaUrlEntryProps) {
-  const internalController = useMediaUrlEntryController(onUrlImport);
-  const controller = controlledController ?? internalController;
   const anchorRef = useRef<HTMLDivElement>(null);
   const motionRef = useRef<HTMLDivElement>(null);
   const previousRectRef = useRef<DOMRect | null>(null);
@@ -219,6 +140,7 @@ export default function MediaUrlEntry({
       className={cn(
         layout === "landing" &&
           "flex w-full flex-col gap-10 max-lg:[@media(max-height:700px)]:gap-6",
+        layout === "standalone" && "w-full",
         layout === "editor" &&
           "flex-shrink-0 border-t bg-background/95 p-3 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-4 lg:z-10 lg:flex lg:justify-center lg:border-t-0 lg:bg-transparent lg:px-4 lg:p-0",
         layout === "empty-editor" &&
@@ -234,7 +156,10 @@ export default function MediaUrlEntry({
       )}
       <div
         ref={anchorRef}
-        className={cn("w-full", layout === "landing" ? "max-w-md" : "max-w-3xl")}
+        className={cn(
+          "w-full",
+          layout === "landing" || layout === "standalone" ? "max-w-md" : "max-w-3xl",
+        )}
       >
         <div ref={motionRef} className="pointer-events-auto w-full bg-background">
           <form
@@ -245,6 +170,7 @@ export default function MediaUrlEntry({
             }}
             className="flex items-start gap-2"
           >
+            {leadingAction}
             <div className="min-w-0 flex-1">
               <div className="relative">
                 <HugeiconsIcon
@@ -261,7 +187,7 @@ export default function MediaUrlEntry({
                   aria-invalid={Boolean(controller.validationError)}
                   aria-describedby={controller.validationError ? "media-url-error" : undefined}
                   onChange={(event) => controller.setSourceUrl(event.target.value)}
-                  placeholder="soundcloud, youtube, or tagium share link"
+                  placeholder={placeholder}
                   disabled={controller.submitting}
                   className="h-10 rounded-lg pl-9 placeholder:text-muted-foreground/45"
                 />
@@ -282,7 +208,7 @@ export default function MediaUrlEntry({
               type="submit"
               size="icon"
               disabled={!canSubmit}
-              aria-label="start media import"
+              aria-label={submitAriaLabel}
               aria-busy={controller.submitting || undefined}
               className="size-10 rounded-lg"
             >

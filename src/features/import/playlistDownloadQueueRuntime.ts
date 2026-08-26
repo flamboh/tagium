@@ -8,7 +8,7 @@ import {
   markPlaylistDownloadFailed,
   retryPlaylistDownloadItem,
 } from "@/features/import/playlistDownloadQueue";
-import type { DownloadAdmissionWindow } from "@/features/import/downloadAdmissionWindow";
+import type { DownloadAdmissionWindow } from "@/shared/cobalt/downloadAdmissionWindow";
 import type {
   PlaylistDownloadQueueState as PlaylistDownloadQueueModel,
   PlaylistDownloadQueueTrack as PlaylistDownloadQueueModelTrack,

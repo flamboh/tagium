@@ -32,7 +32,7 @@ import {
   useMetadataEditorMode,
   type MetadataEditorMode,
 } from "@/features/editor/useMetadataEditorMode";
-import { getTrackFailureDisplay } from "@/features/workspace/systemFailure";
+import { getTrackFailureDisplay } from "@/shared/systemFailure";
 import type { AlbumGroup, AudioMetadata, TagiumFile } from "@/features/library/types";
 import { getAudioFormat } from "@/features/audio/audioFormat";
 import {

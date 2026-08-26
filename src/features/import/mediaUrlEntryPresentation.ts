@@ -1,4 +1,4 @@
-export type MediaUrlEntryLayout = "landing" | "empty-editor" | "editor";
+import type { MediaUrlEntryLayout } from "@/shared/media-url/MediaUrlEntry";
 
 export interface MediaUrlEntryPresentation {
   layout: MediaUrlEntryLayout;

@@ -1,3 +1,9 @@
+import {
+  enforceRateLimit,
+  getDeployEnv,
+  type CobaltRuntimeEnv as DevControlRuntimeEnv,
+} from "./dev-controls";
+
 export type CloudflareRateLimitBinding = {
   limit: (input: { key: string }) => Promise<{ success: boolean }>;
 };
@@ -10,6 +16,11 @@ export type CobaltRequestAdmissionDecision =
 export interface CobaltRequestAdmission {
   admit: (request: Request) => Promise<CobaltRequestAdmissionDecision>;
 }
+
+export type CobaltAdmissionRuntimeEnv = {
+  COBALT_CLIENT_RATE_LIMITER?: CloudflareRateLimitBinding;
+  COBALT_SESSION_RATE_LIMITER?: CloudflareRateLimitBinding;
+} & DevControlRuntimeEnv;
 
 const SESSION_COOKIE_NAME = "tagium_client_id";
 const SESSION_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
@@ -80,3 +91,20 @@ export const createInMemoryCobaltRequestAdmission = (
   admit: async (request) =>
     enforce(request) ? { status: "limited", scope: "client" } : { status: "allowed" },
 });
+
+/** Uses Tagium's provisioned admission policy in deployed environments and its dev policy locally. */
+export const getCobaltRequestAdmission = (
+  request: Request,
+  runtimeEnv: CobaltAdmissionRuntimeEnv,
+): CobaltRequestAdmission | undefined => {
+  if (runtimeEnv.COBALT_SESSION_RATE_LIMITER && runtimeEnv.COBALT_CLIENT_RATE_LIMITER) {
+    return createCloudflareCobaltRequestAdmission({
+      sessionLimiter: runtimeEnv.COBALT_SESSION_RATE_LIMITER,
+      clientLimiter: runtimeEnv.COBALT_CLIENT_RATE_LIMITER,
+    });
+  }
+
+  return getDeployEnv(request, runtimeEnv).deployEnv === "local"
+    ? createInMemoryCobaltRequestAdmission(enforceRateLimit)
+    : undefined;
+};

@@ -19,7 +19,7 @@ import {
 import { isValidFilenameBase } from "@/features/library/filename";
 import { getSubmittedAudioMetadata } from "@/features/editor/audioTaggerUtils";
 import { writeExportMetadata } from "@/features/export/exportMetadataWrites";
-import { reportSystemFailure } from "@/features/workspace/systemFailure";
+import { reportSystemFailure } from "@/shared/systemFailure";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type { AlbumGroup, AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";

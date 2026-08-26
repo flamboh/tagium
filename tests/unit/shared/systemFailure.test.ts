@@ -4,7 +4,7 @@ import {
   getTrackFailureDisplay,
   reportSystemFailure,
   resetSystemFailureReportingForTest,
-} from "@/features/workspace/systemFailure";
+} from "@/shared/systemFailure";
 
 const toastMocks = vi.hoisted(() => ({ error: vi.fn() }));
 
@@ -20,6 +20,11 @@ describe("system failure reporting", () => {
   it.each([
     ["error.api.capacity_exceeded", "capacity", "downloads are busy"],
     ["Cobalt tunnel request failed (429)", "rate_limited", "too many download requests"],
+    [
+      "too many downloads too quickly. wait a moment, then try again.",
+      "rate_limited",
+      "too many download requests",
+    ],
     ["error.api.timed_out", "timeout", "the download took too long"],
     ["error.api.unreachable", "service_unavailable", "downloads are temporarily unavailable"],
   ] as const)("maps %s to safe public copy", (message, code, title) => {
@@ -48,6 +53,40 @@ describe("system failure reporting", () => {
       code: "unsupported_source",
       retryable: false,
       description: "try a public soundcloud or youtube track url.",
+    });
+  });
+
+  it.each([
+    "error.api.link.unsupported",
+    "error.api.service.unsupported",
+    "error.api.service.audio_not_supported",
+  ])("maps typed Cobalt unsupported code %s to a non-retryable failure", (message) => {
+    expect(getSystemFailurePresentation(new Error(message), "download")).toMatchObject({
+      code: "unsupported_source",
+      retryable: false,
+    });
+  });
+
+  it.each([
+    "error.api.content.post.private",
+    "error.api.content.post.unavailable",
+    "error.api.content.post.age",
+    "error.api.content.video.private",
+    "error.api.content.video.unavailable",
+    "error.api.content.video.age",
+  ])("maps typed Cobalt unavailable code %s to a non-retryable failure", (message) => {
+    expect(getSystemFailurePresentation(new Error(message), "download")).toMatchObject({
+      code: "private_or_missing",
+      retryable: false,
+    });
+  });
+
+  it("maps Cobalt's typed empty-fetch code to the invalid response category", () => {
+    expect(
+      getSystemFailurePresentation(new Error("error.api.fetch.empty"), "download"),
+    ).toMatchObject({
+      code: "invalid_response",
+      retryable: true,
     });
   });
 

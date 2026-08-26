@@ -823,4 +823,14 @@ describe("share manifest endpoints", () => {
       expect(otherHeaders.get("x-robots-tag")).toBeNull();
     }
   });
+
+  it("keeps tagium save out of search indexes", () => {
+    const headers = new Headers();
+    noindexMiddleware({
+      req: new Request("https://save.tagium.app/"),
+      res: { headers },
+    } as Parameters<typeof noindexMiddleware>[0]);
+
+    expect(headers.get("x-robots-tag")).toBe("noindex, nofollow");
+  });
 });

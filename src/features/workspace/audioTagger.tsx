@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import AlbumMetadataDialog from "@/features/editor/AlbumMetadataDialog";
 import DestructiveActionDialog from "@/features/workspace/DestructiveActionDialog";
 import LandingScreen from "@/features/import/LandingScreen";
-import MediaUrlEntry, { useMediaUrlEntryController } from "@/features/import/MediaUrlEntry";
+import MediaUrlEntry from "@/shared/media-url/MediaUrlEntry";
 import MetadataCleanupDialog from "@/features/library/MetadataCleanupDialog";
 import { getMetadataLinkState } from "@/features/library/metadataLinks";
 import SettingsPage from "@/features/settings/SettingsPage";
 import TagSidebarPanel from "@/features/library/TagSidebarPanel";
 import TrackMetadataEditor from "@/features/editor/TrackMetadataEditor";
 import { getMediaUrlEntryPresentation } from "@/features/import/mediaUrlEntryPresentation";
+import { useMediaUrlEntryController } from "@/features/import/useMediaUrlEntryController";
 import {
   hasRecoverableSessionWork,
   useBeforeUnloadProtection,
@@ -291,7 +292,6 @@ export default function AudioTagger() {
               <MediaUrlEntry
                 layout={mediaUrlEntryPresentation.layout}
                 controller={mediaUrlEntryController}
-                onUrlImport={handleUrlImport}
               />
             )}
           </LandingScreen>
