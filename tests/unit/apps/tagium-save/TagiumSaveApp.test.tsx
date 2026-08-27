@@ -1,14 +1,15 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import TagiumSaveApp, {
+import TagiumSaveApp from "@/apps/tagium-save/TagiumSaveApp";
+import {
   buildVideoDownloadRequest,
   getDownloadReadyAnnouncement,
   getVideoDownloadPhaseLabel,
   presentVideoDownloadFailure,
   updateVideoDownloadSettings,
   type VideoDownloadSettings,
-} from "@/apps/tagium-save/TagiumSaveApp";
+} from "@/apps/tagium-save/tagiumSaveModel";
 import { VideoDownloadError, type VideoFileDownloadResult } from "@/apps/tagium-save/download";
 import { resetSystemFailureReportingForTest } from "@/shared/systemFailure";
 

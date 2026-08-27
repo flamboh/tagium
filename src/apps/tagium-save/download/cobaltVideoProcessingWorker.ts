@@ -127,11 +127,13 @@ export const encodeWithLibAV = async (
   };
 
   try {
-    for (const [index, file] of request.files.entries()) {
-      const inputName = inputNames[index];
-      if (!inputName) throw new Error("local video processing input names are out of sync.");
-      await libav.mkreadaheadfile(inputName, file);
-    }
+    await Promise.all(
+      request.files.map((file, index) => {
+        const inputName = inputNames[index];
+        if (!inputName) throw new Error("local video processing input names are out of sync.");
+        return libav.mkreadaheadfile(inputName, file);
+      }),
+    );
 
     await libav.mkwriterdev(output);
     await libav.mkwriterdev(VIDEO_PROGRESS_FILENAME);

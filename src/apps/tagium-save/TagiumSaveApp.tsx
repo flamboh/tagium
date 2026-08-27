@@ -15,15 +15,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import MediaUrlEntry, { type MediaUrlEntryController } from "@/shared/media-url/MediaUrlEntry";
 import { TagiumBrand } from "@/shared/brand/TagiumBrand";
 import {
-  cobaltAudioFormats,
-  cobaltDownloadModes,
   cobaltVideoCodecs,
   startVideoDownload,
   type CobaltPickerItem,
-  type CobaltVideoCodec,
-  type CobaltVideoContainer,
   type CobaltVideoDownloadRequest,
-  type CobaltVideoQuality,
   type VideoDownloadCallbacks,
   type VideoDownloadPhase,
   type VideoDownloadProgress,
@@ -32,7 +27,15 @@ import {
   type VideoFileDownloadResult,
   type VideoPickerDownloadResult,
 } from "@/apps/tagium-save/download";
-import { reportSystemFailure, type SystemFailurePresentation } from "@/shared/systemFailure";
+import {
+  buildVideoDownloadRequest,
+  getDownloadReadyAnnouncement,
+  getVideoDownloadPhaseLabel,
+  presentVideoDownloadFailure,
+  updateVideoDownloadSettings,
+  type VideoDownloadSettings,
+  type VideoDownloadSettingsUpdate,
+} from "@/apps/tagium-save/tagiumSaveModel";
 import { cn } from "@/lib/utils";
 
 /**
@@ -43,52 +46,6 @@ import { cn } from "@/lib/utils";
  * the wordmark sits above the standalone URL form in the same narrow centered column, with settings
  * beside the URL field. FORM: a direct landing form with one compact popover and inline state rows.
  */
-
-export type VideoDownloadSettings = {
-  mode: (typeof cobaltDownloadModes)[number];
-  quality: Extract<CobaltVideoQuality, "1080" | "720" | "480">;
-  container: Extract<CobaltVideoContainer, "mp4" | "webm" | "mkv">;
-  codec: CobaltVideoCodec;
-  audioFormat: Extract<(typeof cobaltAudioFormats)[number], "best" | "mp3" | "opus">;
-};
-
-type VideoDownloadSettingsUpdate = {
-  [Key in keyof VideoDownloadSettings]: {
-    key: Key;
-    value: VideoDownloadSettings[Key];
-  };
-}[keyof VideoDownloadSettings];
-
-export const updateVideoDownloadSettings = (
-  settings: VideoDownloadSettings,
-  update: VideoDownloadSettingsUpdate,
-): VideoDownloadSettings => {
-  switch (update.key) {
-    case "mode":
-      return { ...settings, mode: update.value };
-    case "quality":
-      return { ...settings, quality: update.value };
-    case "audioFormat":
-      return { ...settings, audioFormat: update.value };
-    case "container":
-      return {
-        ...settings,
-        container: update.value,
-        codec:
-          update.value === "mp4"
-            ? "h264"
-            : update.value === "webm" && settings.codec === "h264"
-              ? "vp9"
-              : settings.codec,
-      };
-    case "codec":
-      return {
-        ...settings,
-        codec: update.value,
-        container: settings.container === "mkv" ? "mkv" : update.value === "h264" ? "mp4" : "webm",
-      };
-  }
-};
 
 const modeOptions = [
   { value: "auto", label: "video with audio" },
@@ -183,34 +140,6 @@ const normaliseProgress = (progress: VideoDownloadProgress["progress"]) => {
   const fraction = progress > 1 ? progress / 100 : progress;
   return Math.round(Math.max(0, Math.min(1, fraction)) * 100);
 };
-
-const phaseLabels = {
-  planning: "preparing",
-  "waiting-for-tunnel": "waiting",
-  downloading: "downloading",
-  processing: "processing",
-  finalizing: "finalizing",
-} as const satisfies Record<VideoDownloadPhase, string>;
-
-export const getVideoDownloadPhaseLabel = (phase: VideoDownloadPhase) => phaseLabels[phase];
-
-export const getDownloadReadyAnnouncement = (filename: string) => `download ready: ${filename}`;
-
-export const presentVideoDownloadFailure = (error: Error): SystemFailurePresentation =>
-  reportSystemFailure(error, "download");
-
-export const buildVideoDownloadRequest = (
-  sourceUrl: string,
-  settings: VideoDownloadSettings,
-): CobaltVideoDownloadRequest => ({
-  sourceUrl,
-  downloadMode: settings.mode,
-  videoQuality: settings.quality,
-  youtubeVideoContainer: settings.container,
-  youtubeVideoCodec: settings.codec,
-  audioFormat: settings.audioFormat,
-  filenameStyle: "pretty",
-});
 
 interface SelectFieldProps<Value extends string> {
   id: string;
@@ -388,7 +317,7 @@ function PickerChoices({
       <div className="grid min-w-0 flex-1 grid-cols-2 gap-2" aria-label="media choices">
         {result.picker.map((item, index) => (
           <Button
-            key={`${item.type}-${item.url}-${index}`}
+            key={`${item.type}-${item.url}`}
             type="button"
             variant="outline"
             className="h-9 min-w-0 justify-between px-3 text-xs"
@@ -438,38 +367,25 @@ function RecentDownloadRow({
   download: RecentDownload;
   onDownload: (file: File) => void;
 }) {
-  const rowRef = useRef<HTMLLIElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    const row = rowRef.current;
     const content = contentRef.current;
-    if (!row || !content || prefersReducedMotion()) return;
+    if (!content || prefersReducedMotion()) return;
 
-    const rowHeight = row.getBoundingClientRect().height;
-    const reveal = row.animate(
+    const reveal = content.animate(
       [
-        { height: "0px", opacity: 0 },
-        { height: `${rowHeight}px`, opacity: 1 },
-      ],
-      { duration: 300, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
-    );
-    const slide = content.animate(
-      [
-        { clipPath: "inset(0 0 100% 0)", transform: "translateY(-28px)" },
-        { clipPath: "inset(0 0 0 0)", transform: "translateY(0)" },
+        { clipPath: "inset(0 0 100% 0)", opacity: 0, transform: "translateY(-28px)" },
+        { clipPath: "inset(0 0 0 0)", opacity: 1, transform: "translateY(0)" },
       ],
       { duration: 300, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
     );
 
-    return () => {
-      reveal.cancel();
-      slide.cancel();
-    };
+    return () => reveal.cancel();
   }, [download.id]);
 
   return (
-    <li ref={rowRef} className="h-10 overflow-hidden" data-save-download-item>
+    <li className="h-10 overflow-hidden" data-save-download-item>
       <div ref={contentRef} className="flex h-10 min-w-0 items-center gap-2 pl-3">
         <span className="min-w-0 flex-1 truncate text-sm" title={download.file.name}>
           {download.file.name}
@@ -545,6 +461,18 @@ function ErrorRow({
   );
 }
 
+const downloadFile = (file: File) => {
+  const url = URL.createObjectURL(file);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = file.name;
+  anchor.rel = "noopener";
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+};
+
 export default function TagiumSaveApp({
   startDownload = startVideoDownload,
 }: {
@@ -552,7 +480,6 @@ export default function TagiumSaveApp({
 } = {}) {
   const [sourceUrl, setSourceUrl] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [settings, setSettings] = useState(initialSettings);
   const [state, setState] = useState<DownloadState>({ kind: "idle" });
   const [recentDownloads, setRecentDownloads] = useState<ReadonlyArray<RecentDownload>>([]);
@@ -654,7 +581,6 @@ export default function TagiumSaveApp({
     const operation = operationRef.current + 1;
     operationRef.current = operation;
     activeTaskRef.current?.abort();
-    setSubmitting(true);
     setState({ kind: "working", phase: "downloading", progress: undefined });
 
     const task = startDownload(callbacksFor(operation));
@@ -674,7 +600,6 @@ export default function TagiumSaveApp({
       });
     } finally {
       if (operationRef.current === operation) activeTaskRef.current = null;
-      if (operationRef.current === operation) setSubmitting(false);
     }
   };
 
@@ -687,7 +612,7 @@ export default function TagiumSaveApp({
   };
 
   const submit = async (): Promise<boolean> => {
-    if (submitting) return true;
+    if (activeTaskRef.current || state.kind === "picker") return true;
     const trimmedUrl = sourceUrl.trim();
     const localError = validateSourceUrl(trimmedUrl);
     if (localError) {
@@ -695,18 +620,13 @@ export default function TagiumSaveApp({
       return false;
     }
 
-    setSubmitting(true);
-    try {
-      await runRequest(buildVideoDownloadRequest(trimmedUrl, settings), trimmedUrl);
-      return true;
-    } finally {
-      setSubmitting(false);
-    }
+    await runRequest(buildVideoDownloadRequest(trimmedUrl, settings), trimmedUrl);
+    return true;
   };
 
   const controller: MediaUrlEntryController = {
     sourceUrl,
-    submitting: submitting || state.kind === "picker",
+    submitting: state.kind === "working" || state.kind === "picker",
     validationError,
     setSourceUrl: (value) => {
       setSourceUrl(value);
@@ -720,7 +640,6 @@ export default function TagiumSaveApp({
     operationRef.current += 1;
     activeTaskRef.current?.abort();
     activeTaskRef.current = null;
-    setSubmitting(false);
     setState({ kind: "idle" });
   };
 
@@ -728,7 +647,6 @@ export default function TagiumSaveApp({
     operationRef.current += 1;
     activeTaskRef.current?.abort();
     activeTaskRef.current = null;
-    setSubmitting(false);
     setValidationError(null);
     setSourceUrl("");
     setState({ kind: "idle" });
@@ -736,25 +654,10 @@ export default function TagiumSaveApp({
 
   const retry = () => {
     const lastRequest = lastRequestRef.current;
-    if (!lastRequest || submitting) return;
+    if (!lastRequest || activeTaskRef.current) return;
     setSourceUrl(lastRequest.sourceUrl);
     setValidationError(null);
-    setSubmitting(true);
-    void runRequest(lastRequest.request, lastRequest.sourceUrl).finally(() => {
-      setSubmitting(false);
-    });
-  };
-
-  const downloadFile = (file: File) => {
-    const url = URL.createObjectURL(file);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = file.name;
-    anchor.rel = "noopener";
-    document.body.append(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
+    void runRequest(lastRequest.request, lastRequest.sourceUrl);
   };
 
   return (
