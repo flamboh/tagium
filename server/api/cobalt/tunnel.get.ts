@@ -4,6 +4,7 @@ import { Option, Schema } from "effect";
 import {
   isCobaltMachineId,
   isValidCobaltMachineSignature,
+  isValidCobaltResourceSignature,
 } from "../../utils/cobalt-machine-affinity";
 import {
   consumeTunnelDevFault,
@@ -13,6 +14,7 @@ import {
 type CobaltRuntimeEnv = {
   COBALT_API_URL?: string;
   COBALT_MACHINE_AFFINITY_SECRET?: string;
+  TAGIUM_DEPLOY_ENV?: string;
 } & DevControlRuntimeEnv;
 
 type CloudflareRequest = Request & {
@@ -35,7 +37,7 @@ type TunnelLogContext = TunnelObservabilityContext & {
   tunnelId?: string;
 };
 
-const COBALT_TUNNEL_TIMEOUT_MS = 300_000;
+const COBALT_AUDIO_TUNNEL_TIMEOUT_MS = 5 * 60_000;
 const EMPTY_BODY_RETRY_DELAYS_MS = [100, 250, 500, 1_000, 2_000, 4_000] as const;
 const EMPTY_BODY_RETRY_ATTEMPTS = EMPTY_BODY_RETRY_DELAYS_MS.length + 1;
 const EMPTY_BODY_RETRY_JITTER_RATIO = 0.2;
@@ -255,6 +257,14 @@ const cobaltDevTunnelFaultResponse = (fault: ReturnType<typeof consumeTunnelDevF
 
 const parseTunnelRequest = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
   const requestUrl = new URL(request.url);
+  const kind = requestUrl.searchParams.get("kind");
+  if (kind !== null && kind !== "video") {
+    return undefined;
+  }
+  const resource = requestUrl.searchParams.get("resource");
+  if (resource !== null && resource !== "direct") {
+    return undefined;
+  }
   const tunnelUrlParam = requestUrl.searchParams.get("url");
   if (!tunnelUrlParam) {
     return undefined;
@@ -267,20 +277,54 @@ const parseTunnelRequest = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
     return undefined;
   }
 
+  const machineId = requestUrl.searchParams.get("machine");
+  const signature = requestUrl.searchParams.get("signature");
+  if (resource === "direct") {
+    const rawExpiresAt = requestUrl.searchParams.get("expires");
+    const expiresAt = rawExpiresAt && /^\d{1,10}$/.test(rawExpiresAt) ? Number(rawExpiresAt) : NaN;
+    if (
+      kind !== "video" ||
+      machineId !== null ||
+      signature === null ||
+      !Number.isSafeInteger(expiresAt) ||
+      expiresAt <= Math.floor(Date.now() / 1_000) ||
+      (tunnelUrl.protocol !== "http:" && tunnelUrl.protocol !== "https:") ||
+      !isValidCobaltResourceSignature(runtimeEnv, tunnelUrlParam, expiresAt, signature)
+    ) {
+      return undefined;
+    }
+
+    try {
+      return {
+        tunnelUrl,
+        machineId,
+        kind,
+        resource,
+        observability: getTunnelObservabilityContext(requestUrl),
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
   const cobaltUrl = new URL(getCobaltApiUrl(runtimeEnv));
   if (tunnelUrl.origin !== cobaltUrl.origin || tunnelUrl.pathname !== "/tunnel") {
     return undefined;
   }
 
-  const machineId = requestUrl.searchParams.get("machine");
-  const signature = requestUrl.searchParams.get("signature");
   if (machineId === null) {
     if (signature !== null) {
       return undefined;
     }
 
     try {
-      return { tunnelUrl, machineId, observability: getTunnelObservabilityContext(requestUrl) };
+      return {
+        tunnelUrl,
+        machineId,
+        kind,
+        resource,
+        observability: getTunnelObservabilityContext(requestUrl),
+      };
     } catch {
       return undefined;
     }
@@ -295,7 +339,13 @@ const parseTunnelRequest = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
   }
 
   try {
-    return { tunnelUrl, machineId, observability: getTunnelObservabilityContext(requestUrl) };
+    return {
+      tunnelUrl,
+      machineId,
+      kind,
+      resource,
+      observability: getTunnelObservabilityContext(requestUrl),
+    };
   } catch {
     return undefined;
   }
@@ -344,16 +394,17 @@ export default defineHandler(async (event) => {
       requestHeaders.set("Fly-Force-Instance-Id", tunnelRequest.machineId);
     }
 
-    const fetchSignal = AbortSignal.any([
-      AbortSignal.timeout(COBALT_TUNNEL_TIMEOUT_MS),
-      event.req.signal,
-    ]);
+    const fetchSignal =
+      tunnelRequest.kind === "video"
+        ? event.req.signal
+        : AbortSignal.any([AbortSignal.timeout(COBALT_AUDIO_TUNNEL_TIMEOUT_MS), event.req.signal]);
     let response: Response | undefined;
     let body: ReadableStream<Uint8Array> | undefined;
     for (let attempt = 1; attempt <= EMPTY_BODY_RETRY_ATTEMPTS; attempt++) {
       upstreamAttempts = attempt;
       response = await fetch(tunnelRequest.tunnelUrl, {
         headers: requestHeaders,
+        redirect: tunnelRequest.resource === "direct" ? "follow" : "manual",
         signal: fetchSignal,
       });
       if (!response.ok) break;
@@ -437,6 +488,12 @@ export default defineHandler(async (event) => {
     if (contentType) {
       responseHeaders.set("Content-Type", contentType);
     }
+    const estimatedLength =
+      response.headers.get("estimated-content-length") ?? response.headers.get("content-length");
+    if (estimatedLength && /^\d+$/.test(estimatedLength) && estimatedLength !== "0") {
+      responseHeaders.set("Estimated-Content-Length", estimatedLength);
+    }
+    responseHeaders.set("Cache-Control", "private, no-store");
 
     withTunnelTelemetry(
       responseHeaders,

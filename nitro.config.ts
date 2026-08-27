@@ -6,6 +6,7 @@ const wrangler = {
   preview_urls: true,
   routes: [
     { pattern: "tagium.app", custom_domain: true },
+    { pattern: "save.tagium.app", custom_domain: true },
     { pattern: "www.tagium.app", custom_domain: true },
     { pattern: "tagium.oli.boo", custom_domain: true },
   ],

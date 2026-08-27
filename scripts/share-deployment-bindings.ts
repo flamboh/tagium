@@ -93,9 +93,9 @@ export const configureShareDeploymentBindings = (
       simple: { limit: 20, period: 60 },
     },
   ];
-  const cobalt = (config.ratelimits ?? []).filter((binding) =>
+  const downloadRateLimits = (config.ratelimits ?? []).filter((binding) =>
     ["COBALT_SESSION_RATE_LIMITER", "COBALT_CLIENT_RATE_LIMITER"].includes(binding.name ?? ""),
   );
-  config.ratelimits = [...cobalt, ...shareRateLimits];
+  config.ratelimits = [...downloadRateLimits, ...shareRateLimits];
   return config;
 };

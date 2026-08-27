@@ -5,6 +5,7 @@ import { MusicNote01Icon, Upload01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AUDIO_UPLOAD_ACCEPT } from "@/features/audio/audioFormat";
 import { cn } from "@/lib/utils";
+import { TagiumBrand } from "@/shared/brand/TagiumBrand";
 
 export interface AudioImportDropzoneProps {
   onAudioUpload: (files: File[]) => void | Promise<void>;
@@ -76,12 +77,7 @@ export default function AudioImportDropzone({
           event.target.value = "";
         }}
       />
-      {showBrand && (
-        <div className="select-none text-center">
-          <h1 className="text-7xl font-black tracking-[-0.04em] text-foreground">tagium</h1>
-          <p className="mt-3 text-base text-muted-foreground">tag your music</p>
-        </div>
-      )}
+      {showBrand && <TagiumBrand />}
       <button
         type="button"
         onClick={() => fileInputRef.current?.click()}

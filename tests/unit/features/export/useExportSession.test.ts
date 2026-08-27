@@ -12,8 +12,8 @@ const exportMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/analytics", () => ({ analytics: { capture: exportMocks.capture } }));
-vi.mock("@/features/workspace/systemFailure", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/features/workspace/systemFailure")>()),
+vi.mock("@/shared/systemFailure", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/shared/systemFailure")>()),
   reportSystemFailure: exportMocks.reportFailure,
 }));
 vi.mock("@/features/export/downloadLibrary", () => {

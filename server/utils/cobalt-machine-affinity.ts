@@ -39,6 +39,18 @@ export const signCobaltMachine = (
     .update(tunnelUrl)
     .digest("hex");
 
+export const signCobaltResource = (
+  runtimeEnv: CobaltMachineAffinityEnv,
+  resourceUrl: string,
+  expiresAt: number,
+) =>
+  createHmac("sha256", getCobaltMachineAffinitySecret(runtimeEnv))
+    .update("resource\n")
+    .update(String(expiresAt))
+    .update("\n")
+    .update(resourceUrl)
+    .digest("hex");
+
 export const isValidCobaltMachineSignature = (
   runtimeEnv: CobaltMachineAffinityEnv,
   tunnelUrl: string,
@@ -46,6 +58,21 @@ export const isValidCobaltMachineSignature = (
   signature: string,
 ) => {
   const expected = signCobaltMachine(runtimeEnv, tunnelUrl, machineId);
+  const signatureBytes = new TextEncoder().encode(signature);
+  const expectedBytes = new TextEncoder().encode(expected);
+
+  return (
+    signatureBytes.length === expectedBytes.length && timingSafeEqual(signatureBytes, expectedBytes)
+  );
+};
+
+export const isValidCobaltResourceSignature = (
+  runtimeEnv: CobaltMachineAffinityEnv,
+  resourceUrl: string,
+  expiresAt: number,
+  signature: string,
+) => {
+  const expected = signCobaltResource(runtimeEnv, resourceUrl, expiresAt);
   const signatureBytes = new TextEncoder().encode(signature);
   const expectedBytes = new TextEncoder().encode(expected);
 

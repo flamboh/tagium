@@ -19,7 +19,7 @@ import {
   type PlaylistDownloadRuntimeTrack,
 } from "@/features/import/playlistDownloadQueueRuntime";
 import type { PlaylistDownloadQueueTrack as PlaylistDownloadQueueModelTrack } from "@/features/import/playlistDownloadQueue";
-import { createDownloadAdmissionWindow } from "@/features/import/downloadAdmissionWindow";
+import { createDownloadAdmissionWindow } from "@/shared/cobalt/downloadAdmissionWindow";
 import {
   importFailureStageFromDownloadError,
   ImportStageError,

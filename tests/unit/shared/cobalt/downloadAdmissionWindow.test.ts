@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { createDownloadAdmissionWindow } from "@/features/import/downloadAdmissionWindow";
+import { createDownloadAdmissionWindow } from "@/shared/cobalt/downloadAdmissionWindow";
 
 describe("downloadAdmissionWindow", () => {
   it("admits twenty ordinary tracks and makes the twenty-first wait", () => {

@@ -2,9 +2,7 @@ export const DOWNLOAD_ADMISSION_MAX_COST = 40;
 export const DOWNLOAD_ADMISSION_WINDOW_MS = 60_000;
 export const DEFAULT_DOWNLOAD_ADMISSION_COST = 2;
 
-export type DownloadAdmissionResult =
-  | { status: "admitted" }
-  | { status: "waiting"; waitMs: number };
+type DownloadAdmissionResult = { status: "admitted" } | { status: "waiting"; waitMs: number };
 
 export interface DownloadAdmissionWindow {
   reserve: (cost: number, nowMs: number) => DownloadAdmissionResult;

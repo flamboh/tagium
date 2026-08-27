@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { mockEvent } from "h3";
 import handler from "../../../server/api/cobalt/tunnel.get";
+import { signCobaltResource } from "../../../server/utils/cobalt-machine-affinity";
 import { setDevFault } from "../../../server/utils/dev-controls";
 
 type RuntimeRequest = Request & {
@@ -60,6 +61,34 @@ const makeTunnelRequestWithId = (id: string) => {
   return updatedRequest;
 };
 
+const makeVideoTunnelRequest = () => {
+  const request = makeTunnelRequest();
+  const url = new URL(request.url);
+  url.searchParams.set("kind", "video");
+  const videoRequest = new Request(url, request) as RuntimeRequest;
+  videoRequest.runtime = request.runtime;
+  return videoRequest;
+};
+
+const makeDirectResourceRequest = (
+  resourceUrl = "https://cdn.example.test/video.mp4",
+  expiresAt = Math.floor(Date.now() / 1_000) + 15 * 60,
+) => {
+  const request = makeTunnelRequest();
+  const url = new URL(request.url);
+  url.searchParams.set("url", resourceUrl);
+  url.searchParams.set("kind", "video");
+  url.searchParams.set("resource", "direct");
+  url.searchParams.set("expires", String(expiresAt));
+  url.searchParams.set(
+    "signature",
+    signCobaltResource(request.runtime.cloudflare.env, resourceUrl, expiresAt),
+  );
+  const resourceRequest = new Request(url, request) as RuntimeRequest;
+  resourceRequest.runtime = request.runtime;
+  return resourceRequest;
+};
+
 const withObservability = (request: RuntimeRequest) => {
   const url = new URL(request.url);
   url.searchParams.set("parentRequestId", "plan-request-1");
@@ -103,6 +132,133 @@ describe("cobalt tunnel endpoint", () => {
     expect(response.headers.get("X-Tagium-Tunnel-Outcome")).toBe("ready");
     expect(response.headers.get("X-Tagium-Tunnel-Attempts")).toBe("1");
     expect(await response.text()).toBe("audio-bytes");
+  });
+
+  it("forwards a positive upstream length as a download progress estimate", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response("video-bytes", {
+          headers: {
+            "Content-Length": "11",
+            "Content-Type": "video/mp4",
+          },
+        });
+      }),
+    );
+
+    const response = await handler(makeEvent(makeTunnelRequest()));
+
+    expect(response.headers.get("Content-Type")).toBe("video/mp4");
+    expect(response.headers.get("Estimated-Content-Length")).toBe("11");
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(await response.text()).toBe("video-bytes");
+  });
+
+  it("streams marked video tunnels without an absolute timeout", async () => {
+    const timeoutSpy = vi
+      .spyOn(AbortSignal, "timeout")
+      .mockReturnValue(new AbortController().signal);
+    const request = makeVideoTunnelRequest();
+    let upstreamSignal: AbortSignal | null | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+        upstreamSignal = init?.signal;
+        return new Response("video-bytes");
+      }),
+    );
+
+    const response = await handler(makeEvent(request));
+
+    expect(response.status).toBe(200);
+    expect(timeoutSpy).not.toHaveBeenCalled();
+    expect(upstreamSignal).toBe(request.signal);
+  });
+
+  it("keeps the bounded timeout for audio tunnels", async () => {
+    const timeoutSpy = vi
+      .spyOn(AbortSignal, "timeout")
+      .mockReturnValue(new AbortController().signal);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("audio-bytes")),
+    );
+
+    const response = await handler(makeEvent(makeTunnelRequest()));
+
+    expect(response.status).toBe(200);
+    expect(timeoutSpy).toHaveBeenCalledWith(5 * 60_000);
+  });
+
+  it("streams marked video tunnels without a separate admission binding", async () => {
+    const request = makeVideoTunnelRequest();
+    request.runtime.cloudflare.env.TAGIUM_DEPLOY_ENV = "preview";
+    const fetchMock = vi.fn(async () => new Response("video-bytes"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await handler(makeEvent(request));
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("video-bytes");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("never follows an upstream tunnel redirect", async () => {
+    const fetchMock = vi.fn(
+      async (_input: string | URL | Request, _init?: RequestInit) =>
+        new Response(null, { status: 302, headers: { Location: "https://example.test/private" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await handler(makeEvent(makeTunnelRequest()));
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+
+    expect(response.status).toBe(502);
+    expect(init?.redirect).toBe("manual");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("streams signed direct picker resources and follows their CDN redirects", async () => {
+    const fetchMock = vi.fn(
+      async (_input: string | URL | Request, _init?: RequestInit) =>
+        new Response("video-bytes", { headers: { "Content-Type": "video/mp4" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await handler(makeEvent(makeDirectResourceRequest()));
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+
+    expect(response.status).toBe(200);
+    expect(init?.redirect).toBe("follow");
+    expect(await response.text()).toBe("video-bytes");
+  });
+
+  it("rejects tampered direct picker resource URLs", async () => {
+    const request = makeDirectResourceRequest();
+    const url = new URL(request.url);
+    url.searchParams.set("url", "https://cdn.example.test/private.mp4");
+    const tamperedRequest = new Request(url, request) as RuntimeRequest;
+    tamperedRequest.runtime = request.runtime;
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await handler(makeEvent(tamperedRequest));
+
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects expired direct picker resource capabilities", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await handler(
+      makeEvent(makeDirectResourceRequest(undefined, Math.floor(Date.now() / 1_000) - 1)),
+    );
+
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("retries a bounded empty 200 tunnel response", async () => {

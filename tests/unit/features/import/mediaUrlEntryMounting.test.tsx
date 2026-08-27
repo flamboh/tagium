@@ -1,7 +1,8 @@
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it, vi } from "vite-plus/test";
-import MediaUrlEntry, { useMediaUrlEntryController } from "@/features/import/MediaUrlEntry";
+import { useMediaUrlEntryController } from "@/features/import/useMediaUrlEntryController";
 import { InvalidShareLinkError } from "@/features/share/shareLink";
+import MediaUrlEntry from "@/shared/media-url/MediaUrlEntry";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -14,7 +15,7 @@ function MediaEntryHarness({
 }) {
   const controller = useMediaUrlEntryController(onUrlImport);
   if (settingsOpen) return <div data-view="settings" />;
-  return <MediaUrlEntry layout="landing" controller={controller} onUrlImport={onUrlImport} />;
+  return <MediaUrlEntry layout="landing" controller={controller} />;
 }
 
 describe("media URL entry mounting", () => {

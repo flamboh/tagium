@@ -16,15 +16,11 @@ import {
   type RequestLogContext,
 } from "../../utils/request-observability";
 import {
-  createCloudflareCobaltRequestAdmission,
-  createInMemoryCobaltRequestAdmission,
+  getCobaltRequestAdmission,
   type CloudflareRateLimitBinding,
-  type CobaltRequestAdmission,
 } from "../../utils/cobalt-request-admission";
 import {
   consumeAudioDevFault,
-  enforceRateLimit,
-  getDeployEnv,
   type CobaltRuntimeEnv as DevControlRuntimeEnv,
 } from "../../utils/dev-controls";
 import { decodeRequestBody, urlStringSchema } from "../../utils/schema";
@@ -484,24 +480,6 @@ const withYearMetadata = (
       },
     },
   };
-};
-
-const getCobaltRequestAdmission = (
-  request: Request,
-  runtimeEnv: CobaltRuntimeEnv,
-): CobaltRequestAdmission | undefined => {
-  if (runtimeEnv.COBALT_SESSION_RATE_LIMITER && runtimeEnv.COBALT_CLIENT_RATE_LIMITER) {
-    return createCloudflareCobaltRequestAdmission({
-      sessionLimiter: runtimeEnv.COBALT_SESSION_RATE_LIMITER,
-      clientLimiter: runtimeEnv.COBALT_CLIENT_RATE_LIMITER,
-    });
-  }
-
-  if (getDeployEnv(request, runtimeEnv).deployEnv === "local") {
-    return createInMemoryCobaltRequestAdmission(enforceRateLimit);
-  }
-
-  return undefined;
 };
 
 const admissionUnavailableResponse = () =>
