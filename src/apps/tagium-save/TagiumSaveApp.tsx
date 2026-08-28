@@ -61,7 +61,8 @@ import { mediaLinkKindFromUrl } from "@/lib/media-link";
  * entry keep the page in the existing landing world. STORY: paste a link, optionally choose output
  * settings, select an item when needed, then download it from the short recent list. FIRST VIEWPORT:
  * the wordmark sits above the standalone URL form in the same narrow centered column, with settings
- * beside the URL field. FORM: a direct landing form with one compact popover and inline state rows.
+ * beside the URL field, while a quiet attribution sits at the bottom. FORM: a direct landing form
+ * with one compact popover and inline state rows.
  */
 
 const modeOptions = [
@@ -875,7 +876,7 @@ export default function TagiumSaveApp({
   };
 
   return (
-    <main className="flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 max-lg:[@media(max-height:700px)]:p-4">
+    <main className="relative flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 max-lg:[@media(max-height:700px)]:p-4">
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {completionAnnouncement && (
           <span key={completionAnnouncement.id}>
@@ -932,6 +933,27 @@ export default function TagiumSaveApp({
           </div>
         </div>
       </div>
+
+      <footer className="absolute inset-x-4 bottom-4 text-center text-xs leading-5 text-muted-foreground sm:inset-x-8 sm:bottom-8">
+        made by{" "}
+        <a
+          href="https://x.com/flambohh"
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          flamboh
+        </a>
+        , powered by{" "}
+        <a
+          href="https://cobalt.tools/"
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          cobalt
+        </a>
+      </footer>
     </main>
   );
 }

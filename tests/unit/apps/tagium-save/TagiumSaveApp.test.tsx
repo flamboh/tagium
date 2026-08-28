@@ -406,6 +406,17 @@ describe("tagium save app", () => {
     act(() => renderer.unmount());
   });
 
+  it("links the save attribution to flamboh and cobalt", () => {
+    const markup = renderToStaticMarkup(<TagiumSaveApp />);
+
+    expect(markup).toContain("made by");
+    expect(markup).toContain('href="https://x.com/flambohh"');
+    expect(markup).toContain(">flamboh</a>");
+    expect(markup).toContain("powered by");
+    expect(markup).toContain('href="https://cobalt.tools/"');
+    expect(markup).toContain(">cobalt</a>");
+  });
+
   it("releases completed files when they leave the five-item list or the app unmounts", async () => {
     const releases = Array.from({ length: 6 }, () => vi.fn(async () => undefined));
     let resultIndex = 0;
