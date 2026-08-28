@@ -61,22 +61,35 @@ test("spins the settings icon between closed and open states", async ({ page }) 
   const cog = settings.locator('[data-save-settings-icon="cog"]');
   const arrow = settings.locator('[data-save-settings-icon="arrow"]');
 
-  await settings.click();
+  const bounds = await settings.boundingBox();
+  if (!bounds) throw new Error("settings trigger bounds were not found");
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  await page.mouse.down();
+  await expect(settings).toHaveCSS("scale", "0.97");
+  await page.mouse.up();
 
   await expect(settings).toHaveAttribute("data-state", "open");
   await expect(motion).toHaveCSS("transition-duration", "0.28s");
   await expect(motion).toHaveCSS("transition-timing-function", "cubic-bezier(0.34, 1.56, 0.64, 1)");
-  await expect(cog).toHaveCSS("transition-delay", "0s");
-  await expect(arrow).toHaveCSS("transition-delay", "0.075s");
+  await expect(cog).toHaveCSS("transition-delay", "0.03s");
+  await expect(arrow).toHaveCSS("transition-delay", "0.07s");
+  await expect(cog).toHaveCSS("transition-duration", "0.08s");
+  await expect(arrow).toHaveCSS("transition-duration", "0.08s");
+  await expect(cog).toHaveCSS("transition-property", "filter, opacity");
+  await expect(arrow).toHaveCSS("transition-property", "filter, opacity");
   await expect(cog).toHaveCSS("opacity", "0");
+  await expect(cog).toHaveCSS("filter", "blur(2px)");
   await expect(arrow).toHaveCSS("opacity", "1");
+  await expect(arrow).toHaveCSS("filter", "none");
 
   await settings.click();
   await expect(settings).toHaveAttribute("data-state", "closed");
-  await expect(cog).toHaveCSS("transition-delay", "0.075s");
-  await expect(arrow).toHaveCSS("transition-delay", "0s");
+  await expect(cog).toHaveCSS("transition-delay", "0.07s");
+  await expect(arrow).toHaveCSS("transition-delay", "0.03s");
   await expect(cog).toHaveCSS("opacity", "1");
+  await expect(cog).toHaveCSS("filter", "none");
   await expect(arrow).toHaveCSS("opacity", "0");
+  await expect(arrow).toHaveCSS("filter", "blur(2px)");
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await settings.click();

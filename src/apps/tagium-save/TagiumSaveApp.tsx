@@ -226,7 +226,7 @@ function DownloadSettings({
           type="button"
           variant="outline"
           size="icon"
-          className="group size-10 shrink-0 rounded-lg"
+          className="group size-10 shrink-0 rounded-lg active:scale-[0.97] motion-reduce:active:scale-100"
           aria-label="download settings"
           disabled={disabled}
         >
@@ -238,14 +238,14 @@ function DownloadSettings({
               icon={Settings01Icon}
               strokeWidth={2}
               data-save-settings-icon="cog"
-              className="absolute inset-0 size-4 opacity-100 transition-[opacity,transform] delay-75 duration-75 ease-out group-data-[state=open]:scale-0 group-data-[state=open]:opacity-0 group-data-[state=open]:delay-0 motion-reduce:transition-none"
+              className="absolute inset-0 size-4 opacity-100 blur-none transition-[filter,opacity] delay-[70ms] duration-[80ms] ease-linear group-data-[state=open]:opacity-0 group-data-[state=open]:blur-[2px] group-data-[state=open]:delay-[30ms] motion-reduce:transition-none"
               aria-hidden="true"
             />
             <HugeiconsIcon
               icon={ArrowDown01Icon}
               strokeWidth={2}
               data-save-settings-icon="arrow"
-              className="absolute inset-0 size-4 scale-0 opacity-0 transition-[opacity,transform] duration-75 ease-out group-data-[state=open]:scale-100 group-data-[state=open]:opacity-100 group-data-[state=open]:delay-75 motion-reduce:transition-none"
+              className="absolute inset-0 size-4 opacity-0 blur-[2px] transition-[filter,opacity] delay-[30ms] duration-[80ms] ease-linear group-data-[state=open]:opacity-100 group-data-[state=open]:blur-none group-data-[state=open]:delay-[70ms] motion-reduce:transition-none"
               aria-hidden="true"
             />
           </span>
@@ -930,7 +930,7 @@ export default function TagiumSaveApp({
     state.kind === "error" || state.kind === "picker" || recentDownloads.length > 0;
 
   return (
-    <main className="relative flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 [&_button]:transition-[box-shadow,opacity,transform] max-lg:[@media(max-height:700px)]:p-4">
+    <main className="relative flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 [&_button]:transition-[box-shadow,opacity,scale,transform] max-lg:[@media(max-height:700px)]:p-4">
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {completionAnnouncement && (
           <span key={completionAnnouncement.id}>
