@@ -13,9 +13,7 @@ test("switches and remembers the tagium save theme", async ({ page }) => {
   await page.getByRole("button", { name: `switch to ${nextTheme} mode` }).click();
 
   await expect(root).toHaveAttribute("data-theme", nextTheme);
-  await expect(
-    page.getByRole("button", { name: `switch to ${initialTheme} mode` }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: `switch to ${initialTheme} mode` })).toBeVisible();
 
   await page.reload();
   await expect(root).toHaveAttribute("data-theme", nextTheme);
