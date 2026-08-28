@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import {
   Cancel01Icon,
   Download01Icon,
@@ -496,19 +503,15 @@ const structuredDownloadError = (error: unknown, fallbackStage: VideoDownloadSta
     ? error
     : new VideoDownloadError(fallbackStage, "download failed.", undefined, error);
 
-export default function TagiumSaveApp({
-  startDownload = startVideoDownload,
-  capture = analytics.capture,
-  handoffDownload = downloadFile,
+const useDownloadLifecycle = ({
+  capture,
+  setState,
+  setSourceUrl,
 }: {
-  startDownload?: typeof startVideoDownload;
-  capture?: Analytics["capture"];
-  handoffDownload?: (file: File) => void;
-} = {}) {
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [settings, setSettings] = useState(initialSettings);
-  const [state, setState] = useState<DownloadState>({ kind: "idle" });
+  capture: Analytics["capture"];
+  setState: Dispatch<SetStateAction<DownloadState>>;
+  setSourceUrl: Dispatch<SetStateAction<string>>;
+}) => {
   const [recentDownloads, setRecentDownloads] = useState<ReadonlyArray<RecentDownload>>([]);
   const [completionAnnouncement, setCompletionAnnouncement] =
     useState<CompletionAnnouncement | null>(null);
@@ -518,11 +521,6 @@ export default function TagiumSaveApp({
   const activeLifecycleRef = useRef<DownloadLifecycle | null>(null);
   const captureRef = useRef(capture);
   const recentDownloadsRef = useRef<ReadonlyArray<RecentDownload>>([]);
-  const lastRequestRef = useRef<{
-    request: CobaltVideoDownloadRequest;
-    sourceUrl: string;
-    settings: VideoDownloadSettings;
-  } | null>(null);
 
   useLayoutEffect(() => {
     captureRef.current = capture;
@@ -640,6 +638,49 @@ export default function TagiumSaveApp({
     setSourceUrl("");
     setState({ kind: "idle" });
   };
+
+  return {
+    activeLifecycleRef,
+    activeTaskRef,
+    callbacksFor,
+    completeDownload,
+    completionAnnouncement,
+    failLifecycle,
+    finishLifecycle,
+    operationRef,
+    recentDownloads,
+  };
+};
+
+export default function TagiumSaveApp({
+  startDownload = startVideoDownload,
+  capture = analytics.capture,
+  handoffDownload = downloadFile,
+}: {
+  startDownload?: typeof startVideoDownload;
+  capture?: Analytics["capture"];
+  handoffDownload?: (file: File) => void;
+} = {}) {
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [settings, setSettings] = useState(initialSettings);
+  const [state, setState] = useState<DownloadState>({ kind: "idle" });
+  const lastRequestRef = useRef<{
+    request: CobaltVideoDownloadRequest;
+    sourceUrl: string;
+    settings: VideoDownloadSettings;
+  } | null>(null);
+  const {
+    activeLifecycleRef,
+    activeTaskRef,
+    callbacksFor,
+    completeDownload,
+    completionAnnouncement,
+    failLifecycle,
+    finishLifecycle,
+    operationRef,
+    recentDownloads,
+  } = useDownloadLifecycle({ capture, setState, setSourceUrl });
 
   const runRequest = async (
     request: CobaltVideoDownloadRequest,
