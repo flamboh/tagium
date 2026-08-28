@@ -911,7 +911,7 @@ export default function TagiumSaveApp({
     state.kind === "error" || state.kind === "picker" || recentDownloads.length > 0;
 
   return (
-    <main className="relative flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 max-lg:[@media(max-height:700px)]:p-4">
+    <main className="relative flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 [&_button]:transition-[box-shadow,opacity,transform] max-lg:[@media(max-height:700px)]:p-4">
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {completionAnnouncement && (
           <span key={completionAnnouncement.id}>

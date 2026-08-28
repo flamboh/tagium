@@ -19,6 +19,40 @@ test("switches and remembers the tagium save theme", async ({ page }) => {
   await expect(root).toHaveAttribute("data-theme", nextTheme);
 });
 
+test("updates save control colors with the active theme", async ({ page }) => {
+  await page.goto("/?app=tagium-save");
+
+  const root = page.locator("html");
+  const initialTheme = await root.getAttribute("data-theme");
+  if (initialTheme !== "light" && initialTheme !== "dark") {
+    throw new Error("tagium save did not initialize a supported theme");
+  }
+
+  const controls = [
+    page.getByRole("button", { name: "download settings" }),
+    page.getByRole("button", { name: "start video download" }),
+  ];
+  const readColors = () =>
+    Promise.all(
+      controls.map((control) =>
+        control.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return [style.backgroundColor, style.borderColor, style.color];
+        }),
+      ),
+    );
+
+  const nextTheme = initialTheme === "light" ? "dark" : "light";
+  await page.getByRole("button", { name: `switch to ${nextTheme} mode` }).click();
+  await expect(root).toHaveAttribute("data-theme", nextTheme);
+
+  const colorsAfterThemeSwap = await readColors();
+  await page.waitForTimeout(250);
+  const settledColors = await readColors();
+
+  expect(colorsAfterThemeSwap).toEqual(settledColors);
+});
+
 test("keeps the tagium save logo fixed through download states", async ({ page, browserName }) => {
   test.skip(browserName !== "chromium", "layout geometry is covered in Chromium");
   await page.setViewportSize({ width: 320, height: 568 });
