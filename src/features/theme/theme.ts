@@ -20,8 +20,17 @@ export const resolveInitialTheme = (): Theme => {
 export const applyTheme = (mode: Theme) => {
   if (!("document" in globalThis)) return;
 
-  document.documentElement.classList.toggle("dark", mode === "dark");
-  document.documentElement.dataset.theme = mode;
+  const root = document.documentElement;
+  // Disable transitions (see index.css) while the swap lands so themed colors snap
+  // together; the forced style read commits the change before they come back.
+  const themeChanged = root.dataset.theme !== undefined && root.dataset.theme !== mode;
+  if (themeChanged) root.classList.add("theme-switching");
+  root.classList.toggle("dark", mode === "dark");
+  root.dataset.theme = mode;
+  if (themeChanged) {
+    void window.getComputedStyle(root).transitionProperty;
+    window.requestAnimationFrame(() => root.classList.remove("theme-switching"));
+  }
 };
 
 export const setStoredTheme = (mode: Theme) => {

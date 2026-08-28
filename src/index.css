@@ -218,6 +218,12 @@
   label:has([data-slot="checkbox"]) {
     @apply select-none;
   }
+
+  /* applyTheme() holds this class on <html> for the frame a theme change lands so themed
+     colors snap together instead of tweening; icon-swap crossfades stay animated. */
+  .theme-switching *:not([data-icon-swap]) {
+    transition: none !important;
+  }
 }
 
 @layer components {
