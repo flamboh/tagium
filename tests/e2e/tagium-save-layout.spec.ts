@@ -53,6 +53,39 @@ test("updates save control colors with the active theme", async ({ page }) => {
   expect(colorsAfterThemeSwap).toEqual(settledColors);
 });
 
+test("spins the settings icon between closed and open states", async ({ page }) => {
+  await page.goto("/?app=tagium-save");
+
+  const settings = page.getByRole("button", { name: "download settings" });
+  const motion = settings.locator('[data-save-settings-icon="motion"]');
+  const cog = settings.locator('[data-save-settings-icon="cog"]');
+  const arrow = settings.locator('[data-save-settings-icon="arrow"]');
+
+  await settings.click();
+
+  await expect(settings).toHaveAttribute("data-state", "open");
+  await expect(motion).toHaveCSS("transition-duration", "0.28s");
+  await expect(motion).toHaveCSS("transition-timing-function", "cubic-bezier(0.34, 1.56, 0.64, 1)");
+  await expect(cog).toHaveCSS("transition-delay", "0s");
+  await expect(arrow).toHaveCSS("transition-delay", "0.075s");
+  await expect(cog).toHaveCSS("opacity", "0");
+  await expect(arrow).toHaveCSS("opacity", "1");
+
+  await settings.click();
+  await expect(settings).toHaveAttribute("data-state", "closed");
+  await expect(cog).toHaveCSS("transition-delay", "0.075s");
+  await expect(arrow).toHaveCSS("transition-delay", "0s");
+  await expect(cog).toHaveCSS("opacity", "1");
+  await expect(arrow).toHaveCSS("opacity", "0");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await settings.click();
+  await expect(settings).toHaveAttribute("data-state", "open");
+  await expect(motion).toHaveCSS("transition-property", "none");
+  await expect(cog).toHaveCSS("opacity", "0");
+  await expect(arrow).toHaveCSS("opacity", "1");
+});
+
 test("keeps the tagium save logo fixed through download states", async ({ page, browserName }) => {
   test.skip(browserName !== "chromium", "layout geometry is covered in Chromium");
   await page.setViewportSize({ width: 320, height: 568 });

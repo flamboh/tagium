@@ -9,6 +9,7 @@ import {
   type SetStateAction,
 } from "react";
 import {
+  ArrowDown01Icon,
   Cancel01Icon,
   Download01Icon,
   Moon02Icon,
@@ -225,11 +226,29 @@ function DownloadSettings({
           type="button"
           variant="outline"
           size="icon"
-          className="size-10 shrink-0 rounded-lg"
+          className="group size-10 shrink-0 rounded-lg"
           aria-label="download settings"
           disabled={disabled}
         >
-          <HugeiconsIcon icon={Settings01Icon} strokeWidth={2} aria-hidden="true" />
+          <span
+            data-save-settings-icon="motion"
+            className="relative size-4 origin-center transition-transform duration-[280ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] group-data-[state=open]:rotate-[360deg] motion-reduce:transition-none"
+          >
+            <HugeiconsIcon
+              icon={Settings01Icon}
+              strokeWidth={2}
+              data-save-settings-icon="cog"
+              className="absolute inset-0 size-4 opacity-100 transition-[opacity,transform] delay-75 duration-75 ease-out group-data-[state=open]:scale-0 group-data-[state=open]:opacity-0 group-data-[state=open]:delay-0 motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+            <HugeiconsIcon
+              icon={ArrowDown01Icon}
+              strokeWidth={2}
+              data-save-settings-icon="arrow"
+              className="absolute inset-0 size-4 scale-0 opacity-0 transition-[opacity,transform] duration-75 ease-out group-data-[state=open]:scale-100 group-data-[state=open]:opacity-100 group-data-[state=open]:delay-75 motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+          </span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-3">
