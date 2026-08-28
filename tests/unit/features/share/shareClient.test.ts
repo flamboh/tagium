@@ -101,13 +101,14 @@ describe("shared content client", () => {
         slug: "k7m4q2",
         url: "https://tagium.app/share/k7m4q2",
         expiresAt: "2026-10-20T12:00:00Z",
+        analyticsId,
       }),
     );
     await expect(
       updateShare("k7m4q2", "private-secret", manifest, null, {
         fetch,
       }),
-    ).resolves.toMatchObject({ slug: "k7m4q2" });
+    ).resolves.toMatchObject({ slug: "k7m4q2", analyticsId });
     const [url, request] = fetch.mock.calls[0]!;
     expect(url).toBe("/api/manifests/k7m4q2");
     expect(request).toMatchObject({

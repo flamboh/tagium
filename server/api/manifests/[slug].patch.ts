@@ -80,6 +80,7 @@ export default defineHandler(async (event) => {
         slug: result.slug,
         expiresAt: toShareExpiryIso(result.expiresAt),
         url: new URL(`/share/${result.slug}`, request.url).toString(),
+        analyticsId: result.analyticsId,
       },
       { headers: noStore },
     );

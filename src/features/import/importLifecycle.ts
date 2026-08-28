@@ -5,6 +5,7 @@ import type {
   ImportKind,
   ImportOutcome,
 } from "@/analytics";
+import type { AppSettings } from "@/features/library/types";
 
 export type ImportTrackOutcome = "completed" | "failed" | "canceled";
 
@@ -21,6 +22,7 @@ export class ImportStageError extends Error {
 interface ImportOperation {
   sourceUrl: string;
   importKind: ImportKind;
+  requestedFormat: AppSettings["audioFormat"];
   startedAt: number;
   trackIds: Set<string>;
   settledTracks: Map<
@@ -40,7 +42,11 @@ interface ImportLifecycleDependencies {
 }
 
 export interface ImportLifecycleTracker {
-  start: (input: { sourceUrl: string; importKind: ImportKind }) => string;
+  start: (input: {
+    sourceUrl: string;
+    importKind: ImportKind;
+    requestedFormat: AppSettings["audioFormat"];
+  }) => string;
   resolve: (operationId: string, resolution: { trackIds: string[]; hasCover: boolean }) => void;
   fail: (operationId: string, error: Error) => void;
   settle: (
@@ -117,16 +123,17 @@ export const createImportLifecycleTracker = (
   const operations = new Map<string, ImportOperation>();
 
   return {
-    start: ({ sourceUrl, importKind }) => {
+    start: ({ sourceUrl, importKind, requestedFormat }) => {
       const operationId = dependencies.createId();
       operations.set(operationId, {
         sourceUrl,
         importKind,
+        requestedFormat,
         startedAt: dependencies.now(),
         trackIds: new Set(),
         settledTracks: new Map(),
       });
-      dependencies.capture({ type: "import_started", sourceUrl, importKind });
+      dependencies.capture({ type: "import_started", sourceUrl, importKind, requestedFormat });
       return operationId;
     },
     resolve: (operationId, { trackIds, hasCover }) => {
@@ -138,6 +145,7 @@ export const createImportLifecycleTracker = (
           type: "import_resolved",
           sourceUrl: operation.sourceUrl,
           importKind: operation.importKind,
+          requestedFormat: operation.requestedFormat,
           resolvedCount: operation.trackIds.size,
           hasCover,
         });
@@ -151,12 +159,14 @@ export const createImportLifecycleTracker = (
         type: "import_resolution_failed",
         sourceUrl: operation.sourceUrl,
         importKind: operation.importKind,
+        requestedFormat: operation.requestedFormat,
         code: importFailureCodeFrom(error),
       });
       dependencies.capture({
         type: "import_finished",
         sourceUrl: operation.sourceUrl,
         importKind: operation.importKind,
+        requestedFormat: operation.requestedFormat,
         outcome: "failed",
         totalCount: 0,
         completedCount: 0,
@@ -199,6 +209,7 @@ export const createImportLifecycleTracker = (
           type: "import_failure_category",
           sourceUrl: operation.sourceUrl,
           importKind: operation.importKind,
+          requestedFormat: operation.requestedFormat,
           stage: failure.stage,
           code: failure.code,
           trackCount: failure.count,
@@ -208,6 +219,7 @@ export const createImportLifecycleTracker = (
         type: "import_finished",
         sourceUrl: operation.sourceUrl,
         importKind: operation.importKind,
+        requestedFormat: operation.requestedFormat,
         outcome: deriveOutcome({ completed, failed, canceled }),
         totalCount: operation.trackIds.size,
         completedCount: completed,

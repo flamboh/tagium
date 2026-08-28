@@ -334,6 +334,7 @@ describe("share manifest store", () => {
       kind: "updated",
       slug: published.slug,
       expiresAt: published.expiresAt,
+      analyticsId: published.analyticsId,
     });
     expect(await store.load(published.slug)).toMatchObject({
       kind: "available",

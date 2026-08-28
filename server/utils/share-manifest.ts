@@ -100,7 +100,7 @@ interface TrackWithArtwork extends ManifestTrack {
   artwork?: ManifestArtwork;
 }
 export type ShareManifestUpdateResult =
-  | { kind: "updated"; slug: string; expiresAt: number }
+  | { kind: "updated"; slug: string; expiresAt: number; analyticsId: string }
   | ShareManifestUnavailable;
 const unavailable = (): ShareManifestUnavailable => ({ kind: "unavailable" });
 
@@ -396,6 +396,7 @@ export const createShareManifestStore = (
       const revocationTokenHash = await hashShareSecret(revocationToken);
       if (!equalSecretHashes(previous.revocationTokenHash, revocationTokenHash))
         return unavailable();
+      const analyticsId = await shareAnalyticsId(revocationTokenHash);
 
       const artwork = artworkUpdate.kind === "replace" ? artworkUpdate.artwork : undefined;
       const nextManifest =
@@ -483,7 +484,7 @@ export const createShareManifestStore = (
             ) {
               if (previous.artworkKey && previous.artworkKey !== artworkKey)
                 await persistence.deleteArtwork(previous.artworkKey).catch(() => undefined);
-              return { kind: "updated", slug, expiresAt: current.expiresAt };
+              return { kind: "updated", slug, expiresAt: current.expiresAt, analyticsId };
             }
             throw error;
           }
@@ -500,12 +501,12 @@ export const createShareManifestStore = (
         return current &&
           equalSecretHashes(current.revocationTokenHash, revocationTokenHash) &&
           samePublishedValue(current, replacement)
-          ? { kind: "updated", slug, expiresAt: current.expiresAt }
+          ? { kind: "updated", slug, expiresAt: current.expiresAt, analyticsId }
           : unavailable();
       }
       if (previous.artworkKey && previous.artworkKey !== artworkKey)
         await persistence.deleteArtwork(previous.artworkKey).catch(() => undefined);
-      return { kind: "updated", slug, expiresAt: previous.expiresAt };
+      return { kind: "updated", slug, expiresAt: previous.expiresAt, analyticsId };
     },
     load: async (slug: string): Promise<ShareManifestLoaded | ShareManifestUnavailable> => {
       if (!SHARE_SLUG_PATTERN.test(slug)) return unavailable();

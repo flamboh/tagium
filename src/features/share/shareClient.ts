@@ -35,7 +35,9 @@ export interface CreatedSharePublicationReceipt extends SharePublicationReceipt 
   analyticsId: string;
 }
 
-export type ShareUpdateReceipt = Omit<SharePublicationReceipt, "revocationToken">;
+export type ShareUpdateReceipt = Omit<SharePublicationReceipt, "revocationToken"> & {
+  analyticsId: string;
+};
 
 const apiPath = (slug: string, suffix = "") =>
   `/api/manifests/${encodeURIComponent(slug)}${suffix}`;
@@ -67,6 +69,7 @@ const updateShareReceiptSchema = Schema.Struct({
   slug: Schema.String,
   url: Schema.String,
   expiresAt: Schema.String,
+  analyticsId: shareAnalyticsIdSchema,
 });
 
 export interface FetchedSharedContent {
