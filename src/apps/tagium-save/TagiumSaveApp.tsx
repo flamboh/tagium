@@ -754,6 +754,128 @@ const useDownloadLifecycle = ({
   };
 };
 
+type TagiumSaveViewProps = {
+  completionAnnouncement: CompletionAnnouncement | null;
+  controller: MediaUrlEntryController;
+  onCancel: () => void;
+  onDownload: (download: RecentDownload) => void;
+  onPickerAudio: (picker: VideoPickerDownloadResult) => Promise<void>;
+  onPickerItem: (picker: VideoPickerDownloadResult, item: CobaltPickerItem) => Promise<void>;
+  onReset: () => void;
+  onRetry: () => void;
+  onSettingsChange: (update: VideoDownloadSettingsUpdate) => void;
+  recentDownloads: ReadonlyArray<RecentDownload>;
+  settings: VideoDownloadSettings;
+  state: DownloadState;
+};
+
+function TagiumSaveView({
+  completionAnnouncement,
+  controller,
+  onCancel,
+  onDownload,
+  onPickerAudio,
+  onPickerItem,
+  onReset,
+  onRetry,
+  onSettingsChange,
+  recentDownloads,
+  settings,
+  state,
+}: TagiumSaveViewProps) {
+  const attributionFollowsContent =
+    state.kind === "error" || state.kind === "picker" || recentDownloads.length > 0;
+
+  return (
+    <main className="relative flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 [&_button]:transition-[box-shadow,opacity,scale,transform] max-lg:[@media(max-height:700px)]:p-4">
+      <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {completionAnnouncement && (
+          <span key={completionAnnouncement.id}>
+            {getDownloadReadyAnnouncement(completionAnnouncement.filename)}
+          </span>
+        )}
+      </span>
+      <SaveThemeToggle />
+      <div className="flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6">
+        <TagiumBrand product="save" showTagline={false} />
+
+        <div className="h-14 w-full shrink-0" data-save-download-stage>
+          <div className="w-full">
+            <div className="relative z-10 bg-background">
+              <MediaUrlEntry
+                layout="standalone"
+                controller={controller}
+                leadingAction={
+                  <DownloadSettings
+                    settings={settings}
+                    disabled={state.kind === "working" || state.kind === "picker"}
+                    onChange={onSettingsChange}
+                  />
+                }
+                placeholder="paste a media link"
+                submitAriaLabel="start video download"
+                animateSubmitIcon
+              />
+            </div>
+
+            <div className="flow-root h-9" data-save-download-progress-slot>
+              {state.kind === "working" && (
+                <ProgressRow phase={state.phase} progress={state.progress} onCancel={onCancel} />
+              )}
+            </div>
+            {state.kind === "error" && (
+              <ErrorRow
+                message={state.message}
+                onRetry={state.retryable ? onRetry : undefined}
+                onReset={onReset}
+              />
+            )}
+
+            {state.kind === "picker" && (
+              <PickerChoices
+                result={state.result}
+                onSelect={(item) => void onPickerItem(state.result, item)}
+                onSelectAudio={() => void onPickerAudio(state.result)}
+                onReset={onReset}
+              />
+            )}
+
+            <RecentDownloads downloads={recentDownloads} onDownload={onDownload} />
+
+            <footer
+              data-save-attribution
+              className={cn(
+                "absolute inset-x-4 bottom-4 text-center text-xs leading-5 text-muted-foreground sm:inset-x-8 sm:bottom-8",
+                attributionFollowsContent &&
+                  "[@media(max-height:700px)]:static [@media(max-height:700px)]:mt-4",
+              )}
+            >
+              made by{" "}
+              <a
+                href="https://x.com/flambohh"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                flamboh
+              </a>
+              , powered by{" "}
+              <a
+                href="https://cobalt.tools/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                cobalt
+              </a>
+            </footer>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
 export default function TagiumSaveApp({
   startDownload = startVideoDownload,
   capture = analytics.capture,
@@ -976,97 +1098,22 @@ export default function TagiumSaveApp({
     handoffDownload(download.file);
   };
 
-  const attributionFollowsContent =
-    state.kind === "error" || state.kind === "picker" || recentDownloads.length > 0;
-
   return (
-    <main className="relative flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 [&_button]:transition-[box-shadow,opacity,scale,transform] max-lg:[@media(max-height:700px)]:p-4">
-      <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {completionAnnouncement && (
-          <span key={completionAnnouncement.id}>
-            {getDownloadReadyAnnouncement(completionAnnouncement.filename)}
-          </span>
-        )}
-      </span>
-      <SaveThemeToggle />
-      <div className="flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6">
-        <TagiumBrand product="save" showTagline={false} />
-
-        <div className="h-14 w-full shrink-0" data-save-download-stage>
-          <div className="w-full">
-            <div className="relative z-10 bg-background">
-              <MediaUrlEntry
-                layout="standalone"
-                controller={controller}
-                leadingAction={
-                  <DownloadSettings
-                    settings={settings}
-                    disabled={state.kind === "working" || state.kind === "picker"}
-                    onChange={(update) =>
-                      setSettings((current) => updateVideoDownloadSettings(current, update))
-                    }
-                  />
-                }
-                placeholder="paste a media link"
-                submitAriaLabel="start video download"
-                animateSubmitIcon
-              />
-            </div>
-
-            <div className="flow-root h-9" data-save-download-progress-slot>
-              {state.kind === "working" && (
-                <ProgressRow phase={state.phase} progress={state.progress} onCancel={cancel} />
-              )}
-            </div>
-            {state.kind === "error" && (
-              <ErrorRow
-                message={state.message}
-                onRetry={state.retryable ? retry : undefined}
-                onReset={reset}
-              />
-            )}
-
-            {state.kind === "picker" && (
-              <PickerChoices
-                result={state.result}
-                onSelect={(item) => void runPickerItem(state.result, item)}
-                onSelectAudio={() => void runPickerAudio(state.result)}
-                onReset={reset}
-              />
-            )}
-
-            <RecentDownloads downloads={recentDownloads} onDownload={prepareRecentDownload} />
-
-            <footer
-              data-save-attribution
-              className={cn(
-                "absolute inset-x-4 bottom-4 text-center text-xs leading-5 text-muted-foreground sm:inset-x-8 sm:bottom-8",
-                attributionFollowsContent &&
-                  "[@media(max-height:700px)]:static [@media(max-height:700px)]:mt-4",
-              )}
-            >
-              made by{" "}
-              <a
-                href="https://x.com/flambohh"
-                target="_blank"
-                rel="noreferrer"
-                className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                flamboh
-              </a>
-              , powered by{" "}
-              <a
-                href="https://cobalt.tools/"
-                target="_blank"
-                rel="noreferrer"
-                className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                cobalt
-              </a>
-            </footer>
-          </div>
-        </div>
-      </div>
-    </main>
+    <TagiumSaveView
+      completionAnnouncement={completionAnnouncement}
+      controller={controller}
+      onCancel={cancel}
+      onDownload={prepareRecentDownload}
+      onPickerAudio={runPickerAudio}
+      onPickerItem={runPickerItem}
+      onReset={reset}
+      onRetry={retry}
+      onSettingsChange={(update) =>
+        setSettings((current) => updateVideoDownloadSettings(current, update))
+      }
+      recentDownloads={recentDownloads}
+      settings={settings}
+      state={state}
+    />
   );
 }
