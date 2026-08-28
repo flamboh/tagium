@@ -573,7 +573,7 @@ function SaveThemeToggle() {
   return (
     <button
       type="button"
-      className="absolute top-4 left-1/2 inline-flex size-11 -translate-x-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:text-foreground active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:active:scale-100 sm:top-8"
+      className="absolute top-4 left-1/2 inline-flex size-11 -translate-x-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none transition-[color,scale] hover:text-foreground active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:active:scale-100 sm:top-8"
       aria-label={`switch to ${theme === "light" ? "dark" : "light"} mode`}
       onClick={toggleTheme}
     >
@@ -787,7 +787,7 @@ function TagiumSaveView({
     state.kind === "error" || state.kind === "picker" || recentDownloads.length > 0;
 
   return (
-    <main className="relative flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 [&_button]:transition-[box-shadow,opacity,scale,transform] max-lg:[@media(max-height:700px)]:p-4">
+    <main className="relative flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 max-lg:[@media(max-height:700px)]:p-4">
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {completionAnnouncement && (
           <span key={completionAnnouncement.id}>

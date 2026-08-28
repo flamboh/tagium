@@ -233,7 +233,7 @@ export default function MediaUrlEntry({
                     <HugeiconsIcon
                       icon={loaderCircleIcon}
                       strokeWidth={2}
-                      className="size-4"
+                      className="size-4 animate-spin"
                       data-media-url-submit-icon="loading"
                     />
                   }
