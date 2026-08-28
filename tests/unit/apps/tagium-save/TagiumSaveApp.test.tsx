@@ -417,6 +417,30 @@ describe("tagium save app", () => {
     expect(markup).toContain(">cobalt</a>");
   });
 
+  it("toggles between light and dark mode", async () => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<TagiumSaveApp />);
+    });
+
+    const themeToggle = renderer.root
+      .findAllByType("button")
+      .find((button) => String(button.props["aria-label"]).startsWith("switch to "));
+    if (!themeToggle) throw new Error("theme toggle was not found");
+
+    const initialLabel = themeToggle.props["aria-label"];
+    act(() => {
+      themeToggle.props.onClick();
+    });
+
+    const nextThemeToggle = renderer.root
+      .findAllByType("button")
+      .find((button) => String(button.props["aria-label"]).startsWith("switch to "));
+    expect(nextThemeToggle?.props["aria-label"]).not.toBe(initialLabel);
+
+    act(() => renderer.unmount());
+  });
+
   it("releases completed files when they leave the five-item list or the app unmounts", async () => {
     const releases = Array.from({ length: 6 }, () => vi.fn(async () => undefined));
     let resultIndex = 0;

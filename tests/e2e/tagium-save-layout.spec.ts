@@ -1,5 +1,26 @@
 import { expect, test } from "@playwright/test";
 
+test("switches and remembers the tagium save theme", async ({ page }) => {
+  await page.goto("/?app=tagium-save");
+
+  const root = page.locator("html");
+  const initialTheme = await root.getAttribute("data-theme");
+  if (initialTheme !== "light" && initialTheme !== "dark") {
+    throw new Error("tagium save did not initialize a supported theme");
+  }
+
+  const nextTheme = initialTheme === "light" ? "dark" : "light";
+  await page.getByRole("button", { name: `switch to ${nextTheme} mode` }).click();
+
+  await expect(root).toHaveAttribute("data-theme", nextTheme);
+  await expect(
+    page.getByRole("button", { name: `switch to ${initialTheme} mode` }),
+  ).toBeVisible();
+
+  await page.reload();
+  await expect(root).toHaveAttribute("data-theme", nextTheme);
+});
+
 test("keeps the tagium save logo fixed through download states", async ({ page, browserName }) => {
   test.skip(browserName !== "chromium", "layout geometry is covered in Chromium");
   await page.setViewportSize({ width: 320, height: 568 });

@@ -18,6 +18,8 @@ export const resolveInitialTheme = (): Theme => {
 };
 
 export const applyTheme = (mode: Theme) => {
+  if (!("document" in globalThis)) return;
+
   document.documentElement.classList.toggle("dark", mode === "dark");
   document.documentElement.dataset.theme = mode;
 };

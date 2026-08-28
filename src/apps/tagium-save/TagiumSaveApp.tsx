@@ -11,8 +11,10 @@ import {
 import {
   Cancel01Icon,
   Download01Icon,
+  Moon02Icon,
   Refresh04Icon,
   Settings01Icon,
+  Sun03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
@@ -52,6 +54,7 @@ import {
   type VideoDownloadSettings,
   type VideoDownloadSettingsUpdate,
 } from "@/apps/tagium-save/tagiumSaveModel";
+import { useTheme } from "@/features/theme/useTheme";
 import { cn } from "@/lib/utils";
 import { mediaLinkKindFromUrl } from "@/lib/media-link";
 
@@ -61,8 +64,8 @@ import { mediaLinkKindFromUrl } from "@/lib/media-link";
  * entry keep the page in the existing landing world. STORY: paste a link, optionally choose output
  * settings, select an item when needed, then download it from the short recent list. FIRST VIEWPORT:
  * the wordmark sits above the standalone URL form in the same narrow centered column, with settings
- * beside the URL field, while a quiet attribution sits at the bottom. FORM: a direct landing form
- * with one compact popover and inline state rows.
+ * beside the URL field, while the theme toggle and quiet attribution mirror each other at the top
+ * and bottom. FORM: a direct landing form with one compact popover and inline state rows.
  */
 
 const modeOptions = [
@@ -662,6 +665,7 @@ export default function TagiumSaveApp({
   capture?: Analytics["capture"];
   handoffDownload?: (file: File) => void;
 } = {}) {
+  const { theme, toggleTheme } = useTheme();
   const [sourceUrl, setSourceUrl] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
   const [settings, setSettings] = useState(initialSettings);
@@ -887,6 +891,28 @@ export default function TagiumSaveApp({
           </span>
         )}
       </span>
+      <button
+        type="button"
+        className="group absolute top-4 left-1/2 inline-flex size-11 -translate-x-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:top-8"
+        aria-label={`switch to ${theme === "light" ? "dark" : "light"} mode`}
+        onClick={toggleTheme}
+      >
+        {theme === "light" ? (
+          <HugeiconsIcon
+            icon={Moon02Icon}
+            strokeWidth={2}
+            className="size-4 origin-center transition-transform duration-150 ease-out group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+            aria-hidden="true"
+          />
+        ) : (
+          <HugeiconsIcon
+            icon={Sun03Icon}
+            strokeWidth={2}
+            className="size-4 origin-center transition-transform duration-150 ease-out group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+            aria-hidden="true"
+          />
+        )}
+      </button>
       <div className="flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6">
         <TagiumBrand product="save" showTagline={false} />
 
