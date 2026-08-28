@@ -10,10 +10,32 @@ test("switches and remembers the tagium save theme", async ({ page }) => {
   }
 
   const nextTheme = initialTheme === "light" ? "dark" : "light";
-  await page.getByRole("button", { name: `switch to ${nextTheme} mode` }).click();
+  const themeToggle = page.locator('button[aria-label^="switch to "]');
+  const iconSwap = themeToggle.locator("[data-icon-swap-state]");
+  const icon = themeToggle.locator('[data-icon-swap="icon"]');
+  const bounds = await themeToggle.boundingBox();
+  if (!bounds) throw new Error("theme toggle bounds were not found");
+
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  await page.mouse.down();
+  await expect(themeToggle).toHaveCSS("scale", "0.97");
+  await page.mouse.up();
 
   await expect(root).toHaveAttribute("data-theme", nextTheme);
   await expect(page.getByRole("button", { name: `switch to ${initialTheme} mode` })).toBeVisible();
+  await expect(iconSwap).toHaveAttribute(
+    "data-icon-swap-state",
+    nextTheme === "dark" ? "second" : "first",
+  );
+
+  await expect(icon).toHaveCSS("transition-duration", "0.08s");
+  await expect(icon).toHaveCSS("transition-property", "filter, opacity");
+  await expect(icon).toHaveCSS("opacity", "1");
+  await expect(icon).toHaveCSS("filter", "none");
+  await expect(themeToggle.locator("[data-save-theme-icon]")).toHaveCount(1);
+  await expect(
+    themeToggle.locator(`[data-save-theme-icon="${nextTheme === "dark" ? "sun" : "moon"}"]`),
+  ).toBeVisible();
 
   await page.reload();
   await expect(root).toHaveAttribute("data-theme", nextTheme);
@@ -141,8 +163,26 @@ test("keeps the tagium save logo fixed through download states", async ({ page, 
 
   const idleTop = await readLogoTop();
   await page.getByRole("textbox", { name: "media url" }).fill("https://example.com/video");
-  await page.getByRole("button", { name: "start video download" }).click();
+  const submit = page.getByRole("button", { name: "start video download" });
+  const submitSwap = submit.locator("[data-icon-swap-state]");
+  const submitIcon = submit.locator('[data-icon-swap="icon"]');
+  const submitBounds = await submit.boundingBox();
+  if (!submitBounds) throw new Error("submit button bounds were not found");
+
+  await page.mouse.move(
+    submitBounds.x + submitBounds.width / 2,
+    submitBounds.y + submitBounds.height / 2,
+  );
+  await page.mouse.down();
+  await expect(submit).toHaveCSS("scale", "0.97");
+  await page.mouse.up();
   await expect(page.getByText("preparing", { exact: true })).toBeVisible();
+  await expect(submitSwap).toHaveAttribute("data-icon-swap-state", "second");
+  await expect(submitIcon).toHaveCSS("opacity", "1");
+  await expect(submitIcon).toHaveCSS("filter", "none");
+  await expect(submit.locator("[data-media-url-submit-icon]")).toHaveCount(1);
+  await expect(submit.locator('[data-media-url-submit-icon="loading"]')).toBeVisible();
+  await expect(submitIcon.locator("svg")).toHaveCSS("animation-name", "none");
   expect(await readLogoTop()).toBe(idleTop);
 
   releasePlan();
@@ -248,9 +288,30 @@ test("keeps only the five most recent downloads", async ({ page }) => {
   ]);
   await expect(page.getByText("history-1.mp4", { exact: true })).not.toBeAttached();
 
+  const downloadButton = page.getByRole("button", { name: "download history-6.mp4" });
+  const downloadSwap = downloadButton.locator("[data-icon-swap-state]");
+  const downloadIcon = downloadButton.locator('[data-icon-swap="icon"]');
+  const downloadBounds = await downloadButton.boundingBox();
+  if (!downloadBounds) throw new Error("download button bounds were not found");
+
   const downloadEvent = page.waitForEvent("download");
-  await page.getByRole("button", { name: "download history-6.mp4" }).click();
+  await page.mouse.move(
+    downloadBounds.x + downloadBounds.width / 2,
+    downloadBounds.y + downloadBounds.height / 2,
+  );
+  await page.mouse.down();
+  await expect(downloadButton).toHaveCSS("scale", "0.97");
+  await page.mouse.up();
   expect((await downloadEvent).suggestedFilename()).toBe("history-6.mp4");
+  await expect(downloadSwap).toHaveAttribute("data-icon-swap-state", "second");
+  await expect(downloadIcon).toHaveCSS("opacity", "1");
+  await expect(downloadIcon).toHaveCSS("filter", "none");
+  await expect(downloadButton.locator("[data-save-download-icon]")).toHaveCount(1);
+  await expect(downloadButton.locator('[data-save-download-icon="confirmation"]')).toBeVisible();
+  await page.waitForTimeout(900);
+  await expect(downloadButton.locator('[data-save-download-icon="confirmation"]')).toBeVisible();
+  await expect(downloadSwap).toHaveAttribute("data-icon-swap-state", "first", { timeout: 2000 });
+  await expect(downloadButton.locator('[data-save-download-icon="download"]')).toBeVisible();
 });
 
 test("offers audio returned with picker media", async ({ page }) => {

@@ -16,6 +16,7 @@ import {
   Refresh04Icon,
   Settings01Icon,
   Sun03Icon,
+  Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
@@ -27,6 +28,7 @@ import {
   type AnalyticsOutputFormat,
 } from "@/analytics";
 import { Button } from "@/components/ui/button";
+import { IconSwap, iconSwapDurationMs } from "@/components/ui/icon-swap";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import MediaUrlEntry, { type MediaUrlEntryController } from "@/shared/media-url/MediaUrlEntry";
@@ -416,6 +418,8 @@ function RecentDownloadRow({
   onDownload: (download: RecentDownload) => void;
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const confirmationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   useLayoutEffect(() => {
     const content = contentRef.current;
@@ -432,6 +436,30 @@ function RecentDownloadRow({
     return () => reveal.cancel();
   }, [download.id]);
 
+  useEffect(
+    () => () => {
+      if (confirmationTimeoutRef.current !== null) {
+        clearTimeout(confirmationTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  const handleDownload = () => {
+    onDownload(download);
+    setShowConfirmation(true);
+    if (confirmationTimeoutRef.current !== null) {
+      clearTimeout(confirmationTimeoutRef.current);
+    }
+    confirmationTimeoutRef.current = setTimeout(
+      () => {
+        setShowConfirmation(false);
+        confirmationTimeoutRef.current = null;
+      },
+      1000 + iconSwapDurationMs * 2,
+    );
+  };
+
   return (
     <li className="h-10 overflow-hidden" data-save-download-item>
       <div ref={contentRef} className="flex h-10 min-w-0 items-center gap-2 pl-3">
@@ -442,11 +470,29 @@ function RecentDownloadRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-10 shrink-0"
+          className="size-10 shrink-0 active:scale-[0.97] motion-reduce:active:scale-100"
           aria-label={`download ${download.file.name}`}
-          onClick={() => onDownload(download)}
+          onClick={handleDownload}
         >
-          <HugeiconsIcon icon={Download01Icon} strokeWidth={2} aria-hidden="true" />
+          <IconSwap
+            switched={showConfirmation}
+            first={
+              <HugeiconsIcon
+                icon={Download01Icon}
+                strokeWidth={2}
+                className="size-4"
+                data-save-download-icon="download"
+              />
+            }
+            second={
+              <HugeiconsIcon
+                icon={Tick02Icon}
+                strokeWidth={2}
+                className="size-4"
+                data-save-download-icon="confirmation"
+              />
+            }
+          />
         </Button>
       </div>
     </li>
@@ -527,25 +573,29 @@ function SaveThemeToggle() {
   return (
     <button
       type="button"
-      className="group absolute top-4 left-1/2 inline-flex size-11 -translate-x-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:top-8"
+      className="absolute top-4 left-1/2 inline-flex size-11 -translate-x-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:text-foreground active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:active:scale-100 sm:top-8"
       aria-label={`switch to ${theme === "light" ? "dark" : "light"} mode`}
       onClick={toggleTheme}
     >
-      {theme === "light" ? (
-        <HugeiconsIcon
-          icon={Moon02Icon}
-          strokeWidth={2}
-          className="size-4 origin-center transition-transform duration-150 ease-out group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-          aria-hidden="true"
-        />
-      ) : (
-        <HugeiconsIcon
-          icon={Sun03Icon}
-          strokeWidth={2}
-          className="size-4 origin-center transition-transform duration-150 ease-out group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-          aria-hidden="true"
-        />
-      )}
+      <IconSwap
+        switched={theme === "dark"}
+        first={
+          <HugeiconsIcon
+            icon={Moon02Icon}
+            strokeWidth={2}
+            className="size-4"
+            data-save-theme-icon="moon"
+          />
+        }
+        second={
+          <HugeiconsIcon
+            icon={Sun03Icon}
+            strokeWidth={2}
+            className="size-4"
+            data-save-theme-icon="sun"
+          />
+        }
+      />
     </button>
   );
 }
@@ -959,6 +1009,7 @@ export default function TagiumSaveApp({
                 }
                 placeholder="paste a media link"
                 submitAriaLabel="start video download"
+                animateSubmitIcon
               />
             </div>
 
