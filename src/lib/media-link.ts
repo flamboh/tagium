@@ -13,6 +13,34 @@ const youtubeSet = new Set<string>(YOUTUBE_HOSTS);
 const soundcloudSet = new Set<string>(SOUNDCLOUD_HOSTS);
 const videoId = /^[A-Za-z0-9_-]{11}$/;
 
+export type MediaLinkKind = "canonical" | "short" | "mobile" | "nocookie" | "other";
+
+export const mediaLinkKindFromUrl = (sourceUrl: string): MediaLinkKind => {
+  try {
+    const host = new URL(sourceUrl).hostname.toLowerCase();
+    if (host === "youtu.be" || host === "on.soundcloud.com" || host === "snd.sc") {
+      return "short";
+    }
+    if (host === "m.youtube.com" || host === "music.youtube.com" || host === "m.soundcloud.com") {
+      return "mobile";
+    }
+    if (host === "youtube-nocookie.com" || host === "www.youtube-nocookie.com") {
+      return "nocookie";
+    }
+    if (
+      host === "youtube.com" ||
+      host === "www.youtube.com" ||
+      host === "soundcloud.com" ||
+      host === "www.soundcloud.com"
+    ) {
+      return "canonical";
+    }
+  } catch {
+    // Invalid and generic inputs share the non-identifying "other" kind.
+  }
+  return "other";
+};
+
 export type ParsedMediaLink =
   | { provider: "youtube"; kind: "track"; canonicalUrl: string; videoId: string }
   | { provider: "youtube"; kind: "playlist"; canonicalUrl: string; playlistId: string }

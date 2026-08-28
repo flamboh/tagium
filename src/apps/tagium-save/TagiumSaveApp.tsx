@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import {
   Cancel01Icon,
   Download01Icon,
@@ -9,6 +16,13 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
+import {
+  analytics,
+  analyticsOutputFormatFromFilename,
+  type Analytics,
+  type AnalyticsErrorCode,
+  type AnalyticsOutputFormat,
+} from "@/analytics";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -17,12 +31,14 @@ import { TagiumBrand } from "@/shared/brand/TagiumBrand";
 import {
   cobaltVideoCodecs,
   startVideoDownload,
+  VideoDownloadError,
   type CobaltPickerItem,
   type CobaltVideoDownloadRequest,
   type VideoDownloadCallbacks,
   type VideoDownloadPhase,
   type VideoDownloadProgress,
   type VideoDownloadResult,
+  type VideoDownloadStage,
   type VideoDownloadTask,
   type VideoFileDownloadResult,
   type VideoPickerDownloadResult,
@@ -37,6 +53,7 @@ import {
   type VideoDownloadSettingsUpdate,
 } from "@/apps/tagium-save/tagiumSaveModel";
 import { cn } from "@/lib/utils";
+import { mediaLinkKindFromUrl } from "@/lib/media-link";
 
 /**
  * THESIS: one link becomes one downloadable file; this is a landing tool, not a dashboard.
@@ -108,6 +125,8 @@ type DownloadState =
 type RecentDownload = {
   id: number;
   file: File;
+  sourceUrl: string;
+  outputFormat: AnalyticsOutputFormat;
   release: () => Promise<void>;
 };
 
@@ -117,6 +136,12 @@ type CompletionAnnouncement = {
 };
 
 type ActiveDownloadTask = Pick<VideoDownloadTask<VideoDownloadResult>, "abort">;
+
+type DownloadLifecycle = {
+  sourceUrl: string;
+  startedAt: number;
+  finished: boolean;
+};
 
 const maxRecentDownloads = 5;
 
@@ -365,7 +390,7 @@ function RecentDownloadRow({
   onDownload,
 }: {
   download: RecentDownload;
-  onDownload: (file: File) => void;
+  onDownload: (download: RecentDownload) => void;
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -396,7 +421,7 @@ function RecentDownloadRow({
           size="icon"
           className="size-10 shrink-0"
           aria-label={`download ${download.file.name}`}
-          onClick={() => onDownload(download.file)}
+          onClick={() => onDownload(download)}
         >
           <HugeiconsIcon icon={Download01Icon} strokeWidth={2} aria-hidden="true" />
         </Button>
@@ -410,7 +435,7 @@ function RecentDownloads({
   onDownload,
 }: {
   downloads: ReadonlyArray<RecentDownload>;
-  onDownload: (file: File) => void;
+  onDownload: (download: RecentDownload) => void;
 }) {
   if (downloads.length === 0) return null;
 
@@ -473,38 +498,99 @@ const downloadFile = (file: File) => {
   URL.revokeObjectURL(url);
 };
 
-export default function TagiumSaveApp({
-  startDownload = startVideoDownload,
+const structuredDownloadError = (error: unknown, fallbackStage: VideoDownloadStage) =>
+  error instanceof VideoDownloadError
+    ? error
+    : new VideoDownloadError(fallbackStage, "download failed.", undefined, error);
+
+const useDownloadLifecycle = ({
+  capture,
+  setState,
+  setSourceUrl,
 }: {
-  startDownload?: typeof startVideoDownload;
-} = {}) {
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [settings, setSettings] = useState(initialSettings);
-  const [state, setState] = useState<DownloadState>({ kind: "idle" });
+  capture: Analytics["capture"];
+  setState: Dispatch<SetStateAction<DownloadState>>;
+  setSourceUrl: Dispatch<SetStateAction<string>>;
+}) => {
   const [recentDownloads, setRecentDownloads] = useState<ReadonlyArray<RecentDownload>>([]);
   const [completionAnnouncement, setCompletionAnnouncement] =
     useState<CompletionAnnouncement | null>(null);
   const operationRef = useRef(0);
   const nextDownloadIdRef = useRef(0);
   const activeTaskRef = useRef<ActiveDownloadTask | null>(null);
+  const activeLifecycleRef = useRef<DownloadLifecycle | null>(null);
+  const captureRef = useRef(capture);
   const recentDownloadsRef = useRef<ReadonlyArray<RecentDownload>>([]);
-  const lastRequestRef = useRef<{
-    request: CobaltVideoDownloadRequest;
-    sourceUrl: string;
-  } | null>(null);
+
+  useLayoutEffect(() => {
+    captureRef.current = capture;
+  }, [capture]);
 
   useEffect(
     () => () => {
+      const lifecycle = activeLifecycleRef.current;
+      if (lifecycle && !lifecycle.finished) {
+        lifecycle.finished = true;
+        captureRef.current({
+          type: "download_finished",
+          sourceUrl: lifecycle.sourceUrl,
+          outcome: "canceled",
+          durationMs: Math.max(0, Date.now() - lifecycle.startedAt),
+        });
+      }
       operationRef.current += 1;
       activeTaskRef.current?.abort();
       activeTaskRef.current = null;
+      activeLifecycleRef.current = null;
       const downloads = recentDownloadsRef.current;
       recentDownloadsRef.current = [];
       for (const download of downloads) void download.release();
     },
     [],
   );
+
+  const finishLifecycle = (
+    lifecycle: DownloadLifecycle,
+    terminal:
+      | { outcome: "completed"; outputFormat: AnalyticsOutputFormat; sizeBytes: number }
+      | {
+          outcome: "failed";
+          failureStage: VideoDownloadStage;
+          failureCode: AnalyticsErrorCode;
+        }
+      | { outcome: "canceled" },
+  ) => {
+    if (activeLifecycleRef.current !== lifecycle || lifecycle.finished) return;
+    lifecycle.finished = true;
+    activeLifecycleRef.current = null;
+    capture({
+      type: "download_finished",
+      sourceUrl: lifecycle.sourceUrl,
+      durationMs: Math.max(0, Date.now() - lifecycle.startedAt),
+      ...terminal,
+    });
+  };
+
+  const failLifecycle = (
+    operation: number,
+    lifecycle: DownloadLifecycle,
+    error: unknown,
+    fallbackStage: VideoDownloadStage,
+  ) => {
+    if (operationRef.current !== operation || activeLifecycleRef.current !== lifecycle) return;
+    const failureError = structuredDownloadError(error, fallbackStage);
+    const failure = presentVideoDownloadFailure(failureError);
+    finishLifecycle(lifecycle, {
+      outcome: "failed",
+      failureStage: failureError.stage,
+      failureCode: failure.code,
+    });
+    setState({
+      kind: "error",
+      message: failure.trackDescription,
+      retryable: failure.retryable,
+    });
+  };
 
   const callbacksFor = (operation: number): VideoDownloadCallbacks => ({
     onProgress: (event) => {
@@ -516,15 +602,31 @@ export default function TagiumSaveApp({
     },
   });
 
-  const completeDownload = (operation: number, result: VideoFileDownloadResult) => {
-    if (operationRef.current !== operation) {
+  const completeDownload = (
+    operation: number,
+    lifecycle: DownloadLifecycle,
+    result: VideoFileDownloadResult,
+  ) => {
+    if (
+      operationRef.current !== operation ||
+      activeLifecycleRef.current !== lifecycle ||
+      lifecycle.finished
+    ) {
       void result.release();
       return;
     }
+    const outputFormat = analyticsOutputFormatFromFilename(result.file.name);
+    finishLifecycle(lifecycle, {
+      outcome: "completed",
+      outputFormat,
+      sizeBytes: result.file.size,
+    });
     nextDownloadIdRef.current += 1;
     const download = {
       id: nextDownloadIdRef.current,
       file: result.file,
+      sourceUrl: lifecycle.sourceUrl,
+      outputFormat,
       release: result.release,
     };
     const nextDownloads = [download, ...recentDownloadsRef.current];
@@ -537,43 +639,122 @@ export default function TagiumSaveApp({
     setState({ kind: "idle" });
   };
 
-  const runRequest = async (request: CobaltVideoDownloadRequest, source: string): Promise<void> => {
+  return {
+    activeLifecycleRef,
+    activeTaskRef,
+    callbacksFor,
+    completeDownload,
+    completionAnnouncement,
+    failLifecycle,
+    finishLifecycle,
+    operationRef,
+    recentDownloads,
+  };
+};
+
+export default function TagiumSaveApp({
+  startDownload = startVideoDownload,
+  capture = analytics.capture,
+  handoffDownload = downloadFile,
+}: {
+  startDownload?: typeof startVideoDownload;
+  capture?: Analytics["capture"];
+  handoffDownload?: (file: File) => void;
+} = {}) {
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [settings, setSettings] = useState(initialSettings);
+  const [state, setState] = useState<DownloadState>({ kind: "idle" });
+  const lastRequestRef = useRef<{
+    request: CobaltVideoDownloadRequest;
+    sourceUrl: string;
+    settings: VideoDownloadSettings;
+  } | null>(null);
+  const {
+    activeLifecycleRef,
+    activeTaskRef,
+    callbacksFor,
+    completeDownload,
+    completionAnnouncement,
+    failLifecycle,
+    finishLifecycle,
+    operationRef,
+    recentDownloads,
+  } = useDownloadLifecycle({ capture, setState, setSourceUrl });
+
+  const runRequest = async (
+    request: CobaltVideoDownloadRequest,
+    source: string,
+    requestedSettings: VideoDownloadSettings,
+    isRetry: boolean,
+  ): Promise<void> => {
     const operation = operationRef.current + 1;
     operationRef.current = operation;
     activeTaskRef.current?.abort();
-    lastRequestRef.current = { request, sourceUrl: source };
+    lastRequestRef.current = { request, sourceUrl: source, settings: requestedSettings };
+    const lifecycle: DownloadLifecycle = {
+      sourceUrl: source,
+      startedAt: Date.now(),
+      finished: false,
+    };
+    activeLifecycleRef.current = lifecycle;
     setValidationError(null);
     setState({ kind: "working", phase: "planning", progress: undefined });
 
-    const task = startDownload(request, callbacksFor(operation));
-    activeTaskRef.current = task;
     try {
+      capture({
+        type: "download_started",
+        sourceUrl: source,
+        requestedMode: requestedSettings.mode,
+        requestedVideoQuality: requestedSettings.quality,
+        requestedContainer: requestedSettings.container,
+        requestedCodec: requestedSettings.codec,
+        requestedAudioFormat: requestedSettings.audioFormat,
+        isRetry,
+      });
+      const task = startDownload(request, callbacksFor(operation));
+      activeTaskRef.current = task;
       const result = await task.promise;
-      if (operationRef.current !== operation) {
+      if (operationRef.current !== operation || activeLifecycleRef.current !== lifecycle) {
         if (result.status === "file") void result.release();
         return;
       }
       if (result.status === "picker") {
+        const resourceCount = result.picker.length + (result.downloadAudio ? 1 : 0);
+        if (resourceCount === 0) {
+          failLifecycle(
+            operation,
+            lifecycle,
+            new VideoDownloadError("planning", "invalid download plan: picker has no resources."),
+            "planning",
+          );
+          return;
+        }
+        capture({
+          type: "download_resolved",
+          sourceUrl: source,
+          resultKind: "picker",
+          resourceCount,
+        });
         setState({ kind: "picker", result });
         return;
       }
-      completeDownload(operation, result);
-    } catch (error) {
-      if (operationRef.current !== operation) return;
-      const failure = presentVideoDownloadFailure(
-        error instanceof Error ? error : new Error("download failed."),
-      );
-      setState({
-        kind: "error",
-        message: failure.trackDescription,
-        retryable: failure.retryable,
+      capture({
+        type: "download_resolved",
+        sourceUrl: source,
+        resultKind: "file",
+        resourceCount: 1,
       });
+      completeDownload(operation, lifecycle, result);
+    } catch (error) {
+      failLifecycle(operation, lifecycle, error, "planning");
     } finally {
       if (operationRef.current === operation) activeTaskRef.current = null;
     }
   };
 
   const runPickerDownload = async (
+    lifecycle: DownloadLifecycle,
     startDownload: (
       callbacks: VideoDownloadCallbacks,
     ) => VideoDownloadTask<VideoFileDownloadResult>,
@@ -583,32 +764,28 @@ export default function TagiumSaveApp({
     activeTaskRef.current?.abort();
     setState({ kind: "working", phase: "downloading", progress: undefined });
 
-    const task = startDownload(callbacksFor(operation));
-    activeTaskRef.current = task;
     try {
+      const task = startDownload(callbacksFor(operation));
+      activeTaskRef.current = task;
       const result = await task.promise;
-      completeDownload(operation, result);
+      completeDownload(operation, lifecycle, result);
     } catch (error) {
-      if (operationRef.current !== operation) return;
-      const failure = presentVideoDownloadFailure(
-        error instanceof Error ? error : new Error("download failed."),
-      );
-      setState({
-        kind: "error",
-        message: failure.trackDescription,
-        retryable: failure.retryable,
-      });
+      failLifecycle(operation, lifecycle, error, "processing");
     } finally {
       if (operationRef.current === operation) activeTaskRef.current = null;
     }
   };
 
-  const runPickerItem = (picker: VideoPickerDownloadResult, item: CobaltPickerItem) =>
-    runPickerDownload((callbacks) => picker.download(item, callbacks));
+  const runPickerItem = (picker: VideoPickerDownloadResult, item: CobaltPickerItem) => {
+    const lifecycle = activeLifecycleRef.current;
+    if (!lifecycle) return Promise.resolve();
+    return runPickerDownload(lifecycle, (callbacks) => picker.download(item, callbacks));
+  };
 
   const runPickerAudio = (picker: VideoPickerDownloadResult) => {
-    if (!picker.downloadAudio) return Promise.resolve();
-    return runPickerDownload(picker.downloadAudio);
+    const lifecycle = activeLifecycleRef.current;
+    if (!picker.downloadAudio || !lifecycle) return Promise.resolve();
+    return runPickerDownload(lifecycle, picker.downloadAudio);
   };
 
   const submit = async (): Promise<boolean> => {
@@ -616,11 +793,30 @@ export default function TagiumSaveApp({
     const trimmedUrl = sourceUrl.trim();
     const localError = validateSourceUrl(trimmedUrl);
     if (localError) {
+      capture({
+        type: "media_link_processed",
+        sourceUrl: trimmedUrl,
+        mediaKind: "media",
+        linkKind: mediaLinkKindFromUrl(trimmedUrl),
+        normalized: false,
+        redirected: false,
+        outcome: "rejected",
+        failureReason: "invalid",
+      });
       setValidationError(localError);
       return false;
     }
 
-    await runRequest(buildVideoDownloadRequest(trimmedUrl, settings), trimmedUrl);
+    capture({
+      type: "media_link_processed",
+      sourceUrl: trimmedUrl,
+      mediaKind: "media",
+      linkKind: mediaLinkKindFromUrl(trimmedUrl),
+      normalized: false,
+      redirected: false,
+      outcome: "accepted",
+    });
+    await runRequest(buildVideoDownloadRequest(trimmedUrl, settings), trimmedUrl, settings, false);
     return true;
   };
 
@@ -637,6 +833,8 @@ export default function TagiumSaveApp({
 
   const cancel = () => {
     if (state.kind !== "working") return;
+    const lifecycle = activeLifecycleRef.current;
+    if (lifecycle) finishLifecycle(lifecycle, { outcome: "canceled" });
     operationRef.current += 1;
     activeTaskRef.current?.abort();
     activeTaskRef.current = null;
@@ -644,6 +842,10 @@ export default function TagiumSaveApp({
   };
 
   const reset = () => {
+    if (state.kind === "working" || state.kind === "picker") {
+      const lifecycle = activeLifecycleRef.current;
+      if (lifecycle) finishLifecycle(lifecycle, { outcome: "canceled" });
+    }
     operationRef.current += 1;
     activeTaskRef.current?.abort();
     activeTaskRef.current = null;
@@ -657,7 +859,19 @@ export default function TagiumSaveApp({
     if (!lastRequest || activeTaskRef.current) return;
     setSourceUrl(lastRequest.sourceUrl);
     setValidationError(null);
-    void runRequest(lastRequest.request, lastRequest.sourceUrl);
+    void runRequest(lastRequest.request, lastRequest.sourceUrl, lastRequest.settings, true);
+  };
+
+  const prepareRecentDownload = (download: RecentDownload) => {
+    capture({
+      type: "export_prepared",
+      exportKind: "track",
+      trackCount: 1,
+      sizeBytes: download.file.size,
+      sourceUrl: download.sourceUrl,
+      outputFormat: download.outputFormat,
+    });
+    handoffDownload(download.file);
   };
 
   return (
@@ -714,7 +928,7 @@ export default function TagiumSaveApp({
               />
             )}
 
-            <RecentDownloads downloads={recentDownloads} onDownload={downloadFile} />
+            <RecentDownloads downloads={recentDownloads} onDownload={prepareRecentDownload} />
           </div>
         </div>
       </div>

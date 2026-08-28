@@ -543,6 +543,7 @@ describe("share workflow publication lifecycle", () => {
       shareId: analyticsId,
       shareKind: "album",
       trackCount: 1,
+      contentTitle: "Shared",
     });
     hook.unmount();
   });
@@ -610,6 +611,38 @@ describe("share workflow publication lifecycle", () => {
         message: "the shared album could not be updated. the link still has the previous version.",
       }),
     );
+    expect(mocks.capture).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it("records a successful update under the existing share ID", async () => {
+    const album = creatorAlbum(oldPublication);
+    album.title = "  Updated title  ";
+    mocks.getRevocationReceipt.mockReturnValue(capability);
+    mocks.updateShare.mockResolvedValue({
+      slug: oldPublication.slug,
+      url: oldPublication.url,
+      expiresAt: oldPublication.expiresAt,
+      analyticsId,
+    });
+    const { hook } = creatorWorkflow(album, creatorFile);
+
+    await act(async () => hook.result.openCreator({ kind: "album", id: album.id }));
+    expect(hook.result.dialog).toMatchObject({ status: "confirm", intent: "update" });
+    await act(async () => hook.result.publish());
+
+    expect(mocks.capture).toHaveBeenCalledWith({
+      type: "share_updated",
+      shareId: analyticsId,
+      shareKind: "album",
+      trackCount: 1,
+      contentTitle: "Updated title",
+    });
+    expect(mocks.updateShare.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.capture.mock.invocationCallOrder[0]!,
+    );
+    expect(JSON.stringify(mocks.capture.mock.calls)).not.toContain(oldPublication.slug);
+    expect(JSON.stringify(mocks.capture.mock.calls)).not.toContain(capability.token);
     hook.unmount();
   });
 
@@ -642,6 +675,37 @@ describe("share workflow publication lifecycle", () => {
       null,
     );
     expect(file.sharePublication).toMatchObject({ slug: "track-share", status: "active" });
+    expect(mocks.capture).toHaveBeenCalledWith({
+      type: "share_created",
+      shareId: analyticsId,
+      shareKind: "track",
+      trackCount: 1,
+      contentTitle: "One",
+    });
+    hook.unmount();
+  });
+
+  it("uses an untitled fallback for blank shared track titles", async () => {
+    const file: TagiumFile = structuredClone(creatorFile);
+    file.metadata!.title = "   ";
+    const { hook } = trackCreatorWorkflow(file);
+    mocks.publishShare.mockResolvedValue({
+      slug: "untitled-track",
+      url: "https://tagium.app/share/untitled-track",
+      expiresAt: "2031-01-01T00:00:00.000Z",
+      revocationToken: "track-token",
+      analyticsId,
+    });
+
+    await act(async () => hook.result.openCreator({ kind: "track", id: file.id }));
+    await act(async () => hook.result.publish());
+
+    expect(mocks.capture).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "share_created",
+        contentTitle: "untitled track",
+      }),
+    );
     hook.unmount();
   });
 

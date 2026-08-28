@@ -49,11 +49,15 @@ import { useAudioImportSession } from "@/features/workspace/useAudioImportSessio
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
 
-const settings = (audioBitrate: AppSettings["audioBitrate"]): AppSettings => ({
+const settings = (
+  audioBitrate: AppSettings["audioBitrate"],
+  audioFormat: AppSettings["audioFormat"] = DEFAULT_APP_SETTINGS.audioFormat,
+): AppSettings => ({
   ...DEFAULT_APP_SETTINGS,
   syncTrackNumbers: false,
   syncFilenames: false,
   audioBitrate,
+  audioFormat,
   applySoundCloudAlbumCoverToTracks: false,
 });
 
@@ -124,11 +128,11 @@ describe("audio URL import session", () => {
     mocks.resolveTrackMetadata.mockResolvedValue({ title: "Linked Single", artist: "Artist" });
     const hook = renderHook(() => {
       const library = useLibraryStore();
-      const editor = useTrackEditorSession({ library, settings: settings("320") });
+      const editor = useTrackEditorSession({ library, settings: settings("320", "best") });
       const importing = useAudioImportSession({
         library,
         editor,
-        settings: settings("320"),
+        settings: settings("320", "best"),
         activateEditor: vi.fn(),
       });
       return { library, importing };
@@ -149,6 +153,12 @@ describe("audio URL import session", () => {
       normalized: false,
       redirected: false,
       outcome: "accepted",
+    });
+    expect(mocks.capture).toHaveBeenCalledWith({
+      type: "import_started",
+      sourceUrl: "https://www.youtube.com/watch?v=abcdefghijk",
+      importKind: "single",
+      requestedFormat: "best",
     });
 
     await expect(
@@ -491,7 +501,7 @@ describe("audio URL import session", () => {
     },
   );
 
-  it("uses the latest settings and activation callback after asynchronous metadata resolution", async () => {
+  it("keeps the requested format while using later non-format settings after metadata resolution", async () => {
     let resolveMetadata: ((metadata: { title: string; artist: string }) => void) | undefined;
     mocks.resolveTrackMetadata.mockImplementation(
       () =>
@@ -513,7 +523,7 @@ describe("audio URL import session", () => {
         });
         return { library, importing };
       },
-      { currentSettings: settings("320"), activateEditor: firstActivation },
+      { currentSettings: settings("320", "best"), activateEditor: firstActivation },
     );
 
     let importing: Promise<void> | undefined;
@@ -523,13 +533,14 @@ describe("audio URL import session", () => {
       );
     });
     await vi.waitFor(() => expect(resolveMetadata).toBeTypeOf("function"));
-    hook.rerender({ currentSettings: settings("128"), activateEditor: latestActivation });
+    hook.rerender({ currentSettings: settings("128", "mp3"), activateEditor: latestActivation });
     resolveMetadata?.({ title: "Latest Track", artist: "Artist" });
     await act(async () => importing);
 
     expect(firstActivation).not.toHaveBeenCalled();
     expect(latestActivation).toHaveBeenCalledOnce();
     expect(hook.result.library.getSnapshot().files[0].downloadRequest?.audioBitrate).toBe("128");
+    expect(hook.result.library.getSnapshot().files[0].downloadRequest?.audioFormat).toBe("best");
     expect(hook.result.library.getSnapshot().files[0].downloadRequest?.importId).toMatch(
       /^[0-9a-f-]{36}$/,
     );

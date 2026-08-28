@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { parseMediaLink } from "../../../src/lib/media-link";
+import { mediaLinkKindFromUrl, parseMediaLink } from "../../../src/lib/media-link";
 import { resolveSoundCloudShortLink } from "../../../server/utils/soundcloud-link";
 
 describe("media link contract", () => {
+  it.each([
+    ["https://www.youtube.com/watch?v=dQw4w9WgXcQ", "canonical"],
+    ["https://youtu.be/dQw4w9WgXcQ", "short"],
+    ["https://m.soundcloud.com/a/t", "mobile"],
+    ["https://youtube-nocookie.com/embed/dQw4w9WgXcQ", "nocookie"],
+    ["https://example.com/media", "other"],
+  ] as const)("classifies %s as %s", (input, kind) => {
+    expect(mediaLinkKindFromUrl(input)).toBe(kind);
+  });
+
   it.each([
     ["https://youtu.be/qEIbFhBzfvA", "https://www.youtube.com/watch?v=qEIbFhBzfvA", "track"],
     ["https://youtu.be/dQw4w9WgXcQ?si=x", "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "track"],

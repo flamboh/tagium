@@ -532,6 +532,7 @@ describe("share manifest endpoints", () => {
       url: string;
       expiresAt: string;
       revocationToken: string;
+      analyticsId: string;
     };
     const oldArtworkKey = runtime.records.get(receipt.slug)?.artworkKey;
     const edited = { ...manifest, album: { ...manifest.album, title: "Edited album" } };
@@ -558,6 +559,7 @@ describe("share manifest endpoints", () => {
       slug: receipt.slug,
       url: receipt.url,
       expiresAt: receipt.expiresAt,
+      analyticsId: receipt.analyticsId,
     });
     expect(runtime.records.size).toBe(1);
     expect(runtime.records.get(receipt.slug)?.artworkKey).not.toBe(oldArtworkKey);

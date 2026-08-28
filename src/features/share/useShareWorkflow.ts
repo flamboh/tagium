@@ -65,6 +65,11 @@ const sharedContentAddedDescription = (manifest: Manifest) => {
   return `downloading ${count} ${count === 1 ? "track" : "tracks"} — watch progress in the sidebar.`;
 };
 
+const manifestContentTitle = (manifest: Manifest) => {
+  const title = manifest.kind === "album" ? manifest.album.title : manifest.track.metadata.title;
+  return title.trim() || `untitled ${manifest.kind}`;
+};
+
 const albumForTrack = (albums: readonly AlbumGroup[], trackId: string) =>
   albums.find((album) => album.trackIds.includes(trackId));
 
@@ -615,19 +620,23 @@ export const useShareWorkflow = ({
       attemptedIntent = updating ? "update" : "create";
 
       let receipt;
-      let createdAnalyticsId: string | undefined;
+      let publicationAnalytics;
       if (updating) {
         if (!existingPublication || !isActiveSharePublication(existingPublication)) {
           throw new Error(`the shared ${target.kind} can no longer be updated`);
         }
         const capability = getPublicationCapability(existingPublication.slug);
         if (!capability) throw new Error(`this browser cannot update the shared ${target.kind}`);
-        await updateShare(
+        const updatedReceipt = await updateShare(
           existingPublication.slug,
           capability.token,
           shareSnapshot.manifest,
           shareSnapshot.cover,
         );
+        publicationAnalytics = {
+          type: "share_updated",
+          shareId: updatedReceipt.analyticsId,
+        } as const;
         receipt = {
           slug: existingPublication.slug,
           url: existingPublication.url,
@@ -636,7 +645,10 @@ export const useShareWorkflow = ({
         };
       } else {
         receipt = await publishShare(shareSnapshot.manifest, shareSnapshot.cover);
-        createdAnalyticsId = receipt.analyticsId;
+        publicationAnalytics = {
+          type: "share_created",
+          shareId: receipt.analyticsId,
+        } as const;
         const capability = {
           slug: receipt.slug,
           expiresAt: receipt.expiresAt,
@@ -677,14 +689,13 @@ export const useShareWorkflow = ({
         status: "active",
       });
       setDialog({ status: "published", preview: currentDialog.preview, receipt });
-      if (createdAnalyticsId) {
-        analytics.capture({
-          type: "share_created",
-          shareId: createdAnalyticsId,
-          shareKind: shareSnapshot.manifest.kind,
-          trackCount: manifestTrackCount(shareSnapshot.manifest),
-        });
-      }
+      analytics.capture({
+        type: publicationAnalytics.type,
+        shareId: publicationAnalytics.shareId,
+        shareKind: shareSnapshot.manifest.kind,
+        trackCount: manifestTrackCount(shareSnapshot.manifest),
+        contentTitle: manifestContentTitle(shareSnapshot.manifest),
+      });
     } catch (error) {
       const createError = sharePublicationErrorMessage(
         error instanceof Error ? error : new Error("unknown share publication failure"),

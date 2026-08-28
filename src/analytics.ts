@@ -1,5 +1,8 @@
 import { Schema } from "effect";
 import type { CaptureResult, PostHogConfig } from "posthog-js";
+import type { MediaLinkKind } from "@/lib/media-link";
+
+export type { MediaLinkKind } from "@/lib/media-link";
 
 export type AudioUploadTargetKind = "loose" | "album";
 export type ImportKind = "single" | "set";
@@ -8,6 +11,31 @@ export type ExportKind = "track" | "album" | "library";
 export type TrackSourceMix = "local" | "imported" | "mixed" | "unknown";
 export type AnalyticsProvider = "youtube" | "soundcloud" | "other";
 export type AnalyticsProviderScope = AnalyticsProvider | "mixed";
+export type AnalyticsAppId = "tagium" | "tagium-save";
+export type AnalyticsRequestedFormat = "best" | "mp3" | "opus";
+export type AnalyticsOutputFormat =
+  | "mp3"
+  | "m4a"
+  | "flac"
+  | "ogg"
+  | "wav"
+  | "opus"
+  | "mp4"
+  | "webm"
+  | "mkv"
+  | "gif"
+  | "jpg"
+  | "jpeg"
+  | "png"
+  | "webp"
+  | "zip"
+  | "other";
+export type DownloadMode = "auto" | "audio" | "mute";
+export type DownloadVideoQuality = "1080" | "720" | "480";
+export type DownloadVideoContainer = "mp4" | "webm" | "mkv";
+export type DownloadVideoCodec = "h264" | "av1" | "vp9";
+export type DownloadResultKind = "file" | "picker";
+export type DownloadFailureStage = "planning" | "tunnel" | "processing" | "finalizing";
 export type ImportFailureStage = "plan" | "tunnel" | "processing" | "hydration";
 export type ImportFailureCode =
   | "capacity"
@@ -19,7 +47,6 @@ export type ImportFailureCode =
   | "parse_failed"
   | "metadata_write_failed"
   | "unknown";
-export type MediaLinkKind = "canonical" | "short" | "mobile" | "nocookie" | "other";
 export type CobaltTunnelOutcome = "ready" | "recovered" | "exhausted" | "non_retryable";
 export type CobaltTunnelElapsedBucket =
   | "under_1_second"
@@ -33,6 +60,9 @@ export type AnalyticsErrorCode =
   | "timeout"
   | "parse_failed"
   | "metadata_write_failed"
+  | "unsupported_source"
+  | "private_or_missing"
+  | "invalid_response"
   | "unknown";
 
 const MEDIA_LINK_KIND_PROPERTY = "shape";
@@ -49,7 +79,7 @@ export type AnalyticsEvent =
   | {
       type: "media_link_processed";
       sourceUrl: string;
-      mediaKind: "track" | "playlist" | "unsupported";
+      mediaKind: "media" | "track" | "playlist" | "unsupported";
       linkKind: MediaLinkKind;
       normalized: boolean;
       redirected: boolean;
@@ -67,6 +97,7 @@ export type AnalyticsEvent =
       type: "import_started";
       sourceUrl: string;
       importKind: ImportKind;
+      requestedFormat?: AnalyticsRequestedFormat;
     }
   | {
       type: "import_resolved";
@@ -74,6 +105,7 @@ export type AnalyticsEvent =
       importKind: ImportKind;
       resolvedCount: number;
       hasCover: boolean;
+      requestedFormat?: AnalyticsRequestedFormat;
     }
   | {
       type: "import_finished";
@@ -85,12 +117,14 @@ export type AnalyticsEvent =
       failedCount: number;
       canceledCount: number;
       durationMs: number;
+      requestedFormat?: AnalyticsRequestedFormat;
     }
   | {
       type: "import_resolution_failed";
       sourceUrl: string;
       importKind: ImportKind;
       code: ImportFailureCode;
+      requestedFormat?: AnalyticsRequestedFormat;
     }
   | {
       type: "import_failure_category";
@@ -99,6 +133,7 @@ export type AnalyticsEvent =
       stage: ImportFailureStage;
       code: ImportFailureCode;
       trackCount: number;
+      requestedFormat?: AnalyticsRequestedFormat;
     }
   | {
       type: "export_started";
@@ -112,6 +147,8 @@ export type AnalyticsEvent =
       trackCount: number;
       albumCount?: number;
       sizeBytes: number;
+      sourceUrl?: string;
+      outputFormat?: AnalyticsOutputFormat;
     }
   | {
       type: "export_failed";
@@ -162,7 +199,14 @@ export type AnalyticsEvent =
       durationMs: number;
     }
   | {
-      type: "share_created" | "share_added";
+      type: "share_created" | "share_updated";
+      shareId: string;
+      shareKind: "album" | "track";
+      trackCount: number;
+      contentTitle: string;
+    }
+  | {
+      type: "share_added";
       shareId: string;
       shareKind: "album" | "track";
       trackCount: number;
@@ -173,6 +217,44 @@ export type AnalyticsEvent =
       shareKind: "album" | "track";
       trackCount: number;
       viewer: "creator" | "recipient";
+    }
+  | {
+      type: "download_started";
+      sourceUrl: string;
+      requestedMode: DownloadMode;
+      requestedVideoQuality: DownloadVideoQuality;
+      requestedContainer: DownloadVideoContainer;
+      requestedCodec: DownloadVideoCodec;
+      requestedAudioFormat: AnalyticsRequestedFormat;
+      isRetry: boolean;
+    }
+  | {
+      type: "download_resolved";
+      sourceUrl: string;
+      resultKind: DownloadResultKind;
+      resourceCount: number;
+    }
+  | {
+      type: "download_finished";
+      sourceUrl: string;
+      outcome: "completed";
+      durationMs: number;
+      outputFormat: AnalyticsOutputFormat;
+      sizeBytes: number;
+    }
+  | {
+      type: "download_finished";
+      sourceUrl: string;
+      outcome: "failed";
+      durationMs: number;
+      failureStage: DownloadFailureStage;
+      failureCode: AnalyticsErrorCode;
+    }
+  | {
+      type: "download_finished";
+      sourceUrl: string;
+      outcome: "canceled";
+      durationMs: number;
     };
 
 export interface AnalyticsConfig {
@@ -195,7 +277,7 @@ interface AnalyticsDependencies {
 const MAX_QUEUED_EVENTS = 100;
 
 export interface Analytics {
-  initialize: () => void;
+  initialize: (appId: AnalyticsAppId) => void;
   capture: (event: AnalyticsEvent) => void;
 }
 
@@ -260,7 +342,7 @@ interface AnalyticsProperties {
   [key: string]: AnalyticsProperty;
 }
 
-const COMMON_CUSTOM_PROPERTIES = ["event_version", "deploy_env", "release_sha"];
+const COMMON_CUSTOM_PROPERTIES = ["event_version", "deploy_env", "release_sha", "app_id"];
 const CUSTOM_EVENT_PROPERTIES = {
   media_link_processed: new Set([
     ...COMMON_CUSTOM_PROPERTIES,
@@ -287,13 +369,19 @@ const CUSTOM_EVENT_PROPERTIES = {
     "parse_rejected_count",
     "target_kind",
   ]),
-  import_started: new Set([...COMMON_CUSTOM_PROPERTIES, "provider", "import_kind"]),
+  import_started: new Set([
+    ...COMMON_CUSTOM_PROPERTIES,
+    "provider",
+    "import_kind",
+    "requested_format",
+  ]),
   import_resolved: new Set([
     ...COMMON_CUSTOM_PROPERTIES,
     "provider",
     "import_kind",
     "resolved_count",
     "has_cover",
+    "requested_format",
   ]),
   import_finished: new Set([
     ...COMMON_CUSTOM_PROPERTIES,
@@ -305,6 +393,7 @@ const CUSTOM_EVENT_PROPERTIES = {
     "failed_count",
     "canceled_count",
     "duration_ms",
+    "requested_format",
   ]),
   import_failure_category: new Set([
     ...COMMON_CUSTOM_PROPERTIES,
@@ -313,12 +402,14 @@ const CUSTOM_EVENT_PROPERTIES = {
     "stage",
     "code",
     "track_count",
+    "requested_format",
   ]),
   import_resolution_failed: new Set([
     ...COMMON_CUSTOM_PROPERTIES,
     "provider",
     "import_kind",
     "code",
+    "requested_format",
   ]),
   export_started: new Set([
     ...COMMON_CUSTOM_PROPERTIES,
@@ -332,6 +423,8 @@ const CUSTOM_EVENT_PROPERTIES = {
     "track_count",
     "album_count",
     "size_bucket",
+    "provider",
+    "output_format",
   ]),
   export_failed: new Set([...COMMON_CUSTOM_PROPERTIES, "export_kind", "error_code"]),
   settings_changed: new Set([
@@ -371,7 +464,20 @@ const CUSTOM_EVENT_PROPERTIES = {
     "outcome",
     "duration_ms",
   ]),
-  share_created: new Set([...COMMON_CUSTOM_PROPERTIES, "share_id", "share_kind", "track_count"]),
+  share_created: new Set([
+    ...COMMON_CUSTOM_PROPERTIES,
+    "share_id",
+    "share_kind",
+    "track_count",
+    "content_title",
+  ]),
+  share_updated: new Set([
+    ...COMMON_CUSTOM_PROPERTIES,
+    "share_id",
+    "share_kind",
+    "track_count",
+    "content_title",
+  ]),
   share_opened: new Set([
     ...COMMON_CUSTOM_PROPERTIES,
     "share_id",
@@ -380,6 +486,32 @@ const CUSTOM_EVENT_PROPERTIES = {
     "viewer",
   ]),
   share_added: new Set([...COMMON_CUSTOM_PROPERTIES, "share_id", "share_kind", "track_count"]),
+  download_started: new Set([
+    ...COMMON_CUSTOM_PROPERTIES,
+    "provider",
+    "requested_mode",
+    "requested_video_quality",
+    "requested_container",
+    "requested_codec",
+    "requested_audio_format",
+    "is_retry",
+  ]),
+  download_resolved: new Set([
+    ...COMMON_CUSTOM_PROPERTIES,
+    "provider",
+    "result_kind",
+    "resource_count",
+  ]),
+  download_finished: new Set([
+    ...COMMON_CUSTOM_PROPERTIES,
+    "provider",
+    "outcome",
+    "duration_ms",
+    "output_format",
+    "size_bucket",
+    "failure_stage",
+    "failure_code",
+  ]),
 } satisfies Partial<Record<AnalyticsEvent["type"], ReadonlySet<string>>>;
 const SAFE_SDK_EVENTS = new Set(["$pageview", "$pageleave", "$autocapture"]);
 const SAFE_SDK_PROPERTIES = new Set([
@@ -438,6 +570,9 @@ const isImportFailureCode = isOneOf([
   "empty_response",
   "parse_failed",
   "metadata_write_failed",
+  "unsupported_source",
+  "private_or_missing",
+  "invalid_response",
   "unknown",
 ] as const);
 const isNonNegativeInteger = (value: AnalyticsProperty) =>
@@ -446,7 +581,7 @@ const isPositiveInteger = (value: AnalyticsProperty) =>
   isNumber(value) && Number.isInteger(value) && value > 0;
 const isNonNegativeNumber = (value: AnalyticsProperty) =>
   isNumber(value) && Number.isFinite(value) && value >= 0;
-const isMediaKind = isOneOf(["track", "playlist", "unsupported"] as const);
+const isMediaKind = isOneOf(["media", "track", "playlist", "unsupported"] as const);
 const isMediaLinkKind = isOneOf(["canonical", "short", "mobile", "nocookie", "other"] as const);
 const isMediaLinkOutcome = isOneOf(["accepted", "rejected"] as const);
 const isMediaLinkFailure = isOneOf(["invalid", "unsupported", "resolution_failed"] as const);
@@ -464,6 +599,61 @@ const isCobaltTunnelElapsedBucket = isOneOf([
 ] as const);
 const isShareKind = isOneOf(["album", "track"] as const);
 const isShareViewer = isOneOf(["creator", "recipient"] as const);
+const isRequestedFormat = isOneOf(["best", "mp3", "opus"] as const);
+const isOutputFormat = isOneOf([
+  "mp3",
+  "m4a",
+  "flac",
+  "ogg",
+  "wav",
+  "opus",
+  "mp4",
+  "webm",
+  "mkv",
+  "gif",
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "zip",
+  "other",
+] as const);
+const isDownloadMode = isOneOf(["auto", "audio", "mute"] as const);
+const isDownloadVideoQuality = isOneOf(["1080", "720", "480"] as const);
+const isDownloadVideoContainer = isOneOf(["mp4", "webm", "mkv"] as const);
+const isDownloadVideoCodec = isOneOf(["h264", "av1", "vp9"] as const);
+const isDownloadResultKind = isOneOf(["file", "picker"] as const);
+const isDownloadOutcome = isOneOf(["completed", "failed", "canceled"] as const);
+const isDownloadFailureStage = isOneOf(["planning", "tunnel", "processing", "finalizing"] as const);
+const isExportKind = isOneOf(["track", "album", "library"] as const);
+const isAnalyticsErrorCode = isOneOf([
+  "capacity",
+  "rate_limited",
+  "service_unavailable",
+  "timeout",
+  "parse_failed",
+  "metadata_write_failed",
+  "unsupported_source",
+  "private_or_missing",
+  "invalid_response",
+  "unknown",
+] as const);
+const isSizeBucket = isOneOf([
+  "under_10_mb",
+  "10_to_100_mb",
+  "100_to_500_mb",
+  "500_mb_or_more",
+] as const);
+const MAX_CONTENT_TITLE_LENGTH = 200;
+const isSafeContentTitleCharacter = (character: string) => {
+  const code = character.charCodeAt(0);
+  return code > 31 && code !== 127;
+};
+const isContentTitle = (value: AnalyticsProperty) =>
+  isString(value) &&
+  value.trim().length > 0 &&
+  Array.from(value).length <= MAX_CONTENT_TITLE_LENGTH &&
+  Array.from(value).every(isSafeContentTitleCharacter);
 
 const CUSTOM_PROPERTY_VALIDATORS = {
   media_link_processed: {
@@ -481,6 +671,17 @@ const CUSTOM_PROPERTY_VALIDATORS = {
     attempts: isBoundedTunnelAttempt,
     elapsed_bucket: isCobaltTunnelElapsedBucket,
   },
+  import_started: {
+    provider: isAnalyticsProvider,
+    import_kind: isImportKind,
+    requested_format: isRequestedFormat,
+  },
+  import_resolved: {
+    provider: isAnalyticsProvider,
+    import_kind: isImportKind,
+    resolved_count: isPositiveInteger,
+    requested_format: isRequestedFormat,
+  },
   import_finished: {
     provider: isAnalyticsProvider,
     import_kind: isImportKind,
@@ -490,6 +691,7 @@ const CUSTOM_PROPERTY_VALIDATORS = {
     failed_count: isNonNegativeInteger,
     canceled_count: isNonNegativeInteger,
     duration_ms: isNonNegativeNumber,
+    requested_format: isRequestedFormat,
   },
   import_failure_category: {
     provider: isAnalyticsProvider,
@@ -497,11 +699,21 @@ const CUSTOM_PROPERTY_VALIDATORS = {
     stage: isImportFailureStage,
     code: isImportFailureCode,
     track_count: isPositiveInteger,
+    requested_format: isRequestedFormat,
   },
   import_resolution_failed: {
     provider: isAnalyticsProvider,
     import_kind: isImportKind,
     code: isImportFailureCode,
+    requested_format: isRequestedFormat,
+  },
+  export_prepared: {
+    export_kind: isExportKind,
+    track_count: isPositiveInteger,
+    album_count: isNonNegativeInteger,
+    size_bucket: isSizeBucket,
+    provider: isAnalyticsProvider,
+    output_format: isOutputFormat,
   },
   import_retry_started: {
     provider: isAnalyticsProviderScope,
@@ -522,6 +734,13 @@ const CUSTOM_PROPERTY_VALIDATORS = {
     share_id: isShareAnalyticsId,
     share_kind: isShareKind,
     track_count: isPositiveInteger,
+    content_title: isContentTitle,
+  },
+  share_updated: {
+    share_id: isShareAnalyticsId,
+    share_kind: isShareKind,
+    track_count: isPositiveInteger,
+    content_title: isContentTitle,
   },
   share_opened: {
     share_id: isShareAnalyticsId,
@@ -534,11 +753,37 @@ const CUSTOM_PROPERTY_VALIDATORS = {
     share_kind: isShareKind,
     track_count: isPositiveInteger,
   },
+  download_started: {
+    provider: isAnalyticsProvider,
+    requested_mode: isDownloadMode,
+    requested_video_quality: isDownloadVideoQuality,
+    requested_container: isDownloadVideoContainer,
+    requested_codec: isDownloadVideoCodec,
+    requested_audio_format: isRequestedFormat,
+    is_retry: isBoolean,
+  },
+  download_resolved: {
+    provider: isAnalyticsProvider,
+    result_kind: isDownloadResultKind,
+    resource_count: isPositiveInteger,
+  },
+  download_finished: {
+    provider: isAnalyticsProvider,
+    outcome: isDownloadOutcome,
+    duration_ms: isNonNegativeNumber,
+    output_format: isOutputFormat,
+    size_bucket: isSizeBucket,
+    failure_stage: isDownloadFailureStage,
+    failure_code: isAnalyticsErrorCode,
+  },
 } satisfies Partial<
   Record<AnalyticsEvent["type"], Readonly<Record<string, AnalyticsPropertyValidator>>>
 >;
 
-const redactAndValidateEvent = (event: CaptureResult): CaptureResult | null => {
+const redactAndValidateEvent = (
+  event: CaptureResult,
+  appId: AnalyticsAppId,
+): CaptureResult | null => {
   const customAllowedProperties = Object.entries(CUSTOM_EVENT_PROPERTIES).find(
     ([eventName]) => eventName === event.event,
   )?.[1];
@@ -579,7 +824,33 @@ const redactAndValidateEvent = (event: CaptureResult): CaptureResult | null => {
     }
   }
 
-  if (isSdkEvent) properties.app_view = "tagium";
+  if (
+    (event.event === "share_created" || event.event === "share_updated") &&
+    !isContentTitle(properties.content_title)
+  ) {
+    return null;
+  }
+
+  if (event.event === "download_finished") {
+    const outcome = properties.outcome;
+    const hasOutput =
+      isOutputFormat(properties.output_format) && isSizeBucket(properties.size_bucket);
+    const hasFailure =
+      isDownloadFailureStage(properties.failure_stage) &&
+      isAnalyticsErrorCode(properties.failure_code);
+    if (
+      !isNonNegativeNumber(properties.duration_ms) ||
+      !isAnalyticsProvider(properties.provider) ||
+      (outcome === "completed" && (!hasOutput || hasFailure)) ||
+      (outcome === "failed" && (!hasFailure || hasOutput)) ||
+      (outcome === "canceled" && (hasOutput || hasFailure)) ||
+      (outcome !== "completed" && outcome !== "failed" && outcome !== "canceled")
+    ) {
+      return null;
+    }
+  }
+
+  properties.app_id = appId;
   const normalizedEvent: CaptureResult = {
     uuid: event.uuid,
     event: event.event,
@@ -597,10 +868,29 @@ const sizeBucket = (sizeBytes: number) => {
   return "500_mb_or_more";
 };
 
-const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
+const normalizeContentTitle = (title: string) => {
+  const normalized = Array.from(title, (character) =>
+    isSafeContentTitleCharacter(character) ? character : " ",
+  )
+    .join("")
+    .trim();
+  return normalized
+    ? Array.from(normalized).slice(0, MAX_CONTENT_TITLE_LENGTH).join("")
+    : undefined;
+};
+
+export const analyticsOutputFormatFromFilename = (filename: string): AnalyticsOutputFormat => {
+  const extensionStart = filename.lastIndexOf(".");
+  if (extensionStart <= 0 || extensionStart === filename.length - 1) return "other";
+  const extension = filename.slice(extensionStart + 1).toLowerCase();
+  return isOutputFormat(extension) ? extension : "other";
+};
+
+const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: AnalyticsAppId) => {
   const commonProperties: AnalyticsProperties = {
     event_version: 1,
     deploy_env: config.deployEnv,
+    app_id: appId,
   };
   if (config.releaseSha) commonProperties.release_sha = config.releaseSha;
 
@@ -645,63 +935,78 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
           target_kind: event.targetKind,
         },
       };
-    case "import_started":
+    case "import_started": {
+      const properties: AnalyticsProperties = {
+        ...commonProperties,
+        provider: analyticsProviderFromUrl(event.sourceUrl),
+        import_kind: event.importKind,
+      };
+      if (event.requestedFormat) properties.requested_format = event.requestedFormat;
       return {
         name: event.type,
-        properties: {
-          ...commonProperties,
-          provider: analyticsProviderFromUrl(event.sourceUrl),
-          import_kind: event.importKind,
-        },
+        properties,
       };
-    case "import_resolved":
+    }
+    case "import_resolved": {
+      const properties: AnalyticsProperties = {
+        ...commonProperties,
+        provider: analyticsProviderFromUrl(event.sourceUrl),
+        import_kind: event.importKind,
+        resolved_count: event.resolvedCount,
+        has_cover: event.hasCover,
+      };
+      if (event.requestedFormat) properties.requested_format = event.requestedFormat;
       return {
         name: event.type,
-        properties: {
-          ...commonProperties,
-          provider: analyticsProviderFromUrl(event.sourceUrl),
-          import_kind: event.importKind,
-          resolved_count: event.resolvedCount,
-          has_cover: event.hasCover,
-        },
+        properties,
       };
-    case "import_finished":
+    }
+    case "import_finished": {
+      const properties: AnalyticsProperties = {
+        ...commonProperties,
+        provider: analyticsProviderFromUrl(event.sourceUrl),
+        import_kind: event.importKind,
+        outcome: event.outcome,
+        total_count: event.totalCount,
+        completed_count: event.completedCount,
+        failed_count: event.failedCount,
+        canceled_count: event.canceledCount,
+        duration_ms: event.durationMs,
+      };
+      if (event.requestedFormat) properties.requested_format = event.requestedFormat;
       return {
         name: event.type,
-        properties: {
-          ...commonProperties,
-          provider: analyticsProviderFromUrl(event.sourceUrl),
-          import_kind: event.importKind,
-          outcome: event.outcome,
-          total_count: event.totalCount,
-          completed_count: event.completedCount,
-          failed_count: event.failedCount,
-          canceled_count: event.canceledCount,
-          duration_ms: event.durationMs,
-        },
+        properties,
       };
-    case "import_failure_category":
+    }
+    case "import_failure_category": {
+      const properties: AnalyticsProperties = {
+        ...commonProperties,
+        provider: analyticsProviderFromUrl(event.sourceUrl),
+        import_kind: event.importKind,
+        stage: event.stage,
+        code: event.code,
+        track_count: event.trackCount,
+      };
+      if (event.requestedFormat) properties.requested_format = event.requestedFormat;
       return {
         name: event.type,
-        properties: {
-          ...commonProperties,
-          provider: analyticsProviderFromUrl(event.sourceUrl),
-          import_kind: event.importKind,
-          stage: event.stage,
-          code: event.code,
-          track_count: event.trackCount,
-        },
+        properties,
       };
-    case "import_resolution_failed":
+    }
+    case "import_resolution_failed": {
+      const properties: AnalyticsProperties = {
+        ...commonProperties,
+        provider: analyticsProviderFromUrl(event.sourceUrl),
+        import_kind: event.importKind,
+        code: event.code,
+      };
+      if (event.requestedFormat) properties.requested_format = event.requestedFormat;
       return {
         name: event.type,
-        properties: {
-          ...commonProperties,
-          provider: analyticsProviderFromUrl(event.sourceUrl),
-          import_kind: event.importKind,
-          code: event.code,
-        },
+        properties,
       };
+    }
     case "export_started": {
       const properties: AnalyticsProperties = {
         ...commonProperties,
@@ -722,6 +1027,10 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
         size_bucket: sizeBucket(event.sizeBytes),
       };
       if (event.albumCount !== undefined) properties.album_count = event.albumCount;
+      if (event.sourceUrl !== undefined) {
+        properties.provider = analyticsProviderFromUrl(event.sourceUrl);
+      }
+      if (event.outputFormat !== undefined) properties.output_format = event.outputFormat;
       return {
         name: event.type,
         properties,
@@ -804,6 +1113,20 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
         },
       };
     case "share_created":
+    case "share_updated": {
+      const properties: AnalyticsProperties = {
+        ...commonProperties,
+        share_id: event.shareId,
+        share_kind: event.shareKind,
+        track_count: event.trackCount,
+      };
+      const contentTitle = normalizeContentTitle(event.contentTitle);
+      if (contentTitle) properties.content_title = contentTitle;
+      return {
+        name: event.type,
+        properties,
+      };
+    }
     case "share_added":
       return {
         name: event.type,
@@ -825,6 +1148,46 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig) => {
           viewer: event.viewer,
         },
       };
+    case "download_started":
+      return {
+        name: event.type,
+        properties: {
+          ...commonProperties,
+          provider: analyticsProviderFromUrl(event.sourceUrl),
+          requested_mode: event.requestedMode,
+          requested_video_quality: event.requestedVideoQuality,
+          requested_container: event.requestedContainer,
+          requested_codec: event.requestedCodec,
+          requested_audio_format: event.requestedAudioFormat,
+          is_retry: event.isRetry,
+        },
+      };
+    case "download_resolved":
+      return {
+        name: event.type,
+        properties: {
+          ...commonProperties,
+          provider: analyticsProviderFromUrl(event.sourceUrl),
+          result_kind: event.resultKind,
+          resource_count: event.resourceCount,
+        },
+      };
+    case "download_finished": {
+      const properties: AnalyticsProperties = {
+        ...commonProperties,
+        provider: analyticsProviderFromUrl(event.sourceUrl),
+        outcome: event.outcome,
+        duration_ms: event.durationMs,
+      };
+      if (event.outcome === "completed") {
+        properties.output_format = event.outputFormat;
+        properties.size_bucket = sizeBucket(event.sizeBytes);
+      } else if (event.outcome === "failed") {
+        properties.failure_stage = event.failureStage;
+        properties.failure_code = event.failureCode;
+      }
+      return { name: event.type, properties };
+    }
   }
 };
 
@@ -836,10 +1199,11 @@ export const createAnalytics = (
   const queue: AnalyticsEvent[] = [];
   let client: AnalyticsClient | undefined;
   let loadScheduled = false;
+  let appId: AnalyticsAppId | undefined;
 
   const captureSafely = (event: AnalyticsEvent) => {
-    if (!client) return;
-    const serialized = serializeEvent(event, config);
+    if (!client || !appId) return;
+    const serialized = serializeEvent(event, config, appId);
     try {
       client.capture(serialized.name, serialized.properties);
     } catch {
@@ -855,7 +1219,8 @@ export const createAnalytics = (
   };
 
   const scheduleLoad = () => {
-    if (!enabled || loadScheduled) return;
+    if (!enabled || loadScheduled || !appId) return;
+    const initializedAppId = appId;
     loadScheduled = true;
     dependencies.schedule(() => {
       void dependencies
@@ -878,7 +1243,8 @@ export const createAnalytics = (
             disable_surveys: true,
             cookieless_mode: "always",
             person_profiles: "never",
-            before_send: (event) => (event ? redactAndValidateEvent(event) : null),
+            before_send: (event) =>
+              event ? redactAndValidateEvent(event, initializedAppId) : null,
           });
           client = loadedClient;
           flush();
@@ -890,7 +1256,11 @@ export const createAnalytics = (
   };
 
   return {
-    initialize: scheduleLoad,
+    initialize: (initializedAppId) => {
+      if (appId && appId !== initializedAppId) return;
+      appId = initializedAppId;
+      scheduleLoad();
+    },
     capture: (event) => {
       if (!enabled) return;
       queue.push(event);

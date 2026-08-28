@@ -27,6 +27,7 @@ describe("import lifecycle", () => {
     const operationId = tracker.start({
       sourceUrl: "https://soundcloud.com/artist/sets/private-set",
       importKind: "set",
+      requestedFormat: "best",
     });
     tracker.resolve(operationId, {
       trackIds: ["track-1", "track-2"],
@@ -43,11 +44,13 @@ describe("import lifecycle", () => {
         type: "import_started",
         sourceUrl: "https://soundcloud.com/artist/sets/private-set",
         importKind: "set",
+        requestedFormat: "best",
       },
       {
         type: "import_resolved",
         sourceUrl: "https://soundcloud.com/artist/sets/private-set",
         importKind: "set",
+        requestedFormat: "best",
         resolvedCount: 2,
         hasCover: true,
       },
@@ -55,6 +58,7 @@ describe("import lifecycle", () => {
         type: "import_finished",
         sourceUrl: "https://soundcloud.com/artist/sets/private-set",
         importKind: "set",
+        requestedFormat: "best",
         outcome: "completed",
         totalCount: 2,
         completedCount: 2,
@@ -76,6 +80,7 @@ describe("import lifecycle", () => {
     const operationId = tracker.start({
       sourceUrl: "https://soundcloud.com/artist/sets/private-set",
       importKind: "set",
+      requestedFormat: "mp3",
     });
     now = 1_125;
 
@@ -87,12 +92,14 @@ describe("import lifecycle", () => {
         type: "import_resolution_failed",
         sourceUrl: "https://soundcloud.com/artist/sets/private-set",
         importKind: "set",
+        requestedFormat: "mp3",
         code: "fetch_failed",
       },
       {
         type: "import_finished",
         sourceUrl: "https://soundcloud.com/artist/sets/private-set",
         importKind: "set",
+        requestedFormat: "mp3",
         outcome: "failed",
         totalCount: 0,
         completedCount: 0,
@@ -127,6 +134,7 @@ describe("import lifecycle", () => {
       const operationId = tracker.start({
         sourceUrl: "https://soundcloud.com/artist/sets/set",
         importKind: "set",
+        requestedFormat: "mp3",
       });
       tracker.resolve(operationId, { trackIds: ["track-1", "track-2"], hasCover: false });
       tracker.settle(operationId, { trackId: "track-1", outcome: settlements[0] });
@@ -153,6 +161,7 @@ describe("import lifecycle", () => {
     const operationId = tracker.start({
       sourceUrl: "https://soundcloud.com/artist/sets/set",
       importKind: "set",
+      requestedFormat: "best",
     });
     tracker.resolve(operationId, {
       trackIds: ["track-1", "track-2", "track-3"],
@@ -181,18 +190,21 @@ describe("import lifecycle", () => {
     expect(captured.slice(-4, -1)).toEqual([
       expect.objectContaining({
         type: "import_failure_category",
+        requestedFormat: "best",
         stage: "tunnel",
         code: "empty_response",
         trackCount: 1,
       }),
       expect.objectContaining({
         type: "import_failure_category",
+        requestedFormat: "best",
         stage: "plan",
         code: "empty_response",
         trackCount: 1,
       }),
       expect.objectContaining({
         type: "import_failure_category",
+        requestedFormat: "best",
         stage: "hydration",
         code: "parse_failed",
         trackCount: 1,
