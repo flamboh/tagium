@@ -341,7 +341,7 @@ function ProgressRow({
         type="button"
         variant="ghost"
         size="icon"
-        className="size-8 shrink-0"
+        className="size-8 shrink-0 active:scale-[0.97] motion-reduce:active:scale-100"
         aria-label="cancel download"
         onClick={onCancel}
       >
@@ -370,7 +370,7 @@ function PickerChoices({
             key={`${item.type}-${item.url}`}
             type="button"
             variant="outline"
-            className="h-9 min-w-0 justify-between px-3 text-xs"
+            className="h-9 min-w-0 justify-between px-3 text-xs active:scale-[0.97] motion-reduce:active:scale-100"
             aria-label={`download ${item.type} ${index + 1}`}
             onClick={() => onSelect(item)}
           >
@@ -382,7 +382,7 @@ function PickerChoices({
           <Button
             type="button"
             variant="outline"
-            className="h-9 min-w-0 justify-between px-3 text-xs"
+            className="h-9 min-w-0 justify-between px-3 text-xs active:scale-[0.97] motion-reduce:active:scale-100"
             aria-label={`download ${result.audioFilename ?? "audio"}`}
             onClick={onSelectAudio}
           >
@@ -400,7 +400,7 @@ function PickerChoices({
         type="button"
         variant="ghost"
         size="icon"
-        className="size-8 shrink-0"
+        className="size-8 shrink-0 active:scale-[0.97] motion-reduce:active:scale-100"
         aria-label="reset download"
         onClick={onReset}
       >
@@ -534,7 +534,7 @@ function ErrorRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-8 shrink-0 text-destructive hover:text-destructive"
+          className="size-8 shrink-0 text-destructive hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
           aria-label="retry download"
           onClick={onRetry}
         >
@@ -545,7 +545,7 @@ function ErrorRow({
         type="button"
         variant="ghost"
         size="icon"
-        className="size-8 shrink-0 text-destructive hover:text-destructive"
+        className="size-8 shrink-0 text-destructive hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
         aria-label="reset download"
         onClick={onReset}
       >
