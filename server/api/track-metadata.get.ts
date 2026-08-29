@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect";
 import { defineHandler } from "nitro";
 import { getSoundCloudClientId } from "../utils/soundcloud";
+import { resolveSoundCloudShortLink } from "../utils/soundcloud-link";
 import { urlStringSchema } from "../utils/schema";
 import { parseMediaLink } from "../../src/lib/media-link";
 
@@ -16,6 +17,16 @@ const soundCloudTrackSchema = Schema.Struct({
   artwork_url: Schema.optionalKey(Schema.NullOr(urlStringSchema)),
   user: Schema.optionalKey(Schema.Struct({ username: Schema.optionalKey(Schema.String) })),
 });
+const soundCloudShortHosts = new Set(["on.soundcloud.com", "snd.sc"]);
+
+const normalizeTrackMetadataSourceUrl = async (sourceUrl: string, signal: AbortSignal) => {
+  const parsed = parseMediaLink(sourceUrl);
+  if (parsed.kind !== "unsupported") return parsed.canonicalUrl;
+
+  const candidate = new URL(sourceUrl);
+  if (!soundCloudShortHosts.has(candidate.hostname.toLowerCase())) return sourceUrl;
+  return (await resolveSoundCloudShortLink(sourceUrl, { signal })).canonicalUrl;
+};
 
 const isSoundCloudUrl = (url: URL) => {
   const parsed = parseMediaLink(url.toString());
@@ -65,8 +76,9 @@ export const normalizeTrackMetadataArtist = (artist: string, endpoint: URL) =>
 
 export default defineHandler(async (event) => {
   const requestUrl = new URL(event.req.url, "http://tagium.local");
-  const sourceUrl = requestUrl.searchParams.get("url");
-  if (!sourceUrl) throw new Error("track_metadata.url_required");
+  const requestedSourceUrl = requestUrl.searchParams.get("url");
+  if (!requestedSourceUrl) throw new Error("track_metadata.url_required");
+  const sourceUrl = await normalizeTrackMetadataSourceUrl(requestedSourceUrl, event.req.signal);
 
   if (isSoundCloudUrl(new URL(sourceUrl))) {
     return resolveSoundCloudTrackMetadata(sourceUrl, { signal: event.req.signal });

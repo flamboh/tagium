@@ -59,6 +59,7 @@ import {
   type VideoDownloadSettingsUpdate,
 } from "@/apps/tagium-save/tagiumSaveModel";
 import { useTheme } from "@/features/theme/useTheme";
+import { resolveTrackMetadata } from "@/features/import/trackMetadata";
 import { cn } from "@/lib/utils";
 import { mediaLinkKindFromUrl } from "@/lib/media-link";
 
@@ -137,6 +138,7 @@ type RecentDownload = {
   file: File;
   sourceUrl: string;
   outputFormat: AnalyticsOutputFormat;
+  coverUrl?: string;
   release: () => Promise<void>;
 };
 
@@ -151,6 +153,7 @@ type DownloadLifecycle = {
   sourceUrl: string;
   startedAt: number;
   finished: boolean;
+  coverUrl: Promise<string | undefined>;
 };
 
 const maxRecentDownloads = 5;
@@ -474,8 +477,9 @@ function RecentDownloadRow({
 
   return (
     <li ref={itemRef} className="h-10 overflow-hidden" data-save-download-item>
-      <div ref={contentRef} className="flex h-10 min-w-0 items-center gap-2 pl-3">
-        <span className="min-w-0 flex-1 truncate text-sm" title={download.file.name}>
+      <div ref={contentRef} className="flex h-10 min-w-0 items-center gap-2">
+        <RecentDownloadCover key={download.coverUrl ?? "empty"} coverUrl={download.coverUrl} />
+        <span className="min-w-0 flex-1 truncate pl-3 text-sm" title={download.file.name}>
           {download.file.name}
         </span>
         <Button
@@ -511,6 +515,32 @@ function RecentDownloadRow({
   );
 }
 
+function RecentDownloadCover({ coverUrl }: { coverUrl: string | undefined }) {
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  return (
+    <span className="size-10 shrink-0" aria-hidden="true">
+      {coverUrl && (
+        <img
+          src={coverUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          className={cn(
+            "size-10 rounded-lg border border-input object-cover transition-transform duration-150 ease-out motion-reduce:scale-100 motion-reduce:transition-none",
+            isLoaded ? "visible scale-100" : "invisible scale-[0.97]",
+          )}
+          data-save-download-cover
+          data-save-download-cover-state={isLoaded ? "loaded" : "loading"}
+          onLoad={() => setIsLoaded(true)}
+          onError={() => setIsLoaded(false)}
+        />
+      )}
+    </span>
+  );
+}
+
 function RecentDownloads({
   downloads,
   onDownload,
@@ -521,7 +551,7 @@ function RecentDownloads({
   if (downloads.length === 0) return null;
 
   return (
-    <ul className="relative z-0 ml-12 mt-3 w-[calc(100%-3rem)]" aria-label="recent downloads">
+    <ul className="relative z-0 mt-3 flex w-full flex-col gap-0.5" aria-label="recent downloads">
       {downloads.map((download) => (
         <RecentDownloadRow key={download.id} download={download} onDownload={onDownload} />
       ))}
@@ -748,6 +778,16 @@ const useDownloadLifecycle = ({
     recentDownloadsRef.current = retainedDownloads;
     setRecentDownloads(retainedDownloads);
     for (const removed of nextDownloads.slice(maxRecentDownloads)) void removed.release();
+    void lifecycle.coverUrl.then((coverUrl) => {
+      if (!coverUrl) return;
+      const currentDownloads = recentDownloadsRef.current;
+      if (!currentDownloads.some((entry) => entry.id === download.id)) return;
+      const updatedDownloads = currentDownloads.map((entry) =>
+        entry.id === download.id ? { ...entry, coverUrl } : entry,
+      );
+      recentDownloadsRef.current = updatedDownloads;
+      setRecentDownloads(updatedDownloads);
+    });
     setCompletionAnnouncement({ id: download.id, filename: download.file.name });
     setSourceUrl("");
     setState({ kind: "idle" });
@@ -890,10 +930,12 @@ export default function TagiumSaveApp({
   startDownload = startVideoDownload,
   capture = analytics.capture,
   handoffDownload = downloadFile,
+  resolveMetadata = resolveTrackMetadata,
 }: {
   startDownload?: typeof startVideoDownload;
   capture?: Analytics["capture"];
   handoffDownload?: (file: File) => void;
+  resolveMetadata?: typeof resolveTrackMetadata;
 } = {}) {
   const [sourceUrl, setSourceUrl] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -930,6 +972,10 @@ export default function TagiumSaveApp({
       sourceUrl: source,
       startedAt: Date.now(),
       finished: false,
+      coverUrl: Promise.resolve()
+        .then(() => resolveMetadata(source))
+        .then((metadata) => metadata?.coverUrl)
+        .catch(() => undefined),
     };
     activeLifecycleRef.current = lifecycle;
     setValidationError(null);

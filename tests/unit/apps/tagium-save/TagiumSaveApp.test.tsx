@@ -193,6 +193,52 @@ describe("tagium save app", () => {
     act(() => renderer.unmount());
   });
 
+  it("shows a track cover beside a completed download without delaying it", async () => {
+    let resolveMetadata!: (metadata: { title: string; artist: string; coverUrl: string }) => void;
+    const metadata = new Promise<{ title: string; artist: string; coverUrl: string }>((resolve) => {
+      resolveMetadata = resolve;
+    });
+    const startDownload = vi.fn(() =>
+      taskFrom<VideoDownloadResult>(Promise.resolve(resolvedFile("covered-track.mp3"))),
+    );
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <TagiumSaveApp startDownload={startDownload} resolveMetadata={() => metadata} />,
+      );
+    });
+    await setSourceUrl(renderer, "https://soundcloud.com/artist/covered-track");
+    await submit(renderer);
+
+    expect(renderer.root.findByProps({ title: "covered-track.mp3" })).toBeDefined();
+    expect(renderer.root.findAllByProps({ "data-save-download-cover": true })).toHaveLength(0);
+
+    await act(async () => {
+      resolveMetadata({
+        title: "covered track",
+        artist: "artist",
+        coverUrl: "https://images.test/covered-track.jpg",
+      });
+      await metadata;
+    });
+
+    let cover = renderer.root.findByProps({ "data-save-download-cover": true });
+    expect(cover.props.src).toBe("https://images.test/covered-track.jpg");
+    expect(cover.props.className).toContain("size-10");
+    expect(cover.props.className).toContain("invisible scale-[0.97]");
+    expect(cover.props["data-save-download-cover-state"]).toBe("loading");
+
+    await act(async () => cover.props.onLoad());
+
+    cover = renderer.root.findByProps({ "data-save-download-cover": true });
+    expect(cover.props.className).toContain("visible scale-100");
+    expect(cover.props.className).toContain("duration-150 ease-out");
+    expect(cover.props["data-save-download-cover-state"]).toBe("loaded");
+
+    act(() => renderer.unmount());
+  });
+
   it("tracks rejected media links without starting a download", async () => {
     const { capture, events } = captureEvents();
     const startDownload = vi.fn(() =>

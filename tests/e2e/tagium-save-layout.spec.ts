@@ -255,6 +255,75 @@ test("reserves progress space above recent downloads", async ({ page, browserNam
   await expect(page.getByRole("button", { name: "download reserved-2.mp4" })).toBeVisible();
 });
 
+test("shows track covers at the same size as the settings button", async ({ page }) => {
+  let releaseCover = () => {};
+  const coverResponse = new Promise<void>((resolve) => {
+    releaseCover = resolve;
+  });
+
+  await page.route("**/api/track-metadata?**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        title: "covered track",
+        artist: "artist",
+        coverUrl: "https://images.test/covered-track.jpg",
+      }),
+    }),
+  );
+  await page.route("**/api/cobalt/download", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "tunnel",
+        url: "https://media.test/covered-track.mp3",
+        filename: "covered-track.mp3",
+      }),
+    }),
+  );
+  await page.route("https://media.test/covered-track.mp3", (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { "Content-Type": "audio/mpeg" },
+      body: "audio",
+    }),
+  );
+  await page.route("https://images.test/covered-track.jpg", async (route) => {
+    await coverResponse;
+    return route.fulfill({
+      status: 200,
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#9f1239"/></svg>',
+    });
+  });
+
+  await page.goto("/?app=tagium-save");
+  await page
+    .getByRole("textbox", { name: "media url" })
+    .fill("https://soundcloud.com/artist/covered-track");
+  await page.getByRole("button", { name: "start video download" }).click();
+
+  const settingsBounds = await page
+    .getByRole("button", { name: "download settings" })
+    .boundingBox();
+  const cover = page.locator("[data-save-download-cover]");
+  await expect(cover).toHaveAttribute("data-save-download-cover-state", "loading");
+  await expect(cover).toBeHidden();
+  await expect(cover).toHaveCSS("scale", "0.97");
+
+  releaseCover();
+
+  await expect(cover).toHaveAttribute("data-save-download-cover-state", "loaded");
+  await expect(cover).toBeVisible();
+  await expect(cover).toHaveCSS("scale", "1");
+  await expect(cover).toHaveCSS("transition-duration", "0.15s");
+  await expect(cover).toHaveCSS("transition-timing-function", "cubic-bezier(0, 0, 0.2, 1)");
+  const coverBounds = await cover.boundingBox();
+  if (!settingsBounds || !coverBounds) throw new Error("cover geometry was not found");
+  expect(coverBounds.width).toBeCloseTo(settingsBounds.width, 2);
+  expect(coverBounds.height).toBeCloseTo(settingsBounds.height, 2);
+});
+
 test("keeps only the five most recent downloads", async ({ page }) => {
   let downloadNumber = 0;
 
@@ -298,6 +367,13 @@ test("keeps only the five most recent downloads", async ({ page }) => {
     "history-2.mp4",
   ]);
   await expect(page.getByText("history-1.mp4", { exact: true })).not.toBeAttached();
+
+  const firstDownloadBounds = await downloads.nth(0).boundingBox();
+  const secondDownloadBounds = await downloads.nth(1).boundingBox();
+  if (!firstDownloadBounds || !secondDownloadBounds) {
+    throw new Error("recent download geometry was not found");
+  }
+  expect(secondDownloadBounds.y - (firstDownloadBounds.y + firstDownloadBounds.height)).toBe(2);
 
   const downloadButton = page.getByRole("button", { name: "download history-6.mp4" });
   const downloadSwap = downloadButton.locator("[data-icon-swap-state]");
