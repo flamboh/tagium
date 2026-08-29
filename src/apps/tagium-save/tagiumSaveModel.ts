@@ -7,7 +7,10 @@ import {
   type CobaltVideoQuality,
   type VideoDownloadPhase,
 } from "./download";
-import { reportSystemFailure, type SystemFailurePresentation } from "@/shared/systemFailure";
+import {
+  getSystemFailurePresentation,
+  type SystemFailurePresentation,
+} from "@/shared/systemFailure";
 
 export type VideoDownloadSettings = {
   mode: (typeof cobaltDownloadModes)[number];
@@ -68,7 +71,7 @@ export const getVideoDownloadPhaseLabel = (phase: VideoDownloadPhase) => phaseLa
 export const getDownloadReadyAnnouncement = (filename: string) => `download ready: ${filename}`;
 
 export const presentVideoDownloadFailure = (error: Error): SystemFailurePresentation =>
-  reportSystemFailure(error, "download");
+  getSystemFailurePresentation(error, "download");
 
 export const buildVideoDownloadRequest = (
   sourceUrl: string,
