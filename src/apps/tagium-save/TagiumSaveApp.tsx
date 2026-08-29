@@ -68,9 +68,9 @@ import { mediaLinkKindFromUrl } from "@/lib/media-link";
  * settings, select an item when needed, then download it from the short recent list. FIRST VIEWPORT:
  * the wordmark sits above the standalone URL form in the same narrow centered column, with settings
  * beside the URL field, while the theme toggle and quiet attribution mirror each other at the top
- * and bottom; on phones and short viewports the column anchors near the top so the recent list has
- * room to grow above the pinned attribution. FORM: a direct landing form with one compact popover
- * and inline state rows.
+ * and bottom; flex spacers center the column while reserving room below for the recent list and
+ * pinned attribution, easing the column upward as the viewport shrinks. FORM: a direct landing
+ * form with one compact popover and inline state rows.
  */
 
 const modeOptions = [
@@ -795,7 +795,7 @@ function TagiumSaveView({
   state,
 }: TagiumSaveViewProps) {
   return (
-    <main className="relative flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 max-lg:[@media(max-height:700px)]:p-4 max-sm:justify-start [@media(max-height:700px)]:justify-start">
+    <main className="relative flex h-svh min-h-0 flex-col items-center overflow-y-auto p-8 max-lg:[@media(max-height:700px)]:p-4">
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {completionAnnouncement && (
           <span key={completionAnnouncement.id}>
@@ -804,7 +804,11 @@ function TagiumSaveView({
         )}
       </span>
       <SaveThemeToggle />
-      <div className="flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6 max-sm:mt-28 [@media(max-height:700px)]:mt-28">
+      {/* Spacers center the column when there is room; the bottom one reserves space for the
+          recent list and pinned attribution so the layout shifts up continuously as the
+          viewport shrinks, and the top cap keeps phones anchored high. */}
+      <div aria-hidden className="pointer-events-none min-h-12 w-full flex-1 max-sm:max-h-28" />
+      <div className="flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6">
         <TagiumBrand product="save" showTagline={false} />
 
         <div className="h-14 w-full shrink-0" data-save-download-stage>
@@ -876,6 +880,7 @@ function TagiumSaveView({
           </div>
         </div>
       </div>
+      <div aria-hidden className="pointer-events-none min-h-[18.5rem] w-full flex-1" />
     </main>
   );
 }
