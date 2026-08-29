@@ -10,7 +10,6 @@ import {
 } from "react";
 import {
   ArrowDown01Icon,
-  Alert02Icon,
   Cancel01Icon,
   Download01Icon,
   Moon02Icon,
@@ -572,14 +571,8 @@ function ErrorRow({
   return (
     <div
       role="alert"
-      className="flex h-full min-w-0 items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 pl-2.5 pr-1 text-xs text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+      className="flex h-full min-w-0 items-center gap-2 text-xs text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
     >
-      <HugeiconsIcon
-        icon={Alert02Icon}
-        strokeWidth={2}
-        className="size-3.5 shrink-0"
-        aria-hidden="true"
-      />
       <span className="min-w-0 flex-1 truncate" title={message}>
         {message}
       </span>
