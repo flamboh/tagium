@@ -5,7 +5,7 @@ export default function TagiumApp() {
   return (
     <>
       <AudioTagger />
-      <DevPanel />
+      <DevPanel appId="tagium" />
     </>
   );
 }
