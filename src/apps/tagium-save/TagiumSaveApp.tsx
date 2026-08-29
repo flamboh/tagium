@@ -804,7 +804,7 @@ function TagiumSaveView({
         )}
       </span>
       <SaveThemeToggle />
-      <div className="flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6 max-sm:mt-16 [@media(max-height:700px)]:mt-16">
+      <div className="flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6 max-sm:mt-28 [@media(max-height:700px)]:mt-28">
         <TagiumBrand product="save" showTagline={false} />
 
         <div className="h-14 w-full shrink-0" data-save-download-stage>
