@@ -27,6 +27,7 @@ import {
   type AnalyticsErrorCode,
   type AnalyticsOutputFormat,
 } from "@/analytics";
+import { DevPanel } from "@/components/dev/DevPanel";
 import { Button } from "@/components/ui/button";
 import { IconSwap, iconSwapDurationMs } from "@/components/ui/icon-swap";
 import { Label } from "@/components/ui/label";
@@ -1108,21 +1109,24 @@ export default function TagiumSaveApp({
   };
 
   return (
-    <TagiumSaveView
-      completionAnnouncement={completionAnnouncement}
-      controller={controller}
-      onCancel={cancel}
-      onDownload={prepareRecentDownload}
-      onPickerAudio={runPickerAudio}
-      onPickerItem={runPickerItem}
-      onReset={reset}
-      onRetry={retry}
-      onSettingsChange={(update) =>
-        setSettings((current) => updateVideoDownloadSettings(current, update))
-      }
-      recentDownloads={recentDownloads}
-      settings={settings}
-      state={state}
-    />
+    <>
+      <TagiumSaveView
+        completionAnnouncement={completionAnnouncement}
+        controller={controller}
+        onCancel={cancel}
+        onDownload={prepareRecentDownload}
+        onPickerAudio={runPickerAudio}
+        onPickerItem={runPickerItem}
+        onReset={reset}
+        onRetry={retry}
+        onSettingsChange={(update) =>
+          setSettings((current) => updateVideoDownloadSettings(current, update))
+        }
+        recentDownloads={recentDownloads}
+        settings={settings}
+        state={state}
+      />
+      <DevPanel appId="tagium-save" />
+    </>
   );
 }

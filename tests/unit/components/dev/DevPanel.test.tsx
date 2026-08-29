@@ -23,6 +23,7 @@ vi.mock("react", async (importOriginal) => {
 
 type TestElementProps = {
   children?: ReactNode;
+  href?: string;
   onClick?: () => void;
   step?: number;
   type?: string;
@@ -53,7 +54,7 @@ const findElement = (
   throw new Error("element not found");
 };
 
-const createHookHarness = () => {
+const createHookHarness = (appId: "tagium" | "tagium-save" = "tagium") => {
   const states: unknown[] = [];
   const refs: Array<{ current: unknown }> = [];
   let stateCursor = 0;
@@ -85,7 +86,7 @@ const createHookHarness = () => {
     render() {
       stateCursor = 0;
       refCursor = 0;
-      return DevPanel();
+      return DevPanel({ appId });
     },
     runEffect() {
       if (!effect) throw new Error("effect not registered");
@@ -135,6 +136,31 @@ afterEach(() => {
 });
 
 describe("DevPanel config loading", () => {
+  it("links to the other app", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => response(config(1_000))),
+    );
+    const tagiumHooks = createHookHarness();
+
+    tagiumHooks.render();
+    tagiumHooks.runEffect();
+    await flushPromises();
+
+    expect(
+      findElement(tagiumHooks.render(), (element) => element.props.href !== undefined).props.href,
+    ).toBe("/?app=tagium-save");
+
+    const saveHooks = createHookHarness("tagium-save");
+    saveHooks.render();
+    saveHooks.runEffect();
+    await flushPromises();
+
+    expect(
+      findElement(saveHooks.render(), (element) => element.props.href !== undefined).props.href,
+    ).toBe("/");
+  });
+
   it("aborts the discarded StrictMode request and ignores its stale result", async () => {
     const first = createDeferred<Response>();
     const second = createDeferred<Response>();

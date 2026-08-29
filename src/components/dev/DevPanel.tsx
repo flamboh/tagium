@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { TagiumAppId } from "@/runtime/resolveApp";
 import { devToastKinds, spawnDevToast } from "./devToast";
 
 type AudioFault = "rate-limit" | "capacity" | "timeout" | "unreachable" | "malformed";
@@ -78,7 +79,7 @@ const formatReset = (resetAt: number | undefined) => {
   return `${seconds}s`;
 };
 
-export function DevPanel() {
+export function DevPanel({ appId }: { appId: TagiumAppId }) {
   const [config, setConfig] = useState<DevConfig | null>(null);
   const [windowMs, setWindowMs] = useState("60000");
   const [maxRequests, setMaxRequests] = useState("60");
@@ -182,17 +183,24 @@ export function DevPanel() {
                   {config.deployEnv} / {config.detectedFrom}
                 </p>
               </div>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="size-8"
-                onClick={() => void refresh()}
-                disabled={busy}
-                aria-label="refresh dev config"
-              >
-                <HugeiconsIcon icon={RotateLeft02Icon} strokeWidth={2} />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button asChild size="sm" variant="ghost">
+                  <a href={appId === "tagium" ? "/?app=tagium-save" : "/"}>
+                    {appId === "tagium" ? "open tagium save" : "open tagium"}
+                  </a>
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="size-8"
+                  onClick={() => void refresh()}
+                  disabled={busy}
+                  aria-label="refresh dev config"
+                >
+                  <HugeiconsIcon icon={RotateLeft02Icon} strokeWidth={2} />
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -267,35 +275,37 @@ export function DevPanel() {
               </div>
             </section>
 
-            <section className="grid gap-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} className="size-3.5" />
-                next audio
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {audioFaults.map((fault) => (
+            {appId === "tagium" && (
+              <section className="grid gap-3">
+                <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                  <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} className="size-3.5" />
+                  next audio
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {audioFaults.map((fault) => (
+                    <Button
+                      key={fault.value}
+                      type="button"
+                      size="sm"
+                      variant={config.faults.nextAudioFault === fault.value ? "default" : "outline"}
+                      onClick={() => void setFault("audio", fault.value)}
+                      disabled={busy}
+                    >
+                      {fault.label}
+                    </Button>
+                  ))}
                   <Button
-                    key={fault.value}
                     type="button"
                     size="sm"
-                    variant={config.faults.nextAudioFault === fault.value ? "default" : "outline"}
-                    onClick={() => void setFault("audio", fault.value)}
+                    variant="ghost"
+                    onClick={() => void setFault("audio", null)}
                     disabled={busy}
                   >
-                    {fault.label}
+                    clear
                   </Button>
-                ))}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void setFault("audio", null)}
-                  disabled={busy}
-                >
-                  clear
-                </Button>
-              </div>
-            </section>
+                </div>
+              </section>
+            )}
 
             <section className="grid gap-3">
               <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
@@ -327,25 +337,27 @@ export function DevPanel() {
               </div>
             </section>
 
-            <section className="grid gap-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                <HugeiconsIcon icon={Notification03Icon} strokeWidth={2} className="size-3.5" />
-                toasts
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {devToastKinds.map((kind) => (
-                  <Button
-                    key={kind}
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => spawnDevToast(kind)}
-                  >
-                    {kind}
-                  </Button>
-                ))}
-              </div>
-            </section>
+            {appId === "tagium" && (
+              <section className="grid gap-3">
+                <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                  <HugeiconsIcon icon={Notification03Icon} strokeWidth={2} className="size-3.5" />
+                  toasts
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {devToastKinds.map((kind) => (
+                    <Button
+                      key={kind}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => spawnDevToast(kind)}
+                    >
+                      {kind}
+                    </Button>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         </PopoverContent>
       </Popover>
