@@ -256,6 +256,11 @@ test("reserves progress space above recent downloads", async ({ page, browserNam
 });
 
 test("shows track covers at the same size as the settings button", async ({ page }) => {
+  let releaseCover = () => {};
+  const coverResponse = new Promise<void>((resolve) => {
+    releaseCover = resolve;
+  });
+
   await page.route("**/api/track-metadata?**", (route) =>
     route.fulfill({
       contentType: "application/json",
@@ -283,13 +288,14 @@ test("shows track covers at the same size as the settings button", async ({ page
       body: "audio",
     }),
   );
-  await page.route("https://images.test/covered-track.jpg", (route) =>
-    route.fulfill({
+  await page.route("https://images.test/covered-track.jpg", async (route) => {
+    await coverResponse;
+    return route.fulfill({
       status: 200,
       contentType: "image/svg+xml",
       body: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#9f1239"/></svg>',
-    }),
-  );
+    });
+  });
 
   await page.goto("/?app=tagium-save");
   await page
@@ -301,11 +307,21 @@ test("shows track covers at the same size as the settings button", async ({ page
     .getByRole("button", { name: "download settings" })
     .boundingBox();
   const cover = page.locator("[data-save-download-cover]");
+  await expect(cover).toHaveAttribute("data-save-download-cover-state", "loading");
+  await expect(cover).toBeHidden();
+  await expect(cover).toHaveCSS("scale", "0.97");
+
+  releaseCover();
+
+  await expect(cover).toHaveAttribute("data-save-download-cover-state", "loaded");
   await expect(cover).toBeVisible();
+  await expect(cover).toHaveCSS("scale", "1");
+  await expect(cover).toHaveCSS("transition-duration", "0.15s");
+  await expect(cover).toHaveCSS("transition-timing-function", "cubic-bezier(0, 0, 0.2, 1)");
   const coverBounds = await cover.boundingBox();
   if (!settingsBounds || !coverBounds) throw new Error("cover geometry was not found");
-  expect(coverBounds.width).toBe(settingsBounds.width);
-  expect(coverBounds.height).toBe(settingsBounds.height);
+  expect(coverBounds.width).toBeCloseTo(settingsBounds.width, 2);
+  expect(coverBounds.height).toBeCloseTo(settingsBounds.height, 2);
 });
 
 test("keeps only the five most recent downloads", async ({ page }) => {
@@ -351,6 +367,13 @@ test("keeps only the five most recent downloads", async ({ page }) => {
     "history-2.mp4",
   ]);
   await expect(page.getByText("history-1.mp4", { exact: true })).not.toBeAttached();
+
+  const firstDownloadBounds = await downloads.nth(0).boundingBox();
+  const secondDownloadBounds = await downloads.nth(1).boundingBox();
+  if (!firstDownloadBounds || !secondDownloadBounds) {
+    throw new Error("recent download geometry was not found");
+  }
+  expect(secondDownloadBounds.y - (firstDownloadBounds.y + firstDownloadBounds.height)).toBe(2);
 
   const downloadButton = page.getByRole("button", { name: "download history-6.mp4" });
   const downloadSwap = downloadButton.locator("[data-icon-swap-state]");

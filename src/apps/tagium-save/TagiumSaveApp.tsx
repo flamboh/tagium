@@ -478,22 +478,7 @@ function RecentDownloadRow({
   return (
     <li ref={itemRef} className="h-10 overflow-hidden" data-save-download-item>
       <div ref={contentRef} className="flex h-10 min-w-0 items-center gap-2">
-        <span className="size-10 shrink-0" aria-hidden="true">
-          {download.coverUrl && (
-            <img
-              src={download.coverUrl}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              draggable={false}
-              className="size-10 rounded-lg border border-input object-cover"
-              data-save-download-cover
-              onError={(event) => {
-                event.currentTarget.hidden = true;
-              }}
-            />
-          )}
-        </span>
+        <RecentDownloadCover key={download.coverUrl ?? "empty"} coverUrl={download.coverUrl} />
         <span className="min-w-0 flex-1 truncate pl-3 text-sm" title={download.file.name}>
           {download.file.name}
         </span>
@@ -530,6 +515,32 @@ function RecentDownloadRow({
   );
 }
 
+function RecentDownloadCover({ coverUrl }: { coverUrl: string | undefined }) {
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  return (
+    <span className="size-10 shrink-0" aria-hidden="true">
+      {coverUrl && (
+        <img
+          src={coverUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          className={cn(
+            "size-10 rounded-lg border border-input object-cover transition-transform duration-150 ease-out motion-reduce:scale-100 motion-reduce:transition-none",
+            isLoaded ? "visible scale-100" : "invisible scale-[0.97]",
+          )}
+          data-save-download-cover
+          data-save-download-cover-state={isLoaded ? "loaded" : "loading"}
+          onLoad={() => setIsLoaded(true)}
+          onError={() => setIsLoaded(false)}
+        />
+      )}
+    </span>
+  );
+}
+
 function RecentDownloads({
   downloads,
   onDownload,
@@ -540,7 +551,7 @@ function RecentDownloads({
   if (downloads.length === 0) return null;
 
   return (
-    <ul className="relative z-0 mt-3 w-full" aria-label="recent downloads">
+    <ul className="relative z-0 mt-3 flex w-full flex-col gap-0.5" aria-label="recent downloads">
       {downloads.map((download) => (
         <RecentDownloadRow key={download.id} download={download} onDownload={onDownload} />
       ))}

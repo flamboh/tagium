@@ -223,9 +223,18 @@ describe("tagium save app", () => {
       await metadata;
     });
 
-    const cover = renderer.root.findByProps({ "data-save-download-cover": true });
+    let cover = renderer.root.findByProps({ "data-save-download-cover": true });
     expect(cover.props.src).toBe("https://images.test/covered-track.jpg");
     expect(cover.props.className).toContain("size-10");
+    expect(cover.props.className).toContain("invisible scale-[0.97]");
+    expect(cover.props["data-save-download-cover-state"]).toBe("loading");
+
+    await act(async () => cover.props.onLoad());
+
+    cover = renderer.root.findByProps({ "data-save-download-cover": true });
+    expect(cover.props.className).toContain("visible scale-100");
+    expect(cover.props.className).toContain("duration-150 ease-out");
+    expect(cover.props["data-save-download-cover-state"]).toBe("loaded");
 
     act(() => renderer.unmount());
   });
