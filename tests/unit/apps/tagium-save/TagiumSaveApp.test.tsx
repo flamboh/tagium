@@ -406,6 +406,41 @@ describe("tagium save app", () => {
     act(() => renderer.unmount());
   });
 
+  it("links the save attribution to flamboh and cobalt", () => {
+    const markup = renderToStaticMarkup(<TagiumSaveApp />);
+
+    expect(markup).toContain("made by");
+    expect(markup).toContain('href="https://x.com/flambohh"');
+    expect(markup).toContain(">flamboh</a>");
+    expect(markup).toContain("powered by");
+    expect(markup).toContain('href="https://cobalt.tools/"');
+    expect(markup).toContain(">cobalt</a>");
+  });
+
+  it("toggles between light and dark mode", async () => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<TagiumSaveApp />);
+    });
+
+    const themeToggle = renderer.root
+      .findAllByType("button")
+      .find((button) => String(button.props["aria-label"]).startsWith("switch to "));
+    if (!themeToggle) throw new Error("theme toggle was not found");
+
+    const initialLabel = themeToggle.props["aria-label"];
+    act(() => {
+      themeToggle.props.onClick();
+    });
+
+    const nextThemeToggle = renderer.root
+      .findAllByType("button")
+      .find((button) => String(button.props["aria-label"]).startsWith("switch to "));
+    expect(nextThemeToggle?.props["aria-label"]).not.toBe(initialLabel);
+
+    act(() => renderer.unmount());
+  });
+
   it("releases completed files when they leave the five-item list or the app unmounts", async () => {
     const releases = Array.from({ length: 6 }, () => vi.fn(async () => undefined));
     let resultIndex = 0;

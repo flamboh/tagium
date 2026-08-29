@@ -1,5 +1,132 @@
 import { expect, test } from "@playwright/test";
 
+test("switches and remembers the tagium save theme", async ({ page }) => {
+  await page.goto("/?app=tagium-save");
+
+  const root = page.locator("html");
+  const initialTheme = await root.getAttribute("data-theme");
+  if (initialTheme !== "light" && initialTheme !== "dark") {
+    throw new Error("tagium save did not initialize a supported theme");
+  }
+
+  const nextTheme = initialTheme === "light" ? "dark" : "light";
+  const themeToggle = page.locator('button[aria-label^="switch to "]');
+  const iconSwap = themeToggle.locator("[data-icon-swap-state]");
+  const firstIcon = themeToggle.locator('[data-icon-swap="first"]');
+  const secondIcon = themeToggle.locator('[data-icon-swap="second"]');
+  const activeIcon = nextTheme === "dark" ? secondIcon : firstIcon;
+  const inactiveIcon = nextTheme === "dark" ? firstIcon : secondIcon;
+  const bounds = await themeToggle.boundingBox();
+  if (!bounds) throw new Error("theme toggle bounds were not found");
+
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  await page.mouse.down();
+  await expect(themeToggle).toHaveCSS("scale", "0.97");
+  await page.mouse.up();
+
+  await expect(root).toHaveAttribute("data-theme", nextTheme);
+  await expect(page.getByRole("button", { name: `switch to ${initialTheme} mode` })).toBeVisible();
+  await expect(iconSwap).toHaveAttribute(
+    "data-icon-swap-state",
+    nextTheme === "dark" ? "second" : "first",
+  );
+
+  await expect(activeIcon).toHaveCSS("transition-duration", "0.2s");
+  await expect(activeIcon).toHaveCSS("transition-property", "opacity, filter, scale");
+  await expect(activeIcon).toHaveCSS("opacity", "1");
+  await expect(activeIcon).toHaveCSS("filter", "none");
+  await expect(inactiveIcon).toHaveCSS("opacity", "0");
+  await expect(themeToggle.locator("[data-save-theme-icon]")).toHaveCount(2);
+  await expect(
+    themeToggle
+      .locator(`[data-save-theme-icon="${nextTheme === "dark" ? "sun" : "moon"}"]`)
+      .locator(".."),
+  ).toHaveCSS("opacity", "1");
+
+  await page.reload();
+  await expect(root).toHaveAttribute("data-theme", nextTheme);
+});
+
+test("updates save control colors with the active theme", async ({ page }) => {
+  await page.goto("/?app=tagium-save");
+
+  const root = page.locator("html");
+  const initialTheme = await root.getAttribute("data-theme");
+  if (initialTheme !== "light" && initialTheme !== "dark") {
+    throw new Error("tagium save did not initialize a supported theme");
+  }
+
+  const controls = [
+    page.getByRole("button", { name: "download settings" }),
+    page.getByRole("button", { name: "start video download" }),
+  ];
+  const readColors = () =>
+    Promise.all(
+      controls.map((control) =>
+        control.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return [style.backgroundColor, style.borderColor, style.color];
+        }),
+      ),
+    );
+
+  const nextTheme = initialTheme === "light" ? "dark" : "light";
+  await page.getByRole("button", { name: `switch to ${nextTheme} mode` }).click();
+  await expect(root).toHaveAttribute("data-theme", nextTheme);
+
+  const colorsAfterThemeSwap = await readColors();
+  await page.waitForTimeout(250);
+  const settledColors = await readColors();
+
+  expect(colorsAfterThemeSwap).toEqual(settledColors);
+});
+
+test("spins the settings icon between closed and open states", async ({ page }) => {
+  await page.goto("/?app=tagium-save");
+
+  const settings = page.getByRole("button", { name: "download settings" });
+  const motion = settings.locator('[data-save-settings-icon="motion"]');
+  const cog = settings.locator('[data-save-settings-icon="cog"]');
+  const arrow = settings.locator('[data-save-settings-icon="arrow"]');
+
+  const bounds = await settings.boundingBox();
+  if (!bounds) throw new Error("settings trigger bounds were not found");
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  await page.mouse.down();
+  await expect(settings).toHaveCSS("scale", "0.97");
+  await page.mouse.up();
+
+  await expect(settings).toHaveAttribute("data-state", "open");
+  await expect(motion).toHaveCSS("transition-duration", "0.28s");
+  await expect(motion).toHaveCSS("transition-timing-function", "cubic-bezier(0.34, 1.56, 0.64, 1)");
+  await expect(cog).toHaveCSS("transition-delay", "0.03s");
+  await expect(arrow).toHaveCSS("transition-delay", "0.07s");
+  await expect(cog).toHaveCSS("transition-duration", "0.08s");
+  await expect(arrow).toHaveCSS("transition-duration", "0.08s");
+  await expect(cog).toHaveCSS("transition-property", "filter, opacity");
+  await expect(arrow).toHaveCSS("transition-property", "filter, opacity");
+  await expect(cog).toHaveCSS("opacity", "0");
+  await expect(cog).toHaveCSS("filter", "blur(2px)");
+  await expect(arrow).toHaveCSS("opacity", "1");
+  await expect(arrow).toHaveCSS("filter", "none");
+
+  await settings.click();
+  await expect(settings).toHaveAttribute("data-state", "closed");
+  await expect(cog).toHaveCSS("transition-delay", "0.07s");
+  await expect(arrow).toHaveCSS("transition-delay", "0.03s");
+  await expect(cog).toHaveCSS("opacity", "1");
+  await expect(cog).toHaveCSS("filter", "none");
+  await expect(arrow).toHaveCSS("opacity", "0");
+  await expect(arrow).toHaveCSS("filter", "blur(2px)");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await settings.click();
+  await expect(settings).toHaveAttribute("data-state", "open");
+  await expect(motion).toHaveCSS("transition-property", "none");
+  await expect(cog).toHaveCSS("opacity", "0");
+  await expect(arrow).toHaveCSS("opacity", "1");
+});
+
 test("keeps the tagium save logo fixed through download states", async ({ page, browserName }) => {
   test.skip(browserName !== "chromium", "layout geometry is covered in Chromium");
   await page.setViewportSize({ width: 320, height: 568 });
@@ -42,8 +169,31 @@ test("keeps the tagium save logo fixed through download states", async ({ page, 
 
   const idleTop = await readLogoTop();
   await page.getByRole("textbox", { name: "media url" }).fill("https://example.com/video");
-  await page.getByRole("button", { name: "start video download" }).click();
+  const submit = page.getByRole("button", { name: "start video download" });
+  const submitSwap = submit.locator("[data-icon-swap-state]");
+  const submitFirstIcon = submit.locator('[data-icon-swap="first"]');
+  const submitSecondIcon = submit.locator('[data-icon-swap="second"]');
+  const submitBounds = await submit.boundingBox();
+  if (!submitBounds) throw new Error("submit button bounds were not found");
+
+  await page.mouse.move(
+    submitBounds.x + submitBounds.width / 2,
+    submitBounds.y + submitBounds.height / 2,
+  );
+  await page.mouse.down();
+  await expect(submit).toHaveCSS("scale", "0.97");
+  await page.mouse.up();
   await expect(page.getByText("preparing", { exact: true })).toBeVisible();
+  await expect(submitSwap).toHaveAttribute("data-icon-swap-state", "second");
+  await expect(submitSecondIcon).toHaveCSS("opacity", "1");
+  await expect(submitSecondIcon).toHaveCSS("filter", "none");
+  await expect(submitFirstIcon).toHaveCSS("opacity", "0");
+  await expect(submit.locator("[data-media-url-submit-icon]")).toHaveCount(2);
+  await expect(submit.locator('[data-media-url-submit-icon="loading"]').locator("..")).toHaveCSS(
+    "opacity",
+    "1",
+  );
+  await expect(submitSecondIcon.locator("svg")).toHaveCSS("animation-name", "spin");
   expect(await readLogoTop()).toBe(idleTop);
 
   releasePlan();
@@ -149,9 +299,41 @@ test("keeps only the five most recent downloads", async ({ page }) => {
   ]);
   await expect(page.getByText("history-1.mp4", { exact: true })).not.toBeAttached();
 
+  const downloadButton = page.getByRole("button", { name: "download history-6.mp4" });
+  const downloadSwap = downloadButton.locator("[data-icon-swap-state]");
+  const downloadFirstIcon = downloadButton.locator('[data-icon-swap="first"]');
+  const downloadSecondIcon = downloadButton.locator('[data-icon-swap="second"]');
+  const downloadBounds = await downloadButton.boundingBox();
+  if (!downloadBounds) throw new Error("download button bounds were not found");
+
   const downloadEvent = page.waitForEvent("download");
-  await page.getByRole("button", { name: "download history-6.mp4" }).click();
+  await page.mouse.move(
+    downloadBounds.x + downloadBounds.width / 2,
+    downloadBounds.y + downloadBounds.height / 2,
+  );
+  await page.mouse.down();
+  await expect(downloadButton).toHaveCSS("scale", "0.97");
+  await page.mouse.up();
   expect((await downloadEvent).suggestedFilename()).toBe("history-6.mp4");
+  await expect(downloadSwap).toHaveAttribute("data-icon-swap-state", "second");
+  await expect(downloadSecondIcon).toHaveCSS("opacity", "1");
+  await expect(downloadSecondIcon).toHaveCSS("filter", "none");
+  await expect(downloadFirstIcon).toHaveCSS("opacity", "0");
+  await expect(downloadButton.locator("[data-save-download-icon]")).toHaveCount(2);
+  await expect(
+    downloadButton.locator('[data-save-download-icon="confirmation"]').locator(".."),
+  ).toHaveCSS("opacity", "1");
+  await page.waitForTimeout(900);
+  await expect(
+    downloadButton.locator('[data-save-download-icon="confirmation"]').locator(".."),
+  ).toHaveCSS("opacity", "1");
+  await expect(downloadSwap).toHaveAttribute("data-icon-swap-state", "first", { timeout: 2000 });
+  await expect(downloadFirstIcon).toHaveCSS("opacity", "1");
+  await expect(downloadFirstIcon).toHaveCSS("filter", "none");
+  await expect(downloadSecondIcon).toHaveCSS("opacity", "0");
+  await expect(
+    downloadButton.locator('[data-save-download-icon="download"]').locator(".."),
+  ).toHaveCSS("opacity", "1");
 });
 
 test("offers audio returned with picker media", async ({ page }) => {

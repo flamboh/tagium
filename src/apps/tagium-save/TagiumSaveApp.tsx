@@ -9,10 +9,14 @@ import {
   type SetStateAction,
 } from "react";
 import {
+  ArrowDown01Icon,
   Cancel01Icon,
   Download01Icon,
+  Moon02Icon,
   Refresh04Icon,
   Settings01Icon,
+  Sun03Icon,
+  Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
@@ -24,6 +28,7 @@ import {
   type AnalyticsOutputFormat,
 } from "@/analytics";
 import { Button } from "@/components/ui/button";
+import { IconSwap, iconSwapDurationMs } from "@/components/ui/icon-swap";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import MediaUrlEntry, { type MediaUrlEntryController } from "@/shared/media-url/MediaUrlEntry";
@@ -52,6 +57,7 @@ import {
   type VideoDownloadSettings,
   type VideoDownloadSettingsUpdate,
 } from "@/apps/tagium-save/tagiumSaveModel";
+import { useTheme } from "@/features/theme/useTheme";
 import { cn } from "@/lib/utils";
 import { mediaLinkKindFromUrl } from "@/lib/media-link";
 
@@ -61,7 +67,8 @@ import { mediaLinkKindFromUrl } from "@/lib/media-link";
  * entry keep the page in the existing landing world. STORY: paste a link, optionally choose output
  * settings, select an item when needed, then download it from the short recent list. FIRST VIEWPORT:
  * the wordmark sits above the standalone URL form in the same narrow centered column, with settings
- * beside the URL field. FORM: a direct landing form with one compact popover and inline state rows.
+ * beside the URL field, while the theme toggle and quiet attribution mirror each other at the top
+ * and bottom. FORM: a direct landing form with one compact popover and inline state rows.
  */
 
 const modeOptions = [
@@ -221,11 +228,29 @@ function DownloadSettings({
           type="button"
           variant="outline"
           size="icon"
-          className="size-10 shrink-0 rounded-lg"
+          className="group size-10 shrink-0 rounded-lg active:scale-[0.97] motion-reduce:active:scale-100"
           aria-label="download settings"
           disabled={disabled}
         >
-          <HugeiconsIcon icon={Settings01Icon} strokeWidth={2} aria-hidden="true" />
+          <span
+            data-save-settings-icon="motion"
+            className="relative size-4 origin-center transition-transform duration-[280ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] group-data-[state=open]:rotate-[360deg] motion-reduce:transition-none"
+          >
+            <HugeiconsIcon
+              icon={Settings01Icon}
+              strokeWidth={2}
+              data-save-settings-icon="cog"
+              className="absolute inset-0 size-4 opacity-100 blur-none transition-[filter,opacity] delay-[70ms] duration-[80ms] ease-linear group-data-[state=open]:opacity-0 group-data-[state=open]:blur-[2px] group-data-[state=open]:delay-[30ms] motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+            <HugeiconsIcon
+              icon={ArrowDown01Icon}
+              strokeWidth={2}
+              data-save-settings-icon="arrow"
+              className="absolute inset-0 size-4 opacity-0 blur-[2px] transition-[filter,opacity] delay-[30ms] duration-[80ms] ease-linear group-data-[state=open]:opacity-100 group-data-[state=open]:blur-none group-data-[state=open]:delay-[70ms] motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+          </span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-3">
@@ -316,7 +341,7 @@ function ProgressRow({
         type="button"
         variant="ghost"
         size="icon"
-        className="size-8 shrink-0"
+        className="size-8 shrink-0 active:scale-[0.97] motion-reduce:active:scale-100"
         aria-label="cancel download"
         onClick={onCancel}
       >
@@ -345,7 +370,7 @@ function PickerChoices({
             key={`${item.type}-${item.url}`}
             type="button"
             variant="outline"
-            className="h-9 min-w-0 justify-between px-3 text-xs"
+            className="h-9 min-w-0 justify-between px-3 text-xs active:scale-[0.97] motion-reduce:active:scale-100"
             aria-label={`download ${item.type} ${index + 1}`}
             onClick={() => onSelect(item)}
           >
@@ -357,7 +382,7 @@ function PickerChoices({
           <Button
             type="button"
             variant="outline"
-            className="h-9 min-w-0 justify-between px-3 text-xs"
+            className="h-9 min-w-0 justify-between px-3 text-xs active:scale-[0.97] motion-reduce:active:scale-100"
             aria-label={`download ${result.audioFilename ?? "audio"}`}
             onClick={onSelectAudio}
           >
@@ -375,7 +400,7 @@ function PickerChoices({
         type="button"
         variant="ghost"
         size="icon"
-        className="size-8 shrink-0"
+        className="size-8 shrink-0 active:scale-[0.97] motion-reduce:active:scale-100"
         aria-label="reset download"
         onClick={onReset}
       >
@@ -393,6 +418,8 @@ function RecentDownloadRow({
   onDownload: (download: RecentDownload) => void;
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const confirmationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   useLayoutEffect(() => {
     const content = contentRef.current;
@@ -409,6 +436,30 @@ function RecentDownloadRow({
     return () => reveal.cancel();
   }, [download.id]);
 
+  useEffect(
+    () => () => {
+      if (confirmationTimeoutRef.current !== null) {
+        clearTimeout(confirmationTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  const handleDownload = () => {
+    onDownload(download);
+    setShowConfirmation(true);
+    if (confirmationTimeoutRef.current !== null) {
+      clearTimeout(confirmationTimeoutRef.current);
+    }
+    confirmationTimeoutRef.current = setTimeout(
+      () => {
+        setShowConfirmation(false);
+        confirmationTimeoutRef.current = null;
+      },
+      1000 + iconSwapDurationMs * 2,
+    );
+  };
+
   return (
     <li className="h-10 overflow-hidden" data-save-download-item>
       <div ref={contentRef} className="flex h-10 min-w-0 items-center gap-2 pl-3">
@@ -419,11 +470,29 @@ function RecentDownloadRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-10 shrink-0"
+          className="size-10 shrink-0 active:scale-[0.97] motion-reduce:active:scale-100"
           aria-label={`download ${download.file.name}`}
-          onClick={() => onDownload(download)}
+          onClick={handleDownload}
         >
-          <HugeiconsIcon icon={Download01Icon} strokeWidth={2} aria-hidden="true" />
+          <IconSwap
+            switched={showConfirmation}
+            first={
+              <HugeiconsIcon
+                icon={Download01Icon}
+                strokeWidth={2}
+                className="size-4"
+                data-save-download-icon="download"
+              />
+            }
+            second={
+              <HugeiconsIcon
+                icon={Tick02Icon}
+                strokeWidth={2}
+                className="size-4"
+                data-save-download-icon="confirmation"
+              />
+            }
+          />
         </Button>
       </div>
     </li>
@@ -465,7 +534,7 @@ function ErrorRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-8 shrink-0 text-destructive hover:text-destructive"
+          className="size-8 shrink-0 text-destructive hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
           aria-label="retry download"
           onClick={onRetry}
         >
@@ -476,7 +545,7 @@ function ErrorRow({
         type="button"
         variant="ghost"
         size="icon"
-        className="size-8 shrink-0 text-destructive hover:text-destructive"
+        className="size-8 shrink-0 text-destructive hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
         aria-label="reset download"
         onClick={onReset}
       >
@@ -497,6 +566,39 @@ const downloadFile = (file: File) => {
   anchor.remove();
   URL.revokeObjectURL(url);
 };
+
+function SaveThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+
+  return (
+    <button
+      type="button"
+      className="absolute top-4 left-1/2 inline-flex size-11 -translate-x-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none transition-[color,scale] hover:text-foreground active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:active:scale-100 sm:top-8"
+      aria-label={`switch to ${theme === "light" ? "dark" : "light"} mode`}
+      onClick={toggleTheme}
+    >
+      <IconSwap
+        switched={theme === "dark"}
+        first={
+          <HugeiconsIcon
+            icon={Moon02Icon}
+            strokeWidth={2}
+            className="size-4"
+            data-save-theme-icon="moon"
+          />
+        }
+        second={
+          <HugeiconsIcon
+            icon={Sun03Icon}
+            strokeWidth={2}
+            className="size-4"
+            data-save-theme-icon="sun"
+          />
+        }
+      />
+    </button>
+  );
+}
 
 const structuredDownloadError = (error: unknown, fallbackStage: VideoDownloadStage) =>
   error instanceof VideoDownloadError
@@ -651,6 +753,128 @@ const useDownloadLifecycle = ({
     recentDownloads,
   };
 };
+
+type TagiumSaveViewProps = {
+  completionAnnouncement: CompletionAnnouncement | null;
+  controller: MediaUrlEntryController;
+  onCancel: () => void;
+  onDownload: (download: RecentDownload) => void;
+  onPickerAudio: (picker: VideoPickerDownloadResult) => Promise<void>;
+  onPickerItem: (picker: VideoPickerDownloadResult, item: CobaltPickerItem) => Promise<void>;
+  onReset: () => void;
+  onRetry: () => void;
+  onSettingsChange: (update: VideoDownloadSettingsUpdate) => void;
+  recentDownloads: ReadonlyArray<RecentDownload>;
+  settings: VideoDownloadSettings;
+  state: DownloadState;
+};
+
+function TagiumSaveView({
+  completionAnnouncement,
+  controller,
+  onCancel,
+  onDownload,
+  onPickerAudio,
+  onPickerItem,
+  onReset,
+  onRetry,
+  onSettingsChange,
+  recentDownloads,
+  settings,
+  state,
+}: TagiumSaveViewProps) {
+  const attributionFollowsContent =
+    state.kind === "error" || state.kind === "picker" || recentDownloads.length > 0;
+
+  return (
+    <main className="relative flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 max-lg:[@media(max-height:700px)]:p-4">
+      <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {completionAnnouncement && (
+          <span key={completionAnnouncement.id}>
+            {getDownloadReadyAnnouncement(completionAnnouncement.filename)}
+          </span>
+        )}
+      </span>
+      <SaveThemeToggle />
+      <div className="flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6">
+        <TagiumBrand product="save" showTagline={false} />
+
+        <div className="h-14 w-full shrink-0" data-save-download-stage>
+          <div className="w-full">
+            <div className="relative z-10 bg-background">
+              <MediaUrlEntry
+                layout="standalone"
+                controller={controller}
+                leadingAction={
+                  <DownloadSettings
+                    settings={settings}
+                    disabled={state.kind === "working" || state.kind === "picker"}
+                    onChange={onSettingsChange}
+                  />
+                }
+                placeholder="paste a media link"
+                submitAriaLabel="start video download"
+                animateSubmitIcon
+              />
+            </div>
+
+            <div className="flow-root h-9" data-save-download-progress-slot>
+              {state.kind === "working" && (
+                <ProgressRow phase={state.phase} progress={state.progress} onCancel={onCancel} />
+              )}
+            </div>
+            {state.kind === "error" && (
+              <ErrorRow
+                message={state.message}
+                onRetry={state.retryable ? onRetry : undefined}
+                onReset={onReset}
+              />
+            )}
+
+            {state.kind === "picker" && (
+              <PickerChoices
+                result={state.result}
+                onSelect={(item) => void onPickerItem(state.result, item)}
+                onSelectAudio={() => void onPickerAudio(state.result)}
+                onReset={onReset}
+              />
+            )}
+
+            <RecentDownloads downloads={recentDownloads} onDownload={onDownload} />
+
+            <footer
+              data-save-attribution
+              className={cn(
+                "absolute inset-x-4 bottom-4 text-center text-xs leading-5 text-muted-foreground sm:inset-x-8 sm:bottom-8",
+                attributionFollowsContent &&
+                  "[@media(max-height:700px)]:static [@media(max-height:700px)]:mt-4",
+              )}
+            >
+              made by{" "}
+              <a
+                href="https://x.com/flambohh"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                flamboh
+              </a>
+              , powered by{" "}
+              <a
+                href="https://cobalt.tools/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                cobalt
+              </a>
+            </footer>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
 
 export default function TagiumSaveApp({
   startDownload = startVideoDownload,
@@ -875,63 +1099,21 @@ export default function TagiumSaveApp({
   };
 
   return (
-    <main className="flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 max-lg:[@media(max-height:700px)]:p-4">
-      <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {completionAnnouncement && (
-          <span key={completionAnnouncement.id}>
-            {getDownloadReadyAnnouncement(completionAnnouncement.filename)}
-          </span>
-        )}
-      </span>
-      <div className="flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6">
-        <TagiumBrand product="save" showTagline={false} />
-
-        <div className="h-14 w-full shrink-0" data-save-download-stage>
-          <div className="w-full">
-            <div className="relative z-10 bg-background">
-              <MediaUrlEntry
-                layout="standalone"
-                controller={controller}
-                leadingAction={
-                  <DownloadSettings
-                    settings={settings}
-                    disabled={state.kind === "working" || state.kind === "picker"}
-                    onChange={(update) =>
-                      setSettings((current) => updateVideoDownloadSettings(current, update))
-                    }
-                  />
-                }
-                placeholder="paste a media link"
-                submitAriaLabel="start video download"
-              />
-            </div>
-
-            <div className="flow-root h-9" data-save-download-progress-slot>
-              {state.kind === "working" && (
-                <ProgressRow phase={state.phase} progress={state.progress} onCancel={cancel} />
-              )}
-            </div>
-            {state.kind === "error" && (
-              <ErrorRow
-                message={state.message}
-                onRetry={state.retryable ? retry : undefined}
-                onReset={reset}
-              />
-            )}
-
-            {state.kind === "picker" && (
-              <PickerChoices
-                result={state.result}
-                onSelect={(item) => void runPickerItem(state.result, item)}
-                onSelectAudio={() => void runPickerAudio(state.result)}
-                onReset={reset}
-              />
-            )}
-
-            <RecentDownloads downloads={recentDownloads} onDownload={prepareRecentDownload} />
-          </div>
-        </div>
-      </div>
-    </main>
+    <TagiumSaveView
+      completionAnnouncement={completionAnnouncement}
+      controller={controller}
+      onCancel={cancel}
+      onDownload={prepareRecentDownload}
+      onPickerAudio={runPickerAudio}
+      onPickerItem={runPickerItem}
+      onReset={reset}
+      onRetry={retry}
+      onSettingsChange={(update) =>
+        setSettings((current) => updateVideoDownloadSettings(current, update))
+      }
+      recentDownloads={recentDownloads}
+      settings={settings}
+      state={state}
+    />
   );
 }

@@ -6,6 +6,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { IconSwap } from "@/components/ui/icon-swap";
 import { Input } from "@/components/ui/input";
 import { getMediaUrlEntryMotionKeyframes } from "@/shared/media-url/mediaUrlEntryMotion";
 
@@ -25,6 +26,7 @@ type MediaUrlEntryProps = {
   leadingAction?: ReactNode;
   placeholder?: string;
   submitAriaLabel?: string;
+  animateSubmitIcon?: boolean;
 };
 
 const prefersReducedMotion = () =>
@@ -48,6 +50,7 @@ export default function MediaUrlEntry({
   leadingAction,
   placeholder = "soundcloud, youtube, or tagium share link",
   submitAriaLabel = "start media import",
+  animateSubmitIcon = false,
 }: MediaUrlEntryProps) {
   const anchorRef = useRef<HTMLDivElement>(null);
   const motionRef = useRef<HTMLDivElement>(null);
@@ -210,9 +213,32 @@ export default function MediaUrlEntry({
               disabled={!canSubmit}
               aria-label={submitAriaLabel}
               aria-busy={controller.submitting || undefined}
-              className="size-10 rounded-lg"
+              className={cn(
+                "size-10 rounded-lg",
+                animateSubmitIcon && "active:scale-[0.97] motion-reduce:active:scale-100",
+              )}
             >
-              {controller.submitting ? (
+              {animateSubmitIcon ? (
+                <IconSwap
+                  switched={controller.submitting}
+                  first={
+                    <HugeiconsIcon
+                      icon={ArrowRight02Icon}
+                      strokeWidth={2}
+                      className="size-4"
+                      data-media-url-submit-icon="enter"
+                    />
+                  }
+                  second={
+                    <HugeiconsIcon
+                      icon={loaderCircleIcon}
+                      strokeWidth={2}
+                      className="size-4 animate-spin"
+                      data-media-url-submit-icon="loading"
+                    />
+                  }
+                />
+              ) : controller.submitting ? (
                 <HugeiconsIcon icon={loaderCircleIcon} strokeWidth={2} className="animate-spin" />
               ) : (
                 <HugeiconsIcon icon={ArrowRight02Icon} strokeWidth={2} />
