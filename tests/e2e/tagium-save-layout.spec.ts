@@ -255,6 +255,59 @@ test("reserves progress space above recent downloads", async ({ page, browserNam
   await expect(page.getByRole("button", { name: "download reserved-2.mp4" })).toBeVisible();
 });
 
+test("shows track covers at the same size as the settings button", async ({ page }) => {
+  await page.route("**/api/track-metadata?**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        title: "covered track",
+        artist: "artist",
+        coverUrl: "https://images.test/covered-track.jpg",
+      }),
+    }),
+  );
+  await page.route("**/api/cobalt/download", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "tunnel",
+        url: "https://media.test/covered-track.mp3",
+        filename: "covered-track.mp3",
+      }),
+    }),
+  );
+  await page.route("https://media.test/covered-track.mp3", (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { "Content-Type": "audio/mpeg" },
+      body: "audio",
+    }),
+  );
+  await page.route("https://images.test/covered-track.jpg", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#9f1239"/></svg>',
+    }),
+  );
+
+  await page.goto("/?app=tagium-save");
+  await page
+    .getByRole("textbox", { name: "media url" })
+    .fill("https://soundcloud.com/artist/covered-track");
+  await page.getByRole("button", { name: "start video download" }).click();
+
+  const settingsBounds = await page
+    .getByRole("button", { name: "download settings" })
+    .boundingBox();
+  const cover = page.locator("[data-save-download-cover]");
+  await expect(cover).toBeVisible();
+  const coverBounds = await cover.boundingBox();
+  if (!settingsBounds || !coverBounds) throw new Error("cover geometry was not found");
+  expect(coverBounds.width).toBe(settingsBounds.width);
+  expect(coverBounds.height).toBe(settingsBounds.height);
+});
+
 test("keeps only the five most recent downloads", async ({ page }) => {
   let downloadNumber = 0;
 
