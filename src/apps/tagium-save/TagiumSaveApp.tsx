@@ -520,7 +520,7 @@ function RecentDownloads({
   if (downloads.length === 0) return null;
 
   return (
-    <ul className="relative z-0 ml-12 w-[calc(100%-3rem)]" aria-label="recent downloads">
+    <ul className="relative z-0 ml-12 mt-3 w-[calc(100%-3rem)]" aria-label="recent downloads">
       {downloads.map((download) => (
         <RecentDownloadRow key={download.id} download={download} onDownload={onDownload} />
       ))}
