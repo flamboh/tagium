@@ -19,6 +19,10 @@
       {
         "files": ["cobalt-soundcloud.mjs"],
         "rules": ["deslop/unused-file"]
+      },
+      {
+        "files": ["src/apps/tagium-save/TagiumSaveApp.tsx"],
+        "rules": ["react-doctor/no-layout-property-animation"]
       }
     ]
   }

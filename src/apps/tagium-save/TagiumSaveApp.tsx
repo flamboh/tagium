@@ -68,7 +68,9 @@ import { mediaLinkKindFromUrl } from "@/lib/media-link";
  * settings, select an item when needed, then download it from the short recent list. FIRST VIEWPORT:
  * the wordmark sits above the standalone URL form in the same narrow centered column, with settings
  * beside the URL field, while the theme toggle and quiet attribution mirror each other at the top
- * and bottom. FORM: a direct landing form with one compact popover and inline state rows.
+ * and bottom; flex spacers center the column while reserving room below for the recent list and
+ * pinned attribution, easing the column upward as the viewport shrinks. FORM: a direct landing
+ * form with one compact popover and inline state rows.
  */
 
 const modeOptions = [
@@ -417,23 +419,32 @@ function RecentDownloadRow({
   download: RecentDownload;
   onDownload: (download: RecentDownload) => void;
 }) {
+  const itemRef = useRef<HTMLLIElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const confirmationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   useLayoutEffect(() => {
+    const item = itemRef.current;
     const content = contentRef.current;
-    if (!content || prefersReducedMotion()) return;
+    if (!item || !content || prefersReducedMotion()) return;
 
+    // Grow the row from zero height so earlier downloads slide down with it
+    // instead of jumping when a new row is prepended.
+    const timing = { duration: 300, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
+    const grow = item.animate([{ height: "0px" }, { height: "2.5rem" }], timing);
     const reveal = content.animate(
       [
-        { clipPath: "inset(0 0 100% 0)", opacity: 0, transform: "translateY(-28px)" },
-        { clipPath: "inset(0 0 0 0)", opacity: 1, transform: "translateY(0)" },
+        { opacity: 0, transform: "translateY(-28px)" },
+        { opacity: 1, transform: "translateY(0)" },
       ],
-      { duration: 300, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+      timing,
     );
 
-    return () => reveal.cancel();
+    return () => {
+      grow.cancel();
+      reveal.cancel();
+    };
   }, [download.id]);
 
   useEffect(
@@ -461,7 +472,7 @@ function RecentDownloadRow({
   };
 
   return (
-    <li className="h-10 overflow-hidden" data-save-download-item>
+    <li ref={itemRef} className="h-10 overflow-hidden" data-save-download-item>
       <div ref={contentRef} className="flex h-10 min-w-0 items-center gap-2 pl-3">
         <span className="min-w-0 flex-1 truncate text-sm" title={download.file.name}>
           {download.file.name}
@@ -509,7 +520,7 @@ function RecentDownloads({
   if (downloads.length === 0) return null;
 
   return (
-    <ul className="relative z-0 ml-12 w-[calc(100%-3rem)]" aria-label="recent downloads">
+    <ul className="relative z-0 ml-12 mt-3 w-[calc(100%-3rem)]" aria-label="recent downloads">
       {downloads.map((download) => (
         <RecentDownloadRow key={download.id} download={download} onDownload={onDownload} />
       ))}
@@ -783,11 +794,8 @@ function TagiumSaveView({
   settings,
   state,
 }: TagiumSaveViewProps) {
-  const attributionFollowsContent =
-    state.kind === "error" || state.kind === "picker" || recentDownloads.length > 0;
-
   return (
-    <main className="relative flex h-svh min-h-0 flex-col items-center justify-center overflow-y-auto p-8 max-lg:[@media(max-height:700px)]:p-4">
+    <main className="relative flex h-svh min-h-0 flex-col items-center overflow-y-auto p-8 max-lg:[@media(max-height:700px)]:p-4">
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {completionAnnouncement && (
           <span key={completionAnnouncement.id}>
@@ -796,6 +804,10 @@ function TagiumSaveView({
         )}
       </span>
       <SaveThemeToggle />
+      {/* Spacers center the column when there is room; the bottom one reserves space for the
+          recent list and pinned attribution so the layout shifts up continuously as the
+          viewport shrinks, and the top cap keeps phones anchored high. */}
+      <div aria-hidden className="pointer-events-none min-h-12 w-full flex-1 max-sm:max-h-28" />
       <div className="flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6">
         <TagiumBrand product="save" showTagline={false} />
 
@@ -844,11 +856,7 @@ function TagiumSaveView({
 
             <footer
               data-save-attribution
-              className={cn(
-                "absolute inset-x-4 bottom-4 text-center text-xs leading-5 text-muted-foreground sm:inset-x-8 sm:bottom-8",
-                attributionFollowsContent &&
-                  "[@media(max-height:700px)]:static [@media(max-height:700px)]:mt-4",
-              )}
+              className="absolute inset-x-4 bottom-4 text-center text-xs leading-5 text-muted-foreground sm:inset-x-8 sm:bottom-8"
             >
               made by{" "}
               <a
@@ -872,6 +880,7 @@ function TagiumSaveView({
           </div>
         </div>
       </div>
+      <div aria-hidden className="pointer-events-none min-h-[18.5rem] w-full flex-1" />
     </main>
   );
 }

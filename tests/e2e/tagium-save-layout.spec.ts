@@ -336,6 +336,50 @@ test("keeps only the five most recent downloads", async ({ page }) => {
   ).toHaveCSS("opacity", "1");
 });
 
+test("keeps a full download list clear of the attribution at mid heights", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== "chromium", "layout geometry is covered in Chromium");
+  // Heights just above the old 700px top-anchor cutoff used to snap back to a
+  // centered layout and run the fifth row into the pinned attribution.
+  await page.setViewportSize({ width: 640, height: 720 });
+
+  let downloadNumber = 0;
+  await page.route("**/api/cobalt/download", (route) => {
+    downloadNumber += 1;
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "tunnel",
+        url: `https://media.test/mid-${downloadNumber}.mp4`,
+        filename: `mid-${downloadNumber}.mp4`,
+      }),
+    });
+  });
+  await page.route("https://media.test/**", (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { "Content-Type": "video/mp4", "Content-Length": "5" },
+      body: "video",
+    }),
+  );
+
+  await page.goto("/?app=tagium-save");
+  for (let index = 1; index <= 5; index += 1) {
+    await page.getByRole("textbox", { name: "media url" }).fill(`https://example.com/${index}`);
+    await page.getByRole("button", { name: "start video download" }).click();
+    await expect(page.getByRole("button", { name: `download mid-${index}.mp4` })).toBeVisible();
+  }
+
+  const lastRow = page.locator("[data-save-download-item]").last();
+  const lastRowBottom = await lastRow.evaluate((el) => el.getBoundingClientRect().bottom);
+  const footerTop = await page
+    .locator("[data-save-attribution]")
+    .evaluate((el) => el.getBoundingClientRect().top);
+  expect(lastRowBottom).toBeLessThan(footerTop);
+});
+
 test("offers audio returned with picker media", async ({ page }) => {
   await page.route("**/api/cobalt/download", (route) =>
     route.fulfill({
