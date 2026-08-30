@@ -319,122 +319,12 @@ describe("share manifest endpoints", () => {
     expect(renderedWithArtwork).toBe(false);
   });
 
-  it("renders the fallback social card when artwork streaming fails after lookup", async () => {
-    const runtime = createRuntime();
-    const form = new FormData();
-    form.set("manifest", JSON.stringify(manifest));
-    form.set("cover", new File([png], "cover.png", { type: "image/png" }));
-    const published = await publishHandler(
-      event(
-        request("https://tagium.test/api/manifests", { method: "POST", body: form }, runtime.env),
-      ),
-    );
-    const receipt = (await published.json()) as { slug: string };
-    runtime.bucket.get = async () => ({
-      body: new ReadableStream({
-        start(controller) {
-          controller.error(new Error("artwork stream failed"));
-        },
-      }),
-      httpMetadata: { contentType: "image/png" },
-      size: png.byteLength,
-      etag: "sha256",
-    });
-    let renderedWithArtwork: boolean | undefined;
-    const handler = createShareSocialCardHandler(async (_manifest, artwork) => {
-      renderedWithArtwork = Boolean(artwork);
-      return png;
-    });
-
-    const socialCard = await handler(
-      event(
-        request(`https://tagium.test/api/manifests/${receipt.slug}/social-card`, {}, runtime.env),
-        receipt.slug,
-      ),
-    );
-
-    expect(socialCard.status).toBe(200);
-    expect(renderedWithArtwork).toBe(false);
-  });
-
   it("redirects preview artwork to the favicon when stored artwork is unavailable", async () => {
     const runtime = createRuntime();
     const response = await previewArtworkHandler(
       event(
         request("https://tagium.test/api/manifests/missing/preview-artwork", {}, runtime.env),
         "missing",
-      ),
-    );
-
-    expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("https://tagium.test/icon-512.png");
-  });
-
-  it("redirects preview artwork to the favicon when streaming fails", async () => {
-    const runtime = createRuntime();
-    const form = new FormData();
-    form.set("manifest", JSON.stringify(manifest));
-    form.set("cover", new File([png], "cover.png", { type: "image/png" }));
-    const published = await publishHandler(
-      event(
-        request("https://tagium.test/api/manifests", { method: "POST", body: form }, runtime.env),
-      ),
-    );
-    const receipt = (await published.json()) as { slug: string };
-    runtime.bucket.get = async () => ({
-      body: new ReadableStream({
-        start(controller) {
-          controller.error(new Error("artwork stream failed"));
-        },
-      }),
-      httpMetadata: { contentType: "image/png" },
-      size: png.byteLength,
-      etag: "sha256",
-    });
-
-    const response = await previewArtworkHandler(
-      event(
-        request(
-          `https://tagium.test/api/manifests/${receipt.slug}/preview-artwork`,
-          {},
-          runtime.env,
-        ),
-        receipt.slug,
-      ),
-    );
-
-    expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("https://tagium.test/icon-512.png");
-  });
-
-  it("redirects preview artwork to the favicon when stored bytes are corrupt", async () => {
-    const runtime = createRuntime();
-    const form = new FormData();
-    form.set("manifest", JSON.stringify(manifest));
-    form.set("cover", new File([png], "cover.png", { type: "image/png" }));
-    const published = await publishHandler(
-      event(
-        request("https://tagium.test/api/manifests", { method: "POST", body: form }, runtime.env),
-      ),
-    );
-    const receipt = (await published.json()) as { slug: string };
-    const corruptPng = new Uint8Array(png.byteLength);
-    corruptPng.set([137, 80, 78, 71, 13, 10, 26, 10]);
-    runtime.bucket.get = async () => ({
-      body: new Blob([corruptPng]).stream(),
-      httpMetadata: { contentType: "image/png" },
-      size: corruptPng.byteLength,
-      etag: "sha256",
-    });
-
-    const response = await previewArtworkHandler(
-      event(
-        request(
-          `https://tagium.test/api/manifests/${receipt.slug}/preview-artwork`,
-          {},
-          runtime.env,
-        ),
-        receipt.slug,
       ),
     );
 

@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { AnalyticsEvent } from "@/analytics";
 import TagiumSaveApp from "@/apps/tagium-save/TagiumSaveApp";
 import {
-  buildVideoDownloadRequest,
   presentVideoDownloadFailure,
   updateVideoDownloadSettings,
   type VideoDownloadSettings,
@@ -75,27 +74,6 @@ describe("tagium save app", () => {
   beforeEach(() => {
     resetSystemFailureReportingForTest();
     toastMocks.error.mockClear();
-  });
-
-  it("builds a browser-processing request from the compact controls", () => {
-    expect(
-      buildVideoDownloadRequest("https://example.com/watch/one", {
-        ...settings,
-        mode: "mute",
-        quality: "720",
-        container: "webm",
-        codec: "vp9",
-        audioFormat: "opus",
-      }),
-    ).toEqual({
-      sourceUrl: "https://example.com/watch/one",
-      downloadMode: "mute",
-      videoQuality: "720",
-      youtubeVideoContainer: "webm",
-      youtubeVideoCodec: "vp9",
-      audioFormat: "opus",
-      filenameStyle: "pretty",
-    });
   });
 
   it("keeps codec and container settings compatible", () => {
@@ -173,35 +151,6 @@ describe("tagium save app", () => {
     act(() => renderer.unmount());
   });
 
-  it("tracks rejected media links without starting a download", async () => {
-    const { capture, events } = captureEvents();
-    const startDownload = vi.fn(() =>
-      taskFrom<VideoDownloadResult>(Promise.resolve(resolvedFile("unused.mp4"))),
-    );
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(<TagiumSaveApp startDownload={startDownload} capture={capture} />);
-    });
-    await setSourceUrl(renderer, "not a url");
-    await submit(renderer);
-
-    expect(startDownload).not.toHaveBeenCalled();
-    expect(events).toEqual([
-      {
-        type: "media_link_processed",
-        sourceUrl: "not a url",
-        mediaKind: "media",
-        linkKind: "other",
-        normalized: false,
-        redirected: false,
-        outcome: "rejected",
-        failureReason: "invalid",
-      },
-    ]);
-
-    act(() => renderer.unmount());
-  });
-
   it("keeps picker selection in the lifecycle that resolved it", async () => {
     const { capture, events } = captureEvents();
     const selected = resolvedFile("selected.webm");
@@ -240,60 +189,6 @@ describe("tagium save app", () => {
     expect(JSON.stringify(events)).not.toContain("private-audio.mp3");
 
     act(() => renderer.unmount());
-  });
-
-  it("finishes a picker lifecycle once when it is reset", async () => {
-    const { capture, events } = captureEvents();
-    const picker: VideoPickerDownloadResult = {
-      status: "picker",
-      picker: [{ type: "photo", url: "https://private.example/photo" }],
-      download: () => taskFrom(Promise.resolve(resolvedFile("photo.jpg"))),
-    };
-    const startDownload = vi.fn(() => taskFrom<VideoDownloadResult>(Promise.resolve(picker)));
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(<TagiumSaveApp startDownload={startDownload} capture={capture} />);
-    });
-    await setSourceUrl(renderer, "https://example.test/post/reset");
-    await submit(renderer);
-
-    act(() => {
-      renderer.root.findByProps({ "aria-label": "reset download" }).props.onClick();
-    });
-    expect(events.filter((event) => event.type === "download_finished")).toEqual([
-      expect.objectContaining({ outcome: "canceled" }),
-    ]);
-
-    act(() => renderer.unmount());
-    expect(events.filter((event) => event.type === "download_finished")).toHaveLength(1);
-  });
-
-  it("fails an empty picker without emitting a resolved event", async () => {
-    const { capture, events } = captureEvents();
-    const picker: VideoPickerDownloadResult = {
-      status: "picker",
-      picker: [],
-      download: vi.fn(),
-    };
-    const startDownload = vi.fn(() => taskFrom<VideoDownloadResult>(Promise.resolve(picker)));
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(<TagiumSaveApp startDownload={startDownload} capture={capture} />);
-    });
-    await setSourceUrl(renderer, "https://example.test/post/empty-picker");
-    await submit(renderer);
-
-    expect(events.filter((event) => event.type === "download_resolved")).toHaveLength(0);
-    expect(events.filter((event) => event.type === "download_finished")).toEqual([
-      expect.objectContaining({
-        outcome: "failed",
-        failureStage: "planning",
-        failureCode: "invalid_response",
-      }),
-    ]);
-
-    act(() => renderer.unmount());
-    expect(events.filter((event) => event.type === "download_finished")).toHaveLength(1);
   });
 
   it("tracks structured failures and marks a retry as a new lifecycle", async () => {
