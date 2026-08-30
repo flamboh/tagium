@@ -386,6 +386,99 @@ describe("analytics", () => {
     ).toBeNull();
   });
 
+  it("preserves the SDK properties PostHog requires for cookieless identity", async () => {
+    const init = vi.fn();
+    const analytics = createAnalytics(
+      { key: "public-test-key", deployEnv: "production" },
+      {
+        loadClient: async () => ({ init, capture: vi.fn() }),
+        schedule: (load) => load(),
+      },
+    );
+    analytics.initialize("tagium-save");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const options = init.mock.calls[0]?.[1] as AnalyticsInitOptions;
+    expect(
+      options.before_send({
+        uuid: "download-uuid",
+        event: "download_finished",
+        properties: {
+          provider: "youtube",
+          outcome: "completed",
+          duration_ms: 1_500,
+          output_format: "mp4",
+          size_bucket: "10_to_100_mb",
+          $raw_user_agent: "Mozilla/5.0 Chrome/140.0.0.0 Safari/537.36",
+          $cookieless_mode: true,
+          $host: "SAVE.TAGIUM.APP",
+        },
+      }),
+    ).toEqual({
+      uuid: "download-uuid",
+      event: "download_finished",
+      properties: {
+        provider: "youtube",
+        outcome: "completed",
+        duration_ms: 1_500,
+        output_format: "mp4",
+        size_bucket: "10_to_100_mb",
+        $raw_user_agent: "Mozilla/5.0 Chrome/140.0.0.0 Safari/537.36",
+        $cookieless_mode: true,
+        $host: "save.tagium.app",
+        app_id: "tagium-save",
+      },
+    });
+
+    const botUserAgent = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
+    expect(
+      options.before_send({
+        uuid: "pageview-uuid",
+        event: "$pageview",
+        properties: {
+          $raw_user_agent: botUserAgent,
+          $cookieless_mode: true,
+          $host: "https://save.tagium.app/path",
+        },
+      }),
+    ).toEqual({
+      uuid: "pageview-uuid",
+      event: "$pageview",
+      properties: {
+        $raw_user_agent: botUserAgent,
+        $cookieless_mode: true,
+        app_id: "tagium-save",
+      },
+    });
+
+    for (const untrustedHost of ["tagium.app", "", "evil.example"]) {
+      expect(
+        options.before_send({
+          uuid: "untrusted-host-uuid",
+          event: "$pageview",
+          properties: { $cookieless_mode: true, $host: untrustedHost },
+        }),
+      ).toEqual({
+        uuid: "untrusted-host-uuid",
+        event: "$pageview",
+        properties: { $cookieless_mode: true, app_id: "tagium-save" },
+      });
+    }
+
+    expect(
+      options.before_send({
+        uuid: "non-cookieless-uuid",
+        event: "$pageview",
+        properties: { $raw_user_agent: botUserAgent, $host: "save.tagium.app" },
+      }),
+    ).toEqual({
+      uuid: "non-cookieless-uuid",
+      event: "$pageview",
+      properties: { app_id: "tagium-save" },
+    });
+  });
+
   it("fails open when the provider or its initial load fails", async () => {
     const capture = vi
       .fn()

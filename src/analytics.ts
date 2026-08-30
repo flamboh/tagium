@@ -514,6 +514,10 @@ const CUSTOM_EVENT_PROPERTIES = {
   ]),
 } satisfies Partial<Record<AnalyticsEvent["type"], ReadonlySet<string>>>;
 const SAFE_SDK_EVENTS = new Set(["$pageview", "$pageleave", "$autocapture"]);
+const FIRST_PARTY_HOST_BY_APP = {
+  tagium: "tagium.app",
+  "tagium-save": "save.tagium.app",
+} as const satisfies Record<AnalyticsAppId, string>;
 const SAFE_SDK_PROPERTIES = new Set([
   "token",
   "distinct_id",
@@ -524,8 +528,11 @@ const SAFE_SDK_PROPERTIES = new Set([
   "$insert_id",
   "$time",
   "$sent_at",
+  "$cookieless_mode",
   "$lib",
   "$lib_version",
+  "$host",
+  "$raw_user_agent",
   "$user_agent",
   "$browser",
   "$browser_version",
@@ -549,6 +556,11 @@ const URL_VALUE = /https?:\/\//i;
 const isString = Schema.is(Schema.String);
 const isNumber = Schema.is(Schema.Number);
 const isBoolean = Schema.is(Schema.Boolean);
+const normalizeFirstPartyHost = (value: AnalyticsProperty, appId: AnalyticsAppId) => {
+  if (!isString(value)) return undefined;
+  const normalizedHost = value.toLowerCase();
+  return normalizedHost === FIRST_PARTY_HOST_BY_APP[appId] ? normalizedHost : undefined;
+};
 type AnalyticsPropertyValidator = (value: AnalyticsProperty) => boolean;
 const isOneOf =
   <Value extends string>(values: readonly Value[]) =>
@@ -794,16 +806,29 @@ const redactAndValidateEvent = (
   if (!customAllowedProperties && !isSdkEvent) return null;
 
   const properties: AnalyticsProperties = {};
+  const isCookieless = event.properties?.$cookieless_mode === true;
   for (const [property, value] of Object.entries(event.properties ?? {})) {
     const isAllowedCustomProperty = customAllowedProperties?.has(property) ?? false;
     const isAllowedSdkProperty = SAFE_SDK_PROPERTIES.has(property);
+    const isHost = property === "$host";
+    const isRawUserAgent = property === "$raw_user_agent";
     if (!isAllowedCustomProperty && !isAllowedSdkProperty) continue;
+    if ((isHost || isRawUserAgent) && !isCookieless) continue;
+    if (isHost) {
+      const normalizedHost = normalizeFirstPartyHost(value, appId);
+      if (!normalizedHost) continue;
+      properties[property] = normalizedHost;
+      continue;
+    }
+    if (isRawUserAgent && (!isString(value) || value.length > 1_000)) continue;
+    if (property === "$cookieless_mode" && value !== true) continue;
     const customValidator = Object.entries(customPropertyValidators ?? {}).find(
       ([propertyName]) => propertyName === property,
     )?.[1];
     if (customValidator && !customValidator(value)) continue;
     if (!isAllowedCustomProperty && SENSITIVE_PROPERTY_NAME.test(property)) continue;
-    if (!isAllowedCustomProperty && isString(value) && URL_VALUE.test(value)) continue;
+    if (!isAllowedCustomProperty && !isRawUserAgent && isString(value) && URL_VALUE.test(value))
+      continue;
     properties[property] = value;
   }
 
