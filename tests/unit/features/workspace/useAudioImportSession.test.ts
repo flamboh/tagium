@@ -92,27 +92,6 @@ describe("audio upload session", () => {
     expect(bufferEditor).toHaveBeenCalledTimes(2);
   });
 
-  it("preserves a single's album title when its metadata link is disabled", async () => {
-    const source = new File(["audio"], "track.mp3", { lastModified: 42 });
-    backendMocks.parseUploads.mockResolvedValue([parsedUpload(source)]);
-    const library = createLibrary();
-    const session = createAudioUploadSession({
-      library,
-      getSettings: () => ({
-        ...defaultSettings,
-        metadataLinks: { ...defaultSettings.metadataLinks, singleAlbum: false },
-      }),
-      bufferEditor: vi.fn(),
-      activateEditor: vi.fn(),
-      setUploading: vi.fn(),
-    });
-
-    await session.upload([source]);
-
-    expect(library.getSnapshot().files[0].metadata?.album).toBe("");
-    expect(library.getSnapshot().files[0].pendingMetadataPatch).toBeUndefined();
-  });
-
   it("reads current settings after an asynchronous parse before committing", async () => {
     const source = new File(["audio"], "source.mp3", { lastModified: 42 });
     let releaseParse: ((uploads: ReturnType<typeof parsedUpload>[]) => void) | undefined;

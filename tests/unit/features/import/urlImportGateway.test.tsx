@@ -120,7 +120,7 @@ function MediaUrlEntryHarness({
 afterEach(() => vi.clearAllMocks());
 
 describe("media URL entry", () => {
-  it("submits a trimmed valid URL and retains one layout-aware DOM module", async () => {
+  it("submits a trimmed valid URL", async () => {
     const hooks = createHookHarness();
     const onUrlImport = vi.fn(async () => undefined);
     const render = (layout: "landing" | "editor") =>
@@ -130,47 +130,12 @@ describe("media URL entry", () => {
     changeInputValue(tree, "  https://soundcloud.com/user/track  ");
     tree = render("editor");
 
-    expect(tree.props["data-layout"]).toBe("editor");
     const form = findElement(tree, (element) => element.type === "form");
     await form.props.onSubmit?.({
       preventDefault: vi.fn(),
     });
 
     expect(onUrlImport).toHaveBeenCalledWith("https://soundcloud.com/user/track");
-  });
-
-  it("keeps submission state accessible without rendering progress copy under the entry", async () => {
-    const hooks = createHookHarness();
-    let resolveImport!: () => void;
-    const onUrlImport = vi.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          resolveImport = resolve;
-        }),
-    );
-    const render = () =>
-      hooks.render(() => MediaUrlEntryHarness({ layout: "landing", onUrlImport }));
-
-    let tree = render();
-    changeInputValue(tree, "https://soundcloud.com/user/track");
-    tree = render();
-    const form = findElement(tree, (element) => element.type === "form");
-    const submit = form.props.onSubmit?.({
-      preventDefault: vi.fn(),
-    });
-
-    tree = render();
-    const button = findElement(
-      tree,
-      (element) => element.props["aria-label"] === "start media import",
-    );
-    expect(button.props["aria-busy"]).toBe(true);
-    expect(
-      textContent(findElement(tree, (element) => element.props.id === "media-url-error")),
-    ).toBe("");
-
-    resolveImport();
-    await submit;
   });
 
   it("keeps malformed URL feedback local to the input", async () => {

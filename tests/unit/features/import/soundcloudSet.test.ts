@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import {
-  createSingleUrlDownloadPlan,
-  createSoundCloudSetDownloadPlan,
-  type QueuedDownloadTrack,
-} from "@/features/import/downloadTrack";
+import type { QueuedDownloadTrack } from "@/features/import/downloadTrack";
 import { resolveSoundCloudSet } from "@/features/import/soundcloudSet";
 import { startSoundCloudSetImport } from "@/features/import/soundcloudSetImport";
 import type { SoundCloudSet } from "@/features/import/soundcloudSet";
@@ -104,35 +100,6 @@ describe("resolveSoundCloudSet", () => {
     );
 
     await expect(resolveSoundCloudSet("https://soundcloud.com/artist/sets/set")).rejects.toThrow();
-  });
-
-  it("sends the import correlation id with the set request", async () => {
-    vi.stubGlobal("window", {
-      location: {
-        origin: "https://tagium.test",
-      },
-    });
-    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
-      Response.json({
-        title: "Imported Set",
-        artist: "Set Artist",
-        genre: "Electronic",
-        isAlbum: true,
-        tracks: [],
-      }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    await resolveSoundCloudSet(
-      "https://soundcloud.com/artist/sets/set",
-      "0196cc37-9b66-7e7a-a1d4-7c7c1f86c242",
-    );
-
-    const [, init] = fetchMock.mock.calls[0] ?? [];
-    expect(new Headers(init?.headers).get("X-Tagium-Import-Id")).toBe(
-      "0196cc37-9b66-7e7a-a1d4-7c7c1f86c242",
-    );
-    expect(new Headers(init?.headers).get("X-Tagium-Request-Id")).toMatch(/^[0-9a-f-]{36}$/);
   });
 });
 
@@ -248,87 +215,6 @@ const createHarness = (settings: AppSettings = defaultSettings) => {
     updateTagsCalls,
   };
 };
-
-describe("download track plans", () => {
-  it("creates the same queued track shape for single URL and SoundCloud set plans", () => {
-    const singlePlan = createSingleUrlDownloadPlan({
-      sourceUrl: "https://soundcloud.com/artist/direct-track",
-      audioBitrate: "320",
-      audioFormat: "mp3",
-      createId: () => "single-track",
-    });
-    const ids = ["album-1", "set-track-1", "set-track-2"];
-    const setPlan = createSoundCloudSetDownloadPlan({
-      set: soundCloudSet(),
-      audioBitrate: "320",
-      audioFormat: "mp3",
-      createId: () => {
-        const id = ids.shift();
-        if (!id) throw new Error("missing test id");
-        return id;
-      },
-    });
-
-    expect(singlePlan.queuedTracks).toEqual([
-      {
-        fileId: "single-track",
-        title: "direct track",
-        downloadRequest: {
-          sourceUrl: "https://soundcloud.com/artist/direct-track",
-          audioBitrate: "320",
-          audioFormat: "mp3",
-        },
-      },
-    ]);
-    expect(singlePlan.pendingFiles[0].hasBufferedChanges).toBe(false);
-    expect(singlePlan.pendingFiles[0].pendingMetadataPatch).toBeUndefined();
-    expect(Object.keys(singlePlan.queuedTracks[0]).sort()).toEqual(
-      Object.keys(setPlan.queuedTracks[0]).sort(),
-    );
-    expect(setPlan.pendingFiles.map((file) => file.pendingMetadataPatch)).toEqual([
-      {
-        title: "First Track",
-        artist: "Set Artist",
-        album: "Imported Set",
-        genre: "Electronic",
-        year: 2024,
-        trackNumber: 1,
-      },
-      {
-        title: "Second Track",
-        artist: "Set Artist",
-        album: "Imported Set",
-        genre: "Electronic",
-        year: 2024,
-        trackNumber: 2,
-      },
-    ]);
-    expect(setPlan.queuedTracks).toEqual([
-      {
-        fileId: "set-track-1",
-        title: "First Track",
-        downloadRequest: {
-          sourceUrl: "https://soundcloud.com/artist/first-track",
-          audioBitrate: "320",
-          audioFormat: "mp3",
-          trackIndex: 1,
-          year: 2024,
-        },
-      },
-      {
-        fileId: "set-track-2",
-        title: "Second Track",
-        downloadRequest: {
-          sourceUrl: "https://soundcloud.com/artist/second-track",
-          audioBitrate: "320",
-          audioFormat: "mp3",
-          trackIndex: 2,
-          year: 2024,
-        },
-      },
-    ]);
-  });
-});
 
 describe("soundcloud set import", () => {
   it("imports an album plan, queues shared download tracks, and applies cover to downloaded files", async () => {

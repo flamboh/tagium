@@ -140,7 +140,7 @@ describe("share link previews", () => {
       },
     });
     const event = mockEvent("https://tagium.app/share/abc234");
-    event.res.headers.set("x-robots-tag", "noindex, nofollow");
+    event.res.headers.set("x-preview-test", "preserved");
 
     const response = await middleware(event, async () => rendered);
 
@@ -149,7 +149,7 @@ describe("share link previews", () => {
     if (!(response instanceof Response)) throw new Error("expected a response");
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("content-length")).toBeNull();
-    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    expect(response.headers.get("x-preview-test")).toBe("preserved");
     await expect(response.text()).resolves.toContain(
       '<meta property="og:title" content="Album &amp; &lt;Deluxe&gt; - Artist" />',
     );

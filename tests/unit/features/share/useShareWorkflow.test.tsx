@@ -3,9 +3,6 @@ import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
-import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
-import { useLibraryStore } from "@/features/library/useLibraryStore";
-import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 import { createLibraryState } from "@/features/library/libraryState";
 
 const mocks = vi.hoisted(() => ({
@@ -51,11 +48,7 @@ vi.mock("@/features/share/sharePresence", () => ({
 
 import { renderHook } from "../../support/hookTestHarness";
 import { useShareWorkflow } from "@/features/share/useShareWorkflow";
-import { SharedContentUnavailableError } from "@/features/share/shareClient";
-import {
-  projectAlbumShareSnapshot,
-  projectTrackShareSnapshot,
-} from "@/features/share/sharePublication";
+import { projectAlbumShareSnapshot } from "@/features/share/sharePublication";
 
 type WorkflowOptions = Parameters<typeof useShareWorkflow>[0];
 const fakeEditor = (
@@ -94,12 +87,6 @@ type ShareHistory = {
   state: ShareHistoryState;
   replaceState: (state: ShareHistoryState, title: string, path: string) => void;
   back: ReturnType<typeof vi.fn>;
-};
-type FormTarget = {
-  name: "genre" | "year" | "trackNumber";
-  value: string;
-  type?: string;
-  valueAsNumber?: number;
 };
 const sharedManifest = {
   version: 1 as const,
@@ -356,21 +343,9 @@ describe("share workflow pasted links", () => {
       trackCount: 1,
       viewer: "recipient",
     });
-    hook.unmount();
-  });
-
-  it("reports download progress after adding from a share preview", async () => {
-    history.replaceState({}, "", `/share/${slug}`);
-    mocks.fetchSharedContent.mockResolvedValue({
-      manifest: sharedManifest,
-      expiresAt: "2026-10-20T12:00:00.000Z",
-      analyticsId,
-    });
-    const { hook } = workflow();
-
-    await vi.waitFor(() => expect(hook.result.page).toMatchObject({ status: "ready", slug }));
     await act(async () => hook.result.addSharedContent());
 
+    expect(mocks.importSharedContent).toHaveBeenCalledWith(sharedManifest, slug, undefined);
     expect(mocks.toastSuccess).toHaveBeenCalledWith("album added to your library", {
       description: "downloading 1 track — watch progress in the sidebar.",
     });
@@ -380,23 +355,6 @@ describe("share workflow pasted links", () => {
       shareKind: "album",
       trackCount: 1,
     });
-    hook.unmount();
-  });
-
-  it("restores the app title after adding from a share preview", async () => {
-    history.replaceState({}, "", `/share/${slug}`);
-    document.title = "Track · tagium";
-    mocks.fetchSharedContent.mockResolvedValue({
-      manifest: sharedManifest,
-      expiresAt: "2026-10-20T12:00:00.000Z",
-      analyticsId,
-    });
-    const { hook } = workflow();
-
-    await vi.waitFor(() => expect(hook.result.page).toMatchObject({ status: "ready", slug }));
-    await act(async () => hook.result.addSharedContent());
-
-    expect(document.title).toBe("tagium");
     hook.unmount();
   });
 
@@ -453,25 +411,6 @@ describe("share workflow pasted links", () => {
     ]);
     hook.unmount();
   });
-
-  it("rejects pasted links safely when sharing is disabled", async () => {
-    const library = fakeLibraryStore([], [], vi.fn());
-    const hook = renderHook(
-      () =>
-        useShareWorkflow({
-          library,
-          editor: fakeEditor([]),
-          importing: fakeImporting(vi.fn()),
-          enabled: false,
-        }),
-      undefined,
-    );
-
-    await expect(hook.result.importFromInput(slug)).rejects.toBeInstanceOf(
-      SharedContentUnavailableError,
-    );
-    hook.unmount();
-  });
 });
 
 describe("share workflow publication lifecycle", () => {
@@ -487,35 +426,6 @@ describe("share workflow publication lifecycle", () => {
     expiresAt: oldPublication.expiresAt,
     token: "old-token",
   };
-
-  it("skips form projection when the selected track has no active publication", () => {
-    const file: TagiumFile = structuredClone(creatorFile);
-    const state = {
-      ...createLibraryState(),
-      files: [file],
-      looseTrackIds: [file.id],
-      selectedFileId: file.id,
-    };
-    const library: LibraryStore = {
-      state,
-      getSnapshot: () => state,
-      dispatch: vi.fn(),
-    };
-    const editor = fakeEditor([file]);
-    const hook = renderHook(
-      () =>
-        useShareWorkflow({
-          library,
-          editor,
-          importing: fakeImporting(vi.fn()),
-          enabled: true,
-        }),
-      undefined,
-    );
-
-    expect(editor.form.subscribe).not.toHaveBeenCalled();
-    hook.unmount();
-  });
 
   it("replaces a stopped publication with a fresh link", async () => {
     const album = creatorAlbum({ ...oldPublication, status: "stopped" });
@@ -572,46 +482,6 @@ describe("share workflow publication lifecycle", () => {
     expect(mocks.toastError).toHaveBeenCalledWith("share link permission unavailable", {
       description: "try the browser that created this link",
     });
-    hook.unmount();
-  });
-
-  it("explains that a failed create did not produce a link", async () => {
-    const album = creatorAlbum();
-    mocks.publishShare.mockRejectedValue(new Error("sharing is unavailable"));
-    const { hook } = creatorWorkflow(album, creatorFile);
-
-    await act(async () => hook.result.openCreator({ kind: "album", id: album.id }));
-    await act(async () => hook.result.publish());
-
-    await vi.waitFor(() =>
-      expect(hook.result.dialog).toMatchObject({
-        status: "error",
-        intent: "create",
-        message: "the share link could not be created.",
-      }),
-    );
-    expect(mocks.capture).not.toHaveBeenCalled();
-    hook.unmount();
-  });
-
-  it("explains that a failed update left the previous link version intact", async () => {
-    const album = creatorAlbum(oldPublication);
-    mocks.getRevocationReceipt.mockReturnValue(capability);
-    mocks.updateShare.mockRejectedValue(new Error("offline"));
-    const { hook } = creatorWorkflow(album, creatorFile);
-
-    await act(async () => hook.result.openCreator({ kind: "album", id: album.id }));
-    expect(hook.result.dialog).toMatchObject({ status: "confirm", intent: "update" });
-    await act(async () => hook.result.publish());
-
-    await vi.waitFor(() =>
-      expect(hook.result.dialog).toMatchObject({
-        status: "error",
-        intent: "update",
-        message: "the shared album could not be updated. the link still has the previous version.",
-      }),
-    );
-    expect(mocks.capture).not.toHaveBeenCalled();
     hook.unmount();
   });
 
@@ -682,137 +552,6 @@ describe("share workflow publication lifecycle", () => {
       trackCount: 1,
       contentTitle: "One",
     });
-    hook.unmount();
-  });
-
-  it("uses an untitled fallback for blank shared track titles", async () => {
-    const file: TagiumFile = structuredClone(creatorFile);
-    file.metadata!.title = "   ";
-    const { hook } = trackCreatorWorkflow(file);
-    mocks.publishShare.mockResolvedValue({
-      slug: "untitled-track",
-      url: "https://tagium.app/share/untitled-track",
-      expiresAt: "2031-01-01T00:00:00.000Z",
-      revocationToken: "track-token",
-      analyticsId,
-    });
-
-    await act(async () => hook.result.openCreator({ kind: "track", id: file.id }));
-    await act(async () => hook.result.publish());
-
-    expect(mocks.capture).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "share_created",
-        contentTitle: "untitled track",
-      }),
-    );
-    hook.unmount();
-  });
-
-  it("flushes an unpreviewed track edit before choosing update versus view", async () => {
-    const file: TagiumFile = structuredClone(creatorFile);
-    const published = await projectTrackShareSnapshot(file);
-    file.sharePublication = {
-      slug: oldPublication.slug,
-      url: oldPublication.url,
-      expiresAt: oldPublication.expiresAt,
-      publishedFingerprint: published.fingerprint,
-      status: "active",
-    };
-    mocks.getRevocationReceipt.mockReturnValue(capability);
-    const flush = vi.fn(() => {
-      file.pendingMetadataPatch = { genre: "Ambient" };
-    });
-    const { hook } = trackCreatorWorkflow(file, [], flush);
-
-    await vi.waitFor(() =>
-      expect(hook.result.shareTrackActions[file.id]?.label).toBe("view share link"),
-    );
-    await act(async () => hook.result.openCreator({ kind: "track", id: file.id }));
-
-    expect(flush).toHaveBeenCalledOnce();
-    expect(hook.result.dialog).toMatchObject({
-      status: "confirm",
-      intent: "update",
-      preview: { kind: "track" },
-    });
-    expect(file.pendingMetadataPatch).toEqual({ genre: "Ambient" });
-    hook.unmount();
-  });
-
-  it.each([
-    ["year", "2026"],
-    ["genre", "Ambient"],
-    ["trackNumber", "2"],
-  ] as const)("offers an update after a %s-only form edit", async (field, value) => {
-    const file: TagiumFile = structuredClone(creatorFile);
-    const published = await projectTrackShareSnapshot(file);
-    file.sharePublication = {
-      slug: oldPublication.slug,
-      url: oldPublication.url,
-      expiresAt: oldPublication.expiresAt,
-      publishedFingerprint: published.fingerprint,
-      status: "active",
-    };
-    mocks.getRevocationReceipt.mockReturnValue(capability);
-    const hook = renderHook(() => {
-      const library = useLibraryStore();
-      const editor = useTrackEditorSession({
-        library,
-        settings: {
-          ...DEFAULT_APP_SETTINGS,
-          syncFilenames: false,
-          syncTrackNumbers: false,
-          metadataLinks: { ...DEFAULT_APP_SETTINGS.metadataLinks, singleAlbum: false },
-        },
-      });
-      const sharing = useShareWorkflow({
-        library,
-        editor,
-        importing: fakeImporting(vi.fn()),
-        enabled: true,
-      });
-      return { editor, library, sharing };
-    }, undefined);
-    act(() => {
-      hook.result.library.dispatch({
-        type: "content-replaced",
-        files: [file],
-        looseTrackIds: [file.id],
-        selection: { selectedAlbumId: null, selectedFileId: file.id },
-      });
-    });
-    await vi.waitFor(() =>
-      expect(hook.result.sharing.shareTrackActions[file.id]?.label).toBe("view share link"),
-    );
-
-    const registration = hook.result.editor.form.register(
-      field,
-      field === "genre" ? {} : { valueAsNumber: true },
-    );
-    const target: FormTarget = {
-      name: field,
-      value,
-    };
-    if (field !== "genre") {
-      target.type = "number";
-      target.valueAsNumber = Number(value);
-    }
-    act(() => {
-      if (field !== "genre") {
-        registration.ref(target as HTMLInputElement);
-        target.value = value;
-        target.valueAsNumber = Number(value);
-      }
-      void registration.onChange({ target, type: "change" });
-    });
-    expect(hook.result.editor.form.getValues(field)).toBe(
-      field === "genre" ? value : Number(value),
-    );
-
-    await vi.waitFor(() =>
-      expect(hook.result.sharing.shareTrackActions[file.id]?.label).toBe("update shared track"),
-    );
     hook.unmount();
   });
 

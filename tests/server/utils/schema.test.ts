@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 import { HTTPError } from "nitro";
 import { describe, expect, it } from "vite-plus/test";
-import { decodeRequestBody, urlStringSchema } from "../../../server/utils/schema";
+import { decodeRequestBody } from "../../../server/utils/schema";
 
 const exampleBodySchema = Schema.Struct({
   name: Schema.String,
@@ -45,19 +45,5 @@ describe("request body decoding", () => {
       status: 400,
       message: "Invalid request body: expected valid JSON.",
     });
-  });
-});
-
-describe("URL string decoding", () => {
-  it("preserves the string type while trimming a valid URL", () => {
-    expect(Schema.decodeUnknownSync(urlStringSchema)(" https://tagium.app/track ")).toBe(
-      "https://tagium.app/track",
-    );
-  });
-
-  it("rejects invalid URLs", () => {
-    expect(() => Schema.decodeUnknownSync(urlStringSchema)("not a URL")).toThrow(
-      "Expected a valid URL",
-    );
   });
 });

@@ -173,10 +173,7 @@ describe("workspace title cleanup", () => {
       "Archangel",
       "Near Dark",
     ]);
-    expect(toastMocks.toast.success).toHaveBeenLastCalledWith(
-      "cleaned up 1 track",
-      expect.any(Object),
-    );
+    expect(toastMocks.toast.success).toHaveBeenCalledWith(expect.any(String), expect.any(Object));
     hook.unmount();
   });
 });

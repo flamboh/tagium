@@ -33,33 +33,3 @@ test("bulk download confirmation owns focus, dismisses safely, and restores its 
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
 });
-
-test("only the manifest scrolls in a constrained mobile dialog", async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 240 });
-  await page.goto("/");
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles(Array.from({ length: 18 }, (_, index) => mp3Upload(`track-${index + 1}.mp3`)));
-  const menuButton = page.getByRole("button", { name: "open library" });
-  await menuButton.click();
-  const drawer = page.getByRole("dialog", { name: "library" });
-  await expect(drawer).toBeVisible();
-  await downloadAllButton(page).click();
-  await expect(drawer).toBeHidden();
-  const dialog = page.getByRole("dialog", { name: "download 18 tracks" });
-  await expect(dialog.getByRole("button", { name: "cancel" })).toBeFocused();
-  await dialog.getByRole("button", { name: "singles 18 tracks" }).click();
-
-  const manifest = dialog.getByTestId("export-manifest");
-  const metrics = await manifest.evaluate((element) => ({
-    scrollHeight: element.scrollHeight,
-    clientHeight: element.clientHeight,
-  }));
-  expect(metrics.clientHeight).toBeGreaterThan(0);
-  expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
-  await expect(dialog.getByRole("button", { name: "cancel" })).toBeVisible();
-  await expect(dialog.getByRole("button", { name: /^download ~/ })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(dialog).toBeHidden();
-  await expect(menuButton).toBeFocused();
-});

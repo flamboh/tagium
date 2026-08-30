@@ -16,25 +16,13 @@ const importTrack = async (page: Page) => {
 
 const uploadTrack = async (page: Page) => {
   await importTrack(page);
-  await expect(page.getByRole("button", { name: "remove track" })).toBeAttached();
+  await expect(page.getByRole("button", { name: /track actions for/ })).toBeAttached();
 };
 
-test("allows unloading an empty session", async ({ page }) => {
-  await page.goto("/");
-
-  const unloadWasPrevented = await page.evaluate(() => {
-    const event = new Event("beforeunload", { cancelable: true });
-    return {
-      dispatchResult: window.dispatchEvent(event),
-      defaultPrevented: event.defaultPrevented,
-    };
-  });
-
-  expect(unloadWasPrevented).toEqual({
-    dispatchResult: true,
-    defaultPrevented: false,
-  });
-});
+const requestTrackRemoval = async (page: Page) => {
+  await page.getByRole("button", { name: /track actions for/ }).click();
+  await page.getByRole("menuitem", { name: "remove track" }).click();
+};
 
 test("shows the native unload warning", async ({ page, browserName }) => {
   test.skip(
@@ -57,15 +45,15 @@ test("shows the native unload warning", async ({ page, browserName }) => {
 test("requires confirmation before removing an imported track", async ({ page }) => {
   await uploadTrack(page);
 
-  await page.getByRole("button", { name: "remove track" }).click();
+  await requestTrackRemoval(page);
   const confirmation = page.getByRole("dialog", { name: "remove track?" });
   await expect(confirmation).toBeVisible();
 
   await confirmation.getByRole("button", { name: "keep track" }).click();
   await expect(confirmation).toBeHidden();
-  await expect(page.getByRole("button", { name: "remove track" })).toBeAttached();
+  await expect(page.getByRole("button", { name: /track actions for/ })).toBeAttached();
 
-  await page.getByRole("button", { name: "remove track" }).click();
+  await requestTrackRemoval(page);
   await confirmation.getByRole("button", { name: "remove track" }).click();
   await expect(page.getByText("no tracks yet", { exact: true })).toBeVisible();
 });

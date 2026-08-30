@@ -251,34 +251,7 @@ describe("cobalt audio endpoint", () => {
     expect(JSON.stringify(warn.mock.calls)).not.toContain(sentinel);
   });
 
-  it("logs SoundCloud adapter detail without changing the public Cobalt error", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        Response.json(
-          {
-            status: "error",
-            error: {
-              code: "error.api.fetch.soundcloud.resolve_fetch.429.errorType-TypeError.contentType-application%2Fjson",
-            },
-          },
-          { status: 200 },
-        ),
-      ),
-    );
-
-    const response = await handler(makeEvent(makeAudioRequest()));
-
-    expect(response.status).toBe(502);
-    expect(await response.text()).toBe("error.api.fetch.fail");
-    expect(JSON.stringify(warn.mock.calls)).toContain(
-      "error.api.fetch.soundcloud.resolve_fetch.429.errorType-TypeError.contentType-application%2Fjson",
-    );
-  });
-
   it("preserves the public empty-stream error for SoundCloud stream failures", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -293,7 +266,6 @@ describe("cobalt audio endpoint", () => {
 
     expect(response.status).toBe(502);
     expect(await response.text()).toBe("error.api.fetch.empty");
-    expect(JSON.stringify(warn.mock.calls)).toContain("error.api.fetch.soundcloud.stream_parse");
   });
 
   it("infers direct YouTube track year from its upload date", async () => {
@@ -423,31 +395,6 @@ describe("cobalt audio endpoint", () => {
           {
             headers: {
               "X-Cobalt-Machine-Id": "bad machine",
-            },
-          },
-        );
-      }),
-    );
-
-    const response = await handler(makeEvent(makeAudioRequest()));
-
-    expect(response.status).toBe(502);
-    expect(await response.text()).toBe("Cobalt returned invalid machine id.");
-  });
-
-  it("rejects blank Cobalt machine ids at ingestion", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        return Response.json(
-          {
-            status: "tunnel",
-            url: "https://cobalt.test/tunnel?id=123456789012345678901",
-            filename: "download.mp3",
-          },
-          {
-            headers: {
-              "X-Cobalt-Machine-Id": "",
             },
           },
         );

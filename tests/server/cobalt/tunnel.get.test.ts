@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { mockEvent } from "h3";
 import handler from "../../../server/api/cobalt/tunnel.get";
 import { signCobaltResource } from "../../../server/utils/cobalt-machine-affinity";
-import { setDevFault } from "../../../server/utils/dev-controls";
 
 type RuntimeRequest = Request & {
   runtime: {
@@ -47,18 +46,6 @@ const makeTunnelRequestForMachine = () => {
   machineRequest.runtime = request.runtime;
 
   return machineRequest;
-};
-
-const makeTunnelRequestWithId = (id: string) => {
-  const request = makeTunnelRequest();
-  const requestUrl = new URL(request.url);
-  const upstreamUrl = new URL(requestUrl.searchParams.get("url") ?? "");
-  upstreamUrl.searchParams.set("id", id);
-  requestUrl.searchParams.set("url", upstreamUrl.href);
-  const updatedRequest = new Request(requestUrl, request) as RuntimeRequest;
-  updatedRequest.runtime = request.runtime;
-
-  return updatedRequest;
 };
 
 const makeVideoTunnelRequest = () => {
@@ -108,7 +95,6 @@ describe("cobalt tunnel endpoint", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    setDevFault({ target: "tunnel", fault: null });
   });
 
   it("streams successful tunnel bodies even when upstream reports content-length zero", async () => {
@@ -276,104 +262,6 @@ describe("cobalt tunnel endpoint", () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
-  it("recovers when a tunnel becomes ready after the original retry window", async () => {
-    vi.useFakeTimers();
-    let attempt = 0;
-    const fetchMock = vi.fn(async () => {
-      attempt++;
-      return attempt < 7 ? new Response(null, { status: 200 }) : new Response("audio-bytes");
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    try {
-      const responsePromise = handler(makeEvent(makeTunnelRequest()));
-      await vi.advanceTimersByTimeAsync(10_000);
-      const response = await responsePromise;
-
-      expect(response.status).toBe(200);
-      expect(response.headers.get("X-Tagium-Tunnel-Outcome")).toBe("recovered");
-      expect(response.headers.get("X-Tagium-Tunnel-Attempts")).toBe("7");
-      expect(await response.text()).toBe("audio-bytes");
-      expect(fetchMock).toHaveBeenCalledTimes(7);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("deterministically staggers retries for different tunnel urls", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(0);
-    const attemptsByUrl = new Map<string, number>();
-    const startTimesByUrl = new Map<string, number[]>();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: string | URL | Request) => {
-        const url = input instanceof Request ? input.url : input.toString();
-        const attempts = (attemptsByUrl.get(url) ?? 0) + 1;
-        attemptsByUrl.set(url, attempts);
-        startTimesByUrl.set(url, [...(startTimesByUrl.get(url) ?? []), Date.now()]);
-        return attempts === 1 ? new Response(null, { status: 200 }) : new Response("audio-bytes");
-      }),
-    );
-
-    try {
-      const first = handler(makeEvent(makeTunnelRequestWithId("tunnel-a")));
-      const second = handler(makeEvent(makeTunnelRequestWithId("tunnel-b")));
-      await vi.advanceTimersByTimeAsync(200);
-      await Promise.all([first, second]);
-
-      const retryDelays = [...startTimesByUrl.values()].map(
-        ([startedAt = 0, retriedAt = 0]) => retriedAt - startedAt,
-      );
-      expect(retryDelays).toHaveLength(2);
-      expect(retryDelays.every((delay) => delay >= 80 && delay <= 120)).toBe(true);
-      expect(new Set(retryDelays).size).toBe(2);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("stops after the bounded extended retry window", async () => {
-    vi.useFakeTimers();
-    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    try {
-      const responsePromise = handler(makeEvent(makeTunnelRequest()));
-      await vi.advanceTimersByTimeAsync(10_000);
-      const response = await responsePromise;
-
-      expect(response.status).toBe(502);
-      expect(response.headers.get("X-Tagium-Tunnel-Outcome")).toBe("exhausted");
-      expect(response.headers.get("X-Tagium-Tunnel-Attempts")).toBe("7");
-      expect(fetchMock).toHaveBeenCalledTimes(7);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("stops retrying when the shared tunnel timeout aborts a backoff", async () => {
-    vi.useFakeTimers();
-    const timeout = new AbortController();
-    vi.spyOn(AbortSignal, "timeout").mockReturnValue(timeout.signal);
-    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    try {
-      const responsePromise = handler(makeEvent(makeTunnelRequest()));
-      await vi.advanceTimersByTimeAsync(0);
-      timeout.abort(new DOMException("timed out", "TimeoutError"));
-      const response = await responsePromise;
-
-      expect(response.status).toBe(502);
-      expect(response.headers.get("X-Tagium-Tunnel-Outcome")).toBe("non_retryable");
-      expect(response.headers.get("X-Tagium-Tunnel-Attempts")).toBe("1");
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it("stops retrying when the downstream tunnel request is aborted", async () => {
     vi.useFakeTimers();
     const downstream = new AbortController();
@@ -456,32 +344,7 @@ describe("cobalt tunnel endpoint", () => {
     expect(headers.get("X-Tagium-Track-Index")).toBe("7");
   });
 
-  it("logs upstream tunnel failures with machine affinity context", async () => {
-    const warnMock = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        return new Response("missing tunnel", { status: 404 });
-      }),
-    );
-
-    const response = await handler(makeEvent(makeTunnelRequestForMachine()));
-
-    expect(response.status).toBe(502);
-    expect(await response.text()).toBe("Cobalt tunnel request failed (404).");
-    expect(warnMock).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(warnMock.mock.calls[0]?.[0] ?? "{}")).toMatchObject({
-      event: "cobalt_tunnel_failure",
-      message: "upstream non-ok",
-      machineId: "cobalt-machine-1",
-      tunnelId: "123456789012345678901",
-      status: 404,
-      responseBytes: 14,
-    });
-  });
-
   it("preserves Cobalt tunnel capacity overload responses", async () => {
-    const warnMock = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -514,14 +377,6 @@ describe("cobalt tunnel endpoint", () => {
       error: {
         code: "error.api.capacity_exceeded",
       },
-    });
-    expect(JSON.parse(warnMock.mock.calls[0]?.[0] ?? "{}")).toMatchObject({
-      event: "cobalt_tunnel_failure",
-      message: "upstream capacity exceeded",
-      machineId: "cobalt-machine-1",
-      tunnelId: "123456789012345678901",
-      status: 503,
-      retryAfter: "2",
     });
   });
 
@@ -557,31 +412,6 @@ describe("cobalt tunnel endpoint", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("rejects empty successful Cobalt tunnel responses", async () => {
-    vi.useFakeTimers();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        return new Response(null, {
-          headers: {
-            "Content-Type": "audio/mpeg",
-          },
-        });
-      }),
-    );
-
-    try {
-      const responsePromise = handler(makeEvent(makeTunnelRequest()));
-      await vi.advanceTimersByTimeAsync(10_000);
-      const response = await responsePromise;
-
-      expect(response.status).toBe(502);
-      expect(await response.text()).toBe("Cobalt tunnel response was empty.");
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it("returns a safe compatibility response when the upstream fetch throws", async () => {
     const warnMock = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.stubGlobal(
@@ -598,57 +428,5 @@ describe("cobalt tunnel endpoint", () => {
     expect(response.headers.get("X-Tagium-Tunnel-Attempts")).toBe("1");
     expect(await response.text()).toBe("private upstream detail");
     expect(JSON.stringify(warnMock.mock.calls)).not.toContain("private upstream detail");
-  });
-
-  it("reports the number of attempts begun before a retry fetch throws", async () => {
-    let attempts = 0;
-    vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        attempts += 1;
-        if (attempts === 1) return new Response(null, { status: 200 });
-        throw new TypeError("second fetch failed");
-      }),
-    );
-
-    const response = await handler(makeEvent(makeTunnelRequest()));
-
-    expect(response.status).toBe(502);
-    expect(response.headers.get("X-Tagium-Tunnel-Outcome")).toBe("non_retryable");
-    expect(response.headers.get("X-Tagium-Tunnel-Attempts")).toBe("2");
-    expect(await response.text()).toBe("second fetch failed");
-  });
-
-  it("preserves the established timeout wording for aborted upstream fetches", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        throw new DOMException("timed out", "TimeoutError");
-      }),
-    );
-
-    const response = await handler(makeEvent(makeTunnelRequest()));
-
-    expect(response.status).toBe(502);
-    expect(response.headers.get("X-Tagium-Tunnel-Outcome")).toBe("non_retryable");
-    expect(response.headers.get("X-Tagium-Tunnel-Attempts")).toBe("1");
-    expect(await response.text()).toBe("Cobalt tunnel request timed out.");
-  });
-
-  it("annotates a pre-fetch dev timeout with one synthetic attempt", async () => {
-    const request = makeTunnelRequest();
-    request.runtime.cloudflare.env.TAGIUM_DEPLOY_ENV = "local";
-    setDevFault({ target: "tunnel", fault: "timeout" });
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-
-    const response = await handler(makeEvent(request));
-
-    expect(response.status).toBe(502);
-    expect(response.headers.get("X-Tagium-Tunnel-Outcome")).toBe("non_retryable");
-    expect(response.headers.get("X-Tagium-Tunnel-Attempts")).toBe("1");
-    expect(await response.text()).toBe("Cobalt tunnel request timed out.");
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

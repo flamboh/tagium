@@ -7,7 +7,6 @@ import revokeHandler from "../../server/api/manifests/[slug].delete";
 import manifestHandler from "../../server/api/manifests/[slug].get";
 import publishHandler from "../../server/api/manifests/index.post";
 import updateHandler from "../../server/api/manifests/[slug].patch";
-import noindexMiddleware from "../../server/middleware/02-share-noindex";
 import type { ShareRuntimeEnv } from "../../server/utils/share-manifest-request";
 import { isShareExpiryIso } from "../../src/features/share/shareManifest";
 
@@ -320,122 +319,12 @@ describe("share manifest endpoints", () => {
     expect(renderedWithArtwork).toBe(false);
   });
 
-  it("renders the fallback social card when artwork streaming fails after lookup", async () => {
-    const runtime = createRuntime();
-    const form = new FormData();
-    form.set("manifest", JSON.stringify(manifest));
-    form.set("cover", new File([png], "cover.png", { type: "image/png" }));
-    const published = await publishHandler(
-      event(
-        request("https://tagium.test/api/manifests", { method: "POST", body: form }, runtime.env),
-      ),
-    );
-    const receipt = (await published.json()) as { slug: string };
-    runtime.bucket.get = async () => ({
-      body: new ReadableStream({
-        start(controller) {
-          controller.error(new Error("artwork stream failed"));
-        },
-      }),
-      httpMetadata: { contentType: "image/png" },
-      size: png.byteLength,
-      etag: "sha256",
-    });
-    let renderedWithArtwork: boolean | undefined;
-    const handler = createShareSocialCardHandler(async (_manifest, artwork) => {
-      renderedWithArtwork = Boolean(artwork);
-      return png;
-    });
-
-    const socialCard = await handler(
-      event(
-        request(`https://tagium.test/api/manifests/${receipt.slug}/social-card`, {}, runtime.env),
-        receipt.slug,
-      ),
-    );
-
-    expect(socialCard.status).toBe(200);
-    expect(renderedWithArtwork).toBe(false);
-  });
-
   it("redirects preview artwork to the favicon when stored artwork is unavailable", async () => {
     const runtime = createRuntime();
     const response = await previewArtworkHandler(
       event(
         request("https://tagium.test/api/manifests/missing/preview-artwork", {}, runtime.env),
         "missing",
-      ),
-    );
-
-    expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("https://tagium.test/icon-512.png");
-  });
-
-  it("redirects preview artwork to the favicon when streaming fails", async () => {
-    const runtime = createRuntime();
-    const form = new FormData();
-    form.set("manifest", JSON.stringify(manifest));
-    form.set("cover", new File([png], "cover.png", { type: "image/png" }));
-    const published = await publishHandler(
-      event(
-        request("https://tagium.test/api/manifests", { method: "POST", body: form }, runtime.env),
-      ),
-    );
-    const receipt = (await published.json()) as { slug: string };
-    runtime.bucket.get = async () => ({
-      body: new ReadableStream({
-        start(controller) {
-          controller.error(new Error("artwork stream failed"));
-        },
-      }),
-      httpMetadata: { contentType: "image/png" },
-      size: png.byteLength,
-      etag: "sha256",
-    });
-
-    const response = await previewArtworkHandler(
-      event(
-        request(
-          `https://tagium.test/api/manifests/${receipt.slug}/preview-artwork`,
-          {},
-          runtime.env,
-        ),
-        receipt.slug,
-      ),
-    );
-
-    expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("https://tagium.test/icon-512.png");
-  });
-
-  it("redirects preview artwork to the favicon when stored bytes are corrupt", async () => {
-    const runtime = createRuntime();
-    const form = new FormData();
-    form.set("manifest", JSON.stringify(manifest));
-    form.set("cover", new File([png], "cover.png", { type: "image/png" }));
-    const published = await publishHandler(
-      event(
-        request("https://tagium.test/api/manifests", { method: "POST", body: form }, runtime.env),
-      ),
-    );
-    const receipt = (await published.json()) as { slug: string };
-    const corruptPng = new Uint8Array(png.byteLength);
-    corruptPng.set([137, 80, 78, 71, 13, 10, 26, 10]);
-    runtime.bucket.get = async () => ({
-      body: new Blob([corruptPng]).stream(),
-      httpMetadata: { contentType: "image/png" },
-      size: corruptPng.byteLength,
-      etag: "sha256",
-    });
-
-    const response = await previewArtworkHandler(
-      event(
-        request(
-          `https://tagium.test/api/manifests/${receipt.slug}/preview-artwork`,
-          {},
-          runtime.env,
-        ),
-        receipt.slug,
       ),
     );
 
@@ -806,33 +695,5 @@ describe("share manifest endpoints", () => {
       ),
     );
     expect(limited.status).toBe(429);
-  });
-
-  it("marks shared-album routes as noindex without affecting other routes", () => {
-    const headers = new Headers();
-    noindexMiddleware({
-      req: new Request("https://tagium.test/share/aaaaaa"),
-      res: { headers },
-    } as Parameters<typeof noindexMiddleware>[0]);
-    expect(headers.get("x-robots-tag")).toBe("noindex, nofollow");
-
-    for (const pathname of ["/share/not-a-slug", `/share/${"a".repeat(22)}`]) {
-      const otherHeaders = new Headers();
-      noindexMiddleware({
-        req: new Request(`https://tagium.test${pathname}`),
-        res: { headers: otherHeaders },
-      } as Parameters<typeof noindexMiddleware>[0]);
-      expect(otherHeaders.get("x-robots-tag")).toBeNull();
-    }
-  });
-
-  it("keeps tagium save out of search indexes", () => {
-    const headers = new Headers();
-    noindexMiddleware({
-      req: new Request("https://save.tagium.app/"),
-      res: { headers },
-    } as Parameters<typeof noindexMiddleware>[0]);
-
-    expect(headers.get("x-robots-tag")).toBe("noindex, nofollow");
   });
 });

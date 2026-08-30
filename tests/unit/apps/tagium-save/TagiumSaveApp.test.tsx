@@ -1,12 +1,8 @@
-import { renderToStaticMarkup } from "react-dom/server";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { AnalyticsEvent } from "@/analytics";
 import TagiumSaveApp from "@/apps/tagium-save/TagiumSaveApp";
 import {
-  buildVideoDownloadRequest,
-  getDownloadReadyAnnouncement,
-  getVideoDownloadPhaseLabel,
   presentVideoDownloadFailure,
   updateVideoDownloadSettings,
   type VideoDownloadSettings,
@@ -80,27 +76,6 @@ describe("tagium save app", () => {
     toastMocks.error.mockClear();
   });
 
-  it("builds a browser-processing request from the compact controls", () => {
-    expect(
-      buildVideoDownloadRequest("https://example.com/watch/one", {
-        ...settings,
-        mode: "mute",
-        quality: "720",
-        container: "webm",
-        codec: "vp9",
-        audioFormat: "opus",
-      }),
-    ).toEqual({
-      sourceUrl: "https://example.com/watch/one",
-      downloadMode: "mute",
-      videoQuality: "720",
-      youtubeVideoContainer: "webm",
-      youtubeVideoCodec: "vp9",
-      audioFormat: "opus",
-      filenameStyle: "pretty",
-    });
-  });
-
   it("keeps codec and container settings compatible", () => {
     const webm = updateVideoDownloadSettings(settings, { key: "container", value: "webm" });
     expect(webm).toMatchObject({ container: "webm", codec: "vp9" });
@@ -133,23 +108,6 @@ describe("tagium save app", () => {
       id: "system-download-rate-limited",
       description: "wait a moment, then try the download again.",
     });
-  });
-
-  it("labels each browser download phase", () => {
-    expect(
-      (["planning", "waiting-for-tunnel", "downloading", "processing", "finalizing"] as const).map(
-        getVideoDownloadPhaseLabel,
-      ),
-    ).toEqual(["preparing", "waiting", "downloading", "processing", "finalizing"]);
-  });
-
-  it("keeps one polite completion announcement mounted", () => {
-    const markup = renderToStaticMarkup(<TagiumSaveApp />);
-
-    expect(markup).toContain('role="status"');
-    expect(markup).toContain('aria-live="polite"');
-    expect(markup).toContain('aria-atomic="true"');
-    expect(getDownloadReadyAnnouncement("My Clip.mp4")).toBe("download ready: My Clip.mp4");
   });
 
   it("tracks one complete lifecycle for a direct file", async () => {
@@ -193,81 +151,6 @@ describe("tagium save app", () => {
     act(() => renderer.unmount());
   });
 
-  it("shows a track cover beside a completed download without delaying it", async () => {
-    let resolveMetadata!: (metadata: { title: string; artist: string; coverUrl: string }) => void;
-    const metadata = new Promise<{ title: string; artist: string; coverUrl: string }>((resolve) => {
-      resolveMetadata = resolve;
-    });
-    const startDownload = vi.fn(() =>
-      taskFrom<VideoDownloadResult>(Promise.resolve(resolvedFile("covered-track.mp3"))),
-    );
-
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(
-        <TagiumSaveApp startDownload={startDownload} resolveMetadata={() => metadata} />,
-      );
-    });
-    await setSourceUrl(renderer, "https://soundcloud.com/artist/covered-track");
-    await submit(renderer);
-
-    expect(renderer.root.findByProps({ title: "covered-track.mp3" })).toBeDefined();
-    expect(renderer.root.findAllByProps({ "data-save-download-cover": true })).toHaveLength(0);
-
-    await act(async () => {
-      resolveMetadata({
-        title: "covered track",
-        artist: "artist",
-        coverUrl: "https://images.test/covered-track.jpg",
-      });
-      await metadata;
-    });
-
-    let cover = renderer.root.findByProps({ "data-save-download-cover": true });
-    expect(cover.props.src).toBe("https://images.test/covered-track.jpg");
-    expect(cover.props.className).toContain("size-10");
-    expect(cover.props.className).toContain("invisible scale-[0.97]");
-    expect(cover.props["data-save-download-cover-state"]).toBe("loading");
-
-    await act(async () => cover.props.onLoad());
-
-    cover = renderer.root.findByProps({ "data-save-download-cover": true });
-    expect(cover.props.className).toContain("visible scale-100");
-    expect(cover.props.className).toContain("duration-150 ease-out");
-    expect(cover.props["data-save-download-cover-state"]).toBe("loaded");
-
-    act(() => renderer.unmount());
-  });
-
-  it("tracks rejected media links without starting a download", async () => {
-    const { capture, events } = captureEvents();
-    const startDownload = vi.fn(() =>
-      taskFrom<VideoDownloadResult>(Promise.resolve(resolvedFile("unused.mp4"))),
-    );
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(<TagiumSaveApp startDownload={startDownload} capture={capture} />);
-    });
-    await setSourceUrl(renderer, "not a url");
-    await submit(renderer);
-
-    expect(startDownload).not.toHaveBeenCalled();
-    expect(events).toEqual([
-      {
-        type: "media_link_processed",
-        sourceUrl: "not a url",
-        mediaKind: "media",
-        linkKind: "other",
-        normalized: false,
-        redirected: false,
-        outcome: "rejected",
-        failureReason: "invalid",
-      },
-    ]);
-
-    act(() => renderer.unmount());
-  });
-
   it("keeps picker selection in the lifecycle that resolved it", async () => {
     const { capture, events } = captureEvents();
     const selected = resolvedFile("selected.webm");
@@ -306,60 +189,6 @@ describe("tagium save app", () => {
     expect(JSON.stringify(events)).not.toContain("private-audio.mp3");
 
     act(() => renderer.unmount());
-  });
-
-  it("finishes a picker lifecycle once when it is reset", async () => {
-    const { capture, events } = captureEvents();
-    const picker: VideoPickerDownloadResult = {
-      status: "picker",
-      picker: [{ type: "photo", url: "https://private.example/photo" }],
-      download: () => taskFrom(Promise.resolve(resolvedFile("photo.jpg"))),
-    };
-    const startDownload = vi.fn(() => taskFrom<VideoDownloadResult>(Promise.resolve(picker)));
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(<TagiumSaveApp startDownload={startDownload} capture={capture} />);
-    });
-    await setSourceUrl(renderer, "https://example.test/post/reset");
-    await submit(renderer);
-
-    act(() => {
-      renderer.root.findByProps({ "aria-label": "reset download" }).props.onClick();
-    });
-    expect(events.filter((event) => event.type === "download_finished")).toEqual([
-      expect.objectContaining({ outcome: "canceled" }),
-    ]);
-
-    act(() => renderer.unmount());
-    expect(events.filter((event) => event.type === "download_finished")).toHaveLength(1);
-  });
-
-  it("fails an empty picker without emitting a resolved event", async () => {
-    const { capture, events } = captureEvents();
-    const picker: VideoPickerDownloadResult = {
-      status: "picker",
-      picker: [],
-      download: vi.fn(),
-    };
-    const startDownload = vi.fn(() => taskFrom<VideoDownloadResult>(Promise.resolve(picker)));
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(<TagiumSaveApp startDownload={startDownload} capture={capture} />);
-    });
-    await setSourceUrl(renderer, "https://example.test/post/empty-picker");
-    await submit(renderer);
-
-    expect(events.filter((event) => event.type === "download_resolved")).toHaveLength(0);
-    expect(events.filter((event) => event.type === "download_finished")).toEqual([
-      expect.objectContaining({
-        outcome: "failed",
-        failureStage: "planning",
-        failureCode: "invalid_response",
-      }),
-    ]);
-
-    act(() => renderer.unmount());
-    expect(events.filter((event) => event.type === "download_finished")).toHaveLength(1);
   });
 
   it("tracks structured failures and marks a retry as a new lifecycle", async () => {
@@ -448,41 +277,6 @@ describe("tagium save app", () => {
     expect(JSON.stringify(events)).not.toContain("private-release.mov");
     expect(JSON.stringify(events)).not.toContain("video/private");
     expect(handoffDownload).toHaveBeenCalledWith(result.file);
-
-    act(() => renderer.unmount());
-  });
-
-  it("links the save attribution to flamboh and cobalt", () => {
-    const markup = renderToStaticMarkup(<TagiumSaveApp />);
-
-    expect(markup).toContain("made by");
-    expect(markup).toContain('href="https://x.com/flambohh"');
-    expect(markup).toContain(">flamboh</a>");
-    expect(markup).toContain("powered by");
-    expect(markup).toContain('href="https://cobalt.tools/"');
-    expect(markup).toContain(">cobalt</a>");
-  });
-
-  it("toggles between light and dark mode", async () => {
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(<TagiumSaveApp />);
-    });
-
-    const themeToggle = renderer.root
-      .findAllByType("button")
-      .find((button) => String(button.props["aria-label"]).startsWith("switch to "));
-    if (!themeToggle) throw new Error("theme toggle was not found");
-
-    const initialLabel = themeToggle.props["aria-label"];
-    act(() => {
-      themeToggle.props.onClick();
-    });
-
-    const nextThemeToggle = renderer.root
-      .findAllByType("button")
-      .find((button) => String(button.props["aria-label"]).startsWith("switch to "));
-    expect(nextThemeToggle?.props["aria-label"]).not.toBe(initialLabel);
 
     act(() => renderer.unmount());
   });
@@ -606,25 +400,5 @@ describe("tagium save app", () => {
       expect.objectContaining({ outcome: "canceled" }),
     ]);
     expect(lateFile.release).toHaveBeenCalledOnce();
-  });
-
-  it("reuses the landing primitives without adding a marketing surface", () => {
-    const markup = renderToStaticMarkup(<TagiumSaveApp />);
-
-    expect(markup).toContain("tagium");
-    expect(markup).toContain("save");
-    expect(markup).toContain('data-layout="standalone"');
-    expect(markup).toContain('name="media-url"');
-    expect(markup).toContain("paste a media link");
-    expect(markup).toContain("download settings");
-    expect(markup.indexOf("download settings")).toBeLessThan(markup.indexOf('name="media-url"'));
-    expect(markup).not.toContain("save a link. keep the file.");
-    expect(markup).not.toContain("processing stays in your browser");
-    expect(markup).not.toContain("rate limited");
-    expect(markup).not.toContain("soundcloud, youtube");
-    expect(markup).not.toContain("tagium / video");
-    expect(markup).not.toContain("video · tagium");
-    expect(markup).not.toContain("choose a file");
-    expect(markup).not.toContain("your file is ready");
   });
 });

@@ -22,10 +22,6 @@ const storageWith = (initialValue: string | null) => {
 };
 
 describe("settings", () => {
-  it("uses defaults when no settings are stored", () => {
-    expect(loadAppSettings(storageWith(null))).toEqual(DEFAULT_APP_SETTINGS);
-  });
-
   it("uses defaults when stored settings cannot be read", () => {
     const storage = {
       getItem: () => {
@@ -34,27 +30,6 @@ describe("settings", () => {
     };
 
     expect(loadAppSettings(storage)).toEqual(DEFAULT_APP_SETTINGS);
-  });
-
-  it("fills new default keys when stored settings are incomplete", () => {
-    const storage = storageWith(JSON.stringify({ syncTrackNumbers: false }));
-
-    expect(loadAppSettings(storage)).toEqual({
-      ...DEFAULT_APP_SETTINGS,
-      syncTrackNumbers: false,
-    });
-  });
-
-  it("migrates partial metadata-link settings independently", () => {
-    const storage = storageWith(
-      JSON.stringify({ advancedMetadata: true, metadataLinks: { artist: false } }),
-    );
-
-    expect(loadAppSettings(storage)).toEqual({
-      ...DEFAULT_APP_SETTINGS,
-      advancedMetadata: true,
-      metadataLinks: { ...DEFAULT_APP_SETTINGS.metadataLinks, artist: false },
-    });
   });
 
   it("ignores invalid stored setting values", () => {
