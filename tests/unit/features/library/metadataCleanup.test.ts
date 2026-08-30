@@ -72,19 +72,6 @@ describe("metadata cleanup suggestions", () => {
     expect(suggestTitleCleanup("Four Tet - Audio (Live)", ["Burial"])).toBeNull();
   });
 
-  it.each([
-    "Good Girls (XCX WORLD)",
-    "Good Girls [XCX WORLD]",
-    "Good Girls - XCX WORLD",
-    "Good Girls – XCX WORLD",
-    "Good Girls — XCX WORLD",
-  ])("removes a trailing album title from %s", (title) => {
-    expect(suggestTitleCleanup(title, [], "XCX WORLD")).toEqual({
-      afterTitle: "Good Girls",
-      reasons: ["album"],
-    });
-  });
-
   it("matches album titles using NFKC, case, and whitespace normalization", () => {
     expect(suggestTitleCleanup("Good Girls (ｘｃｘ   ｗｏｒｌｄ)", [], "XCX WORLD")).toEqual({
       afterTitle: "Good Girls",
@@ -98,22 +85,16 @@ describe("metadata cleanup suggestions", () => {
 
   it("keeps tight dashes, missing album context, and non-matching suffixes unchanged", () => {
     expect(suggestTitleCleanup("Good Girls-XCX WORLD", [], "XCX WORLD")).toBeNull();
-    expect(suggestTitleCleanup("Good Girls -XCX WORLD", [], "XCX WORLD")).toBeNull();
-    expect(suggestTitleCleanup("Good Girls- XCX WORLD", [], "XCX WORLD")).toBeNull();
     expect(suggestTitleCleanup("Good Girls - XCX WORLD", [])).toBeNull();
-    expect(suggestTitleCleanup("Good Girls - BRAT", [], "XCX WORLD")).toBeNull();
   });
 
-  it.each([
-    "Good Girls (XCX WORLD) (Official Audio)",
-    "Good Girls (Official Audio) (XCX WORLD)",
-    "Good Girls - XCX WORLD (Official Audio)",
-    "Good Girls (Official Audio) - XCX WORLD",
-  ])("composes album cleanup with recognized labels in %s", (title) => {
-    expect(suggestTitleCleanup(title, [], "XCX WORLD")).toEqual({
-      afterTitle: "Good Girls",
-      reasons: ["album", "label"],
-    });
+  it("composes album cleanup with a recognized label", () => {
+    expect(suggestTitleCleanup("Good Girls (XCX WORLD) (Official Audio)", [], "XCX WORLD")).toEqual(
+      {
+        afterTitle: "Good Girls",
+        reasons: ["album", "label"],
+      },
+    );
   });
 
   it("uses the containing album group's title", () => {

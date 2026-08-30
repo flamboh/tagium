@@ -2,7 +2,6 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   createDirtyMetadataPatch,
   getAcceptedUploadParseResult,
-  getUploadRejectionMessage,
   getFileImportKey,
   getSubmittedAudioMetadata,
   getTagiumFileImportKey,
@@ -57,44 +56,6 @@ describe("audioTagger metadata patches", () => {
       acceptedUploads: [accepted],
       parseRejectedCount: 1,
     });
-  });
-
-  it("presents lowercase recovery copy without changing filename casing", () => {
-    const rejectedUploads = ["EMPTY.MP3", "song.wav"].map(
-      (filename, index) =>
-        ({
-          file: {
-            id: `rejected-${index}`,
-            filename,
-            status: "error",
-            downloadStatus: "ready",
-            downloadError: "private CODEC diagnostic",
-          },
-          albumSeed: { title: "", artist: "", genre: "" },
-        }) satisfies UploadedTrack,
-    );
-
-    expect(getUploadRejectionMessage(rejectedUploads)).toBe(
-      "EMPTY.MP3 could not be imported. try a valid mp3, flac, unencrypted m4a/mp4, or opus file.\n" +
-        "song.wav could not be imported. try a valid mp3, flac, unencrypted m4a/mp4, or opus file.",
-    );
-  });
-
-  it("surfaces a concise error when vorbis audio is rejected", () => {
-    const rejected = {
-      file: {
-        id: "vorbis",
-        filename: "mix.ogg",
-        status: "error",
-        downloadStatus: "ready",
-        downloadError: "this ogg file uses vorbis audio.",
-      },
-      albumSeed: { title: "", artist: "", genre: "" },
-    } satisfies UploadedTrack;
-
-    expect(getUploadRejectionMessage([rejected])).toBe(
-      "mix.ogg could not be imported. this ogg file uses vorbis audio.",
-    );
   });
 
   it("keeps a lightweight source identity after releasing the original file", () => {

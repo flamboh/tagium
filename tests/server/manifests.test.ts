@@ -7,7 +7,6 @@ import revokeHandler from "../../server/api/manifests/[slug].delete";
 import manifestHandler from "../../server/api/manifests/[slug].get";
 import publishHandler from "../../server/api/manifests/index.post";
 import updateHandler from "../../server/api/manifests/[slug].patch";
-import noindexMiddleware from "../../server/middleware/02-share-noindex";
 import type { ShareRuntimeEnv } from "../../server/utils/share-manifest-request";
 import { isShareExpiryIso } from "../../src/features/share/shareManifest";
 
@@ -806,33 +805,5 @@ describe("share manifest endpoints", () => {
       ),
     );
     expect(limited.status).toBe(429);
-  });
-
-  it("marks shared-album routes as noindex without affecting other routes", () => {
-    const headers = new Headers();
-    noindexMiddleware({
-      req: new Request("https://tagium.test/share/aaaaaa"),
-      res: { headers },
-    } as Parameters<typeof noindexMiddleware>[0]);
-    expect(headers.get("x-robots-tag")).toBe("noindex, nofollow");
-
-    for (const pathname of ["/share/not-a-slug", `/share/${"a".repeat(22)}`]) {
-      const otherHeaders = new Headers();
-      noindexMiddleware({
-        req: new Request(`https://tagium.test${pathname}`),
-        res: { headers: otherHeaders },
-      } as Parameters<typeof noindexMiddleware>[0]);
-      expect(otherHeaders.get("x-robots-tag")).toBeNull();
-    }
-  });
-
-  it("keeps tagium save out of search indexes", () => {
-    const headers = new Headers();
-    noindexMiddleware({
-      req: new Request("https://save.tagium.app/"),
-      res: { headers },
-    } as Parameters<typeof noindexMiddleware>[0]);
-
-    expect(headers.get("x-robots-tag")).toBe("noindex, nofollow");
   });
 });

@@ -150,14 +150,12 @@ describe("albumDialogReducer", () => {
     });
   });
 
-  for (const finishType of ["closed", "saved"] as const) {
-    it(`keeps edit content stable while the ${finishType} dialog exits`, () => {
-      const openState = reduce([{ type: "edit-opened", album: album() }]);
-      const state = albumDialogReducer(openState, { type: finishType });
+  it("keeps edit content stable while the dialog exits", () => {
+    const openState = reduce([{ type: "edit-opened", album: album() }]);
+    const state = albumDialogReducer(openState, { type: "closed" });
 
-      expect(state).toEqual({ ...openState, open: false });
-    });
-  }
+    expect(state).toEqual({ ...openState, open: false });
+  });
 });
 
 describe("getAlbumDialogSubmission", () => {

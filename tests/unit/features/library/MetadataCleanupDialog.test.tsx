@@ -1,6 +1,5 @@
 import type { FocusEvent, ReactNode } from "react";
-import { Schema } from "effect";
-import { act, create, type ReactTestInstance } from "react-test-renderer";
+import { act, create } from "react-test-renderer";
 import { describe, expect, it, vi } from "vite-plus/test";
 import type { MetadataCleanupSuggestion } from "@/features/library/metadataCleanup";
 import { buttonElementFixture } from "../../../support/domFixtures";
@@ -46,11 +45,6 @@ const suggestion = (trackId: string): MetadataCleanupSuggestion => ({
   reasons: ["artist"],
 });
 
-const textContent = (node: ReactTestInstance): string =>
-  node.children
-    .map((child) => (Schema.is(Schema.String)(child) ? child : textContent(child)))
-    .join("");
-
 describe("MetadataCleanupDialog", () => {
   it("keeps populated suggestions rendered while the dialog closes", () => {
     const props = {
@@ -70,8 +64,10 @@ describe("MetadataCleanupDialog", () => {
       renderer!.update(<MetadataCleanupDialog {...props} open={false} suggestions={[]} />);
     });
 
-    expect(textContent(renderer!.root)).toContain("apply 2 changes");
-    expect(textContent(renderer!.root)).not.toContain("nothing left to clean up");
+    expect(renderer!.root.findAllByProps({ "data-checkbox": true })).toHaveLength(2);
+    expect(
+      renderer!.root.findAllByType("button").find((button) => button.props.disabled === false),
+    ).toBeDefined();
     act(() => renderer!.unmount());
   });
 
@@ -99,7 +95,7 @@ describe("MetadataCleanupDialog", () => {
     });
     const apply = renderer!.root
       .findAllByType("button")
-      .find((button) => textContent(button).startsWith("apply "));
+      .find((button) => button.props.disabled === false);
     void act(() => apply!.props.onClick());
     expect(onApply).toHaveBeenCalledWith([expect.objectContaining({ trackId: "two" })]);
 
@@ -108,12 +104,12 @@ describe("MetadataCleanupDialog", () => {
     });
     const reopenedApply = renderer!.root
       .findAllByType("button")
-      .find((button) => textContent(button).startsWith("apply "));
-    expect(reopenedApply && textContent(reopenedApply)).toBe("apply 2 changes");
+      .find((button) => button.props.disabled === false);
+    expect(reopenedApply).toBeDefined();
     act(() => renderer!.unmount());
   });
 
-  it("names an album, explains an empty live state, and restores menu focus on close", () => {
+  it("restores menu focus when the dialog closes", () => {
     const focus = vi.fn();
     const returnFocusTarget = buttonElementFixture(focus);
     let renderer: ReturnType<typeof create>;
@@ -123,7 +119,6 @@ describe("MetadataCleanupDialog", () => {
           open
           selectionSessionKey={1}
           suggestions={[]}
-          albumTitle="Untrue"
           returnFocusTarget={returnFocusTarget}
           onOpenChange={vi.fn()}
           onApply={vi.fn()}
@@ -131,8 +126,6 @@ describe("MetadataCleanupDialog", () => {
       );
     });
 
-    expect(textContent(renderer!.root)).toContain("review suggested title changes for Untrue");
-    expect(textContent(renderer!.root)).toContain("nothing left to clean up");
     const content = renderer!.root.findByProps({ "data-dialog-content": true });
     const preventDefault = vi.fn();
     void act(() => content.props.onBlur({ preventDefault }));

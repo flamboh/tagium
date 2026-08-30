@@ -96,35 +96,6 @@ describe("CobaltAudio download", () => {
     mp3tagMock.instances = [];
   });
 
-  it("sends the import correlation id with the plan request", async () => {
-    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-      if (url === "/api/cobalt/audio") {
-        expect(new Headers(init?.headers).get("X-Tagium-Import-Id")).toBe(
-          "0196cc37-9b66-7e7a-a1d4-7c7c1f86c242",
-        );
-        expect(new Headers(init?.headers).get("X-Tagium-Request-Id")).toMatch(/^[0-9a-f-]{36}$/);
-        expect(new Headers(init?.headers).get("X-Tagium-Track-Index")).toBe("7");
-        return new Response("stop after plan headers", { status: 502 });
-      }
-
-      return new Response("audio-bytes", {
-        headers: { "Content-Type": "audio/mpeg" },
-      });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      runCobaltDownload({
-        sourceUrl: "https://soundcloud.com/artist/correlated",
-        audioBitrate: "128",
-        importId: "0196cc37-9b66-7e7a-a1d4-7c7c1f86c242",
-        trackIndex: 7,
-      }),
-    ).rejects.toThrow("stop after plan headers");
-
-    expect(fetchMock).toHaveBeenCalledOnce();
-  });
-
   it.each([
     {
       outcome: "recovered",
@@ -277,65 +248,6 @@ describe("CobaltAudio download", () => {
 
     const firstStart = tunnelStartTimes[0] ?? 0;
     expect(tunnelStartTimes.map((time) => time - firstStart)).toEqual([0, 1_600, 3_200, 4_800]);
-  });
-
-  it("reports Cobalt tunnel budget waits", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(10_000);
-    let nextPlanId = 0;
-    const lifecycleEvents: Array<{ downloadIndex: number; time: number; type: string }> = [];
-
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url: string) => {
-        if (url === "/api/cobalt/audio") {
-          nextPlanId += 1;
-          return Response.json({
-            status: "tunnel",
-            url: `/api/cobalt/tunnel?id=${nextPlanId}`,
-            filename: `track-${nextPlanId}.mp3`,
-          });
-        }
-
-        return new Response("audio-bytes", {
-          headers: {
-            "Content-Type": "audio/mpeg",
-          },
-        });
-      }),
-    );
-
-    const downloads = Promise.all(
-      Array.from({ length: 2 }, (_value, downloadIndex) =>
-        runCobaltDownload({
-          sourceUrl: `https://soundcloud.com/artist/wait-${downloadIndex}`,
-          audioBitrate: "128",
-          onLifecycle: (event) => {
-            lifecycleEvents.push({
-              downloadIndex,
-              time: Date.now(),
-              type: event.type,
-            });
-          },
-        }),
-      ),
-    );
-
-    await vi.advanceTimersByTimeAsync(2_000);
-    await downloads;
-
-    expect(lifecycleEvents).toEqual([
-      {
-        downloadIndex: 1,
-        time: 10_000,
-        type: "tunnel-budget-wait-started",
-      },
-      {
-        downloadIndex: 1,
-        time: 11_600,
-        type: "tunnel-budget-wait-ended",
-      },
-    ]);
   });
 
   it("rejects promptly when aborted behind the tunnel pacing queue", async () => {

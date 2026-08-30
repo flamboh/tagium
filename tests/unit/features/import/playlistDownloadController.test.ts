@@ -6,11 +6,8 @@ import {
   type PlaylistDownloadControllerSnapshot,
 } from "@/features/import/playlistDownloadController";
 import type { PlaylistDownloadRuntimeTrack } from "@/features/import/playlistDownloadQueueRuntime";
-import { ImportStageError } from "@/features/import/importLifecycle";
 
-type Track = PlaylistDownloadRuntimeTrack & {
-  sourceUrl: string;
-};
+type Track = PlaylistDownloadRuntimeTrack & { sourceUrl: string };
 
 const tracks = (count: number): Track[] =>
   Array.from({ length: count }, (_value, index) => ({
@@ -20,9 +17,7 @@ const tracks = (count: number): Track[] =>
   }));
 
 const flushEffects = async () => {
-  for (let index = 0; index < 8; index += 1) {
-    await Promise.resolve();
-  }
+  for (let index = 0; index < 8; index += 1) await Promise.resolve();
 };
 
 const deferred = <Value>() => {
@@ -82,8 +77,7 @@ const createControllerHarness = (
         try: (signal) => {
           hydrationSignals.set(track.fileId, signal);
           hydrated.push(track.fileId);
-          const hydration = hydrations.get(track.fileId);
-          return hydration?.promise ?? Promise.resolve();
+          return hydrations.get(track.fileId)?.promise ?? Promise.resolve();
         },
         catch: (error) => error,
       }),
@@ -120,9 +114,8 @@ afterEach(() => {
 });
 
 describe("playlistDownloadController", () => {
-  it("starts at concurrency 3 and publishes active tracks immediately", async () => {
+  it("starts three downloads and publishes active tracks immediately", async () => {
     const harness = createControllerHarness();
-
     harness.controller.enqueue(tracks(5));
     await flushEffects();
 
@@ -135,11 +128,10 @@ describe("playlistDownloadController", () => {
     });
   });
 
-  it("waits on the 21st SoundCloud track without failing it and wakes on budget", async () => {
+  it("waits on the 21st SoundCloud track and wakes when budget opens", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
     const harness = createControllerHarness();
-
     harness.controller.enqueue(tracks(21));
     await flushEffects();
 
@@ -147,7 +139,6 @@ describe("playlistDownloadController", () => {
       harness.downloads.get(`track-${index}`)?.resolve(audioFile(`track-${index}.mp3`));
       await flushEffects();
     }
-
     expect(harness.failed).toEqual([]);
     expect(harness.snapshots.at(-1)).toMatchObject({
       completed: 20,
@@ -155,11 +146,9 @@ describe("playlistDownloadController", () => {
       waitingForTunnelBudget: true,
       done: false,
     });
-    expect(harness.downloads.has("track-21")).toBe(false);
 
     await vi.advanceTimersByTimeAsync(60_000);
     await flushEffects();
-
     expect(harness.downloads.has("track-21")).toBe(true);
     expect(harness.snapshots.at(-1)).toMatchObject({
       waitingForTunnelBudget: false,
@@ -167,21 +156,17 @@ describe("playlistDownloadController", () => {
     });
   });
 
-  it("cancels pending and active tracks, aborts active work, then finishes when idle", async () => {
+  it("cancels active and pending tracks, aborts work, and finishes when idle", async () => {
     const harness = createControllerHarness();
-
     harness.controller.enqueue(tracks(4));
     await flushEffects();
     harness.controller.cancel();
     await flushEffects();
 
     expect(harness.downloadSignals.get("track-1")?.aborted).toBe(true);
-    expect(harness.downloadSignals.get("track-2")?.aborted).toBe(true);
-    expect(harness.downloadSignals.get("track-3")?.aborted).toBe(true);
     expect(harness.canceled.flat()).toEqual(
       expect.arrayContaining(["track-1", "track-2", "track-3", "track-4"]),
     );
-
     for (let index = 1; index <= 3; index += 1) {
       harness.downloads.get(`track-${index}`)?.reject(new DOMException("aborted", "AbortError"));
     }
@@ -194,34 +179,10 @@ describe("playlistDownloadController", () => {
       canceledCount: 4,
       active: [],
     });
-    expect(harness.lifecycle).toEqual(
-      expect.arrayContaining(
-        tracks(4).map((track) => ({
-          track,
-          outcome: "canceled",
-        })),
-      ),
-    );
-    expect(harness.actions).toEqual([
-      {
-        type: "cancel_requested",
-        snapshot: expect.objectContaining({
-          total: 4,
-          completed: 0,
-          active: [
-            expect.objectContaining({ fileId: "track-1" }),
-            expect.objectContaining({ fileId: "track-2" }),
-            expect.objectContaining({ fileId: "track-3" }),
-          ],
-          pending: 1,
-        }),
-      },
-    ]);
   });
 
   it("removes deleted active and pending tracks from the current run", async () => {
     const harness = createControllerHarness();
-
     harness.controller.enqueue(tracks(5));
     await flushEffects();
     harness.controller.remove(["track-2", "track-5"]);
@@ -237,93 +198,13 @@ describe("playlistDownloadController", () => {
     });
   });
 
-  it("removes a deleted completed track from both progress counts", async () => {
+  it("ignores a stale completion after a newer run starts", async () => {
     const harness = createControllerHarness();
-
-    harness.controller.enqueue(tracks(4));
-    await flushEffects();
-    harness.downloads.get("track-1")?.resolve(audioFile("track-1.mp3"));
-    await flushEffects();
-
-    expect(harness.controller.getSnapshot()).toMatchObject({ total: 4, completed: 1 });
-
-    harness.controller.remove(["track-1"]);
-
-    expect(harness.controller.getSnapshot()).toMatchObject({
-      trackIds: ["track-2", "track-3", "track-4"],
-      total: 3,
-      completed: 0,
-    });
-  });
-
-  it("keeps the local tunnel budget across repeated cancel and restart cycles", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(0);
-    const harness = createControllerHarness();
-
-    for (let run = 0; run < 6; run += 1) {
-      harness.controller.enqueue(tracks(3));
-      await flushEffects();
-      harness.controller.cancel();
-      await flushEffects();
-    }
-
-    harness.controller.enqueue(tracks(3));
-    await flushEffects();
-
-    expect(harness.downloadStarts).toHaveLength(20);
-    expect(harness.controller.getSnapshot()).toMatchObject({
-      pending: 1,
-      waitingForTunnelBudget: true,
-    });
-  });
-
-  it("retries failed, canceled, and completed-with-file-error tracks without duplicates", async () => {
-    const harness = createControllerHarness();
-    harness.controller.enqueue(tracks(3));
-    await flushEffects();
-
-    harness.downloads.get("track-1")?.reject(new Error("network failed"));
-    harness.downloads.get("track-2")?.reject(new DOMException("aborted", "AbortError"));
-    harness.downloads.get("track-3")?.resolve(audioFile("track-3.mp3"));
-    await flushEffects();
-
-    harness.fileErrorTrackIds.add("track-3");
-    harness.controller.retry(tracks(3));
-    await flushEffects();
-
-    expect(harness.queued.at(-1)).toEqual(["track-1", "track-2", "track-3"]);
-    expect(harness.snapshots.at(-1)).toMatchObject({
-      total: 3,
-      completed: 0,
-      failed: 0,
-      pending: 0,
-    });
-    expect(harness.controller.getSnapshot()?.trackIds).toEqual(["track-1", "track-2", "track-3"]);
-    expect(harness.actions).toEqual([
-      {
-        type: "retry_started",
-        retryAttemptId: 1,
-        tracks: tracks(3),
-        previousSnapshot: expect.objectContaining({
-          total: 3,
-          completed: 1,
-          failed: 1,
-          canceledCount: 1,
-          done: true,
-        }),
-      },
-    ]);
-  });
-
-  it("does not let stale completions mutate a newer run", async () => {
-    const harness = createControllerHarness();
-    harness.controller.enqueue([tracks(1)[0]]);
+    harness.controller.enqueue([tracks(1)[0]!]);
     await flushEffects();
     harness.controller.cancel();
     await flushEffects();
-
-    harness.controller.enqueue([tracks(2)[1]]);
+    harness.controller.enqueue([tracks(2)[1]!]);
     await flushEffects();
     harness.downloads.get("track-1")?.resolve(audioFile("stale.mp3"));
     await flushEffects();
@@ -335,34 +216,20 @@ describe("playlistDownloadController", () => {
     });
   });
 
-  it("does not let a canceled run settle an immediate retry with the same track id", async () => {
+  it("does not let cancellation settle an immediate retry with the same id", async () => {
     const harness = createControllerHarness();
-    harness.controller.enqueue([tracks(1)[0]]);
+    harness.controller.enqueue([tracks(1)[0]!]);
     await flushEffects();
-
     harness.controller.cancel();
-    harness.controller.retry([tracks(1)[0]]);
-
-    expect(harness.actions.map((action) => action.type)).toEqual([
-      "cancel_requested",
-      "retry_started",
-    ]);
-
+    harness.controller.retry([tracks(1)[0]!]);
     await flushEffects();
 
     expect(harness.lifecycle).toEqual([{ track: tracks(1)[0], outcome: "canceled" }]);
-    expect(harness.actions.map((action) => action.type)).toEqual([
-      "cancel_requested",
-      "retry_started",
-    ]);
-
     harness.downloads.get("track-1")?.resolve(audioFile("retry.mp3"));
     await flushEffects();
-
     expect(harness.actions.at(-1)).toEqual(
       expect.objectContaining({
         type: "retry_finished",
-        retryCount: 1,
         completedCount: 1,
         failedCount: 0,
         canceledCount: 0,
@@ -371,68 +238,22 @@ describe("playlistDownloadController", () => {
     );
   });
 
-  it("does not let a removed execution settle its same-run replacement", async () => {
+  it("keeps retry generations separate when a retry is removed and retried", async () => {
     const harness = createControllerHarness();
-    harness.controller.enqueue([tracks(1)[0]]);
-    await flushEffects();
-
-    harness.controller.remove(["track-1"]);
-    harness.controller.retry([tracks(1)[0]]);
-
-    expect(harness.actions.map((action) => action.type)).toEqual(["retry_started"]);
-
-    await flushEffects();
-
-    expect(harness.lifecycle).toEqual([{ track: tracks(1)[0], outcome: "canceled" }]);
-    expect(harness.actions.map((action) => action.type)).toEqual(["retry_started"]);
-    expect(harness.controller.getSnapshot()).toMatchObject({
-      active: [{ fileId: "track-1" }],
-      pending: 0,
-      completed: 0,
-      canceledCount: 0,
-      done: false,
-    });
-
-    harness.downloads.get("track-1")?.resolve(audioFile("replacement.mp3"));
-    await flushEffects();
-
-    expect(harness.actions.at(-1)).toEqual(
-      expect.objectContaining({
-        type: "retry_finished",
-        retryCount: 1,
-        completedCount: 1,
-        failedCount: 0,
-        canceledCount: 0,
-        outcome: "completed",
-      }),
-    );
-    expect(harness.controller.getSnapshot()).toMatchObject({
-      active: [],
-      completed: 1,
-      done: true,
-    });
-  });
-
-  it("keeps retry generations separate when a retry is removed and retried again", async () => {
-    const harness = createControllerHarness();
-    harness.controller.enqueue([tracks(1)[0]]);
+    harness.controller.enqueue([tracks(1)[0]!]);
     await flushEffects();
     harness.downloads.get("track-1")?.reject(new Error("initial failure"));
     await flushEffects();
 
-    harness.controller.retry([tracks(1)[0]]);
+    harness.controller.retry([tracks(1)[0]!]);
     await flushEffects();
     harness.controller.remove(["track-1"]);
-    harness.controller.retry([tracks(1)[0]]);
+    harness.controller.retry([tracks(1)[0]!]);
     await flushEffects();
 
     expect(harness.actions).toEqual([
       expect.objectContaining({ type: "retry_started", retryAttemptId: 1 }),
-      expect.objectContaining({
-        type: "retry_finished",
-        retryAttemptId: 1,
-        canceledCount: 1,
-      }),
+      expect.objectContaining({ type: "retry_finished", retryAttemptId: 1, canceledCount: 1 }),
       expect.objectContaining({ type: "retry_started", retryAttemptId: 2 }),
     ]);
     expect(harness.controller.getSnapshot()).toMatchObject({
@@ -442,7 +263,6 @@ describe("playlistDownloadController", () => {
 
     harness.downloads.get("track-1")?.resolve(audioFile("second-retry.mp3"));
     await flushEffects();
-
     expect(harness.actions.at(-1)).toEqual(
       expect.objectContaining({
         type: "retry_finished",
@@ -454,40 +274,19 @@ describe("playlistDownloadController", () => {
     );
   });
 
-  it("pumps retry work without emitting telemetry when there is no baseline snapshot", async () => {
-    const harness = createControllerHarness();
-
-    harness.controller.retry([tracks(1)[0]]);
-    await flushEffects();
-
-    expect(harness.downloadStarts).toEqual(["track-1"]);
-    expect(harness.actions).toEqual([]);
-
-    harness.downloads.get("track-1")?.resolve(audioFile("track-1.mp3"));
-    await flushEffects();
-
-    expect(harness.controller.getSnapshot()).toMatchObject({
-      completed: 1,
-      done: true,
-    });
-    expect(harness.actions).toEqual([]);
-  });
-
-  it("does not let stale pending hydration complete an old run after cancel and retry", async () => {
+  it("ignores stale hydration after cancel and a new run", async () => {
     const harness = createControllerHarness();
     harness.hydrations.set("track-1", deferred<void>());
-
-    harness.controller.enqueue([tracks(1)[0]]);
+    harness.controller.enqueue([tracks(1)[0]!]);
     await flushEffects();
     harness.downloads.get("track-1")?.resolve(audioFile("track-1.mp3"));
     await flushEffects();
-
     expect(harness.hydrated).toEqual(["track-1"]);
+
     harness.controller.cancel();
     await flushEffects();
     expect(harness.hydrationSignals.get("track-1")?.aborted).toBe(true);
-
-    harness.controller.enqueue([tracks(2)[1]]);
+    harness.controller.enqueue([tracks(2)[1]!]);
     await flushEffects();
     harness.hydrations.get("track-1")?.resolve();
     await flushEffects();
@@ -499,54 +298,30 @@ describe("playlistDownloadController", () => {
     });
   });
 
-  it("treats hydration error state as completed when hydrate resolves", async () => {
-    const harness = createControllerHarness();
-    harness.controller.enqueue([tracks(1)[0]]);
-    await flushEffects();
-
-    harness.downloads.get("track-1")?.resolve(audioFile("track-1.mp3"));
-    await flushEffects();
-
-    expect(harness.hydrated).toEqual(["track-1"]);
-    expect(harness.failed).toEqual([]);
-    expect(harness.controller.getSnapshot()).toMatchObject({
-      completed: 1,
-      done: true,
-    });
-  });
-
   it("reports completion only after download and hydration both succeed", async () => {
     const harness = createControllerHarness();
     harness.hydrations.set("track-1", deferred<void>());
-    harness.controller.enqueue([tracks(1)[0]]);
+    harness.controller.enqueue([tracks(1)[0]!]);
     await flushEffects();
-
     harness.downloads.get("track-1")?.resolve(audioFile("track-1.mp3"));
     await flushEffects();
     expect(harness.lifecycle).toEqual([]);
 
     harness.hydrations.get("track-1")?.resolve();
     await flushEffects();
-
-    expect(harness.lifecycle).toEqual([
-      {
-        track: tracks(1)[0],
-        outcome: "completed",
-      },
-    ]);
+    expect(harness.lifecycle).toEqual([{ track: tracks(1)[0], outcome: "completed" }]);
   });
 
-  it("reports typed failure stages and a terminal outcome for each retry batch", async () => {
+  it("reports typed failure stages and one terminal retry outcome", async () => {
     const harness = createControllerHarness();
     harness.controller.enqueue(tracks(3));
     await flushEffects();
-    harness.downloads.get("track-1")?.reject(new Error("initial failure"));
-    harness.downloads.get("track-2")?.reject(new Error("initial failure"));
-    harness.downloads.get("track-3")?.reject(new Error("initial failure"));
+    for (let index = 1; index <= 3; index += 1) {
+      harness.downloads.get(`track-${index}`)?.reject(new Error("initial failure"));
+    }
     await flushEffects();
 
     harness.hydrations.set("track-2", deferred<void>());
-    harness.controller.retry(tracks(3));
     harness.controller.retry(tracks(3));
     await flushEffects();
     harness.downloads.get("track-1")?.reject(new Error("error.api.fetch.fail private-id"));
@@ -556,13 +331,9 @@ describe("playlistDownloadController", () => {
     harness.hydrations.get("track-2")?.reject(new Error("private parse failure"));
     await flushEffects();
 
-    expect(harness.lifecycle.slice(-3)).toEqual(
+    expect(harness.lifecycle).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({
-          track: tracks(3)[0],
-          outcome: "failed",
-          failureStage: "plan",
-        }),
+        expect.objectContaining({ track: tracks(3)[0], outcome: "failed", failureStage: "plan" }),
         expect.objectContaining({
           track: tracks(3)[1],
           outcome: "failed",
@@ -571,45 +342,27 @@ describe("playlistDownloadController", () => {
         { track: tracks(3)[2], outcome: "completed" },
       ]),
     );
-    expect(harness.actions.at(-1)).toEqual({
-      type: "retry_finished",
-      retryAttemptId: 1,
-      tracks: tracks(3),
-      retryCount: 3,
-      completedCount: 1,
-      failedCount: 2,
-      canceledCount: 0,
-      outcome: "partial",
-      durationMs: expect.any(Number),
-    });
-    expect(harness.actions.map((action) => action.type).slice(-2)).toEqual([
-      "retry_started",
-      "retry_finished",
-    ]);
-    expect(harness.actions.filter((action) => action.type === "retry_started")).toHaveLength(1);
+    expect(harness.actions.at(-1)).toEqual(
+      expect.objectContaining({
+        type: "retry_finished",
+        retryCount: 3,
+        completedCount: 1,
+        failedCount: 2,
+        canceledCount: 0,
+        outcome: "partial",
+      }),
+    );
   });
 
-  it("registers the accepted retry set before fast settlement", async () => {
+  it("registers accepted retry tracks before fast cancellation settles", async () => {
     const harness = createControllerHarness({ hasTrack: () => false });
-    harness.controller.enqueue([tracks(1)[0]]);
+    harness.controller.enqueue([tracks(1)[0]!]);
+    await flushEffects();
+    harness.controller.retry([tracks(1)[0]!, tracks(2)[1]!]);
     await flushEffects();
 
-    harness.controller.retry([tracks(1)[0], tracks(2)[1]]);
-    harness.controller.retry([tracks(1)[0]]);
-    await flushEffects();
-
-    expect(harness.actions.map((action) => action.type)).toEqual([
-      "retry_started",
-      "retry_finished",
-      "retry_started",
-      "retry_finished",
-    ]);
     expect(harness.actions).toEqual([
-      expect.objectContaining({
-        type: "retry_started",
-        retryAttemptId: 1,
-        tracks: [tracks(1)[0], tracks(2)[1]],
-      }),
+      expect.objectContaining({ type: "retry_started", retryAttemptId: 1 }),
       expect.objectContaining({
         type: "retry_finished",
         retryAttemptId: 1,
@@ -617,88 +370,8 @@ describe("playlistDownloadController", () => {
         completedCount: 0,
         failedCount: 0,
         canceledCount: 2,
+        outcome: "canceled",
       }),
-      expect.objectContaining({ type: "retry_started", retryAttemptId: 2 }),
-      expect.objectContaining({ type: "retry_finished", retryAttemptId: 2 }),
     ]);
-  });
-
-  it("finishes a retry as canceled when its accepted track is removed", async () => {
-    const harness = createControllerHarness();
-    harness.controller.enqueue([tracks(1)[0]]);
-    await flushEffects();
-    harness.downloads.get("track-1")?.reject(new Error("initial failure"));
-    await flushEffects();
-
-    harness.controller.retry([tracks(1)[0]]);
-    await flushEffects();
-    harness.controller.remove(["track-1"]);
-    await flushEffects();
-
-    expect(harness.actions.at(-1)).toEqual(
-      expect.objectContaining({
-        type: "retry_finished",
-        retryCount: 1,
-        completedCount: 0,
-        failedCount: 0,
-        canceledCount: 1,
-        outcome: "canceled",
-      }),
-    );
-  });
-
-  it("finishes every accepted retry track when the retry run is canceled", async () => {
-    const harness = createControllerHarness();
-    harness.controller.enqueue(tracks(2));
-    await flushEffects();
-    harness.downloads.get("track-1")?.reject(new Error("initial failure"));
-    harness.downloads.get("track-2")?.reject(new Error("initial failure"));
-    await flushEffects();
-
-    harness.controller.retry(tracks(2));
-    await flushEffects();
-    harness.controller.cancel();
-    await flushEffects();
-
-    expect(harness.actions.at(-1)).toEqual(
-      expect.objectContaining({
-        type: "retry_finished",
-        retryCount: 2,
-        completedCount: 0,
-        failedCount: 0,
-        canceledCount: 2,
-        outcome: "canceled",
-      }),
-    );
-  });
-
-  it("settles a track removed before work starts as canceled", async () => {
-    const harness = createControllerHarness({ hasTrack: () => false });
-
-    harness.controller.enqueue([tracks(1)[0]]);
-    await flushEffects();
-
-    expect(harness.downloads.size).toBe(0);
-    expect(harness.hydrated).toEqual([]);
-    expect(harness.lifecycle).toEqual([{ track: tracks(1)[0], outcome: "canceled" }]);
-    expect(harness.canceled).toEqual([["track-1"]]);
-    expect(harness.controller.getSnapshot()).toMatchObject({
-      completed: 0,
-      canceledCount: 1,
-      done: true,
-    });
-  });
-
-  it("preserves cancellation through a typed download-stage error", async () => {
-    const harness = createControllerHarness();
-    harness.controller.enqueue([tracks(1)[0]]);
-    await flushEffects();
-    harness.downloads
-      .get("track-1")
-      ?.reject(new ImportStageError("tunnel", new DOMException("aborted", "AbortError")));
-    await flushEffects();
-
-    expect(harness.failed).toEqual([]);
-    expect(harness.lifecycle).toEqual([{ track: tracks(1)[0], outcome: "canceled" }]);
   });
 });

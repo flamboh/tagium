@@ -43,8 +43,8 @@ test("removing downloading and queued tracks updates the current run", async ({ 
     await expect(page.getByText("downloading 0/5", { exact: true })).toBeVisible();
     await expect.poll(() => sourceUrls).toHaveLength(3);
 
-    const removeButtons = page.getByRole("button", { name: "remove track" });
-    await removeButtons.first().click();
+    await page.getByRole("button", { name: "track actions for Track 1.mp3" }).click();
+    await page.getByRole("menuitem", { name: "remove track" }).click();
     await page
       .getByRole("dialog", { name: "remove track?" })
       .getByRole("button", { name: "remove track" })
@@ -53,7 +53,8 @@ test("removing downloading and queued tracks updates the current run", async ({ 
     await expect(page.getByText("downloading 0/4", { exact: true })).toBeVisible();
     await expect.poll(() => sourceUrls).toHaveLength(4);
 
-    await removeButtons.last().click();
+    await page.getByRole("button", { name: "track actions for Track 5.mp3" }).click();
+    await page.getByRole("menuitem", { name: "remove track" }).click();
     await page
       .getByRole("dialog", { name: "remove track?" })
       .getByRole("button", { name: "remove track" })
