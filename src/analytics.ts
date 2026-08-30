@@ -524,8 +524,10 @@ const SAFE_SDK_PROPERTIES = new Set([
   "$insert_id",
   "$time",
   "$sent_at",
+  "$cookieless_mode",
   "$lib",
   "$lib_version",
+  "$raw_user_agent",
   "$user_agent",
   "$browser",
   "$browser_version",
@@ -797,13 +799,17 @@ const redactAndValidateEvent = (
   for (const [property, value] of Object.entries(event.properties ?? {})) {
     const isAllowedCustomProperty = customAllowedProperties?.has(property) ?? false;
     const isAllowedSdkProperty = SAFE_SDK_PROPERTIES.has(property);
+    const isRawUserAgent = property === "$raw_user_agent";
     if (!isAllowedCustomProperty && !isAllowedSdkProperty) continue;
+    if (isRawUserAgent && (!isString(value) || value.length > 1_000)) continue;
+    if (property === "$cookieless_mode" && value !== true) continue;
     const customValidator = Object.entries(customPropertyValidators ?? {}).find(
       ([propertyName]) => propertyName === property,
     )?.[1];
     if (customValidator && !customValidator(value)) continue;
     if (!isAllowedCustomProperty && SENSITIVE_PROPERTY_NAME.test(property)) continue;
-    if (!isAllowedCustomProperty && isString(value) && URL_VALUE.test(value)) continue;
+    if (!isAllowedCustomProperty && !isRawUserAgent && isString(value) && URL_VALUE.test(value))
+      continue;
     properties[property] = value;
   }
 
