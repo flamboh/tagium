@@ -569,14 +569,19 @@ function ErrorRow({
   onReset: () => void;
 }) {
   return (
-    <div className="mt-1 flex min-w-0 items-start gap-2 text-xs text-destructive" role="alert">
-      <span className="min-w-0 flex-1 break-words pt-2">{message}</span>
+    <div
+      role="alert"
+      className="flex h-full min-w-0 items-center gap-2 text-xs text-destructive motion-safe:animate-[enter_300ms_ease] motion-safe:fade-in"
+    >
+      <span className="min-w-0 flex-1 truncate" title={message}>
+        {message}
+      </span>
       {onRetry && (
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="size-8 shrink-0 text-destructive hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
+          className="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
           aria-label="retry download"
           onClick={onRetry}
         >
@@ -587,7 +592,7 @@ function ErrorRow({
         type="button"
         variant="ghost"
         size="icon"
-        className="size-8 shrink-0 text-destructive hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
+        className="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
         aria-label="reset download"
         onClick={onReset}
       >
@@ -875,14 +880,14 @@ function TagiumSaveView({
               {state.kind === "working" && (
                 <ProgressRow phase={state.phase} progress={state.progress} onCancel={onCancel} />
               )}
+              {state.kind === "error" && (
+                <ErrorRow
+                  message={state.message}
+                  onRetry={state.retryable ? onRetry : undefined}
+                  onReset={onReset}
+                />
+              )}
             </div>
-            {state.kind === "error" && (
-              <ErrorRow
-                message={state.message}
-                onRetry={state.retryable ? onRetry : undefined}
-                onReset={onReset}
-              />
-            )}
 
             {state.kind === "picker" && (
               <PickerChoices

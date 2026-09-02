@@ -98,3 +98,78 @@ test("offers audio returned with picker media", async ({ page }) => {
   await expect(page.getByRole("button", { name: "download post-audio.mp3" })).toBeVisible();
   await expect(page.locator("[data-save-download-item]")).toHaveText("post-audio.mp3");
 });
+
+test("keeps download errors from shifting the save layout", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  let requestCount = 0;
+  await page.route("**/api/cobalt/download", (route) => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      return route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "tunnel",
+          url: "https://media.test/stable.mp4",
+          filename: "stable.mp4",
+        }),
+      });
+    }
+
+    return route.fulfill({
+      status: 429,
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "error",
+        error: { code: "error.api.rate_exceeded" },
+      }),
+    });
+  });
+  await page.route("https://media.test/**", (route) =>
+    route.fulfill({
+      status: 200,
+      headers: {
+        "Content-Type": "video/mp4",
+        "Content-Length": "5",
+      },
+      body: "video",
+    }),
+  );
+
+  await page.goto("/?app=tagium-save");
+  const sourceUrl = page.getByRole("textbox", { name: "media url" });
+  const submit = page.getByRole("button", { name: "start video download" });
+
+  await sourceUrl.fill("https://example.com/stable");
+  await submit.click();
+  const recentDownload = page.locator("[data-save-download-item]");
+  await expect(recentDownload).toHaveText("stable.mp4");
+
+  const progressSlot = page.locator("[data-save-download-progress-slot]");
+  await expect(progressSlot).toBeVisible();
+  const progressBoundsBefore = await progressSlot.boundingBox();
+  const downloadBoundsBefore = await recentDownload.boundingBox();
+  expect(progressBoundsBefore).not.toBeNull();
+  expect(downloadBoundsBefore).not.toBeNull();
+
+  await sourceUrl.fill("https://example.com/failure");
+  await submit.click();
+
+  await expect(page.getByRole("alert")).toHaveText(
+    "too many download requests. try again shortly.",
+  );
+  await expect(page.getByRole("button", { name: "retry download" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "reset download" })).toBeVisible();
+  expect(requestCount).toBe(2);
+
+  expect(await progressSlot.boundingBox()).toEqual(progressBoundsBefore);
+  expect(await recentDownload.boundingBox()).toEqual(downloadBoundsBefore);
+
+  await page.getByRole("button", { name: "retry download" }).click();
+  await expect.poll(() => requestCount).toBe(3);
+  await expect(page.getByRole("alert")).toHaveText(
+    "too many download requests. try again shortly.",
+  );
+
+  await page.getByRole("button", { name: "reset download" }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});

@@ -104,10 +104,7 @@ describe("tagium save app", () => {
       trackDescription: "too many download requests. try again shortly.",
       retryable: true,
     });
-    expect(toastMocks.error).toHaveBeenCalledWith("too many download requests", {
-      id: "system-download-rate-limited",
-      description: "wait a moment, then try the download again.",
-    });
+    expect(toastMocks.error).not.toHaveBeenCalled();
   });
 
   it("tracks one complete lifecycle for a direct file", async () => {
@@ -210,6 +207,7 @@ describe("tagium save app", () => {
     });
     await setSourceUrl(renderer, "https://example.test/watch/retry");
     await submit(renderer);
+    expect(toastMocks.error).not.toHaveBeenCalled();
     await act(async () => {
       renderer.root.findByProps({ "aria-label": "retry download" }).props.onClick();
       await Promise.resolve();
