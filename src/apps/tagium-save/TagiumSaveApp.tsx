@@ -571,7 +571,7 @@ function ErrorRow({
   return (
     <div
       role="alert"
-      className="flex h-full min-w-0 items-center gap-2 text-xs text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+      className="flex h-full min-w-0 items-center gap-2 text-xs text-destructive motion-safe:animate-[enter_300ms_ease] motion-safe:fade-in"
     >
       <span className="min-w-0 flex-1 truncate" title={message}>
         {message}
@@ -581,7 +581,7 @@ function ErrorRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
+          className="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
           aria-label="retry download"
           onClick={onRetry}
         >
@@ -592,7 +592,7 @@ function ErrorRow({
         type="button"
         variant="ghost"
         size="icon"
-        className="size-7 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
+        className="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
         aria-label="reset download"
         onClick={onReset}
       >

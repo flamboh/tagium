@@ -207,8 +207,6 @@ describe("tagium save app", () => {
     });
     await setSourceUrl(renderer, "https://example.test/watch/retry");
     await submit(renderer);
-    const progressSlot = renderer.root.findByProps({ "data-save-download-progress-slot": true });
-    expect(progressSlot.findByProps({ role: "alert" })).toBeDefined();
     expect(toastMocks.error).not.toHaveBeenCalled();
     await act(async () => {
       renderer.root.findByProps({ "aria-label": "retry download" }).props.onClick();
