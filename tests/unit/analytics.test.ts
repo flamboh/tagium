@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import type { BeforeSendFn } from "posthog-js";
+import type { BeforeSendFn, PostHogConfig } from "posthog-js";
 import { createAnalytics } from "@/analytics";
 
-type AnalyticsInitOptions = { before_send: BeforeSendFn };
+type AnalyticsInitOptions = {
+  before_send: BeforeSendFn;
+  capture_performance?: PostHogConfig["capture_performance"];
+};
 type AppId = "tagium" | "tagium-save";
 
 const settle = async () => {
@@ -16,7 +19,7 @@ const createLoadedAnalytics = async (appId: AppId = "tagium") => {
   const analytics = createAnalytics(
     {
       key: "public-test-key",
-      host: "https://us.i.posthog.com",
+      host: "https://t.tagium.app",
       deployEnv: "production",
       releaseSha: "release-sha",
     },
@@ -476,6 +479,73 @@ describe("analytics", () => {
       uuid: "non-cookieless-uuid",
       event: "$pageview",
       properties: { app_id: "tagium-save" },
+    });
+  });
+
+  it("keeps privacy-safe web vitals and the configured proxy marker", async () => {
+    const { init } = await createLoadedAnalytics();
+    const options = init.mock.calls[0]?.[1] as AnalyticsInitOptions;
+
+    expect(options.capture_performance).toEqual({
+      web_vitals: true,
+      web_vitals_attribution: false,
+    });
+    expect(
+      options.before_send({
+        uuid: "web-vitals-uuid",
+        event: "$web_vitals",
+        properties: {
+          $web_vitals_CLS_value: 0.04,
+          $web_vitals_FCP_value: 800,
+          $web_vitals_INP_value: 120,
+          $web_vitals_LCP_value: 1_400,
+          $web_vitals_LCP_event: { attribution: { target: "private selector" } },
+          $current_url: "https://tagium.app/private-path",
+          $session_id: "session-id",
+        },
+      }),
+    ).toEqual({
+      uuid: "web-vitals-uuid",
+      event: "$web_vitals",
+      properties: {
+        $web_vitals_CLS_value: 0.04,
+        $web_vitals_FCP_value: 800,
+        $web_vitals_INP_value: 120,
+        $web_vitals_LCP_value: 1_400,
+        $session_id: "session-id",
+        app_id: "tagium",
+      },
+    });
+    expect(
+      options.before_send({
+        uuid: "proxy-uuid",
+        event: "$pageview",
+        properties: {
+          $lib_custom_api_host: "https://t.tagium.app",
+        },
+      }),
+    ).toEqual({
+      uuid: "proxy-uuid",
+      event: "$pageview",
+      properties: {
+        $lib_custom_api_host: "https://t.tagium.app",
+        app_id: "tagium",
+      },
+    });
+    expect(
+      options.before_send({
+        uuid: "untrusted-proxy-uuid",
+        event: "$pageview",
+        properties: {
+          $lib_custom_api_host: "https://analytics.attacker.example",
+        },
+      }),
+    ).toEqual({
+      uuid: "untrusted-proxy-uuid",
+      event: "$pageview",
+      properties: {
+        app_id: "tagium",
+      },
     });
   });
 
