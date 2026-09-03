@@ -513,7 +513,7 @@ const CUSTOM_EVENT_PROPERTIES = {
     "failure_code",
   ]),
 } satisfies Partial<Record<AnalyticsEvent["type"], ReadonlySet<string>>>;
-const SAFE_SDK_EVENTS = new Set(["$pageview", "$pageleave", "$autocapture"]);
+const SAFE_SDK_EVENTS = new Set(["$pageview", "$pageleave", "$autocapture", "$web_vitals"]);
 const FIRST_PARTY_HOST_BY_APP = {
   tagium: "tagium.app",
   "tagium-save": "save.tagium.app",
@@ -531,6 +531,7 @@ const SAFE_SDK_PROPERTIES = new Set([
   "$cookieless_mode",
   "$lib",
   "$lib_version",
+  "$lib_custom_api_host",
   "$host",
   "$raw_user_agent",
   "$user_agent",
@@ -553,6 +554,7 @@ const SAFE_SDK_PROPERTIES = new Set([
 const SENSITIVE_PROPERTY_NAME =
   /(?:url|href|referrer|pathname|host|filename|artist|album|artwork|message|response|body|tunnel|text|elements)/i;
 const URL_VALUE = /https?:\/\//i;
+const WEB_VITAL_VALUE_PROPERTY = /^\$web_vitals_(?:CLS|FCP|INP|LCP)_value$/;
 const isString = Schema.is(Schema.String);
 const isNumber = Schema.is(Schema.Number);
 const isBoolean = Schema.is(Schema.Boolean);
@@ -560,6 +562,15 @@ const normalizeFirstPartyHost = (value: AnalyticsProperty, appId: AnalyticsAppId
   if (!isString(value)) return undefined;
   const normalizedHost = value.toLowerCase();
   return normalizedHost === FIRST_PARTY_HOST_BY_APP[appId] ? normalizedHost : undefined;
+};
+const normalizeConfiguredAnalyticsHost = (
+  value: AnalyticsProperty,
+  configuredHost: string | undefined,
+) => {
+  if (!isString(value) || !configuredHost) return undefined;
+  const normalizedValue = value.toLowerCase().replace(/\/+$/, "");
+  const normalizedConfiguredHost = configuredHost.toLowerCase().replace(/\/+$/, "");
+  return normalizedValue === normalizedConfiguredHost ? normalizedConfiguredHost : undefined;
 };
 type AnalyticsPropertyValidator = (value: AnalyticsProperty) => boolean;
 const isOneOf =
@@ -795,6 +806,7 @@ const CUSTOM_PROPERTY_VALIDATORS = {
 const redactAndValidateEvent = (
   event: CaptureResult,
   appId: AnalyticsAppId,
+  analyticsHost: string | undefined,
 ): CaptureResult | null => {
   const customAllowedProperties = Object.entries(CUSTOM_EVENT_PROPERTIES).find(
     ([eventName]) => eventName === event.event,
@@ -810,12 +822,23 @@ const redactAndValidateEvent = (
   for (const [property, value] of Object.entries(event.properties ?? {})) {
     const isAllowedCustomProperty = customAllowedProperties?.has(property) ?? false;
     const isAllowedSdkProperty = SAFE_SDK_PROPERTIES.has(property);
+    const isWebVitalValue =
+      event.event === "$web_vitals" &&
+      WEB_VITAL_VALUE_PROPERTY.test(property) &&
+      isNonNegativeNumber(value);
     const isHost = property === "$host";
+    const isAnalyticsHost = property === "$lib_custom_api_host";
     const isRawUserAgent = property === "$raw_user_agent";
-    if (!isAllowedCustomProperty && !isAllowedSdkProperty) continue;
+    if (!isAllowedCustomProperty && !isAllowedSdkProperty && !isWebVitalValue) continue;
     if ((isHost || isRawUserAgent) && !isCookieless) continue;
     if (isHost) {
       const normalizedHost = normalizeFirstPartyHost(value, appId);
+      if (!normalizedHost) continue;
+      properties[property] = normalizedHost;
+      continue;
+    }
+    if (isAnalyticsHost) {
+      const normalizedHost = normalizeConfiguredAnalyticsHost(value, analyticsHost);
       if (!normalizedHost) continue;
       properties[property] = normalizedHost;
       continue;
@@ -1266,10 +1289,14 @@ export const createAnalytics = (
             disable_session_recording: true,
             enable_heatmaps: false,
             disable_surveys: true,
+            capture_performance: {
+              web_vitals: true,
+              web_vitals_attribution: false,
+            },
             cookieless_mode: "always",
             person_profiles: "never",
             before_send: (event) =>
-              event ? redactAndValidateEvent(event, initializedAppId) : null,
+              event ? redactAndValidateEvent(event, initializedAppId, config.host) : null,
           });
           client = loadedClient;
           flush();
