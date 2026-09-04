@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -106,6 +107,21 @@ export default function AlbumSidebar({
   onReorderAlbums,
   onAudioUpload,
 }: AlbumSidebarProps) {
+  const seenIdsRef = useRef<Set<string> | null>(null);
+  if (seenIdsRef.current === null) {
+    seenIdsRef.current = new Set([
+      ...files.map((file) => file.id),
+      ...albums.map((album) => album.id),
+    ]);
+  }
+
+  const seenIds = seenIdsRef.current;
+  // Rows are marked seen after commit, so a row only animates on the render that first mounts it
+  // (StrictMode's double render would otherwise mark it seen before it ever appears).
+  useEffect(() => {
+    for (const file of files) seenIds.add(file.id);
+    for (const album of albums) seenIds.add(album.id);
+  });
   const filesById = new Map(files.map((file) => [file.id, file]));
   const looseTracks = looseTrackIds
     .map((trackId) => filesById.get(trackId))
@@ -196,18 +212,22 @@ export default function AlbumSidebar({
               data={{ type: "container", container: "loose" }}
               className={looseTracks.length === 0 ? "min-h-0 shrink-0" : "shrink-0"}
             >
-              {looseTracks.map((track) => (
-                <SortableTrackRow
-                  key={track.id}
-                  track={track}
-                  filenamePreviewStore={filenamePreviewStore}
-                  container="loose"
-                  selectedTone={selectedTone(track.id)}
-                  muted={track.downloadStatus === "downloading"}
-                  actions={actionsForTrack(track)}
-                  onSelect={(event) => onSelectLooseTrack(track.id, event)}
-                />
-              ))}
+              {looseTracks.map((track) => {
+                const animateEnter = !seenIds.has(track.id);
+                return (
+                  <SortableTrackRow
+                    key={track.id}
+                    track={track}
+                    filenamePreviewStore={filenamePreviewStore}
+                    container="loose"
+                    selectedTone={selectedTone(track.id)}
+                    muted={track.downloadStatus === "downloading"}
+                    actions={actionsForTrack(track)}
+                    animateEnter={animateEnter}
+                    onSelect={(event) => onSelectLooseTrack(track.id, event)}
+                  />
+                );
+              })}
             </DroppableTrackContainer>
           </SortableContext>
 
@@ -216,6 +236,9 @@ export default function AlbumSidebar({
             strategy={verticalListSortingStrategy}
           >
             {albums.map((album) => {
+              // A new album grows in as one block, so its tracks must not run their own entrance
+              // (they would be mid-animation at zero height when the album measures itself).
+              const animateEnter = !seenIds.has(album.id);
               const canDownloadAlbum =
                 album.trackIds.length > 0 &&
                 album.trackIds.every((trackId) => {
@@ -259,6 +282,7 @@ export default function AlbumSidebar({
                   canDownload={canDownloadAlbum}
                   cleanupSuggestionCount={cleanupSuggestionCount}
                   actions={actions}
+                  animateEnter={animateEnter}
                   onSelect={(event) => onSelectAlbum(album.id, event)}
                   onDownload={() => onDownloadAlbum(album.id)}
                   {...fileDropProps}
@@ -280,6 +304,7 @@ export default function AlbumSidebar({
                         album.trackIds.map((trackId, index) => {
                           const track = filesById.get(trackId);
                           if (!track) return null;
+                          const animateTrackEnter = !animateEnter && !seenIds.has(track.id);
 
                           return (
                             <SortableTrackRow
@@ -292,6 +317,7 @@ export default function AlbumSidebar({
                               selectedTone={selectedTone(track.id)}
                               muted={track.downloadStatus === "downloading"}
                               actions={actionsForTrack(track)}
+                              animateEnter={animateTrackEnter}
                               onSelect={(event) => onSelectFile(album.id, track.id, event)}
                             />
                           );

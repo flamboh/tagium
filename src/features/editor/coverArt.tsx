@@ -109,6 +109,7 @@ export default function CoverArt({
   };
 
   const [coverSrc, setCoverSrc] = useState<string | null>(null);
+  const [loadedCoverSrc, setLoadedCoverSrc] = useState<string | null>(null);
   const isCompact = size === "compact";
   const containerClassName = isCompact
     ? "flex-shrink-0 flex gap-2 md:h-full md:flex-col"
@@ -165,13 +166,15 @@ export default function CoverArt({
       >
         {coverSrc ? (
           <img
+            key={coverSrc}
             src={coverSrc}
             alt="album cover"
             className={
               isCompact
-                ? "size-24 object-cover rounded-lg border md:size-44"
-                : "size-full object-cover rounded-lg border lg:size-64"
+                ? `size-24 object-cover rounded-lg border transition-transform duration-150 ease-out motion-reduce:scale-100 motion-reduce:transition-none md:size-44 ${loadedCoverSrc === coverSrc ? "visible scale-100" : "invisible scale-[0.97]"}`
+                : `size-full object-cover rounded-lg border transition-transform duration-150 ease-out motion-reduce:scale-100 motion-reduce:transition-none lg:size-64 ${loadedCoverSrc === coverSrc ? "visible scale-100" : "invisible scale-[0.97]"}`
             }
+            onLoad={() => setLoadedCoverSrc(coverSrc)}
           />
         ) : (
           <div

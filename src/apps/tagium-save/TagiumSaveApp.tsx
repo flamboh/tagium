@@ -60,6 +60,7 @@ import {
 } from "@/apps/tagium-save/tagiumSaveModel";
 import { useTheme } from "@/features/theme/useTheme";
 import { resolveTrackMetadata } from "@/features/import/trackMetadata";
+import { animateRowEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { mediaLinkKindFromUrl } from "@/lib/media-link";
 
@@ -158,10 +159,6 @@ type DownloadLifecycle = {
 
 const maxRecentDownloads = 5;
 
-const prefersReducedMotion = () =>
-  typeof window !== "undefined" &&
-  (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
-
 const validateSourceUrl = (value: string) => {
   if (!value) return "enter a media url";
   try {
@@ -234,7 +231,7 @@ function DownloadSettings({
           type="button"
           variant="outline"
           size="icon"
-          className="group size-10 shrink-0 rounded-lg active:scale-[0.97] motion-reduce:active:scale-100"
+          className="group size-10 shrink-0 rounded-lg"
           aria-label="download settings"
           disabled={disabled}
         >
@@ -347,7 +344,7 @@ function ProgressRow({
         type="button"
         variant="ghost"
         size="icon"
-        className="size-8 shrink-0 active:scale-[0.97] motion-reduce:active:scale-100"
+        className="size-8 shrink-0"
         aria-label="cancel download"
         onClick={onCancel}
       >
@@ -376,7 +373,7 @@ function PickerChoices({
             key={`${item.type}-${item.url}`}
             type="button"
             variant="outline"
-            className="h-9 min-w-0 justify-between px-3 text-xs active:scale-[0.97] motion-reduce:active:scale-100"
+            className="h-9 min-w-0 justify-between px-3 text-xs"
             aria-label={`download ${item.type} ${index + 1}`}
             onClick={() => onSelect(item)}
           >
@@ -388,7 +385,7 @@ function PickerChoices({
           <Button
             type="button"
             variant="outline"
-            className="h-9 min-w-0 justify-between px-3 text-xs active:scale-[0.97] motion-reduce:active:scale-100"
+            className="h-9 min-w-0 justify-between px-3 text-xs"
             aria-label={`download ${result.audioFilename ?? "audio"}`}
             onClick={onSelectAudio}
           >
@@ -406,7 +403,7 @@ function PickerChoices({
         type="button"
         variant="ghost"
         size="icon"
-        className="size-8 shrink-0 active:scale-[0.97] motion-reduce:active:scale-100"
+        className="size-8 shrink-0"
         aria-label="reset download"
         onClick={onReset}
       >
@@ -431,24 +428,8 @@ function RecentDownloadRow({
   useLayoutEffect(() => {
     const item = itemRef.current;
     const content = contentRef.current;
-    if (!item || !content || prefersReducedMotion()) return;
-
-    // Grow the row from zero height so earlier downloads slide down with it
-    // instead of jumping when a new row is prepended.
-    const timing = { duration: 300, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
-    const grow = item.animate([{ height: "0px" }, { height: "2.5rem" }], timing);
-    const reveal = content.animate(
-      [
-        { opacity: 0, transform: "translateY(-28px)" },
-        { opacity: 1, transform: "translateY(0)" },
-      ],
-      timing,
-    );
-
-    return () => {
-      grow.cancel();
-      reveal.cancel();
-    };
+    if (!item) return;
+    return animateRowEnter(item, content);
   }, [download.id]);
 
   useEffect(
@@ -486,7 +467,7 @@ function RecentDownloadRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-10 shrink-0 active:scale-[0.97] motion-reduce:active:scale-100"
+          className="size-10 shrink-0"
           aria-label={`download ${download.file.name}`}
           onClick={handleDownload}
         >
@@ -581,7 +562,7 @@ function ErrorRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
+          className="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
           aria-label="retry download"
           onClick={onRetry}
         >
@@ -592,7 +573,7 @@ function ErrorRow({
         type="button"
         variant="ghost"
         size="icon"
-        className="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
+        className="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
         aria-label="reset download"
         onClick={onReset}
       >
@@ -872,7 +853,6 @@ function TagiumSaveView({
                 }
                 placeholder="paste a media link"
                 submitAriaLabel="start video download"
-                animateSubmitIcon
               />
             </div>
 

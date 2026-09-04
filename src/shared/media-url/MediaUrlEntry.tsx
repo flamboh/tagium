@@ -4,10 +4,11 @@ import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { ArrowRight02Icon, Link02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { IconSwap } from "@/components/ui/icon-swap";
 import { Input } from "@/components/ui/input";
+import { prefersReducedMotion } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 import { getMediaUrlEntryMotionKeyframes } from "@/shared/media-url/mediaUrlEntryMotion";
 
 export type MediaUrlEntryLayout = "landing" | "standalone" | "empty-editor" | "editor";
@@ -26,12 +27,7 @@ type MediaUrlEntryProps = {
   leadingAction?: ReactNode;
   placeholder?: string;
   submitAriaLabel?: string;
-  animateSubmitIcon?: boolean;
 };
-
-const prefersReducedMotion = () =>
-  typeof window !== "undefined" &&
-  (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
 
 const clearMotionStyles = (anchor: HTMLDivElement | null, motion: HTMLDivElement | null) => {
   if (anchor) anchor.style.height = "";
@@ -50,7 +46,6 @@ export default function MediaUrlEntry({
   leadingAction,
   placeholder = "soundcloud, youtube, or tagium share link",
   submitAriaLabel = "start media import",
-  animateSubmitIcon = false,
 }: MediaUrlEntryProps) {
   const anchorRef = useRef<HTMLDivElement>(null);
   const motionRef = useRef<HTMLDivElement>(null);
@@ -213,36 +208,27 @@ export default function MediaUrlEntry({
               disabled={!canSubmit}
               aria-label={submitAriaLabel}
               aria-busy={controller.submitting || undefined}
-              className={cn(
-                "size-10 rounded-lg",
-                animateSubmitIcon && "active:scale-[0.97] motion-reduce:active:scale-100",
-              )}
+              className="size-10 rounded-lg"
             >
-              {animateSubmitIcon ? (
-                <IconSwap
-                  switched={controller.submitting}
-                  first={
-                    <HugeiconsIcon
-                      icon={ArrowRight02Icon}
-                      strokeWidth={2}
-                      className="size-4"
-                      data-media-url-submit-icon="enter"
-                    />
-                  }
-                  second={
-                    <HugeiconsIcon
-                      icon={loaderCircleIcon}
-                      strokeWidth={2}
-                      className="size-4 animate-spin"
-                      data-media-url-submit-icon="loading"
-                    />
-                  }
-                />
-              ) : controller.submitting ? (
-                <HugeiconsIcon icon={loaderCircleIcon} strokeWidth={2} className="animate-spin" />
-              ) : (
-                <HugeiconsIcon icon={ArrowRight02Icon} strokeWidth={2} />
-              )}
+              <IconSwap
+                switched={controller.submitting}
+                first={
+                  <HugeiconsIcon
+                    icon={ArrowRight02Icon}
+                    strokeWidth={2}
+                    className="size-4"
+                    data-media-url-submit-icon="enter"
+                  />
+                }
+                second={
+                  <HugeiconsIcon
+                    icon={loaderCircleIcon}
+                    strokeWidth={2}
+                    className="size-4 animate-spin"
+                    data-media-url-submit-icon="loading"
+                  />
+                }
+              />
             </Button>
           </form>
         </div>
