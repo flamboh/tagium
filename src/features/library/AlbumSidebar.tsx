@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -107,15 +107,10 @@ export default function AlbumSidebar({
   onReorderAlbums,
   onAudioUpload,
 }: AlbumSidebarProps) {
-  const seenIdsRef = useRef<Set<string> | null>(null);
-  if (seenIdsRef.current === null) {
-    seenIdsRef.current = new Set([
-      ...files.map((file) => file.id),
-      ...albums.map((album) => album.id),
-    ]);
-  }
-
-  const seenIds = seenIdsRef.current;
+  // Ids present on first render are pre-seeded so an already populated library does not animate.
+  const [seenIds] = useState(
+    () => new Set([...files.map((file) => file.id), ...albums.map((album) => album.id)]),
+  );
   // Rows are marked seen after commit, so a row only animates on the render that first mounts it
   // (StrictMode's double render would otherwise mark it seen before it ever appears).
   useEffect(() => {

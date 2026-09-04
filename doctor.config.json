@@ -21,7 +21,7 @@
         "rules": ["deslop/unused-file"]
       },
       {
-        "files": ["src/apps/tagium-save/TagiumSaveApp.tsx"],
+        "files": ["src/lib/motion.ts"],
         "rules": ["react-doctor/no-layout-property-animation"]
       }
     ]
