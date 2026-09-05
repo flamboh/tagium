@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { AnimatePresence } from "motion/react";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
@@ -106,6 +108,16 @@ export default function AlbumSidebar({
   onReorderAlbums,
   onAudioUpload,
 }: AlbumSidebarProps) {
+  // Ids present on first render are pre-seeded so an already populated library does not animate.
+  const [seenIds] = useState(
+    () => new Set([...files.map((file) => file.id), ...albums.map((album) => album.id)]),
+  );
+  // Rows are marked seen after commit, so a row only animates on the render that first mounts it
+  // (StrictMode's double render would otherwise mark it seen before it ever appears).
+  useEffect(() => {
+    for (const file of files) seenIds.add(file.id);
+    for (const album of albums) seenIds.add(album.id);
+  });
   const filesById = new Map(files.map((file) => [file.id, file]));
   const looseTracks = looseTrackIds
     .map((trackId) => filesById.get(trackId))
@@ -196,18 +208,22 @@ export default function AlbumSidebar({
               data={{ type: "container", container: "loose" }}
               className={looseTracks.length === 0 ? "min-h-0 shrink-0" : "shrink-0"}
             >
-              {looseTracks.map((track) => (
-                <SortableTrackRow
-                  key={track.id}
-                  track={track}
-                  filenamePreviewStore={filenamePreviewStore}
-                  container="loose"
-                  selectedTone={selectedTone(track.id)}
-                  muted={track.downloadStatus === "downloading"}
-                  actions={actionsForTrack(track)}
-                  onSelect={(event) => onSelectLooseTrack(track.id, event)}
-                />
-              ))}
+              {looseTracks.map((track) => {
+                const animateEnter = !seenIds.has(track.id);
+                return (
+                  <SortableTrackRow
+                    key={track.id}
+                    track={track}
+                    filenamePreviewStore={filenamePreviewStore}
+                    container="loose"
+                    selectedTone={selectedTone(track.id)}
+                    muted={track.downloadStatus === "downloading"}
+                    actions={actionsForTrack(track)}
+                    animateEnter={animateEnter}
+                    onSelect={(event) => onSelectLooseTrack(track.id, event)}
+                  />
+                );
+              })}
             </DroppableTrackContainer>
           </SortableContext>
 
@@ -215,93 +231,101 @@ export default function AlbumSidebar({
             items={albums.map((album) => albumItemId(album.id))}
             strategy={verticalListSortingStrategy}
           >
-            {albums.map((album) => {
-              const canDownloadAlbum =
-                album.trackIds.length > 0 &&
-                album.trackIds.every((trackId) => {
-                  const file = filesById.get(trackId);
-                  return file ? isTrackReadyForDownload(file) : false;
+            <AnimatePresence initial={false}>
+              {albums.map((album) => {
+                // A new album grows in as one block, so its tracks must not run their own entrance
+                // (they would be mid-animation at zero height when the album measures itself).
+                const animateEnter = !seenIds.has(album.id);
+                const canDownloadAlbum =
+                  album.trackIds.length > 0 &&
+                  album.trackIds.every((trackId) => {
+                    const file = filesById.get(trackId);
+                    return file ? isTrackReadyForDownload(file) : false;
+                  });
+                const shareableTracks = album.trackIds.map((trackId) => filesById.get(trackId));
+                const contentCanShare =
+                  shareableTracks.length > 0 &&
+                  shareableTracks.every((file) => Boolean(file?.downloadRequest && file.metadata));
+                const contentDisabledReason =
+                  album.trackIds.length === 0
+                    ? "add imported tracks first"
+                    : "albums with local tracks cannot be shared";
+                const shareAction = shareAlbumActions[album.id];
+                const retrievesExistingLink = shareAction?.variant === "view";
+                const canShareAlbum =
+                  Boolean(onShareAlbum) &&
+                  (retrievesExistingLink || contentCanShare) &&
+                  (shareAction?.enabled ?? true);
+                const shareDisabledReason = shareAction?.reason ?? contentDisabledReason;
+                const cleanupSuggestionCount = cleanupSuggestionCountByAlbumId.get(album.id) ?? 0;
+                const actions = createAlbumActionItems({
+                  cleanupSuggestionCount,
+                  canShare: canShareAlbum,
+                  shareDisabledReason,
+                  shareLabel: shareAction?.label ?? "share album",
+                  shareVariant: shareAction?.variant ?? "create",
+                  onEdit: () => onEditAlbum(album.id),
+                  onReviewCleanup: ({ returnFocusTarget }) =>
+                    onReviewAlbumCleanup(album.id, returnFocusTarget),
+                  onShare: () => onShareAlbum?.(album.id),
+                  onDelete: ({ returnFocusTarget }) => onDeleteAlbum(album.id, returnFocusTarget),
                 });
-              const shareableTracks = album.trackIds.map((trackId) => filesById.get(trackId));
-              const contentCanShare =
-                shareableTracks.length > 0 &&
-                shareableTracks.every((file) => Boolean(file?.downloadRequest && file.metadata));
-              const contentDisabledReason =
-                album.trackIds.length === 0
-                  ? "add imported tracks first"
-                  : "albums with local tracks cannot be shared";
-              const shareAction = shareAlbumActions[album.id];
-              const retrievesExistingLink = shareAction?.variant === "view";
-              const canShareAlbum =
-                Boolean(onShareAlbum) &&
-                (retrievesExistingLink || contentCanShare) &&
-                (shareAction?.enabled ?? true);
-              const shareDisabledReason = shareAction?.reason ?? contentDisabledReason;
-              const cleanupSuggestionCount = cleanupSuggestionCountByAlbumId.get(album.id) ?? 0;
-              const actions = createAlbumActionItems({
-                cleanupSuggestionCount,
-                canShare: canShareAlbum,
-                shareDisabledReason,
-                shareLabel: shareAction?.label ?? "share album",
-                shareVariant: shareAction?.variant ?? "create",
-                onEdit: () => onEditAlbum(album.id),
-                onReviewCleanup: ({ returnFocusTarget }) =>
-                  onReviewAlbumCleanup(album.id, returnFocusTarget),
-                onShare: () => onShareAlbum?.(album.id),
-                onDelete: ({ returnFocusTarget }) => onDeleteAlbum(album.id, returnFocusTarget),
-              });
-              const fileDropProps = albumFileDropProps(album.id);
-              return (
-                <SortableAlbumCard
-                  key={album.id}
-                  album={album}
-                  selected={selectedAlbumId === album.id}
-                  canDownload={canDownloadAlbum}
-                  cleanupSuggestionCount={cleanupSuggestionCount}
-                  actions={actions}
-                  onSelect={(event) => onSelectAlbum(album.id, event)}
-                  onDownload={() => onDownloadAlbum(album.id)}
-                  {...fileDropProps}
-                >
-                  <SortableContext
-                    items={album.trackIds.map((trackId) => trackItemId(trackId))}
-                    strategy={verticalListSortingStrategy}
+                const fileDropProps = albumFileDropProps(album.id);
+                return (
+                  <SortableAlbumCard
+                    key={album.id}
+                    album={album}
+                    selected={selectedAlbumId === album.id}
+                    canDownload={canDownloadAlbum}
+                    cleanupSuggestionCount={cleanupSuggestionCount}
+                    actions={actions}
+                    animateEnter={animateEnter}
+                    onSelect={(event) => onSelectAlbum(album.id, event)}
+                    onDownload={() => onDownloadAlbum(album.id)}
+                    {...fileDropProps}
                   >
-                    <DroppableTrackContainer
-                      id={albumContainerId(album.id)}
-                      data={{ type: "container", container: "album", albumId: album.id }}
-                      className="min-h-8"
+                    <SortableContext
+                      items={album.trackIds.map((trackId) => trackItemId(trackId))}
+                      strategy={verticalListSortingStrategy}
                     >
-                      {album.trackIds.length === 0 ? (
-                        <div className="text-xs text-muted-foreground px-4 py-3 text-center">
-                          drag tracks here
-                        </div>
-                      ) : (
-                        album.trackIds.map((trackId, index) => {
-                          const track = filesById.get(trackId);
-                          if (!track) return null;
+                      <DroppableTrackContainer
+                        id={albumContainerId(album.id)}
+                        data={{ type: "container", container: "album", albumId: album.id }}
+                        className="min-h-8"
+                      >
+                        {album.trackIds.length === 0 ? (
+                          <div className="text-xs text-muted-foreground px-4 py-3 text-center">
+                            drag tracks here
+                          </div>
+                        ) : (
+                          album.trackIds.map((trackId, index) => {
+                            const track = filesById.get(trackId);
+                            if (!track) return null;
+                            const animateTrackEnter = !animateEnter && !seenIds.has(track.id);
 
-                          return (
-                            <SortableTrackRow
-                              key={track.id}
-                              track={track}
-                              filenamePreviewStore={filenamePreviewStore}
-                              index={index + 1}
-                              container="album"
-                              albumId={album.id}
-                              selectedTone={selectedTone(track.id)}
-                              muted={track.downloadStatus === "downloading"}
-                              actions={actionsForTrack(track)}
-                              onSelect={(event) => onSelectFile(album.id, track.id, event)}
-                            />
-                          );
-                        })
-                      )}
-                    </DroppableTrackContainer>
-                  </SortableContext>
-                </SortableAlbumCard>
-              );
-            })}
+                            return (
+                              <SortableTrackRow
+                                key={track.id}
+                                track={track}
+                                filenamePreviewStore={filenamePreviewStore}
+                                index={index + 1}
+                                container="album"
+                                albumId={album.id}
+                                selectedTone={selectedTone(track.id)}
+                                muted={track.downloadStatus === "downloading"}
+                                actions={actionsForTrack(track)}
+                                animateEnter={animateTrackEnter}
+                                onSelect={(event) => onSelectFile(album.id, track.id, event)}
+                              />
+                            );
+                          })
+                        )}
+                      </DroppableTrackContainer>
+                    </SortableContext>
+                  </SortableAlbumCard>
+                );
+              })}
+            </AnimatePresence>
           </SortableContext>
           <DroppableTrackContainer
             id={LOOSE_APPEND_CONTAINER_ID}

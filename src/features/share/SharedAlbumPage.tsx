@@ -170,8 +170,8 @@ function Artwork({ slug, title }: { slug: string; title: string }) {
           <img
             src={sharedArtworkUrl(slug)}
             alt={`${title} cover`}
-            className={`absolute inset-0 size-full object-cover transition-opacity duration-200 motion-reduce:transition-none ${
-              status === "loaded" ? "opacity-100" : "opacity-0"
+            className={`absolute inset-0 size-full object-cover transition-[opacity,transform] duration-200 motion-reduce:scale-100 motion-reduce:transition-none ${
+              status === "loaded" ? "opacity-100 scale-100" : "opacity-0 scale-[0.97]"
             }`}
             onLoad={() => setStatus("loaded")}
             onError={() => setStatus("failed")}

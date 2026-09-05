@@ -3,6 +3,7 @@ import { Copy01Icon, MusicNote04Icon, Tick02Icon } from "@hugeicons/core-free-ic
 import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { Button } from "@/components/ui/button";
+import { IconSwap } from "@/components/ui/icon-swap";
 import {
   Dialog,
   DialogContent,
@@ -147,7 +148,10 @@ function ShareAlbumDialogSession({
         className="max-h-[calc(100dvh-2rem)] max-w-lg gap-0 overflow-y-auto p-0"
         showCloseButton={state.status !== "publishing" && !stopping}
       >
-        <>
+        <div
+          key={dialogView}
+          className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+        >
           <DialogHeader className="min-w-0 border-b px-5 py-4 pr-12">
             <DialogTitle className="truncate text-left">
               {`share ${targetName}: ${state.preview.title}`}
@@ -176,11 +180,11 @@ function ShareAlbumDialogSession({
                   className="min-w-0 font-mono text-xs"
                 />
                 <Button type="button" onClick={copyLink} className="h-9 w-32 shrink-0">
-                  {copyStatus === "copied" ? (
-                    <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} aria-hidden="true" />
-                  ) : (
-                    <HugeiconsIcon icon={Copy01Icon} strokeWidth={2} aria-hidden="true" />
-                  )}
+                  <IconSwap
+                    switched={copyStatus === "copied"}
+                    first={<HugeiconsIcon icon={Copy01Icon} strokeWidth={2} />}
+                    second={<HugeiconsIcon icon={Tick02Icon} strokeWidth={2} />}
+                  />
                   {copyStatus === "copied" ? "copied" : "copy link"}
                 </Button>
               </div>
@@ -312,7 +316,7 @@ function ShareAlbumDialogSession({
               </div>
             )}
           </DialogFooter>
-        </>
+        </div>
       </DialogContent>
     </Dialog>
   );

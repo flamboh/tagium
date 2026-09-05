@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MusicNote01Icon, Upload01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { IconSwap } from "@/components/ui/icon-swap";
 import { AUDIO_UPLOAD_ACCEPT } from "@/features/audio/audioFormat";
 import { cn } from "@/lib/utils";
 import { TagiumBrand } from "@/shared/brand/TagiumBrand";
@@ -105,23 +106,30 @@ export default function AudioImportDropzone({
             : "border-border hover:border-brand/50 hover:bg-accent/20 focus-visible:border-brand/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         )}
       >
-        {isDragging ? (
-          <HugeiconsIcon
-            icon={MusicNote01Icon}
-            strokeWidth={2}
-            aria-hidden="true"
-            className="size-14 text-brand"
-          />
-        ) : (
-          <div className="flex size-16 items-center justify-center rounded-(--radius-hero-inner) bg-muted">
-            <HugeiconsIcon
-              icon={Upload01Icon}
-              strokeWidth={2}
-              aria-hidden="true"
-              className="size-7 text-muted-foreground"
-            />
-          </div>
-        )}
+        <IconSwap
+          switched={isDragging}
+          className="size-16"
+          first={
+            <div className="flex size-16 items-center justify-center rounded-(--radius-hero-inner) bg-muted">
+              <HugeiconsIcon
+                icon={Upload01Icon}
+                strokeWidth={2}
+                aria-hidden="true"
+                className="size-7 text-muted-foreground"
+              />
+            </div>
+          }
+          second={
+            <div className="flex size-16 items-center justify-center">
+              <HugeiconsIcon
+                icon={MusicNote01Icon}
+                strokeWidth={2}
+                aria-hidden="true"
+                className="size-14 text-brand"
+              />
+            </div>
+          }
+        />
         <div className="select-none text-center">
           <p className="text-lg font-semibold text-foreground">
             {isDragging ? "drop to import" : "drop your audio here"}
