@@ -19,6 +19,7 @@ import {
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { AnimatePresence, m } from "motion/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import {
   analytics,
@@ -60,7 +61,7 @@ import {
 } from "@/apps/tagium-save/tagiumSaveModel";
 import { useTheme } from "@/features/theme/useTheme";
 import { resolveTrackMetadata } from "@/features/import/trackMetadata";
-import { animateRowEnter } from "@/lib/motion";
+import { rowContent, rowShell } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { mediaLinkKindFromUrl } from "@/lib/media-link";
 
@@ -420,17 +421,8 @@ function RecentDownloadRow({
   download: RecentDownload;
   onDownload: (download: RecentDownload) => void;
 }) {
-  const itemRef = useRef<HTMLLIElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
   const confirmationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
-
-  useLayoutEffect(() => {
-    const item = itemRef.current;
-    const content = contentRef.current;
-    if (!item) return;
-    return animateRowEnter(item, content);
-  }, [download.id]);
 
   useEffect(
     () => () => {
@@ -457,8 +449,8 @@ function RecentDownloadRow({
   };
 
   return (
-    <li ref={itemRef} className="h-10 overflow-hidden" data-save-download-item>
-      <div ref={contentRef} className="flex h-10 min-w-0 items-center gap-2">
+    <m.li {...rowShell} data-save-download-item>
+      <m.div {...rowContent} className="flex h-10 min-w-0 items-center gap-2">
         <RecentDownloadCover key={download.coverUrl ?? "empty"} coverUrl={download.coverUrl} />
         <span className="min-w-0 flex-1 truncate pl-3 text-sm" title={download.file.name}>
           {download.file.name}
@@ -491,8 +483,8 @@ function RecentDownloadRow({
             }
           />
         </Button>
-      </div>
-    </li>
+      </m.div>
+    </m.li>
   );
 }
 
@@ -533,9 +525,11 @@ function RecentDownloads({
 
   return (
     <ul className="relative z-0 mt-3 flex w-full flex-col gap-0.5" aria-label="recent downloads">
-      {downloads.map((download) => (
-        <RecentDownloadRow key={download.id} download={download} onDownload={onDownload} />
-      ))}
+      <AnimatePresence initial={false}>
+        {downloads.map((download) => (
+          <RecentDownloadRow key={download.id} download={download} onDownload={onDownload} />
+        ))}
+      </AnimatePresence>
     </ul>
   );
 }

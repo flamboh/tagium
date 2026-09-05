@@ -19,10 +19,6 @@
       {
         "files": ["cobalt-soundcloud.mjs"],
         "rules": ["deslop/unused-file"]
-      },
-      {
-        "files": ["src/lib/motion.ts"],
-        "rules": ["react-doctor/no-layout-property-animation"]
       }
     ]
   }

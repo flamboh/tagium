@@ -1,39 +1,33 @@
-/** Returns whether the user has requested reduced motion. */
-export const prefersReducedMotion = () =>
-  typeof window !== "undefined" &&
-  (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
+/** Expo-out timing shared by every row entrance and exit. */
+export const rowTransition = { duration: 0.3, ease: [0.16, 1, 0.3, 1] } as const;
 
 /**
- * Grows a newly inserted row from zero height while its content slides down into place, so
- * neighbouring rows shift smoothly instead of jumping. Clips the row for the duration and
- * returns a cancel function for effect cleanup. No-op under reduced motion.
+ * Presence props for the clipping shell of a list row: it grows from zero height so neighbours
+ * slide instead of jumping, and collapses again on exit. Pair with `rowContent` on the child.
  */
-export function animateRowEnter(row: HTMLElement, content: HTMLElement | null): () => void {
-  if (prefersReducedMotion() || typeof row.animate !== "function") return () => {};
+export const rowShell = {
+  initial: { height: 0, opacity: 0 },
+  animate: { height: "auto", opacity: 1 },
+  exit: { height: 0, opacity: 0 },
+  transition: rowTransition,
+  style: { overflow: "hidden" },
+} as const;
 
-  const timing = { duration: 300, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
-  const previousOverflow = row.style.overflow;
-  row.style.overflow = "hidden";
-  const restoreOverflow = () => {
-    row.style.overflow = previousOverflow;
-  };
+/** Presence props for a row's content: it slides down from under the previous row. */
+export const rowContent = {
+  initial: { y: -28 },
+  animate: { y: 0 },
+  exit: { y: -12 },
+  transition: rowTransition,
+} as const;
 
-  const rowAnimation = row.animate(
-    [{ height: "0px" }, { height: `${row.offsetHeight}px` }],
-    timing,
-  );
-  rowAnimation.addEventListener("finish", restoreOverflow);
-  const contentAnimation = content?.animate(
-    [
-      { opacity: 0, transform: "translateY(-28px)" },
-      { opacity: 1, transform: "translateY(0)" },
-    ],
-    timing,
-  );
+/** Presence props for a small block that should simply fade in and out. */
+export const fadePresence = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
+  transition: { duration: 0.2 },
+} as const;
 
-  return () => {
-    rowAnimation.cancel();
-    contentAnimation?.cancel();
-    restoreOverflow();
-  };
-}
+/** Timing for the media url entry as it moves between the landing and editor positions. */
+export const morphTransition = { duration: 0.42, ease: [0.22, 1, 0.36, 1] } as const;

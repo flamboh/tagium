@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { ArrowRight02Icon, Link02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { m, useAnimate, useReducedMotion } from "motion/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { Button } from "@/components/ui/button";
 import { IconSwap } from "@/components/ui/icon-swap";
 import { Input } from "@/components/ui/input";
-import { prefersReducedMotion } from "@/lib/motion";
+import { morphTransition } from "@/lib/motion";
 import { cn } from "@/lib/utils";
-import { getMediaUrlEntryMotionKeyframes } from "@/shared/media-url/mediaUrlEntryMotion";
 
 export type MediaUrlEntryLayout = "landing" | "standalone" | "empty-editor" | "editor";
 
@@ -29,17 +29,6 @@ type MediaUrlEntryProps = {
   submitAriaLabel?: string;
 };
 
-const clearMotionStyles = (anchor: HTMLDivElement | null, motion: HTMLDivElement | null) => {
-  if (anchor) anchor.style.height = "";
-  if (!motion) return;
-
-  motion.style.position = "";
-  motion.style.left = "";
-  motion.style.top = "";
-  motion.style.width = "";
-  motion.style.zIndex = "";
-};
-
 export default function MediaUrlEntry({
   layout,
   controller,
@@ -47,87 +36,12 @@ export default function MediaUrlEntry({
   placeholder = "soundcloud, youtube, or tagium share link",
   submitAriaLabel = "start media import",
 }: MediaUrlEntryProps) {
-  const anchorRef = useRef<HTMLDivElement>(null);
-  const motionRef = useRef<HTMLDivElement>(null);
-  const previousRectRef = useRef<DOMRect | null>(null);
-  const previousLayoutRef = useRef(layout);
-  const animationRef = useRef<Animation | null>(null);
-
-  useLayoutEffect(() => {
-    const anchor = anchorRef.current;
-    const motion = motionRef.current;
-    if (!anchor || !motion) return;
-
-    const runningAnimation = animationRef.current;
-    const previousRect = runningAnimation
-      ? motion.getBoundingClientRect()
-      : previousRectRef.current;
-    const layoutChanged = previousLayoutRef.current !== layout;
-    runningAnimation?.cancel();
-    animationRef.current = null;
-    clearMotionStyles(anchor, motion);
-
-    const nextRect = motion.getBoundingClientRect();
-    if (
-      previousRect &&
-      layoutChanged &&
-      !prefersReducedMotion() &&
-      typeof motion.animate === "function"
-    ) {
-      anchor.style.height = `${nextRect.height}px`;
-      motion.style.position = "fixed";
-      motion.style.left = `${previousRect.left}px`;
-      motion.style.top = `${previousRect.top}px`;
-      motion.style.width = `${previousRect.width}px`;
-      motion.style.zIndex = "30";
-
-      const animation = motion.animate(getMediaUrlEntryMotionKeyframes(previousRect, nextRect), {
-        duration: 420,
-        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-      });
-      animationRef.current = animation;
-      animation.onfinish = () => {
-        if (animationRef.current !== animation) return;
-        animationRef.current = null;
-        clearMotionStyles(anchorRef.current, motionRef.current);
-        previousRectRef.current = motion.getBoundingClientRect();
-      };
-    }
-
-    previousRectRef.current = nextRect;
-    previousLayoutRef.current = layout;
-  }, [layout]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const settleMotion = () => {
-      animationRef.current?.cancel();
-      animationRef.current = null;
-      clearMotionStyles(anchorRef.current, motionRef.current);
-      previousRectRef.current = motionRef.current?.getBoundingClientRect() ?? null;
-    };
-
-    window.addEventListener("resize", settleMotion);
-    return () => {
-      window.removeEventListener("resize", settleMotion);
-      settleMotion();
-    };
-  }, []);
+  const [scope, animate] = useAnimate();
+  const reducedMotion = useReducedMotion();
 
   const showValidationFeedback = () => {
-    const feedback = motionRef.current;
-    if (!feedback || prefersReducedMotion() || typeof feedback.animate !== "function") return;
-    feedback.animate(
-      [
-        { transform: "translateX(0)" },
-        { transform: "translateX(-5px)" },
-        { transform: "translateX(4px)" },
-        { transform: "translateX(-2px)" },
-        { transform: "translateX(0)" },
-      ],
-      { duration: 360, easing: "ease-out" },
-    );
+    if (!scope.current || reducedMotion) return;
+    animate(scope.current, { x: [0, -5, 4, -2, 0] }, { duration: 0.36, ease: "easeOut" });
   };
 
   const canSubmit = controller.sourceUrl.trim().length > 0 && !controller.submitting;
@@ -153,14 +67,19 @@ export default function MediaUrlEntry({
         </div>
       )}
       <div
-        ref={anchorRef}
         className={cn(
           "w-full",
           layout === "landing" || layout === "standalone" ? "max-w-md" : "max-w-3xl",
         )}
       >
-        <div ref={motionRef} className="pointer-events-auto w-full bg-background">
-          <form
+        <m.div
+          ref={scope}
+          layout
+          transition={morphTransition}
+          className="pointer-events-auto w-full bg-background"
+        >
+          <m.form
+            layout
             noValidate
             onSubmit={async (event) => {
               event.preventDefault();
@@ -168,8 +87,12 @@ export default function MediaUrlEntry({
             }}
             className="flex items-start gap-2"
           >
-            {leadingAction}
-            <div className="min-w-0 flex-1">
+            {leadingAction !== undefined && leadingAction !== null && (
+              <m.div layout className="shrink-0">
+                {leadingAction}
+              </m.div>
+            )}
+            <m.div layout className="min-w-0 flex-1">
               <div className="relative">
                 <HugeiconsIcon
                   icon={Link02Icon}
@@ -201,37 +124,39 @@ export default function MediaUrlEntry({
               >
                 {controller.validationError ?? ""}
               </p>
-            </div>
-            <Button
-              type="submit"
-              size="icon"
-              disabled={!canSubmit}
-              aria-label={submitAriaLabel}
-              aria-busy={controller.submitting || undefined}
-              className="size-10 rounded-lg"
-            >
-              <IconSwap
-                switched={controller.submitting}
-                first={
-                  <HugeiconsIcon
-                    icon={ArrowRight02Icon}
-                    strokeWidth={2}
-                    className="size-4"
-                    data-media-url-submit-icon="enter"
-                  />
-                }
-                second={
-                  <HugeiconsIcon
-                    icon={loaderCircleIcon}
-                    strokeWidth={2}
-                    className="size-4 animate-spin"
-                    data-media-url-submit-icon="loading"
-                  />
-                }
-              />
-            </Button>
-          </form>
-        </div>
+            </m.div>
+            <m.div layout className="shrink-0">
+              <Button
+                type="submit"
+                size="icon"
+                disabled={!canSubmit}
+                aria-label={submitAriaLabel}
+                aria-busy={controller.submitting || undefined}
+                className="size-10 rounded-lg"
+              >
+                <IconSwap
+                  switched={controller.submitting}
+                  first={
+                    <HugeiconsIcon
+                      icon={ArrowRight02Icon}
+                      strokeWidth={2}
+                      className="size-4"
+                      data-media-url-submit-icon="enter"
+                    />
+                  }
+                  second={
+                    <HugeiconsIcon
+                      icon={loaderCircleIcon}
+                      strokeWidth={2}
+                      className="size-4 animate-spin"
+                      data-media-url-submit-icon="loading"
+                    />
+                  }
+                />
+              </Button>
+            </m.div>
+          </m.form>
+        </m.div>
       </div>
     </div>
   );
