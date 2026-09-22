@@ -855,7 +855,7 @@ function TagiumSaveView({
           viewport shrinks, and the top cap keeps phones anchored high. */}
       <div aria-hidden className="pointer-events-none min-h-12 w-full flex-1 max-sm:max-h-28" />
       <div className="flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6">
-        <TagiumBrand product="save" showTagline={false} />
+        <TagiumBrand product="save" />
 
         <div className="h-14 w-full shrink-0" data-save-download-stage>
           <div className="w-full">
