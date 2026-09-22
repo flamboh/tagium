@@ -1,10 +1,9 @@
 export interface TagiumBrandProps {
   product?: "tagium" | "save";
-  showTagline?: boolean;
 }
 
 /** The shared Tagium wordmark, with an optional companion-product label. */
-export function TagiumBrand({ product = "tagium", showTagline = true }: TagiumBrandProps) {
+export function TagiumBrand({ product = "tagium" }: TagiumBrandProps) {
   return (
     <div className="select-none text-center">
       <h1
@@ -18,7 +17,6 @@ export function TagiumBrand({ product = "tagium", showTagline = true }: TagiumBr
           </span>
         )}
       </h1>
-      {showTagline && <p className="mt-3 text-base text-muted-foreground">tag your music</p>}
     </div>
   );
 }
