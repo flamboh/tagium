@@ -1,22 +1,16 @@
 import { Schema } from "effect";
 
-export class AudioDecodeError extends Schema.TaggedErrorClass<AudioDecodeError>()(
-  "AudioDecodeError",
-  {
-    message: Schema.String,
-    cause: Schema.Unknown,
-  },
-) {}
+export class AudioDecodeError extends Schema.TaggedError<AudioDecodeError>()("AudioDecodeError", {
+  message: Schema.String,
+  cause: Schema.Unknown,
+}) {}
 
-export class AudioWorkerError extends Schema.TaggedErrorClass<AudioWorkerError>()(
-  "AudioWorkerError",
-  {
-    message: Schema.String,
-    cause: Schema.Unknown,
-  },
-) {}
+export class AudioWorkerError extends Schema.TaggedError<AudioWorkerError>()("AudioWorkerError", {
+  message: Schema.String,
+  cause: Schema.Unknown,
+}) {}
 
-export class AudioMetadataReadError extends Schema.TaggedErrorClass<AudioMetadataReadError>()(
+export class AudioMetadataReadError extends Schema.TaggedError<AudioMetadataReadError>()(
   "AudioMetadataReadError",
   {
     message: Schema.String,
@@ -24,7 +18,7 @@ export class AudioMetadataReadError extends Schema.TaggedErrorClass<AudioMetadat
   },
 ) {}
 
-export class AudioMetadataWriteError extends Schema.TaggedErrorClass<AudioMetadataWriteError>()(
+export class AudioMetadataWriteError extends Schema.TaggedError<AudioMetadataWriteError>()(
   "AudioMetadataWriteError",
   {
     message: Schema.String,

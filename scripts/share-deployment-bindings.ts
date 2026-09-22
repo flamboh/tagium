@@ -37,18 +37,19 @@ export const SHARE_DEPLOYMENT_RESOURCES = {
 export const getShareDeploymentResources = (environment: DeployEnvironment) =>
   SHARE_DEPLOYMENT_RESOURCES[environment];
 
-export const wranglerConfigSchema = Schema.Struct({
-  name: optionalMutableKey(Schema.String),
-  vars: optionalMutableKey(Schema.Record(Schema.String, Schema.String)),
-  d1_databases: optionalMutableKey(Schema.Array(Schema.Unknown)),
-  r2_buckets: optionalMutableKey(Schema.Array(Schema.Unknown)),
-  ratelimits: optionalMutableKey(Schema.Array(wranglerBindingSchema)),
-  env: optionalMutableKey(Schema.Unknown),
-});
+export const wranglerConfigSchema = Schema.StructWithRest(
+  Schema.Struct({
+    name: optionalMutableKey(Schema.String),
+    vars: optionalMutableKey(Schema.Record(Schema.String, Schema.String)),
+    d1_databases: optionalMutableKey(Schema.Array(Schema.Unknown)),
+    r2_buckets: optionalMutableKey(Schema.Array(Schema.Unknown)),
+    ratelimits: optionalMutableKey(Schema.Array(wranglerBindingSchema)),
+    env: optionalMutableKey(Schema.Unknown),
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+);
 export type WranglerConfig = Schema.Schema.Type<typeof wranglerConfigSchema>;
-export const decodeWranglerConfig = Schema.decodeUnknownSync(wranglerConfigSchema, {
-  onExcessProperty: "preserve",
-});
+export const decodeWranglerConfig = Schema.decodeUnknownSync(wranglerConfigSchema);
 
 /** Materialize one target into the top-level config used by both Wrangler commands. */
 export const configureShareDeploymentBindings = (
