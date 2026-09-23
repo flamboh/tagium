@@ -56,6 +56,7 @@
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
+    "@alchemy.run/frontend-frameworks": "https://pkg.alchemy.run/@alchemy.run/frontend-frameworks/-/07b5e4857b5cc4947115314c0c757bef5f005a6c014091225c0dd1b32b9be433.tgz",
     "@effect/platform-bun": "4.0.0-rc.117",
     "@effect/platform-node": "4.0.0-rc.117",
     "@eslint/js": "^9.39.4",
