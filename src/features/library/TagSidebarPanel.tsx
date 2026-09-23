@@ -48,6 +48,8 @@ export interface TagSidebarPanelProps {
   shareAlbumActions?: Readonly<Record<string, ShareActionState>>;
   onShareTrack?: (trackId: string) => void;
   shareTrackActions?: Readonly<Record<string, ShareActionState>>;
+  shareSpotlightTrackId?: string | null;
+  onShareSpotlightDismiss?: () => void;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
     trackId: string,
@@ -106,6 +108,8 @@ export default function TagSidebarPanel({
   shareAlbumActions,
   onShareTrack,
   shareTrackActions,
+  shareSpotlightTrackId,
+  onShareSpotlightDismiss,
   onUploadToAlbum,
   onMoveTrackToAlbum,
   onMoveTrackToLoose,
@@ -262,6 +266,8 @@ export default function TagSidebarPanel({
         shareAlbumActions={shareAlbumActions}
         onShareTrack={onShareTrack}
         shareTrackActions={shareTrackActions}
+        shareSpotlightTrackId={shareSpotlightTrackId}
+        onShareSpotlightDismiss={onShareSpotlightDismiss}
         onUploadToAlbum={onUploadToAlbum}
         onMoveTrackToAlbum={onMoveTrackToAlbum}
         onMoveTrackToLoose={onMoveTrackToLoose}

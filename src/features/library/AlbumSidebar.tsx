@@ -52,6 +52,8 @@ interface AlbumSidebarProps {
   shareAlbumActions?: Readonly<Record<string, ShareActionState>>;
   onShareTrack?: (trackId: string) => void;
   shareTrackActions?: Readonly<Record<string, ShareActionState>>;
+  shareSpotlightTrackId?: string | null;
+  onShareSpotlightDismiss?: () => void;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
     trackId: string,
@@ -99,6 +101,8 @@ export default function AlbumSidebar({
   shareAlbumActions = {},
   onShareTrack,
   shareTrackActions = {},
+  shareSpotlightTrackId = null,
+  onShareSpotlightDismiss,
   onUploadToAlbum,
   onMoveTrackToAlbum,
   onMoveTrackToLoose,
@@ -205,6 +209,8 @@ export default function AlbumSidebar({
                   selectedTone={selectedTone(track.id)}
                   muted={track.downloadStatus === "downloading"}
                   actions={actionsForTrack(track)}
+                  shareSpotlight={shareSpotlightTrackId === track.id}
+                  onShareSpotlightDismiss={onShareSpotlightDismiss}
                   onSelect={(event) => onSelectLooseTrack(track.id, event)}
                 />
               ))}
@@ -292,6 +298,8 @@ export default function AlbumSidebar({
                               selectedTone={selectedTone(track.id)}
                               muted={track.downloadStatus === "downloading"}
                               actions={actionsForTrack(track)}
+                              shareSpotlight={shareSpotlightTrackId === track.id}
+                              onShareSpotlightDismiss={onShareSpotlightDismiss}
                               onSelect={(event) => onSelectFile(album.id, track.id, event)}
                             />
                           );
