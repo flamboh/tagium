@@ -30,11 +30,13 @@ flyctl deploy --config fly.cobalt.toml
 
 Alchemy preview stages don't share production Cobalt. `alchemy.run.ts` deploys
 `tagium-cobalt-<stage>` from `Dockerfile.cobalt` with the same machine settings as
-`fly.cobalt.toml`. It uses rolling updates with a 300-second SIGTERM drain, so tunnel machine ids
-stay stable. Each stage generates its own Cobalt API key. Cobalt reads it through `API_KEY_URL` as
-a `data:` URL, `API_AUTH_REQUIRED=1` rejects unauthenticated requests, and the Worker gets the
-same key as `COBALT_API_KEY`. Set `COBALT_MACHINE_COUNT` to deploy more than one machine, for
-example to exercise machine affinity.
+`fly.cobalt.toml`. It deploys blue/green: Alchemy health-checks a new machine set, then cordons
+each old machine and waits up to its 300-second SIGTERM drain before destroying it, so in-flight
+tunnels finish. Machine ids change on every deploy, which is safe because tunnel URLs never
+outlive their Cobalt process. Each stage generates its own Cobalt API key. Cobalt reads it through
+`API_KEY_URL` as a `data:` URL, `API_AUTH_REQUIRED=1` rejects unauthenticated requests, and the
+Worker gets the same key as `COBALT_API_KEY`. Set `COBALT_MACHINE_COUNT` to deploy more than one
+machine, for example to exercise machine affinity.
 
 ## Scaling invariant
 

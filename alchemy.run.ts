@@ -140,7 +140,7 @@ export default Alchemy.Stack(
           ],
         },
       ],
-      deploy: { strategy: "rolling", healthTimeout: "2 minutes" },
+      deploy: { strategy: "bluegreen", healthTimeout: "2 minutes" },
       shutdown: { signal: "SIGTERM", timeout: "300 seconds" },
     });
 
