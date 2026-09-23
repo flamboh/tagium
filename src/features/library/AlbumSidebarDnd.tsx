@@ -4,6 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
+import { m } from "motion/react";
 import {
   AlertCircleIcon,
   BanIcon,
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { rowContent, rowShell } from "@/lib/motion";
 import { AlbumCoverThumb } from "@/features/library/AlbumCoverThumb";
 import {
   albumItemId,
@@ -52,6 +54,7 @@ type TrackRowBaseProps = {
   selectedTone: "primary" | "secondary" | null;
   muted: boolean;
   actions: TrackActionItem[];
+  animateEnter: boolean;
   onSelect: (event: ReactMouseEvent) => void;
 };
 
@@ -78,6 +81,7 @@ export function SortableTrackRow({
   selectedTone,
   muted,
   actions,
+  animateEnter,
   onSelect,
 }: TrackRowProps) {
   const filename = useTrackFilenamePreview(filenamePreviewStore, track.id, track.filename);
@@ -139,66 +143,70 @@ export function SortableTrackRow({
       )}
       style={sortableStyle(transform, transition)}
     >
-      <Button
-        type="button"
-        ref={setActivatorNodeRef}
-        variant="ghost"
-        className={cn(
-          "justify-start h-auto py-2.5 px-4 pr-12 w-full text-left font-normal rounded-none hover:bg-accent/30 [@media(pointer:coarse)]:min-h-11",
-          container === "loose" ? "py-3" : "",
-          muted ? "opacity-65" : "",
-          selectedTone === "primary" ? "bg-accent text-accent-foreground" : "",
-          selectedTone === "secondary" ? "bg-accent/50 text-accent-foreground" : "",
-        )}
-        onClick={onSelect}
-        {...attributes}
-        {...listeners}
-      >
-        <div className="flex flex-col gap-1 w-full min-w-0">
-          <div className="flex items-center gap-1.5 w-full overflow-hidden">
-            {container === "loose" ? (
-              <HugeiconsIcon
-                icon={FileMusicIcon}
-                strokeWidth={2}
-                className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
-              />
-            ) : (
-              <span className="min-w-3 text-[11px] text-muted-foreground">{index}</span>
+      <m.div {...rowShell} initial={animateEnter ? rowShell.initial : false}>
+        <m.div {...rowContent} initial={animateEnter ? rowContent.initial : false}>
+          <Button
+            type="button"
+            ref={setActivatorNodeRef}
+            variant="ghost"
+            className={cn(
+              "justify-start h-auto py-2.5 px-4 pr-12 w-full text-left font-normal rounded-none hover:bg-accent/30 active:scale-100 focus-visible:ring-inset [@media(pointer:coarse)]:min-h-11",
+              container === "loose" ? "py-3" : "",
+              muted ? "opacity-65" : "",
+              selectedTone === "primary" ? "bg-accent text-accent-foreground" : "",
+              selectedTone === "secondary" ? "bg-accent/50 text-accent-foreground" : "",
             )}
-            <span className="truncate text-sm flex-1">{filename}</span>
-            {track.downloadStatus === "downloading" && (
-              <HugeiconsIcon
-                icon={loaderCircleIcon}
-                strokeWidth={2}
-                className="h-3 w-3 shrink-0 animate-spin text-muted-foreground"
-              />
-            )}
-            {track.downloadStatus !== "downloading" && showSavedCheck && (
-              <HugeiconsIcon
-                icon={Tick02Icon}
-                strokeWidth={2}
-                aria-hidden="true"
-                className="h-3 w-3 shrink-0 animate-in fade-in text-success motion-reduce:animate-none"
-              />
-            )}
-            {(track.downloadStatus === "error" || track.status === "error") && (
-              <HugeiconsIcon
-                icon={AlertCircleIcon}
-                strokeWidth={2}
-                aria-label="track has an error"
-                className="h-3 w-3 shrink-0 text-destructive"
-              />
-            )}
-            {track.downloadStatus === "canceled" && (
-              <HugeiconsIcon
-                icon={BanIcon}
-                strokeWidth={2}
-                className="h-3 w-3 text-muted-foreground flex-shrink-0"
-              />
-            )}
-          </div>
-        </div>
-      </Button>
+            onClick={onSelect}
+            {...attributes}
+            {...listeners}
+          >
+            <div className="flex flex-col gap-1 w-full min-w-0">
+              <div className="flex items-center gap-1.5 w-full overflow-hidden">
+                {container === "loose" ? (
+                  <HugeiconsIcon
+                    icon={FileMusicIcon}
+                    strokeWidth={2}
+                    className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                  />
+                ) : (
+                  <span className="min-w-3 text-[11px] text-muted-foreground">{index}</span>
+                )}
+                <span className="truncate text-sm flex-1">{filename}</span>
+                {track.downloadStatus === "downloading" && (
+                  <HugeiconsIcon
+                    icon={loaderCircleIcon}
+                    strokeWidth={2}
+                    className="h-3 w-3 shrink-0 animate-spin text-muted-foreground"
+                  />
+                )}
+                {track.downloadStatus !== "downloading" && showSavedCheck && (
+                  <HugeiconsIcon
+                    icon={Tick02Icon}
+                    strokeWidth={2}
+                    aria-hidden="true"
+                    className="h-3 w-3 shrink-0 animate-in fade-in text-success motion-reduce:animate-none"
+                  />
+                )}
+                {(track.downloadStatus === "error" || track.status === "error") && (
+                  <HugeiconsIcon
+                    icon={AlertCircleIcon}
+                    strokeWidth={2}
+                    aria-label="track has an error"
+                    className="h-3 w-3 shrink-0 text-destructive"
+                  />
+                )}
+                {track.downloadStatus === "canceled" && (
+                  <HugeiconsIcon
+                    icon={BanIcon}
+                    strokeWidth={2}
+                    className="h-3 w-3 text-muted-foreground flex-shrink-0"
+                  />
+                )}
+              </div>
+            </div>
+          </Button>
+        </m.div>
+      </m.div>
       {showSavedCheck && (
         <span role="status" aria-live="polite" className="sr-only">
           track saved
@@ -274,6 +282,7 @@ type AlbumCardProps = {
   canDownload: boolean;
   cleanupSuggestionCount: number;
   actions: AlbumActionItem[];
+  animateEnter: boolean;
   children: ReactNode;
   onSelect: (event: ReactMouseEvent) => void;
   onDownload: () => void;
@@ -328,6 +337,7 @@ export function SortableAlbumCard({
   canDownload,
   cleanupSuggestionCount,
   actions,
+  animateEnter,
   children,
   onSelect,
   onDownload,
@@ -361,93 +371,101 @@ export function SortableAlbumCard({
       onDragOver={onFileDragOver}
       onDrop={onFileDrop}
     >
-      <div className="w-full flex items-center justify-between gap-1 px-3 py-3 border-b">
-        <button
-          type="button"
-          ref={setActivatorNodeRef}
-          className="min-w-0 flex-1 flex items-center gap-2 text-left cursor-pointer"
-          onClick={onSelect}
-          {...attributes}
-          {...listeners}
-        >
-          <AlbumCoverThumb picture={album.cover} />
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium truncate leading-tight">{album.title}</div>
-            <div className="text-xs text-muted-foreground truncate leading-tight">
-              {artistLabel(album.artist)} &middot; {album.trackIds.length} track
-              {album.trackIds.length !== 1 ? "s" : ""}
-            </div>
-          </div>
-        </button>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 [@media(pointer:coarse)]:size-11"
-                onClick={onDownload}
-                disabled={!canDownload}
-                aria-label={`download ${album.title}`}
-              >
-                <HugeiconsIcon icon={Download01Icon} strokeWidth={2} className="h-3.5 w-3.5" />
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            {canDownload ? "download album" : "album tracks need files, metadata, and filenames"}
-          </TooltipContent>
-        </Tooltip>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              ref={menuTriggerRef}
+      <m.div {...rowShell} initial={animateEnter ? rowShell.initial : false}>
+        <m.div {...rowContent} initial={animateEnter ? rowContent.initial : false}>
+          <div className="w-full flex items-center justify-between gap-1 px-3 py-3 border-b">
+            <button
               type="button"
-              variant="ghost"
-              size="icon"
-              className="relative h-7 w-7 [@media(pointer:coarse)]:size-11"
-              aria-label={`album actions for ${album.title}${
-                cleanupSuggestionCount > 0 ? ", cleanup suggested" : ""
-              }`}
+              ref={setActivatorNodeRef}
+              className="min-w-0 flex-1 flex items-center gap-2 text-left cursor-pointer"
+              onClick={onSelect}
+              {...attributes}
+              {...listeners}
             >
-              <HugeiconsIcon icon={MoreVerticalIcon} strokeWidth={2} className="h-3.5 w-3.5" />
-              {cleanupSuggestionCount > 0 && (
-                <span
-                  aria-hidden="true"
-                  className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-primary"
-                />
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64">
-            {actions.map((action) => {
-              const accessibleLabel = [action.label, action.trailingText, action.description]
-                .filter(Boolean)
-                .join(", ");
-              return (
-                <Fragment key={action.id}>
-                  {action.destructive && <hr className="-mx-1 my-1 h-px border-0 bg-border" />}
-                  <DropdownMenuItem
-                    disabled={action.disabled}
-                    aria-label={accessibleLabel}
-                    title={action.description}
-                    className={cn(
-                      "[@media(pointer:coarse)]:min-h-10",
-                      action.destructive &&
-                        "text-destructive focus:bg-destructive/10 focus:text-destructive",
-                    )}
-                    onSelect={() => action.onSelect({ returnFocusTarget: menuTriggerRef.current })}
+              <AlbumCoverThumb picture={album.cover} />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium truncate leading-tight">{album.title}</div>
+                <div className="text-xs text-muted-foreground truncate leading-tight">
+                  {artistLabel(album.artist)} &middot; {album.trackIds.length} track
+                  {album.trackIds.length !== 1 ? "s" : ""}
+                </div>
+              </div>
+            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 [@media(pointer:coarse)]:size-11"
+                    onClick={onDownload}
+                    disabled={!canDownload}
+                    aria-label={`download ${album.title}`}
                   >
-                    <AlbumActionItemContent action={action} />
-                  </DropdownMenuItem>
-                </Fragment>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      {children}
+                    <HugeiconsIcon icon={Download01Icon} strokeWidth={2} className="h-3.5 w-3.5" />
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {canDownload
+                  ? "download album"
+                  : "album tracks need files, metadata, and filenames"}
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  ref={menuTriggerRef}
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="relative h-7 w-7 [@media(pointer:coarse)]:size-11"
+                  aria-label={`album actions for ${album.title}${
+                    cleanupSuggestionCount > 0 ? ", cleanup suggested" : ""
+                  }`}
+                >
+                  <HugeiconsIcon icon={MoreVerticalIcon} strokeWidth={2} className="h-3.5 w-3.5" />
+                  {cleanupSuggestionCount > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-primary"
+                    />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                {actions.map((action) => {
+                  const accessibleLabel = [action.label, action.trailingText, action.description]
+                    .filter(Boolean)
+                    .join(", ");
+                  return (
+                    <Fragment key={action.id}>
+                      {action.destructive && <hr className="-mx-1 my-1 h-px border-0 bg-border" />}
+                      <DropdownMenuItem
+                        disabled={action.disabled}
+                        aria-label={accessibleLabel}
+                        title={action.description}
+                        className={cn(
+                          "[@media(pointer:coarse)]:min-h-10",
+                          action.destructive &&
+                            "text-destructive focus:bg-destructive/10 focus:text-destructive",
+                        )}
+                        onSelect={() =>
+                          action.onSelect({ returnFocusTarget: menuTriggerRef.current })
+                        }
+                      >
+                        <AlbumActionItemContent action={action} />
+                      </DropdownMenuItem>
+                    </Fragment>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          {children}
+        </m.div>
+      </m.div>
     </div>
   );
 }

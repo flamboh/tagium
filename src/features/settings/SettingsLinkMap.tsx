@@ -3,6 +3,7 @@
 import { Link05Icon, Unlink05Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
+import { IconSwap } from "@/components/ui/icon-swap";
 import {
   METADATA_LINK_DESCRIPTORS,
   isMetadataLinkEnabled,
@@ -65,17 +66,17 @@ function LinkRow({
           variant={linked ? "default" : "outline"}
           size="icon"
           className={cn(
-            "relative z-10 size-11 rounded-full transition-[color,background-color,border-color] duration-150 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none sm:size-8",
+            "relative z-10 size-11 rounded-full transition-[color,background-color,border-color,scale] duration-150 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none sm:size-8",
             !linked &&
               "border-border bg-card text-muted-foreground shadow-none hover:border-brand hover:bg-card hover:text-brand focus-visible:border-brand focus-visible:text-brand dark:border-border dark:bg-card dark:hover:bg-card",
           )}
           onClick={() => onChange(withMetadataLinkEnabled(settings, descriptor, !linked))}
         >
-          {linked ? (
-            <HugeiconsIcon icon={Link05Icon} strokeWidth={2} aria-hidden="true" />
-          ) : (
-            <HugeiconsIcon icon={Unlink05Icon} strokeWidth={2} aria-hidden="true" />
-          )}
+          <IconSwap
+            switched={!linked}
+            first={<HugeiconsIcon icon={Link05Icon} strokeWidth={2} />}
+            second={<HugeiconsIcon icon={Unlink05Icon} strokeWidth={2} />}
+          />
         </Button>
         <span className={cn(wireClassName, "origin-left")} aria-hidden="true" />
       </div>

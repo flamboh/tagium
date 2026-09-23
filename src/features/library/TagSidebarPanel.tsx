@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { Cancel01Icon, Moon02Icon, Settings01Icon, Sun03Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
+import { IconSwap } from "@/components/ui/icon-swap";
 import AlbumSidebar from "@/features/library/AlbumSidebar";
 import PlaylistDownloadQueuePanel, {
   type PlaylistDownloadQueuePanelState,
@@ -204,25 +205,17 @@ export default function TagSidebarPanel({
         <button
           type="button"
           className={cn(
-            "group ml-auto inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+            "ml-auto inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md outline-none transition-[color,scale] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.97] motion-reduce:active:scale-100",
             !(mobileOpen && onMobileClose) && "-mr-3",
           )}
           aria-label={`switch to ${theme === "light" ? "dark" : "light"} mode`}
           onClick={toggleTheme}
         >
-          {theme === "light" ? (
-            <HugeiconsIcon
-              icon={Moon02Icon}
-              strokeWidth={2}
-              className="size-4 origin-center transition-transform duration-150 ease-out group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-            />
-          ) : (
-            <HugeiconsIcon
-              icon={Sun03Icon}
-              strokeWidth={2}
-              className="size-4 origin-center transition-transform duration-150 ease-out group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-            />
-          )}
+          <IconSwap
+            switched={theme === "dark"}
+            first={<HugeiconsIcon icon={Moon02Icon} strokeWidth={2} className="size-4" />}
+            second={<HugeiconsIcon icon={Sun03Icon} strokeWidth={2} className="size-4" />}
+          />
         </button>
         {mobileOpen && onMobileClose ? (
           <Button
