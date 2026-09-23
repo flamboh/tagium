@@ -16,8 +16,8 @@ const cobaltAppNamePattern = /^tagium-cobalt-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 const cobaltProxyPort = 9000;
 
 const cobaltEnv = {
-  CUSTOM_INNERTUBE_CLIENT: "WEB_EMBEDDED",
-  YOUTUBE_GENERATE_PO_TOKENS: "0",
+  CUSTOM_INNERTUBE_CLIENT: "TV_SIMPLY",
+  YOUTUBE_GENERATE_PO_TOKENS: "1",
   RATELIMIT_WINDOW: "60",
   RATELIMIT_MAX: "1000",
   TUNNEL_RATELIMIT_WINDOW: "60",
