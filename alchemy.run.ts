@@ -78,10 +78,7 @@ export default Alchemy.Stack(
       );
     }
 
-    const cobaltApp = yield* Fly.App("Cobalt", {
-      name: yield* cobaltAppName(stage),
-      orgSlug: Config.String("FLY_ORG"),
-    });
+    const cobaltApp = yield* Fly.App("Cobalt", { name: yield* cobaltAppName(stage) });
     yield* Fly.IpAssignment("CobaltSharedIpv4", { app: cobaltApp, type: "shared_v4" });
     yield* Fly.IpAssignment("CobaltIpv6", { app: cobaltApp, type: "v6" });
 

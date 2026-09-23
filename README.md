@@ -54,9 +54,9 @@ Deploys go through Cloudflare Workers Builds; `bun run deploy:preview` and
 Isolated preview stages are declared in `alchemy.run.ts`. Each stage gets its own Worker, D1
 database, and R2 bucket on a workers.dev URL, plus its own Cobalt Fly app,
 `tagium-cobalt-<stage>`, with a per-stage API key. Stage names must fit that 30-character Fly app
-name. Deploying needs Bun 1.4.2, Docker, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, an
-org-scoped `FLY_API_TOKEN`, and `FLY_ORG`. The Cobalt image builds from production's pinned base
-in `registry.fly.io`, so log Docker in first:
+name. Deploying needs Bun 1.4.2, Docker, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and an
+org-scoped `FLY_API_TOKEN`, whose org owns the Fly apps. The Cobalt image builds from production's
+pinned base in `registry.fly.io`, so log Docker in first:
 
 ```sh
 echo "$FLY_API_TOKEN" | docker login registry.fly.io -u x --password-stdin
@@ -65,8 +65,7 @@ bun run alchemy:destroy --stage dev-yourname
 ```
 
 Pull requests deploy to `pr-<number>` once the `ALCHEMY_PREVIEWS` repository variable is `true`,
-using the `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `FLY_PREVIEW_API_TOKEN` secrets and
-the `FLY_ORG` variable.
+using the `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `FLY_PREVIEW_API_TOKEN` secrets.
 The `prod` and `production` stages are refused.
 
 ## License
