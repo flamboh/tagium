@@ -53,6 +53,8 @@
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
+    "@effect/platform-bun": "4.0.0-rc.117",
+    "@effect/platform-node": "4.0.0-rc.117",
     "@eslint/js": "^9.39.4",
     "@oxlint/plugins": "1.73.0",
     "@playwright/test": "^1.61.1",
@@ -62,6 +64,7 @@
     "@types/react-dom": "^19",
     "@types/react-test-renderer": "^19.1.0",
     "@vitejs/plugin-react": "^6.0.1",
+    "alchemy": "2.0.0-beta.79",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "nitro": "^3.0.260311-beta",
