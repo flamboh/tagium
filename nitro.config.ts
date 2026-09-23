@@ -13,6 +13,8 @@ const wrangler = {
   vars: {
     COBALT_API_URL: "https://tagium-cobalt.fly.dev/",
     TAGIUM_DEPLOY_ENV: "production",
+    SENTRY_DSN:
+      "https://4e610dc86e5ffd151308b361352a1342@o4511707616182272.ingest.us.sentry.io/4511707631124480",
   },
   ratelimits: [
     {

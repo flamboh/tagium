@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { HTTPError } from "nitro";
 import { mockEvent } from "h3";
 import handler from "../../../server/api/cobalt/download.post";
+import { captureSentryEvents } from "../sentry-events";
 import { resetRateLimitBuckets } from "../../../server/utils/dev-controls";
 
 type RateLimitBinding = {
@@ -327,6 +328,38 @@ describe("cobalt video download endpoint", () => {
     await expect(response.json()).resolves.toEqual({
       status: "error",
       error: { code: "error.api.capacity_exceeded" },
+    });
+  });
+
+  it("reports upstream failures with the source service and cobalt code", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          { status: "error", error: { code: "error.api.content.video.unavailable" } },
+          { status: 400, headers: { "X-Cobalt-Machine-Id": "cobalt-machine-1" } },
+        ),
+      ),
+    );
+
+    let response: Response | undefined;
+    const events = await captureSentryEvents(async () => {
+      response = await handler(makeEvent(makeRequest()));
+    });
+
+    expect(response?.status).toBe(502);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      message: "youtube download failed: error.api.content.video.unavailable",
+      tags: {
+        route: "download",
+        service: "youtube",
+        stage: "cobalt.resolve_error",
+        error_code: "error.api.content.video.unavailable",
+        upstream_status: 400,
+        machine_id: "cobalt-machine-1",
+        request_id: "request-test",
+      },
     });
   });
 
