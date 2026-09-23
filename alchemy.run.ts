@@ -89,7 +89,12 @@ export default Alchemy.Stack(
         username: "x",
         password: Config.Redacted("FLY_API_TOKEN"),
       },
-      build: { context: ".", dockerfile: "Dockerfile.cobalt", platform: "linux/amd64" },
+      build: {
+        context: ".",
+        dockerfile: "Dockerfile.cobalt",
+        platform: "linux/amd64",
+        options: ["--provenance=false"],
+      },
     });
 
     const cobaltApiKey = Output.map(
