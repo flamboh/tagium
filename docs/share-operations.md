@@ -13,7 +13,7 @@ bun install --frozen-lockfile
 bun run build:cloudflare
 ```
 
-`build:cloudflare` maps `WORKERS_CI_BRANCH=main` (or `master`) to production and every other branch to preview; it maps `WORKERS_CI_COMMIT_SHA` to `VITE_PUBLIC_RELEASE_SHA`, enables share links, and passes through `VITE_PUBLIC_POSTHOG_HOST` and `VITE_PUBLIC_POSTHOG_KEY`. Workers Builds supplies Bun **1.3.10**. For a manual non-production upload (including a safe config-only check), use `bun run deploy:preview` (add `--no-upload`); production uses `bun run deploy:production` (add `--no-upload`). These commands only materialize and validate generated config, then upload/deploy; they never mutate D1 or R2.
+`build:cloudflare` maps `WORKERS_CI_BRANCH=main` (or `master`) to production and every other branch to preview; it maps `WORKERS_CI_COMMIT_SHA` to `VITE_PUBLIC_RELEASE_SHA`, enables share links, and passes through `VITE_PUBLIC_POSTHOG_HOST` and `VITE_PUBLIC_POSTHOG_KEY`. Workers Builds must set the `BUN_VERSION` build variable to **1.4.2** to match `packageManager`. For a manual non-production upload (including a safe config-only check), use `bun run deploy:preview` (add `--no-upload`); production uses `bun run deploy:production` (add `--no-upload`). These commands only materialize and validate generated config, then upload/deploy; they never mutate D1 or R2.
 
 Run these reviewed, fail-closed commands once per environment, and again only when intentionally changing infrastructure:
 
