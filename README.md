@@ -64,7 +64,9 @@ bun run alchemy:deploy --stage dev-yourname
 bun run alchemy:destroy --stage dev-yourname
 ```
 
-Pull requests deploy to `pr-<number>` once the `ALCHEMY_PREVIEWS` repository variable is `true`.
+Pull requests deploy to `pr-<number>` once the `ALCHEMY_PREVIEWS` repository variable is `true`,
+using the `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `FLY_PREVIEW_API_TOKEN` secrets and
+the `FLY_ORG` variable.
 The `prod` and `production` stages are refused.
 
 ## License
