@@ -101,7 +101,7 @@ export default Alchemy.Stack(
     );
     const cobaltUrl = Output.interpolate`${cobaltApp.url}/`;
 
-    yield* Fly.Machine("Cobalt", {
+    yield* Fly.Machine("CobaltMachine", {
       app: cobaltApp,
       region: "lax",
       count: Config.Int("COBALT_MACHINE_COUNT").pipe(Config.withDefault(1)),
