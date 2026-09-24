@@ -47,6 +47,7 @@ export interface AlbumGroup {
   artist: string;
   genre: string;
   cover?: AudioMetadata["picture"];
+  coverPending?: boolean;
   trackIds: string[];
   year?: number;
   /** Original provider playlist/set URL, when available. */

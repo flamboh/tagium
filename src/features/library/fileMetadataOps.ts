@@ -489,7 +489,7 @@ export function applyPlaylistImportedCover(
   selectedFileId: string | null,
 ) {
   const coveredAlbums = albums.map((currentAlbum) =>
-    currentAlbum.id === albumId ? { ...currentAlbum, cover } : currentAlbum,
+    currentAlbum.id === albumId ? { ...currentAlbum, cover, coverPending: false } : currentAlbum,
   );
 
   if (

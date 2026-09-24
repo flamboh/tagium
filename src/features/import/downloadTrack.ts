@@ -339,6 +339,7 @@ export const createPlaylistDownloadPlan = ({
     year: playlist.year,
   };
   if (playlist.sourceUrl !== undefined) album.sourceUrl = playlist.sourceUrl;
+  if (playlist.coverUrl) album.coverPending = true;
   const firstPendingFileId = pendingFiles[0]?.id ?? null;
 
   return {

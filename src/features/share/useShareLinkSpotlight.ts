@@ -15,11 +15,15 @@ export const shareLinkSpotlightTarget = ({
   shareAlbumActions,
   shareTrackActions,
 }: {
-  albums: readonly Pick<AlbumGroup, "id">[];
-  files: readonly Pick<TagiumFile, "id">[];
+  albums: readonly Pick<AlbumGroup, "id" | "coverPending">[];
+  files: readonly Pick<TagiumFile, "id" | "downloadStatus">[];
   shareAlbumActions: ShareActions;
   shareTrackActions: ShareActions;
 }): ShareLinkSpotlightTarget | null => {
+  const importing =
+    files.some((file) => file.downloadStatus === "downloading") ||
+    albums.some((album) => album.coverPending);
+  if (importing) return null;
   const album = albums.find((candidate) => canCreateShare(shareAlbumActions[candidate.id]));
   if (album) return { kind: "album", id: album.id };
   const file = files.find((candidate) => canCreateShare(shareTrackActions[candidate.id]));
@@ -39,8 +43,8 @@ export const useShareLinkSpotlight = ({
   visible,
   storage,
 }: {
-  albums: readonly Pick<AlbumGroup, "id">[];
-  files: readonly Pick<TagiumFile, "id">[];
+  albums: readonly Pick<AlbumGroup, "id" | "coverPending">[];
+  files: readonly Pick<TagiumFile, "id" | "downloadStatus">[];
   shareAlbumActions: ShareActions | undefined;
   shareTrackActions: ShareActions | undefined;
   visible: boolean;

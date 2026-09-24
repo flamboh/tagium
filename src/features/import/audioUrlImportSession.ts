@@ -357,6 +357,14 @@ export const createAudioUrlImportSession = ({
             }),
           );
         } catch (error) {
+          const current = library.getSnapshot();
+          library.dispatch({
+            type: "content-replaced",
+            albums: current.albums.map((album) =>
+              album.id === coverImport.albumId ? { ...album, coverPending: false } : album,
+            ),
+            files: current.files,
+          });
           reportSystemFailure(error, "cover-import");
         }
       })();

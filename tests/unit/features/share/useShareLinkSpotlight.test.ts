@@ -41,7 +41,10 @@ type SpotlightProps = Parameters<typeof useShareLinkSpotlight>[0];
 
 const props = (overrides: Partial<SpotlightProps> = {}): SpotlightProps => ({
   albums: [{ id: "shared-album" }, { id: "local-album" }, { id: "playlist" }],
-  files: [{ id: "local" }, { id: "imported" }],
+  files: [
+    { id: "local", downloadStatus: "ready" },
+    { id: "imported", downloadStatus: "ready" },
+  ],
   shareAlbumActions: {
     "shared-album": viewOnly,
     "local-album": unavailable("share album"),
@@ -71,7 +74,35 @@ describe("share link spotlight", () => {
     const storage = memoryStorage();
     const hook = renderHook(
       useShareLinkSpotlight,
-      props({ albums: [], files: [{ id: "local" }], storage }),
+      props({ albums: [], files: [{ id: "local", downloadStatus: "ready" }], storage }),
+    );
+    expect(hook.result.target).toBeNull();
+
+    hook.rerender(props({ storage }));
+    expect(hook.result.target).toEqual({ kind: "album", id: "playlist" });
+  });
+
+  it("waits for running imports to settle before pointing anywhere", () => {
+    const storage = memoryStorage();
+    const hook = renderHook(
+      useShareLinkSpotlight,
+      props({
+        files: [
+          { id: "local", downloadStatus: "ready" },
+          { id: "imported", downloadStatus: "ready" },
+          { id: "queued", downloadStatus: "downloading" },
+        ],
+        storage,
+      }),
+    );
+    expect(hook.result.target).toBeNull();
+
+    hook.rerender(
+      props({
+        albums: [{ id: "playlist", coverPending: true }],
+        shareAlbumActions: { playlist: unavailable("share album") },
+        storage,
+      }),
     );
     expect(hook.result.target).toBeNull();
 
