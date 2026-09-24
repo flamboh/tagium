@@ -1,56 +1,56 @@
-import { useState } from "react";
-import type { TagiumFile } from "@/features/library/types";
+import type { AlbumGroup, TagiumFile } from "@/features/library/types";
+import { useFeatureDiscovery } from "@/features/discovery/featureDiscovery";
 import type { ShareActionState } from "@/features/share/sharePublication";
 
-export const SHARE_LINK_SPOTLIGHT_STORAGE_KEY = "tagium:share-link-spotlight-seen";
+export type ShareLinkSpotlightTarget = { kind: "album" | "track"; id: string };
 
-const loadSeen = (storage?: Pick<Storage, "getItem">) => {
-  try {
-    return (storage ?? localStorage).getItem(SHARE_LINK_SPOTLIGHT_STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
+type ShareActions = Readonly<Record<string, ShareActionState>>;
+
+const canCreateShare = (action: ShareActionState | undefined) =>
+  action?.enabled === true && action.variant === "create";
+
+export const shareLinkSpotlightTarget = ({
+  albums,
+  files,
+  shareAlbumActions,
+  shareTrackActions,
+}: {
+  albums: readonly Pick<AlbumGroup, "id">[];
+  files: readonly Pick<TagiumFile, "id">[];
+  shareAlbumActions: ShareActions;
+  shareTrackActions: ShareActions;
+}): ShareLinkSpotlightTarget | null => {
+  const album = albums.find((candidate) => canCreateShare(shareAlbumActions[candidate.id]));
+  if (album) return { kind: "album", id: album.id };
+  const file = files.find((candidate) => canCreateShare(shareTrackActions[candidate.id]));
+  return file ? { kind: "track", id: file.id } : null;
 };
 
-const storeSeen = (storage?: Pick<Storage, "setItem">) => {
-  try {
-    (storage ?? localStorage).setItem(SHARE_LINK_SPOTLIGHT_STORAGE_KEY, "true");
-  } catch {
-    return;
-  }
-};
-
-const shareLinkSpotlightTrackId = (
-  files: readonly Pick<TagiumFile, "id">[],
-  shareTrackActions: Readonly<Record<string, ShareActionState>>,
-) =>
-  files.find((file) => {
-    const action = shareTrackActions[file.id];
-    return action?.enabled && action.variant === "create";
-  })?.id ?? null;
+export const shareLinkSpotlightCopy = (kind: ShareLinkSpotlightTarget["kind"]) => ({
+  title: "share your edits with a link",
+  description: `anyone with the link gets this ${kind} with your tags and artwork.`,
+});
 
 export const useShareLinkSpotlight = ({
+  albums,
   files,
+  shareAlbumActions,
   shareTrackActions,
   visible,
   storage,
 }: {
+  albums: readonly Pick<AlbumGroup, "id">[];
   files: readonly Pick<TagiumFile, "id">[];
-  shareTrackActions: Readonly<Record<string, ShareActionState>> | undefined;
+  shareAlbumActions: ShareActions | undefined;
+  shareTrackActions: ShareActions | undefined;
   visible: boolean;
   storage?: Pick<Storage, "getItem" | "setItem">;
 }) => {
-  const [seen, setSeen] = useState(() => loadSeen(storage));
-  const trackId =
-    visible && !seen && shareTrackActions
-      ? shareLinkSpotlightTrackId(files, shareTrackActions)
+  const discovery = useFeatureDiscovery("share-links", storage);
+  const target =
+    visible && !discovery.seen && shareAlbumActions && shareTrackActions
+      ? shareLinkSpotlightTarget({ albums, files, shareAlbumActions, shareTrackActions })
       : null;
 
-  return {
-    trackId,
-    dismiss: () => {
-      storeSeen(storage);
-      setSeen(true);
-    },
-  };
+  return { target, dismiss: discovery.markSeen };
 };

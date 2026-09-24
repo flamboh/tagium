@@ -78,7 +78,9 @@ export default function AudioTagger() {
   const { files, albums, looseTrackIds, selectedFileId, selectedAlbumId, selectedFileIds } =
     library.state;
   const shareSpotlight = useShareLinkSpotlight({
+    albums,
     files,
+    shareAlbumActions: shareLinksEnabled ? sharing.shareActions : undefined,
     shareTrackActions: shareLinksEnabled ? sharing.shareTrackActions : undefined,
     visible: !mobileNavigation.isMobile || mobileNavigation.drawerOpen,
   });
@@ -209,7 +211,7 @@ export default function AudioTagger() {
               : undefined
           }
           shareTrackActions={shareLinksEnabled ? sharing.shareTrackActions : undefined}
-          shareSpotlightTrackId={shareSpotlight.trackId}
+          shareSpotlight={shareSpotlight.target}
           onShareSpotlightDismiss={shareSpotlight.dismiss}
           onUploadToAlbum={(albumId, filesToUpload) =>
             runPrimaryAction(() => void importing.commands.upload(filesToUpload, albumId))

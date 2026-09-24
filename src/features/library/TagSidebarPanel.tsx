@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { allTracksReadyForDownload } from "@/features/export/downloadLibrary";
 import { isValidFilenameBase } from "@/features/library/filename";
 import type { ShareActionState } from "@/features/share/sharePublication";
+import type { ShareLinkSpotlightTarget } from "@/features/share/useShareLinkSpotlight";
 import { useTheme } from "@/features/theme/useTheme";
 import type { TrackFilenamePreviewStore } from "@/features/library/trackFilenamePreview";
 
@@ -48,7 +49,7 @@ export interface TagSidebarPanelProps {
   shareAlbumActions?: Readonly<Record<string, ShareActionState>>;
   onShareTrack?: (trackId: string) => void;
   shareTrackActions?: Readonly<Record<string, ShareActionState>>;
-  shareSpotlightTrackId?: string | null;
+  shareSpotlight?: ShareLinkSpotlightTarget | null;
   onShareSpotlightDismiss?: () => void;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
@@ -108,7 +109,7 @@ export default function TagSidebarPanel({
   shareAlbumActions,
   onShareTrack,
   shareTrackActions,
-  shareSpotlightTrackId,
+  shareSpotlight,
   onShareSpotlightDismiss,
   onUploadToAlbum,
   onMoveTrackToAlbum,
@@ -266,7 +267,7 @@ export default function TagSidebarPanel({
         shareAlbumActions={shareAlbumActions}
         onShareTrack={onShareTrack}
         shareTrackActions={shareTrackActions}
-        shareSpotlightTrackId={shareSpotlightTrackId}
+        shareSpotlight={shareSpotlight}
         onShareSpotlightDismiss={onShareSpotlightDismiss}
         onUploadToAlbum={onUploadToAlbum}
         onMoveTrackToAlbum={onMoveTrackToAlbum}

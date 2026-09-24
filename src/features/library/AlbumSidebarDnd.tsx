@@ -21,22 +21,8 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Spotlight,
-  SpotlightAnchor,
-  SpotlightClose,
-  SpotlightContent,
-  SpotlightDescription,
-  SpotlightFooter,
-  SpotlightTitle,
-  spotlightItemClassName,
-} from "@/components/ui/spotlight";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { spotlightItemClassName } from "@/components/ui/spotlight";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { AlbumCoverThumb } from "@/features/library/AlbumCoverThumb";
@@ -48,7 +34,8 @@ import {
 } from "@/features/library/sidebarDnd";
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import type { AlbumActionItem, AlbumActionItemId } from "@/features/library/albumActionItems";
-import type { TrackActionItem } from "@/features/library/trackActionItems";
+import type { TrackActionItem, TrackActionItemId } from "@/features/library/trackActionItems";
+import { type ActionSpotlight, SpotlitActionMenu } from "@/features/library/SpotlitActionMenu";
 import {
   type TrackFilenamePreviewStore,
   useTrackFilenamePreview,
@@ -62,8 +49,7 @@ type TrackRowBaseProps = {
   selectedTone: "primary" | "secondary" | null;
   muted: boolean;
   actions: TrackActionItem[];
-  shareSpotlight?: boolean;
-  onShareSpotlightDismiss?: () => void;
+  spotlight?: ActionSpotlight<TrackActionItemId> | null;
   onSelect: (event: ReactMouseEvent) => void;
 };
 
@@ -90,12 +76,10 @@ export function SortableTrackRow({
   selectedTone,
   muted,
   actions,
-  shareSpotlight = false,
-  onShareSpotlightDismiss,
+  spotlight,
   onSelect,
 }: TrackRowProps) {
   const filename = useTrackFilenamePreview(filenamePreviewStore, track.id, track.filename);
-  const [menuOpen, setMenuOpen] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const previousStatusRef = useRef(track.status);
   const successTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
@@ -219,83 +203,45 @@ export function SortableTrackRow({
           track saved
         </span>
       )}
-      <Spotlight
-        open={shareSpotlight && !menuOpen}
-        onOpenChange={(open) => {
-          if (!open) onShareSpotlightDismiss?.();
-        }}
+      <SpotlitActionMenu
+        spotlight={spotlight}
+        trigger={
+          <Button
+            ref={menuTriggerRef}
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-2 top-1/2 size-7 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100 [@media(pointer:coarse)]:right-0 [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:opacity-100"
+            aria-label={`track actions for ${filename}`}
+          >
+            <HugeiconsIcon icon={MoreVerticalIcon} strokeWidth={2} className="size-3.5" />
+          </Button>
+        }
       >
-        <DropdownMenu
-          open={menuOpen}
-          onOpenChange={(open) => {
-            setMenuOpen(open);
-            if (!open && shareSpotlight) onShareSpotlightDismiss?.();
-          }}
-        >
-          <SpotlightAnchor asChild>
-            <DropdownMenuTrigger asChild>
-              <Button
-                ref={menuTriggerRef}
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-2 top-1/2 size-7 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100 [@media(pointer:coarse)]:right-0 [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:opacity-100"
-                aria-label={`track actions for ${filename}`}
+        {actions.map((action) => {
+          const accessibleLabel = [action.label, action.description].filter(Boolean).join(", ");
+          return (
+            <Fragment key={action.id}>
+              {action.destructive && <hr className="-mx-1 my-1 h-px border-0 bg-border" />}
+              <DropdownMenuItem
+                disabled={action.disabled}
+                aria-label={accessibleLabel}
+                title={action.description}
+                data-spotlight={spotlight?.actionId === action.id ? "active" : undefined}
+                className={cn(
+                  "[@media(pointer:coarse)]:min-h-10",
+                  spotlightItemClassName,
+                  action.destructive &&
+                    "text-destructive focus:bg-destructive/10 focus:text-destructive",
+                )}
+                onSelect={action.onSelect}
               >
-                <HugeiconsIcon icon={MoreVerticalIcon} strokeWidth={2} className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-          </SpotlightAnchor>
-          <DropdownMenuContent align="end" className="w-64">
-            {actions.map((action) => {
-              const accessibleLabel = [action.label, action.description].filter(Boolean).join(", ");
-              const spotlit = shareSpotlight && action.id === "share";
-              return (
-                <Fragment key={action.id}>
-                  {action.destructive && <hr className="-mx-1 my-1 h-px border-0 bg-border" />}
-                  <DropdownMenuItem
-                    disabled={action.disabled}
-                    aria-label={accessibleLabel}
-                    title={action.description}
-                    data-spotlight={spotlit ? "active" : undefined}
-                    className={cn(
-                      "[@media(pointer:coarse)]:min-h-10",
-                      spotlightItemClassName,
-                      action.destructive &&
-                        "text-destructive focus:bg-destructive/10 focus:text-destructive",
-                    )}
-                    onSelect={action.onSelect}
-                  >
-                    <TrackActionItemContent action={action} />
-                    {spotlit && (
-                      <span aria-hidden="true" className="text-[11px] font-medium text-brand">
-                        new
-                      </span>
-                    )}
-                  </DropdownMenuItem>
-                </Fragment>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <SpotlightContent aria-label="share links">
-          <SpotlightTitle>share your edits with a link</SpotlightTitle>
-          <SpotlightDescription>
-            anyone with the link gets this track with your tags and artwork. no audio files are
-            uploaded.
-          </SpotlightDescription>
-          <SpotlightFooter>
-            <SpotlightClose asChild>
-              <Button type="button" variant="ghost" size="sm">
-                got it
-              </Button>
-            </SpotlightClose>
-            <Button type="button" size="sm" onClick={() => setMenuOpen(true)}>
-              show me
-            </Button>
-          </SpotlightFooter>
-        </SpotlightContent>
-      </Spotlight>
+                <TrackActionItemContent action={action} />
+              </DropdownMenuItem>
+            </Fragment>
+          );
+        })}
+      </SpotlitActionMenu>
     </div>
   );
 }
@@ -329,6 +275,7 @@ type AlbumCardProps = {
   canDownload: boolean;
   cleanupSuggestionCount: number;
   actions: AlbumActionItem[];
+  spotlight?: ActionSpotlight<AlbumActionItemId> | null;
   children: ReactNode;
   onSelect: (event: ReactMouseEvent) => void;
   onDownload: () => void;
@@ -383,6 +330,7 @@ export function SortableAlbumCard({
   canDownload,
   cleanupSuggestionCount,
   actions,
+  spotlight,
   children,
   onSelect,
   onDownload,
@@ -454,8 +402,9 @@ export function SortableAlbumCard({
             {canDownload ? "download album" : "album tracks need files, metadata, and filenames"}
           </TooltipContent>
         </Tooltip>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        <SpotlitActionMenu
+          spotlight={spotlight}
+          trigger={
             <Button
               ref={menuTriggerRef}
               type="button"
@@ -474,33 +423,34 @@ export function SortableAlbumCard({
                 />
               )}
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64">
-            {actions.map((action) => {
-              const accessibleLabel = [action.label, action.trailingText, action.description]
-                .filter(Boolean)
-                .join(", ");
-              return (
-                <Fragment key={action.id}>
-                  {action.destructive && <hr className="-mx-1 my-1 h-px border-0 bg-border" />}
-                  <DropdownMenuItem
-                    disabled={action.disabled}
-                    aria-label={accessibleLabel}
-                    title={action.description}
-                    className={cn(
-                      "[@media(pointer:coarse)]:min-h-10",
-                      action.destructive &&
-                        "text-destructive focus:bg-destructive/10 focus:text-destructive",
-                    )}
-                    onSelect={() => action.onSelect({ returnFocusTarget: menuTriggerRef.current })}
-                  >
-                    <AlbumActionItemContent action={action} />
-                  </DropdownMenuItem>
-                </Fragment>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+          }
+        >
+          {actions.map((action) => {
+            const accessibleLabel = [action.label, action.trailingText, action.description]
+              .filter(Boolean)
+              .join(", ");
+            return (
+              <Fragment key={action.id}>
+                {action.destructive && <hr className="-mx-1 my-1 h-px border-0 bg-border" />}
+                <DropdownMenuItem
+                  disabled={action.disabled}
+                  aria-label={accessibleLabel}
+                  title={action.description}
+                  data-spotlight={spotlight?.actionId === action.id ? "active" : undefined}
+                  className={cn(
+                    "[@media(pointer:coarse)]:min-h-10",
+                    spotlightItemClassName,
+                    action.destructive &&
+                      "text-destructive focus:bg-destructive/10 focus:text-destructive",
+                  )}
+                  onSelect={() => action.onSelect({ returnFocusTarget: menuTriggerRef.current })}
+                >
+                  <AlbumActionItemContent action={action} />
+                </DropdownMenuItem>
+              </Fragment>
+            );
+          })}
+        </SpotlitActionMenu>
       </div>
       {children}
     </div>

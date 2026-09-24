@@ -1,22 +1,26 @@
 import { describe, expect, it } from "vite-plus/test";
+import {
+  FEATURE_DISCOVERY_STORAGE_KEY,
+  markFeatureSeen,
+} from "@/features/discovery/featureDiscovery";
 import type { ShareActionState } from "@/features/share/sharePublication";
 import {
-  SHARE_LINK_SPOTLIGHT_STORAGE_KEY,
+  shareLinkSpotlightCopy,
   useShareLinkSpotlight,
 } from "@/features/share/useShareLinkSpotlight";
 import { renderHook } from "../../support/hookTestHarness";
 
-const shareable: ShareActionState = {
+const canCreate = (label: ShareActionState["label"]): ShareActionState => ({
   enabled: true,
-  label: "share track",
-  reason: "share track",
+  label,
+  reason: label,
   variant: "create",
-};
-const unavailable: ShareActionState = {
-  ...shareable,
+});
+const unavailable = (label: ShareActionState["label"]): ShareActionState => ({
+  ...canCreate(label),
   enabled: false,
-  reason: "local tracks cannot be shared",
-};
+  reason: "unavailable",
+});
 const viewOnly: ShareActionState = {
   enabled: true,
   label: "view share link",
@@ -24,8 +28,8 @@ const viewOnly: ShareActionState = {
   variant: "view",
 };
 
-const memoryStorage = (initial: Record<string, string> = {}) => {
-  const values = new Map(Object.entries(initial));
+const memoryStorage = () => {
+  const values = new Map<string, string>();
   return {
     values,
     getItem: (key: string) => values.get(key) ?? null,
@@ -35,73 +39,78 @@ const memoryStorage = (initial: Record<string, string> = {}) => {
 
 type SpotlightProps = Parameters<typeof useShareLinkSpotlight>[0];
 
-const files = [{ id: "local" }, { id: "shared" }, { id: "imported" }, { id: "later" }];
-const actions = { local: unavailable, shared: viewOnly, imported: shareable, later: shareable };
+const props = (overrides: Partial<SpotlightProps> = {}): SpotlightProps => ({
+  albums: [{ id: "shared-album" }, { id: "local-album" }, { id: "playlist" }],
+  files: [{ id: "local" }, { id: "imported" }],
+  shareAlbumActions: {
+    "shared-album": viewOnly,
+    "local-album": unavailable("share album"),
+    playlist: canCreate("share album"),
+  },
+  shareTrackActions: { local: unavailable("share track"), imported: canCreate("share track") },
+  visible: true,
+  storage: memoryStorage(),
+  ...overrides,
+});
 
 describe("share link spotlight", () => {
-  it("targets the first track that can create a new share link", () => {
-    const storage = memoryStorage();
-    const hook = renderHook(useShareLinkSpotlight, {
-      files,
-      shareTrackActions: actions,
-      visible: true,
-      storage,
-    });
-
-    expect(hook.result.trackId).toBe("imported");
+  it("prefers a shareable album over a shareable track", () => {
+    const hook = renderHook(useShareLinkSpotlight, props());
+    expect(hook.result.target).toEqual({ kind: "album", id: "playlist" });
   });
 
-  it("waits until an eligible track exists", () => {
-    const storage = memoryStorage();
-    const hook = renderHook(useShareLinkSpotlight, {
-      files: [{ id: "local" }],
-      shareTrackActions: { local: unavailable },
-      visible: true,
-      storage,
-    });
-    expect(hook.result.trackId).toBeNull();
+  it("falls back to the first shareable track", () => {
+    const hook = renderHook(
+      useShareLinkSpotlight,
+      props({ shareAlbumActions: { playlist: unavailable("share album") } }),
+    );
+    expect(hook.result.target).toEqual({ kind: "track", id: "imported" });
+  });
 
-    hook.rerender({ files, shareTrackActions: actions, visible: true, storage });
-    expect(hook.result.trackId).toBe("imported");
+  it("waits until something can be shared", () => {
+    const storage = memoryStorage();
+    const hook = renderHook(
+      useShareLinkSpotlight,
+      props({ albums: [], files: [{ id: "local" }], storage }),
+    );
+    expect(hook.result.target).toBeNull();
+
+    hook.rerender(props({ storage }));
+    expect(hook.result.target).toEqual({ kind: "album", id: "playlist" });
   });
 
   it("stays hidden while the library is not visible or sharing is off", () => {
     const storage = memoryStorage();
-    const hook = renderHook<SpotlightProps, ReturnType<typeof useShareLinkSpotlight>>(
-      useShareLinkSpotlight,
-      {
-        files,
-        shareTrackActions: actions,
-        visible: false,
-        storage,
-      },
-    );
-    expect(hook.result.trackId).toBeNull();
+    const hook = renderHook(useShareLinkSpotlight, props({ visible: false, storage }));
+    expect(hook.result.target).toBeNull();
 
-    hook.rerender({ files, shareTrackActions: undefined, visible: true, storage });
-    expect(hook.result.trackId).toBeNull();
+    hook.rerender(props({ shareAlbumActions: undefined, shareTrackActions: undefined, storage }));
+    expect(hook.result.target).toBeNull();
   });
 
-  it("remembers dismissal across sessions", () => {
+  it("shares one seen flag across albums and tracks", () => {
     const storage = memoryStorage();
-    const hook = renderHook(useShareLinkSpotlight, {
-      files,
-      shareTrackActions: actions,
-      visible: true,
-      storage,
-    });
+    const hook = renderHook(useShareLinkSpotlight, props({ storage }));
 
     hook.result.dismiss();
-    hook.rerender({ files, shareTrackActions: actions, visible: true, storage });
-    expect(hook.result.trackId).toBeNull();
-    expect(storage.values.get(SHARE_LINK_SPOTLIGHT_STORAGE_KEY)).toBe("true");
+    hook.rerender(props({ storage, shareAlbumActions: {} }));
+    expect(hook.result.target).toBeNull();
+    expect(storage.values.get(FEATURE_DISCOVERY_STORAGE_KEY)).toBe('{"share-links":true}');
+  });
 
-    const nextSession = renderHook(useShareLinkSpotlight, {
-      files,
-      shareTrackActions: actions,
-      visible: true,
-      storage,
-    });
-    expect(nextSession.result.trackId).toBeNull();
+  it("starts hidden once share links were already discovered", () => {
+    const storage = memoryStorage();
+    markFeatureSeen("share-links", storage);
+    const hook = renderHook(useShareLinkSpotlight, props({ storage }));
+    expect(hook.result.target).toBeNull();
+  });
+
+  it("describes what the recipient gets for each kind", () => {
+    expect(shareLinkSpotlightCopy("album").description).toBe(
+      "anyone with the link gets this album with your tags and artwork.",
+    );
+    expect(shareLinkSpotlightCopy("track").description).toBe(
+      "anyone with the link gets this track with your tags and artwork.",
+    );
   });
 });
