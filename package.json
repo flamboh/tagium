@@ -56,6 +56,7 @@
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
+    "@alchemy.run/frontend-frameworks": "https://pkg.alchemy.run/@alchemy.run/frontend-frameworks/-/07b5e4857b5cc4947115314c0c757bef5f005a6c014091225c0dd1b32b9be433.tgz",
     "@effect/platform-bun": "4.0.0-rc.117",
     "@effect/platform-node": "4.0.0-rc.117",
     "@eslint/js": "^9.39.4",
@@ -67,7 +68,7 @@
     "@types/react-dom": "^19",
     "@types/react-test-renderer": "^19.1.0",
     "@vitejs/plugin-react": "^6.0.1",
-    "alchemy": "2.0.0-beta.79",
+    "alchemy": "https://pkg.alchemy.run/alchemy/4eae83e",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "nitro": "^3.0.260311-beta",
@@ -87,5 +88,5 @@
       "onFail": "download"
     }
   },
-  "packageManager": "bun@1.3.10"
+  "packageManager": "bun@1.4.2"
 }
