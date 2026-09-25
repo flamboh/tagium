@@ -2,22 +2,17 @@
 
 import type { MouseEvent as ReactMouseEvent, RefObject } from "react";
 import { useRef, useState } from "react";
-import { Cancel01Icon, Moon02Icon, Settings01Icon, Sun03Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 import AlbumSidebar from "@/features/library/AlbumSidebar";
 import PlaylistDownloadQueuePanel, {
   type PlaylistDownloadQueuePanelState,
 } from "@/features/import/PlaylistDownloadQueuePanel";
 import { AlbumGroup, TagiumFile } from "@/features/library/types";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { allTracksReadyForDownload } from "@/features/export/downloadLibrary";
-import { isValidFilenameBase } from "@/features/library/filename";
 import type { ShareActionState } from "@/features/share/sharePublication";
 import type { ShareLinkSpotlightTarget } from "@/features/share/useShareLinkSpotlight";
-import { useTheme } from "@/features/theme/useTheme";
 import type { TrackFilenamePreviewStore } from "@/features/library/trackFilenamePreview";
+import TagSidebarHeader from "@/features/library/TagSidebarHeader";
+import TagSidebarFooter from "@/features/library/TagSidebarFooter";
 
 export interface TagSidebarPanelProps {
   mobileOpen?: boolean;
@@ -125,18 +120,6 @@ export default function TagSidebarPanel({
 }: TagSidebarPanelProps) {
   const dragCounterRef = useRef(0);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
-  const { theme, toggleTheme } = useTheme();
-  const canDownloadAll = files.length > 0 && allTracksReadyForDownload(files);
-  const hasInvalidFilename = files.some(
-    (file) => file.metadata && !isValidFilenameBase(file.metadata.filename),
-  );
-  const downloadAllReason = loading
-    ? "download in progress"
-    : files.length === 0
-      ? "add tracks first"
-      : hasInvalidFilename
-        ? "every track needs a filename"
-        : "tracks need files and metadata";
 
   const handleSidebarDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
     if (!isFileDrag(event)) return;
@@ -197,51 +180,7 @@ export default function TagSidebarPanel({
       }}
       onDrop={handleSidebarFileDrop}
     >
-      <div className="h-14 flex items-center px-5 border-b flex-shrink-0">
-        <button
-          type="button"
-          aria-label="tagium, go to workspace home"
-          onClick={onGoHome}
-          className="cursor-pointer font-black text-xl tracking-tight select-none rounded-sm transition-colors hover:text-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          tagium
-        </button>
-        <button
-          type="button"
-          className={cn(
-            "group ml-auto inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-            !(mobileOpen && onMobileClose) && "-mr-3",
-          )}
-          aria-label={`switch to ${theme === "light" ? "dark" : "light"} mode`}
-          onClick={toggleTheme}
-        >
-          {theme === "light" ? (
-            <HugeiconsIcon
-              icon={Moon02Icon}
-              strokeWidth={2}
-              className="size-4 origin-center transition-transform duration-150 ease-out group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-            />
-          ) : (
-            <HugeiconsIcon
-              icon={Sun03Icon}
-              strokeWidth={2}
-              className="size-4 origin-center transition-transform duration-150 ease-out group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-            />
-          )}
-        </button>
-        {mobileOpen && onMobileClose ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-11 md:hidden"
-            aria-label="close library"
-            onClick={onMobileClose}
-          >
-            <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
-          </Button>
-        ) : null}
-      </div>
+      <TagSidebarHeader mobileOpen={mobileOpen} onMobileClose={onMobileClose} onGoHome={onGoHome} />
 
       <AlbumSidebar
         albums={albums}
@@ -283,41 +222,13 @@ export default function TagSidebarPanel({
         onRetry={onRetryPlaylistDownloadQueue}
       />
 
-      <div className="px-3 py-3 border-t flex-shrink-0 flex flex-col gap-2">
-        {canDownloadAll && !loading ? (
-          <Button className="w-full [@media(pointer:coarse)]:min-h-11" onClick={onDownloadAll}>
-            download all
-          </Button>
-        ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="block">
-                <Button
-                  className="w-full [@media(pointer:coarse)]:min-h-11"
-                  onClick={onDownloadAll}
-                  disabled
-                >
-                  {loading ? "downloading..." : "download all"}
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>{downloadAllReason}</TooltipContent>
-          </Tooltip>
-        )}
-        <Button
-          variant="outline"
-          data-export-focus-fallback
-          className={cn(
-            "h-auto w-full flex-col justify-center gap-1 py-3 text-center",
-            settingsOpen &&
-              "border-transparent bg-accent text-accent-foreground shadow-none hover:bg-accent",
-          )}
-          onClick={onOpenSettings}
-        >
-          <HugeiconsIcon icon={Settings01Icon} strokeWidth={2} />
-          settings
-        </Button>
-      </div>
+      <TagSidebarFooter
+        files={files}
+        loading={loading}
+        settingsOpen={settingsOpen}
+        onDownloadAll={onDownloadAll}
+        onOpenSettings={onOpenSettings}
+      />
     </div>
   );
 }
