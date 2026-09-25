@@ -24,6 +24,7 @@ export type HttpMethod =
   | "HEAD"
   | "OPTIONS"
   | "TRACE"
+  | "QUERY"
 
 /**
  * Namespace containing subtype helpers associated with `HttpMethod`.
@@ -51,7 +52,7 @@ export declare namespace HttpMethod {
 /**
  * Returns `true` when a method can carry a request body and narrows it to `HttpMethod.WithBody`.
  *
- * @category predicates
+ * @category guards
  * @since 4.0.0
  */
 export const hasBody = (method: HttpMethod): method is HttpMethod.WithBody =>
@@ -76,7 +77,8 @@ export const all: ReadonlySet<HttpMethod> = new Set([
   "PATCH",
   "HEAD",
   "OPTIONS",
-  "TRACE"
+  "TRACE",
+  "QUERY"
 ])
 
 /**
@@ -99,7 +101,8 @@ export const allShort = [
   ["PATCH", "patch"],
   ["HEAD", "head"],
   ["OPTIONS", "options"],
-  ["TRACE", "trace"]
+  ["TRACE", "trace"],
+  ["QUERY", "query"]
 ] as const
 
 /**
@@ -107,18 +110,15 @@ export const allShort = [
  *
  * **Example** (Checking HTTP method values)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { HttpMethod } from "effect/unstable/http"
  *
- * console.log(HttpMethod.isHttpMethod("GET"))
- * // true
- * console.log(HttpMethod.isHttpMethod("get"))
- * // false
- * console.log(HttpMethod.isHttpMethod(1))
- * // false
+ * HttpMethod.isHttpMethod("GET") // => true
+ * HttpMethod.isHttpMethod("get") // => false
+ * HttpMethod.isHttpMethod(1) // => false
  * ```
  *
- * @category refinements
+ * @category guards
  * @since 4.0.0
  */
 export const isHttpMethod = (u: unknown): u is HttpMethod => all.has(u as HttpMethod)

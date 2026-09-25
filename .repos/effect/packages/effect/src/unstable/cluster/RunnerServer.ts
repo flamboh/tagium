@@ -10,6 +10,7 @@
  *
  * @since 4.0.0
  */
+import type * as Cause from "../../Cause.ts"
 import * as Effect from "../../Effect.ts"
 import type * as Exit from "../../Exit.ts"
 import * as Fiber from "../../Fiber.ts"
@@ -17,6 +18,7 @@ import { constant } from "../../Function.ts"
 import * as Layer from "../../Layer.ts"
 import * as Option from "../../Option.ts"
 import * as Queue from "../../Queue.ts"
+import type * as Rpc from "../rpc/Rpc.ts"
 import * as RpcServer from "../rpc/RpcServer.ts"
 import type * as ClusterError from "./ClusterError.ts"
 import * as Message from "./Message.ts"
@@ -30,6 +32,20 @@ import { ShardingConfig } from "./ShardingConfig.ts"
 
 const constVoid = constant(Effect.void)
 
+const serializeDefectReply = <R extends Rpc.Any>(
+  reply: Reply.ReplyWithContext<R>,
+  defect: unknown,
+  codecFor: RpcServer.Protocol["Service"]["codecFor"]
+): Effect.Effect<Reply.Encoded> =>
+  Effect.orDie(Reply.serialize(
+    Reply.ReplyWithContext.fromDefect({
+      id: reply.reply.id,
+      requestId: reply.reply.requestId,
+      defect
+    }),
+    codecFor
+  ))
+
 /**
  * Layer that handles runner protocol RPCs by forwarding requests to `Sharding`
  * and `MessageStorage`.
@@ -40,20 +56,23 @@ const constVoid = constant(Effect.void)
 export const layerHandlers = Runners.Rpcs.toLayer(Effect.gen(function*() {
   const sharding = yield* Sharding.Sharding
   const storage = yield* MessageStorage.MessageStorage
+  const { codecFor } = yield* RpcServer.Protocol
 
   return {
     Ping: () => Effect.void,
-    Notify: ({ envelope }) =>
-      sharding.notify(
-        envelope._tag === "Request"
-          ? new Message.IncomingRequest({
-            envelope,
-            respond: constVoid,
-            lastSentReply: Option.none()
-          })
-          : new Message.IncomingEnvelope({ envelope })
-      ),
-    Effect: ({ persisted, request }) => {
+    Notify: ({ envelope, persisted }) => {
+      const message = envelope._tag === "Request"
+        ? new Message.IncomingRequest({
+          envelope,
+          respond: constVoid,
+          lastSentReply: Option.none(),
+          codecFor
+        })
+        : new Message.IncomingEnvelope({ envelope })
+      return persisted ? sharding.notify(message) : sharding.send(message)
+    },
+    Effect: Effect.fnUntraced(function*({ persisted, request }) {
+      const callerScope = yield* Effect.scope
       let replyEncoded: Option.Option<Effect.Effect<Reply.Encoded, ClusterError.EntityNotAssignedToRunner>> = Option
         .none()
       let resume = (reply: Effect.Effect<Reply.Encoded, ClusterError.EntityNotAssignedToRunner>) => {
@@ -62,13 +81,15 @@ export const layerHandlers = Runners.Rpcs.toLayer(Effect.gen(function*() {
       const message = new Message.IncomingRequest({
         envelope: request,
         lastSentReply: Option.none(),
+        codecFor,
+        callerScope,
         respond(reply) {
-          resume(Effect.orDie(Reply.serialize(reply)))
+          resume(Reply.serializeOrDefect(reply, codecFor))
           return Effect.void
         }
       })
       if (persisted) {
-        return Effect.callback<
+        return yield* Effect.callback<
           Reply.Encoded,
           ClusterError.EntityNotAssignedToRunner
         >((resume_) => {
@@ -95,45 +116,56 @@ export const layerHandlers = Runners.Rpcs.toLayer(Effect.gen(function*() {
           return Fiber.interrupt(fiber)
         })
       }
-      return Effect.andThen(
-        sharding.send(message),
-        Effect.callback<Reply.Encoded, ClusterError.EntityNotAssignedToRunner>((resume_) => {
-          if (Option.isSome(replyEncoded)) {
-            resume_(replyEncoded.value)
-          } else {
-            resume = resume_
-          }
-        })
-      )
-    },
-    Stream: ({ persisted, request }) =>
-      Effect.flatMap(
-        Queue.make<Reply.Encoded, ClusterError.EntityNotAssignedToRunner>(),
-        (queue) => {
-          const message = new Message.IncomingRequest({
-            envelope: request,
-            lastSentReply: Option.none(),
-            respond(reply) {
-              return Effect.flatMap(Reply.serialize(reply), (reply) => {
-                Queue.offerUnsafe(queue, reply)
-                return Effect.void
-              })
-            }
-          })
-          return Effect.as(
-            persisted ?
-              Effect.andThen(
-                storage.registerReplyHandler(message).pipe(
-                  Effect.onError((cause) => Queue.failCause(queue, cause)),
-                  Effect.forkScoped
-                ),
-                sharding.notify(message, constWaitUntilRead)
-              ) :
-              sharding.send(message),
-            queue
+      yield* sharding.send(message)
+      return yield* Effect.callback<Reply.Encoded, ClusterError.EntityNotAssignedToRunner>((resume_) => {
+        if (Option.isSome(replyEncoded)) {
+          resume_(replyEncoded.value)
+        } else {
+          resume = resume_
+        }
+      })
+    }),
+    Stream: Effect.fnUntraced(function*({ persisted, request }) {
+      const callerScope = yield* Effect.scope
+      const queue = yield* Queue.make<Reply.Encoded, ClusterError.EntityNotAssignedToRunner | Cause.Done>()
+      const message = new Message.IncomingRequest({
+        envelope: request,
+        lastSentReply: Option.none(),
+        codecFor,
+        callerScope,
+        respond(reply) {
+          return Reply.serialize(reply, codecFor).pipe(
+            Effect.flatMap((reply) => {
+              Queue.offerUnsafe(queue, reply)
+              if (reply._tag === "WithExit") {
+                Queue.endUnsafe(queue)
+              }
+              return Effect.void
+            }),
+            Effect.catchTag(
+              "MalformedMessage",
+              (error) =>
+                Effect.flatMap(serializeDefectReply(reply, error, codecFor), (reply) => {
+                  // the fallback defect reply is terminal, so end the stream
+                  Queue.offerUnsafe(queue, reply)
+                  Queue.endUnsafe(queue)
+                  return Effect.void
+                })
+            )
           )
         }
-      ),
+      })
+      if (persisted) {
+        yield* storage.registerReplyHandler(message).pipe(
+          Effect.onError((cause) => Queue.failCause(queue, cause)),
+          Effect.forkScoped
+        )
+        yield* sharding.notify(message, constWaitUntilRead)
+      } else {
+        yield* sharding.send(message)
+      }
+      return queue
+    }),
     Envelope: ({ envelope }) => sharding.send(new Message.IncomingEnvelope({ envelope }))
   }
 }))
@@ -165,10 +197,13 @@ const constWaitUntilRead = { waitUntilRead: true } as const
 export const layer: Layer.Layer<
   never,
   never,
-  RpcServer.Protocol | Sharding.Sharding | MessageStorage.MessageStorage
+  | RpcServer.Protocol
+  | Sharding.Sharding
+  | MessageStorage.MessageStorage
 > = RpcServer.layer(Runners.Rpcs, {
   spanPrefix: "RunnerServer",
-  disableTracing: true
+  disableTracing: true,
+  disableFatalDefects: true
 }).pipe(Layer.provide(layerHandlers))
 
 /**

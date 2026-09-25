@@ -2,15 +2,18 @@
  * Defines schemas for Model Context Protocol messages.
  *
  * MCP clients and servers use these schemas to describe the JSON-RPC requests,
- * notifications, results, and errors that can cross the protocol boundary. This
- * module focuses on message shapes: it defines the shared protocol data model,
- * groups related messages for the RPC layer, and provides helpers for optional
- * fields and parameter metadata. Transport and server behavior live in other
- * modules.
+ * notifications, results, and errors that can cross the protocol boundary.
+ * This is the stable public compatibility and authoring surface. It is not an
+ * exact dated wire contract: MCP protocol adapters use frozen schemas under
+ * `internal/mcpSchema` for decoding and encoding. This module groups the
+ * current public message model for application authors and provides helpers
+ * for optional fields and parameter metadata. Transport and server behavior
+ * live in other modules.
  *
  * @since 4.0.0
  */
 import * as Context from "../../Context.ts"
+import * as Data from "../../Data.ts"
 import * as Effect from "../../Effect.ts"
 import { constFalse, constTrue } from "../../Function.ts"
 import * as Option from "../../Option.ts"
@@ -19,10 +22,9 @@ import * as Schema from "../../Schema.ts"
 import * as SchemaGetter from "../../SchemaGetter.ts"
 import type * as Scope from "../../Scope.ts"
 import * as Rpc from "../rpc/Rpc.ts"
-import type * as RpcClient from "../rpc/RpcClient.ts"
-import type { RpcClientError } from "../rpc/RpcClientError.ts"
 import * as RpcGroup from "../rpc/RpcGroup.ts"
 import * as RpcMiddleware from "../rpc/RpcMiddleware.ts"
+import type { ProtocolVersion, StatefulProtocolVersion } from "./McpProtocol.ts"
 
 /**
  * Schema type returned by `optionalWithDefault`.
@@ -100,8 +102,8 @@ export const optional = <S extends Schema.Constraint>(
  */
 export const RequestId: Schema.Union<[
   typeof Schema.String,
-  typeof Schema.Number
-]> = Schema.Union([Schema.String, Schema.Number])
+  typeof Schema.Finite
+]> = Schema.Union([Schema.String, Schema.Finite])
 
 /**
  * Type represented by the JSON-RPC request identifier schema.
@@ -120,8 +122,8 @@ export type RequestId = typeof RequestId.Type
  */
 export const ProgressToken: Schema.Union<[
   typeof Schema.String,
-  typeof Schema.Number
-]> = Schema.Union([Schema.String, Schema.Number])
+  typeof Schema.Finite
+]> = Schema.Union([Schema.String, Schema.Finite])
 
 /**
  * Type represented by the MCP progress token schema.
@@ -143,16 +145,19 @@ export type ProgressToken = typeof ProgressToken.Type
  * @since 4.0.0
  */
 export class RequestMeta extends Schema.Opaque<RequestMeta>()(Schema.Struct({
-  _meta: optional(Schema.Struct({
-    /**
-     * If specified, the caller is requesting out-of-band progress notifications
-     * for this request (as represented by notifications/progress). The value of
-     * this parameter is an opaque token that will be attached to any subsequent
-     * notifications. The receiver is not obligated to provide these
-     * notifications.
-     */
-    progressToken: optional(ProgressToken)
-  }))
+  _meta: optional(Schema.StructWithRest(
+    Schema.Struct({
+      /**
+       * If specified, the caller is requesting out-of-band progress notifications
+       * for this request (as represented by notifications/progress). The value of
+       * this parameter is an opaque token that will be attached to any subsequent
+       * notifications. The receiver is not obligated to provide these
+       * notifications.
+       */
+      progressToken: optional(ProgressToken)
+    }),
+    [Schema.JsonObject]
+  ))
 })) {}
 
 /**
@@ -171,7 +176,7 @@ export class ResultMeta extends Schema.Opaque<ResultMeta>()(Schema.Struct({
    * This result property is reserved by the protocol to allow clients and
    * servers to attach additional metadata to their responses.
    */
-  _meta: optional(Schema.Record(Schema.String, Schema.Json))
+  _meta: optional(Schema.JsonObject)
 })) {}
 
 /**
@@ -190,7 +195,7 @@ export class NotificationMeta extends Schema.Opaque<NotificationMeta>()(Schema.S
    * This parameter name is reserved by MCP to allow clients and servers to
    * attach additional metadata to their notifications.
    */
-  _meta: optional(Schema.Record(Schema.String, Schema.Json))
+  _meta: optional(Schema.JsonObject)
 })) {}
 
 /**
@@ -299,8 +304,38 @@ export class Annotations extends Schema.Opaque<Annotations>()(Schema.Struct({
    * effectively required, while 0 means "least important," and indicates that
    * the data is entirely optional.
    */
-  priority: optional(Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 1 })))
+  priority: optional(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 1 }))),
+  /**
+   * The last time the annotated object was modified, formatted as an ISO 8601
+   * timestamp.
+   */
+  lastModified: optional(Schema.String)
 })) {}
+
+/**
+ * Schema for an icon that an MCP client can display.
+ *
+ * @category schemas
+ * @since 4.0.0
+ */
+export class Icon extends Schema.Class<Icon>("@effect/ai/McpSchema/Icon")({
+  /**
+   * URI containing the icon image.
+   */
+  src: Schema.String,
+  /**
+   * MIME type of the icon, when known.
+   */
+  mimeType: optional(Schema.String),
+  /**
+   * Sizes supported by the icon, such as `"48x48"` or `"any"`.
+   */
+  sizes: optional(Schema.Array(Schema.String)),
+  /**
+   * Color theme for which the icon was designed.
+   */
+  theme: optional(Schema.Literals(["light", "dark"]))
+}) {}
 
 /**
  * Describes the name and version of an MCP implementation.
@@ -311,7 +346,10 @@ export class Annotations extends Schema.Opaque<Annotations>()(Schema.Struct({
 export class Implementation extends Schema.Opaque<Implementation>()(Schema.Struct({
   name: Schema.String,
   title: optional(Schema.String),
-  version: Schema.String
+  version: Schema.String,
+  icons: optional(Schema.Array(Icon)),
+  description: optional(Schema.String),
+  websiteUrl: optional(Schema.String)
 })) {}
 
 /**
@@ -354,11 +392,29 @@ export class ClientCapabilities extends Schema.Class<ClientCapabilities>(
   /**
    * Present if the client supports sampling from an LLM.
    */
-  sampling: optional(Schema.Struct({})),
+  sampling: optional(Schema.Struct({
+    /**
+     * Present if the client supports context inclusion during sampling.
+     */
+    context: optional(Schema.Struct({})),
+    /**
+     * Present if the client supports tool use during sampling.
+     */
+    tools: optional(Schema.Struct({}))
+  })),
   /**
    * Present if the client supports elicitation from the server.
    */
-  elicitation: optional(Schema.Struct({}))
+  elicitation: optional(Schema.Struct({
+    /**
+     * Present if the client supports form-mode elicitation.
+     */
+    form: optional(Schema.Struct({})),
+    /**
+     * Present if the client supports URL-mode elicitation.
+     */
+    url: optional(Schema.Struct({}))
+  }))
 }) {}
 
 /**
@@ -449,7 +505,7 @@ export class McpErrorBase extends Schema.Class<McpErrorBase>(
   /**
    * The error type that occurred.
    */
-  code: Schema.Number,
+  code: Schema.Int,
   /**
    * A short description of the error. The message SHOULD be limited to a
    * concise single sentence.
@@ -525,6 +581,20 @@ export const INTERNAL_ERROR_CODE = -32603 as const
 export const PARSE_ERROR_CODE = -32700 as const
 
 /**
+ * Represents the MCP error code for HTTP headers that do not match the
+ * corresponding request values.
+ *
+ * **When to use**
+ *
+ * Use when building an MCP error response for missing, malformed, or
+ * mismatched request-routing headers.
+ *
+ * @category constants
+ * @since 4.0.0
+ */
+export const HEADER_MISMATCH_ERROR_CODE = -32020 as const
+
+/**
  * Represents an MCP/JSON-RPC error for invalid JSON that could not be parsed.
  *
  * **When to use**
@@ -539,7 +609,7 @@ export const PARSE_ERROR_CODE = -32700 as const
  * @category errors
  * @since 4.0.0
  */
-export class ParseError extends Schema.ErrorClass<ParseError>("effect/ai/McpSchema/ParseError")({
+export class ParseError extends Schema.Error<ParseError>("effect/ai/McpSchema/ParseError")({
   ...McpErrorBase.fields,
   _tag: Schema.tag("ParseError"),
   code: Schema.tag(PARSE_ERROR_CODE)
@@ -560,7 +630,7 @@ export class ParseError extends Schema.ErrorClass<ParseError>("effect/ai/McpSche
  * @category errors
  * @since 4.0.0
  */
-export class InvalidRequest extends Schema.ErrorClass<InvalidRequest>("effect/ai/McpSchema/InvalidRequest")({
+export class InvalidRequest extends Schema.Error<InvalidRequest>("effect/ai/McpSchema/InvalidRequest")({
   ...McpErrorBase.fields,
   _tag: Schema.tag("InvalidRequest"),
   code: Schema.tag(INVALID_REQUEST_ERROR_CODE)
@@ -580,7 +650,7 @@ export class InvalidRequest extends Schema.ErrorClass<InvalidRequest>("effect/ai
  * @category errors
  * @since 4.0.0
  */
-export class MethodNotFound extends Schema.ErrorClass<MethodNotFound>("effect/ai/McpSchema/MethodNotFound")({
+export class MethodNotFound extends Schema.Error<MethodNotFound>("effect/ai/McpSchema/MethodNotFound")({
   ...McpErrorBase.fields,
   _tag: Schema.tag("MethodNotFound"),
   code: Schema.tag(METHOD_NOT_FOUND_ERROR_CODE)
@@ -601,7 +671,7 @@ export class MethodNotFound extends Schema.ErrorClass<MethodNotFound>("effect/ai
  * @category errors
  * @since 4.0.0
  */
-export class InvalidParams extends Schema.ErrorClass<InvalidParams>("effect/ai/McpSchema/InvalidParams")({
+export class InvalidParams extends Schema.Error<InvalidParams>("effect/ai/McpSchema/InvalidParams")({
   ...McpErrorBase.fields,
   _tag: Schema.tag("InvalidParams"),
   code: Schema.tag(INVALID_PARAMS_ERROR_CODE)
@@ -623,7 +693,7 @@ export class InvalidParams extends Schema.ErrorClass<InvalidParams>("effect/ai/M
  * @category errors
  * @since 4.0.0
  */
-export class InternalError extends Schema.ErrorClass<InternalError>("effect/ai/McpSchema/InternalError")({
+export class InternalError extends Schema.Error<InternalError>("effect/ai/McpSchema/InternalError")({
   ...McpErrorBase.fields,
   _tag: Schema.tag("InternalError"),
   code: Schema.tag(INTERNAL_ERROR_CODE)
@@ -647,6 +717,14 @@ export const McpError = Schema.Union([
   McpErrorBase
 ])
 
+/**
+ * Type represented by the MCP protocol error schema.
+ *
+ * @category models
+ * @since 4.0.0
+ */
+export type McpError = typeof McpError.Type
+
 // =============================================================================
 // Ping
 // =============================================================================
@@ -662,7 +740,7 @@ export const McpError = Schema.Union([
  *
  * The receiver should respond promptly; otherwise the sender may disconnect.
  *
- * @category ping
+ * @category protocols
  * @since 4.0.0
  */
 export class Ping extends Rpc.make("ping", {
@@ -678,7 +756,7 @@ export class Ping extends Rpc.make("ping", {
 /**
  * Schema for the server's response to an initialize request from the client.
  *
- * @category initialization
+ * @category schemas
  * @since 4.0.0
  */
 export class InitializeResult extends Schema.Opaque<InitializeResult>()(Schema.Struct({
@@ -705,7 +783,7 @@ export class InitializeResult extends Schema.Opaque<InitializeResult>()(Schema.S
  * Sent from the client to the server when it first connects, asking it to begin
  * initialization.
  *
- * @category initialization
+ * @category protocols
  * @since 4.0.0
  */
 export class Initialize extends Rpc.make("initialize", {
@@ -734,7 +812,7 @@ export class Initialize extends Rpc.make("initialize", {
 /**
  * Sent from the client to the server after initialization has finished.
  *
- * @category initialization
+ * @category protocols
  * @since 4.0.0
  */
 export class InitializedNotification extends Rpc.make("notifications/initialized", {
@@ -754,7 +832,7 @@ export class InitializedNotification extends Rpc.make("notifications/initialized
  * The payload identifies the request to cancel and may include a
  * human-readable reason.
  *
- * @category cancellation
+ * @category protocols
  * @since 4.0.0
  */
 export class CancelledNotification extends Rpc.make("notifications/cancelled", {
@@ -782,7 +860,7 @@ export class CancelledNotification extends Rpc.make("notifications/cancelled", {
 /**
  * Sent from either peer to report progress for a long-running request.
  *
- * @category progress
+ * @category protocols
  * @since 4.0.0
  */
 export class ProgressNotification extends Rpc.make("notifications/progress", {
@@ -797,11 +875,11 @@ export class ProgressNotification extends Rpc.make("notifications/progress", {
      * The progress thus far. This should increase every time progress is made,
      * even if the total is unknown.
      */
-    progress: optional(Schema.Number),
+    progress: Schema.Finite,
     /**
      * Total number of items to process (or total progress required), if known.
      */
-    total: optional(Schema.Number),
+    total: optional(Schema.Finite),
     /**
      * An optional message describing the current progress.
      */
@@ -816,7 +894,7 @@ export class ProgressNotification extends Rpc.make("notifications/progress", {
 /**
  * Schema for a known resource that the server is capable of reading.
  *
- * @category resources
+ * @category schemas
  * @since 4.0.0
  */
 export class Resource extends Schema.Class<Resource>(
@@ -849,26 +927,30 @@ export class Resource extends Schema.Class<Resource>(
    */
   annotations: optional(Annotations),
   /**
+   * Icons that clients can display for this resource.
+   */
+  icons: optional(Schema.Array(Icon)),
+  /**
    * The size of the raw resource content, in bytes (i.e., before base64
    * encoding or any tokenization), if known.
    *
    * This can be used by Hosts to display file sizes and estimate context
    * window usage.
    */
-  size: optional(Schema.Number),
+  size: optional(Schema.Int),
   /**
    * Optional additional metadata for the client.
    *
    * This parameter name is reserved by MCP to allow clients and servers to
    * attach additional metadata to resources.
    */
-  _meta: optional(Schema.Record(Schema.String, Schema.Json))
+  _meta: optional(Schema.JsonObject)
 }) {}
 
 /**
  * Schema for a template description of resources available on the server.
  *
- * @category resources
+ * @category schemas
  * @since 4.0.0
  */
 export class ResourceTemplate extends Schema.Class<ResourceTemplate>(
@@ -904,17 +986,21 @@ export class ResourceTemplate extends Schema.Class<ResourceTemplate>(
    * Optional annotations for the client.
    */
   annotations: optional(Annotations),
+  /**
+   * Icons that clients can display for this resource template.
+   */
+  icons: optional(Schema.Array(Icon)),
 
   /**
    * Optional additional metadata for the client.
    */
-  _meta: optional(Schema.Record(Schema.String, Schema.Json))
+  _meta: optional(Schema.JsonObject)
 }) {}
 
 /**
  * Schema for the contents of a specific resource or sub-resource.
  *
- * @category resources
+ * @category schemas
  * @since 4.0.0
  */
 export class ResourceContents extends Schema.Opaque<ResourceContents>()(Schema.Struct({
@@ -929,13 +1015,13 @@ export class ResourceContents extends Schema.Opaque<ResourceContents>()(Schema.S
   /**
    * Optional additional metadata for the client.
    */
-  _meta: optional(Schema.Record(Schema.String, Schema.Json))
+  _meta: optional(Schema.JsonObject)
 })) {}
 
 /**
  * Schema for text resource contents represented as a string.
  *
- * @category resources
+ * @category schemas
  * @since 4.0.0
  */
 export class TextResourceContents extends Schema.Opaque<TextResourceContents>()(Schema.Struct({
@@ -950,7 +1036,7 @@ export class TextResourceContents extends Schema.Opaque<TextResourceContents>()(
 /**
  * Schema for binary resource contents represented as a `Uint8Array`.
  *
- * @category resources
+ * @category schemas
  * @since 4.0.0
  */
 export class BlobResourceContents extends Schema.Opaque<BlobResourceContents>()(Schema.Struct({
@@ -958,13 +1044,13 @@ export class BlobResourceContents extends Schema.Opaque<BlobResourceContents>()(
   /**
    * The binary data of the item decoded from a base64-encoded string.
    */
-  blob: Schema.Uint8Array
+  blob: Schema.Uint8ArrayFromBase64
 })) {}
 
 /**
  * Schema for the server's response to a resources/list request from the client.
  *
- * @category resources
+ * @category schemas
  * @since 4.0.0
  */
 export class ListResourcesResult extends Schema.Class<ListResourcesResult>(
@@ -977,7 +1063,7 @@ export class ListResourcesResult extends Schema.Class<ListResourcesResult>(
 /**
  * Sent from the client to request a list of resources the server has.
  *
- * @category resources
+ * @category protocols
  * @since 4.0.0
  */
 export class ListResources extends Rpc.make("resources/list", {
@@ -990,7 +1076,7 @@ export class ListResources extends Rpc.make("resources/list", {
  * Schema for the server's response to a resources/templates/list request from
  * the client.
  *
- * @category resources
+ * @category schemas
  * @since 4.0.0
  */
 export class ListResourceTemplatesResult extends Schema.Class<ListResourceTemplatesResult>(
@@ -1003,7 +1089,7 @@ export class ListResourceTemplatesResult extends Schema.Class<ListResourceTempla
 /**
  * Sent from the client to request a list of resource templates the server has.
  *
- * @category resources
+ * @category protocols
  * @since 4.0.0
  */
 export class ListResourceTemplates extends Rpc.make("resources/templates/list", {
@@ -1015,7 +1101,7 @@ export class ListResourceTemplates extends Rpc.make("resources/templates/list", 
 /**
  * Schema for the server's response to a resources/read request from the client.
  *
- * @category resources
+ * @category schemas
  * @since 4.0.0
  */
 export class ReadResourceResult extends Schema.Opaque<ReadResourceResult>()(Schema.Struct({
@@ -1026,7 +1112,7 @@ export class ReadResourceResult extends Schema.Opaque<ReadResourceResult>()(Sche
 /**
  * Sent from the client to the server, to read a specific resource URI.
  *
- * @category resources
+ * @category protocols
  * @since 4.0.0
  */
 export class ReadResource extends Rpc.make("resources/read", {
@@ -1053,7 +1139,7 @@ export class ReadResource extends Rpc.make("resources/read", {
  *
  * Servers may send this notification without a previous client subscription.
  *
- * @category resources
+ * @category protocols
  * @since 4.0.0
  */
 export class ResourceListChangedNotification extends Rpc.make("notifications/resources/list_changed", {
@@ -1064,10 +1150,11 @@ export class ResourceListChangedNotification extends Rpc.make("notifications/res
  * Sent from the client to request resources/updated notifications from the
  * server whenever a particular resource changes.
  *
- * @category resources
+ * @category protocols
  * @since 4.0.0
  */
 export class Subscribe extends Rpc.make("resources/subscribe", {
+  success: Schema.Struct({}),
   error: McpError,
   payload: {
     ...RequestMeta.fields,
@@ -1084,10 +1171,11 @@ export class Subscribe extends Rpc.make("resources/subscribe", {
  * notifications from the server. This should follow a previous
  * resources/subscribe request.
  *
- * @category resources
+ * @category protocols
  * @since 4.0.0
  */
 export class Unsubscribe extends Rpc.make("resources/unsubscribe", {
+  success: Schema.Struct({}),
   error: McpError,
   payload: {
     ...RequestMeta.fields,
@@ -1107,7 +1195,7 @@ export class Unsubscribe extends Rpc.make("resources/unsubscribe", {
  * The URI may identify a sub-resource of the resource that the client
  * originally subscribed to.
  *
- * @category resources
+ * @category protocols
  * @since 4.0.0
  */
 export class ResourceUpdatedNotification extends Rpc.make("notifications/resources/updated", {
@@ -1167,7 +1255,12 @@ export class Prompt extends Schema.Class<Prompt>(
   /**
    * A list of arguments to use for templating the prompt.
    */
-  arguments: optional(Schema.Array(PromptArgument))
+  arguments: optional(Schema.Array(PromptArgument)),
+  /**
+   * Icons that clients can display for this prompt.
+   */
+  icons: optional(Schema.Array(Icon)),
+  _meta: optional(Schema.JsonObject)
 }) {}
 
 /**
@@ -1185,7 +1278,8 @@ export class TextContent extends Schema.Opaque<TextContent>()(Schema.Struct({
   /**
    * Optional annotations for the client.
    */
-  annotations: optional(Annotations)
+  annotations: optional(Annotations),
+  _meta: optional(Schema.JsonObject)
 })) {}
 
 /**
@@ -1199,7 +1293,7 @@ export class ImageContent extends Schema.Opaque<ImageContent>()(Schema.Struct({
   /**
    * The image data.
    */
-  data: Schema.Uint8Array,
+  data: Schema.Uint8ArrayFromBase64,
   /**
    * The MIME type of the image. Different providers may support different
    * image types.
@@ -1208,7 +1302,8 @@ export class ImageContent extends Schema.Opaque<ImageContent>()(Schema.Struct({
   /**
    * Optional annotations for the client.
    */
-  annotations: optional(Annotations)
+  annotations: optional(Annotations),
+  _meta: optional(Schema.JsonObject)
 })) {}
 
 /**
@@ -1222,7 +1317,7 @@ export class AudioContent extends Schema.Opaque<AudioContent>()(Schema.Struct({
   /**
    * The audio data.
    */
-  data: Schema.Uint8Array,
+  data: Schema.Uint8ArrayFromBase64,
   /**
    * The MIME type of the audio. Different providers may support different
    * audio types.
@@ -1231,7 +1326,8 @@ export class AudioContent extends Schema.Opaque<AudioContent>()(Schema.Struct({
   /**
    * Optional annotations for the client.
    */
-  annotations: optional(Annotations)
+  annotations: optional(Annotations),
+  _meta: optional(Schema.JsonObject)
 })) {}
 
 /**
@@ -1251,7 +1347,8 @@ export class EmbeddedResource extends Schema.Opaque<EmbeddedResource>()(Schema.S
   /**
    * Optional annotations for the client.
    */
-  annotations: optional(Annotations)
+  annotations: optional(Annotations),
+  _meta: optional(Schema.JsonObject)
 })) {}
 
 /**
@@ -1284,6 +1381,14 @@ export const ContentBlock = Schema.Union([
   EmbeddedResource,
   ResourceLink
 ])
+
+/**
+ * Type represented by the MCP content block schema.
+ *
+ * @category models
+ * @since 4.0.0
+ */
+export type ContentBlock = typeof ContentBlock.Type
 
 /**
  * Describes a message returned as part of a prompt.
@@ -1403,7 +1508,7 @@ export class PromptListChangedNotification extends Rpc.make("notifications/promp
  * Clients should never make tool use decisions based on ToolAnnotations
  * received from untrusted servers.
  *
- * @category tools
+ * @category schemas
  * @since 4.0.0
  */
 export class ToolAnnotations extends Schema.Opaque<ToolAnnotations>()(Schema.Struct({
@@ -1447,9 +1552,61 @@ export class ToolAnnotations extends Schema.Opaque<ToolAnnotations>()(Schema.Str
 })) {}
 
 /**
- * Schema for the definition of a tool the client can call.
+ * Object-root JSON Schema used by MCP tool inputs.
+ *
+ * **Details**
+ *
+ * Property definitions and additional root keywords are constrained to JSON
+ * values. The open root supports generated keywords such as `$defs`.
  *
  * @category tools
+ * @since 4.0.0
+ */
+export type ToolJson = Schema.JsonObject & {
+  readonly type: "object"
+  readonly properties?: Readonly<Record<string, Schema.JsonObject>> | undefined
+  readonly required?: ReadonlyArray<string> | undefined
+}
+
+/**
+ * Schema for {@link ToolJson}.
+ *
+ * @category tools
+ * @since 4.0.0
+ */
+export const ToolJson: Schema.Codec<ToolJson> = Schema.StructWithRest(
+  Schema.Struct({
+    type: Schema.Literal("object"),
+    properties: optional(Schema.Record(Schema.String, Schema.JsonObject)),
+    required: optional(Schema.Array(Schema.String))
+  }),
+  [Schema.JsonObject]
+)
+
+/**
+ * JSON Schema used by MCP tool outputs.
+ *
+ * **Details**
+ *
+ * Unlike tool inputs, tool outputs may use any JSON Schema root type.
+ *
+ * @category tools
+ * @since 4.0.0
+ */
+export type ToolOutputJson = Schema.JsonObject
+
+/**
+ * Schema for {@link ToolOutputJson}.
+ *
+ * @category tools
+ * @since 4.0.0
+ */
+export const ToolOutputJson: Schema.Codec<ToolOutputJson> = Schema.JsonObject
+
+/**
+ * Schema for the definition of a tool the client can call.
+ *
+ * @category schemas
  * @since 4.0.0
  */
 export class Tool extends Schema.Class<Tool>(
@@ -1469,24 +1626,32 @@ export class Tool extends Schema.Class<Tool>(
   /**
    * A JSON Schema object defining the expected parameters for the tool.
    */
-  inputSchema: Schema.Any,
+  inputSchema: ToolJson,
+  /**
+   * An optional JSON Schema object defining the structure of the tool output.
+   */
+  outputSchema: optional(ToolOutputJson),
   /**
    * Optional additional tool information.
    */
   annotations: optional(ToolAnnotations),
+  /**
+   * Icons that clients can display for this tool.
+   */
+  icons: optional(Schema.Array(Icon)),
   /**
    * Optional additional metadata for the client.
    *
    * This parameter name is reserved by MCP to allow clients and servers to
    * attach additional metadata to resources.
    */
-  _meta: optional(Schema.Record(Schema.String, Schema.Json))
+  _meta: optional(Schema.JsonObject)
 }) {}
 
 /**
  * Schema for the server's response to a tools/list request from the client.
  *
- * @category tools
+ * @category schemas
  * @since 4.0.0
  */
 export class ListToolsResult extends Schema.Class<ListToolsResult>(
@@ -1499,7 +1664,7 @@ export class ListToolsResult extends Schema.Class<ListToolsResult>(
 /**
  * Sent from the client to request a list of tools the server has.
  *
- * @category tools
+ * @category protocols
  * @since 4.0.0
  */
 export class ListTools extends Rpc.make("tools/list", {
@@ -1520,13 +1685,16 @@ export class ListTools extends Rpc.make("tools/list", {
  * indicating that the server does not support tool calls, or any other
  * exceptional conditions, should be reported as an MCP error response.
  *
- * @category tools
+ * @category schemas
  * @since 4.0.0
  */
 export class CallToolResult extends Schema.Class<CallToolResult>("@effect/ai/McpSchema/CallToolResult")({
   ...ResultMeta.fields,
   content: Schema.Array(ContentBlock),
-  structuredContent: optional(Schema.Any),
+  /**
+   * An optional JSON value containing the structured result of the tool call.
+   */
+  structuredContent: optional(Schema.Json),
   /**
    * Whether the tool call ended in an error.
    *
@@ -1546,7 +1714,7 @@ export class CallToolResult extends Schema.Class<CallToolResult>("@effect/ai/Mcp
  * @see {@link ListTools} for discovering available tools before calling one
  * @see {@link CallToolResult} for the successful tool-call result shape
  *
- * @category tools
+ * @category protocols
  * @since 4.0.0
  */
 export class CallTool extends Rpc.make("tools/call", {
@@ -1555,9 +1723,12 @@ export class CallTool extends Rpc.make("tools/call", {
   payload: {
     ...RequestMeta.fields,
     name: Schema.String,
-    arguments: Schema.Record(
-      Schema.String,
-      Schema.Any
+    arguments: optionalWithDefault(
+      Schema.Record(
+        Schema.String,
+        Schema.Any
+      ),
+      () => ({})
     )
   }
 }) {}
@@ -1573,7 +1744,7 @@ export class CallTool extends Rpc.make("tools/call", {
  *
  * Servers may send this notification without a previous client subscription.
  *
- * @category tools
+ * @category protocols
  * @since 4.0.0
  */
 export class ToolListChangedNotification extends Rpc.make("notifications/tools/list_changed", {
@@ -1638,6 +1809,7 @@ export class SetLevel extends Rpc.make("logging/setLevel", {
      */
     level: LoggingLevel
   },
+  success: Schema.Struct({}),
   error: McpError
 }) {}
 
@@ -1676,15 +1848,101 @@ export class LoggingMessageNotification extends Rpc.make("notifications/message"
 // =============================================================================
 
 /**
- * Describes a message issued to or received from an LLM API.
+ * Schema for a tool-use request produced during MCP sampling.
  *
  * @category sampling
  * @since 4.0.0
  */
+export class ToolUseContent extends Schema.Class<ToolUseContent>("@effect/ai/McpSchema/ToolUseContent")({
+  type: Schema.tag("tool_use"),
+  /**
+   * Identifier used to associate a later tool result with this request.
+   */
+  id: Schema.String,
+  /**
+   * Name of the tool to invoke.
+   */
+  name: Schema.String,
+  /**
+   * Arguments supplied to the tool.
+   */
+  input: Schema.Record(Schema.String, Schema.Unknown),
+  _meta: optional(Schema.JsonObject)
+}) {}
+
+/**
+ * Schema for the result of a tool use supplied in a sampling message.
+ *
+ * @category sampling
+ * @since 4.0.0
+ */
+export class ToolResultContent extends Schema.Class<ToolResultContent>("@effect/ai/McpSchema/ToolResultContent")({
+  type: Schema.tag("tool_result"),
+  /**
+   * Identifier of the tool-use request that produced this result.
+   */
+  toolUseId: Schema.String,
+  /**
+   * Content returned by the tool.
+   */
+  content: Schema.Array(ContentBlock),
+  /**
+   * Optional structured result returned by the tool.
+   */
+  structuredContent: optional(Schema.Json),
+  /**
+   * Whether tool execution ended in an error.
+   */
+  isError: optional(Schema.Boolean),
+  _meta: optional(Schema.JsonObject)
+}) {}
+
+/**
+ * Schema for content blocks accepted in MCP sampling messages.
+ *
+ * @category sampling
+ * @since 4.0.0
+ */
+export const SamplingMessageContentBlock = Schema.Union([
+  TextContent,
+  ImageContent,
+  AudioContent,
+  ToolUseContent,
+  ToolResultContent
+])
+
+/**
+ * Type represented by the MCP sampling message content block schema.
+ *
+ * @category models
+ * @since 4.0.0
+ */
+export type SamplingMessageContentBlock = typeof SamplingMessageContentBlock.Type
+
+/**
+ * Describes a message issued to or received from an LLM API.
+ *
+ * @category schemas
+ * @since 4.0.0
+ */
 export class SamplingMessage extends Schema.Opaque<SamplingMessage>()(Schema.Struct({
   role: Role,
-  content: Schema.Union([TextContent, ImageContent, AudioContent])
+  content: Schema.Union([SamplingMessageContentBlock, Schema.Array(SamplingMessageContentBlock)]),
+  _meta: optional(Schema.JsonObject)
 })) {}
+
+/**
+ * Schema for controlling tool selection during MCP sampling.
+ *
+ * @category sampling
+ * @since 4.0.0
+ */
+export class ToolChoice extends Schema.Class<ToolChoice>("@effect/ai/McpSchema/ToolChoice")({
+  /**
+   * Tool-selection mode requested from the client.
+   */
+  mode: optional(Schema.Literals(["auto", "required", "none"]))
+}) {}
 
 /**
  * Schema for model selection hints.
@@ -1694,7 +1952,7 @@ export class SamplingMessage extends Schema.Opaque<SamplingMessage>()(Schema.Str
  * Keys not declared here are currently left unspecified by the spec and are up
  * to the client to interpret.
  *
- * @category sampling
+ * @category schemas
  * @since 4.0.0
  */
 export class ModelHint extends Schema.Opaque<ModelHint>()(Schema.Struct({
@@ -1731,7 +1989,7 @@ export class ModelHint extends Schema.Opaque<ModelHint>()(Schema.Struct({
  * up to the client to decide how to interpret these preferences and how to
  * balance them against other considerations.
  *
- * @category sampling
+ * @category schemas
  * @since 4.0.0
  */
 export class ModelPreferences extends Schema.Class<ModelPreferences>(
@@ -1752,19 +2010,19 @@ export class ModelPreferences extends Schema.Class<ModelPreferences>(
    * is not important, while a value of 1 means cost is the most important
    * factor.
    */
-  costPriority: optional(Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 1 }))),
+  costPriority: optional(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 1 }))),
   /**
    * How much to prioritize sampling speed (latency) when selecting a model. A
    * value of 0 means speed is not important, while a value of 1 means speed is
    * the most important factor.
    */
-  speedPriority: optional(Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 1 }))),
+  speedPriority: optional(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 1 }))),
   /**
    * How much to prioritize intelligence and capabilities when selecting a
    * model. A value of 0 means intelligence is not important, while a value of 1
    * means intelligence is the most important factor.
    */
-  intelligencePriority: optional(Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 1 })))
+  intelligencePriority: optional(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 1 })))
 }) {}
 
 /**
@@ -1779,12 +2037,15 @@ export class ModelPreferences extends Schema.Class<ModelPreferences>(
  * The client should let the user inspect the sampled message before returning
  * it to the server.
  *
- * @category sampling
+ * @category schemas
  * @since 4.0.0
  */
 export class CreateMessageResult extends Schema.Class<CreateMessageResult>(
   "@effect/ai/McpSchema/CreateMessageResult"
 )({
+  role: Role,
+  content: Schema.Union([SamplingMessageContentBlock, Schema.Array(SamplingMessageContentBlock)]),
+  _meta: optional(Schema.JsonObject),
   /**
    * The name of the model that generated the message.
    */
@@ -1808,7 +2069,7 @@ export class CreateMessageResult extends Schema.Class<CreateMessageResult>(
  * The client chooses the model and should ask the user to approve the sampling
  * request before it begins.
  *
- * @category sampling
+ * @category protocols
  * @since 4.0.0
  */
 export class CreateMessage extends Rpc.make("sampling/createMessage", {
@@ -1820,7 +2081,7 @@ export class CreateMessage extends Rpc.make("sampling/createMessage", {
      * The server's preferences for which model to select. The client MAY ignore
      * these preferences.
      */
-    modelPreferences: optional(ModelPreferences),
+    modelPreferences: optional(Schema.Struct(ModelPreferences.fields)),
     /**
      * An optional system prompt the server wants to use for sampling. The
      * client MAY modify or omit this prompt.
@@ -1831,18 +2092,26 @@ export class CreateMessage extends Rpc.make("sampling/createMessage", {
      * caller), to be attached to the prompt. The client MAY ignore this request.
      */
     includeContext: optional(Schema.Literals(["none", "thisServer", "allServers"])),
-    temperature: optional(Schema.Number),
+    temperature: optional(Schema.Finite),
     /**
      * The maximum number of tokens to sample, as requested by the server. The
      * client MAY choose to sample fewer tokens than requested.
      */
-    maxTokens: Schema.Number,
+    maxTokens: Schema.Int,
     stopSequences: optional(Schema.Array(Schema.String)),
     /**
      * Optional metadata to pass through to the LLM provider. The format of
      * this metadata is provider-specific.
      */
-    metadata: Schema.Any
+    metadata: optional(Schema.Record(Schema.String, Schema.Unknown)),
+    /**
+     * Tools that the model may call while producing the response.
+     */
+    tools: optional(Schema.Array(Schema.Struct(Tool.fields))),
+    /**
+     * Controls whether the model may or must call a tool.
+     */
+    toolChoice: optional(Schema.Struct(ToolChoice.fields))
   }
 }) {}
 
@@ -1853,7 +2122,7 @@ export class CreateMessage extends Rpc.make("sampling/createMessage", {
 /**
  * Schema for a reference to a resource or resource template definition.
  *
- * @category autocomplete
+ * @category schemas
  * @since 4.0.0
  */
 export class ResourceReference extends Schema.Opaque<ResourceReference>()(Schema.Struct({
@@ -1867,7 +2136,7 @@ export class ResourceReference extends Schema.Opaque<ResourceReference>()(Schema
 /**
  * Schema for a prompt reference used in autocomplete requests.
  *
- * @category autocomplete
+ * @category schemas
  * @since 4.0.0
  */
 export class PromptReference extends Schema.Opaque<PromptReference>()(Schema.Struct({
@@ -1882,10 +2151,11 @@ export class PromptReference extends Schema.Opaque<PromptReference>()(Schema.Str
 /**
  * Schema for the server's response to a completion/complete request.
  *
- * @category autocomplete
+ * @category schemas
  * @since 4.0.0
  */
 export class CompleteResult extends Schema.Opaque<CompleteResult>()(Schema.Struct({
+  ...ResultMeta.fields,
   completion: Schema.Struct({
     /**
      * An array of completion values. Must not exceed 100 items.
@@ -1895,7 +2165,7 @@ export class CompleteResult extends Schema.Opaque<CompleteResult>()(Schema.Struc
      * The total number of completion options available. This can exceed the
      * number of values actually sent in the response.
      */
-    total: optional(Schema.Number),
+    total: optional(Schema.Int),
     /**
      * Indicates whether there are additional completion options beyond those
      * provided in the current response, even if the exact total is unknown.
@@ -1920,7 +2190,7 @@ export class CompleteResult extends Schema.Opaque<CompleteResult>()(Schema.Struc
 /**
  * Sent from the client to the server to ask for completion options.
  *
- * @category autocomplete
+ * @category protocols
  * @since 4.0.0
  */
 export class Complete extends Rpc.make("completion/complete", {
@@ -1966,7 +2236,7 @@ export class Complete extends Rpc.make("completion/complete", {
 /**
  * Represents a root directory or file that the server can operate on.
  *
- * @category roots
+ * @category schemas
  * @since 4.0.0
  */
 export class Root extends Schema.Class<Root>(
@@ -1983,7 +2253,11 @@ export class Root extends Schema.Class<Root>(
    * identifier for the root, which may be useful for display purposes or for
    * referencing the root in other parts of the application.
    */
-  name: optional(Schema.String)
+  name: optional(Schema.String),
+  /**
+   * Optional additional metadata associated with the root.
+   */
+  _meta: optional(Schema.JsonObject)
 }) {}
 
 /**
@@ -1993,7 +2267,7 @@ export class Root extends Schema.Class<Root>(
  *
  * Use to return the directories or files that an MCP server may operate on.
  *
- * @category roots
+ * @category schemas
  * @since 4.0.0
  */
 export class ListRootsResult extends Schema.Class<ListRootsResult>(
@@ -2014,7 +2288,7 @@ export class ListRootsResult extends Schema.Class<ListRootsResult>(
  * system structure or access specific locations that the client has permission
  * to read from.
  *
- * @category roots
+ * @category protocols
  * @since 4.0.0
  */
 export class ListRoots extends Rpc.make("roots/list", {
@@ -2034,7 +2308,7 @@ export class ListRoots extends Rpc.make("roots/list", {
  *
  * Send this when the client adds, removes, or modifies a root.
  *
- * @category roots
+ * @category protocols
  * @since 4.0.0
  */
 export class RootsListChangedNotification extends Rpc.make("notifications/roots/list_changed", {
@@ -2046,9 +2320,286 @@ export class RootsListChangedNotification extends Rpc.make("notifications/roots/
 // =============================================================================
 
 /**
- * Schema for an accepted client response to an elicitation request.
+ * Schema for a string field in an MCP elicitation form.
  *
  * @category elicitation
+ * @since 4.0.0
+ */
+export class ElicitationString extends Schema.Class<ElicitationString>("@effect/ai/McpSchema/ElicitationString")({
+  type: Schema.tag("string"),
+  title: optional(Schema.String),
+  description: optional(Schema.String),
+  minLength: optional(Schema.Int),
+  maxLength: optional(Schema.Int),
+  format: optional(Schema.Literals(["email", "uri", "date", "date-time"])),
+  default: optional(Schema.String)
+}) {}
+
+/**
+ * Schema for a numeric field in an MCP elicitation form.
+ *
+ * @category elicitation
+ * @since 4.0.0
+ */
+export class ElicitationNumber extends Schema.Class<ElicitationNumber>("@effect/ai/McpSchema/ElicitationNumber")({
+  type: Schema.Literals(["number", "integer"]),
+  title: optional(Schema.String),
+  description: optional(Schema.String),
+  minimum: optional(Schema.Finite),
+  maximum: optional(Schema.Finite),
+  default: optional(Schema.Finite)
+}) {}
+
+/**
+ * Schema for a boolean field in an MCP elicitation form.
+ *
+ * @category elicitation
+ * @since 4.0.0
+ */
+export class ElicitationBoolean extends Schema.Class<ElicitationBoolean>("@effect/ai/McpSchema/ElicitationBoolean")({
+  type: Schema.tag("boolean"),
+  title: optional(Schema.String),
+  description: optional(Schema.String),
+  default: optional(Schema.Boolean)
+}) {}
+
+/**
+ * Schema for an untitled single-select field in an MCP elicitation form.
+ *
+ * @category elicitation
+ * @since 4.0.0
+ */
+export class UntitledSingleSelectEnum extends Schema.Class<UntitledSingleSelectEnum>(
+  "@effect/ai/McpSchema/UntitledSingleSelectEnum"
+)({
+  type: Schema.tag("string"),
+  title: optional(Schema.String),
+  description: optional(Schema.String),
+  enum: Schema.Array(Schema.String),
+  default: optional(Schema.String)
+}) {}
+
+/**
+ * Schema for a titled single-select field in an MCP elicitation form.
+ *
+ * @category elicitation
+ * @since 4.0.0
+ */
+export class TitledSingleSelectEnum extends Schema.Class<TitledSingleSelectEnum>(
+  "@effect/ai/McpSchema/TitledSingleSelectEnum"
+)({
+  type: Schema.tag("string"),
+  title: optional(Schema.String),
+  description: optional(Schema.String),
+  oneOf: Schema.Array(Schema.Struct({
+    const: Schema.String,
+    title: Schema.String
+  })),
+  default: optional(Schema.String)
+}) {}
+
+/**
+ * Schema for every single-select field in an MCP elicitation form.
+ *
+ * @category elicitation
+ * @since 4.0.0
+ */
+export const SingleSelectEnum = Schema.Union([
+  UntitledSingleSelectEnum,
+  TitledSingleSelectEnum
+])
+
+/**
+ * Type represented by the single-select elicitation field schema.
+ *
+ * @category models
+ * @since 4.0.0
+ */
+export type SingleSelectEnum = typeof SingleSelectEnum.Type
+
+/**
+ * Schema for an untitled multi-select field in an MCP elicitation form.
+ *
+ * @category elicitation
+ * @since 4.0.0
+ */
+export class UntitledMultiSelectEnum extends Schema.Class<UntitledMultiSelectEnum>(
+  "@effect/ai/McpSchema/UntitledMultiSelectEnum"
+)({
+  type: Schema.tag("array"),
+  title: optional(Schema.String),
+  description: optional(Schema.String),
+  minItems: optional(Schema.Int),
+  maxItems: optional(Schema.Int),
+  items: Schema.Struct({
+    type: Schema.tag("string"),
+    enum: Schema.Array(Schema.String)
+  }),
+  default: optional(Schema.Array(Schema.String))
+}) {}
+
+/**
+ * Schema for a titled multi-select field in an MCP elicitation form.
+ *
+ * @category elicitation
+ * @since 4.0.0
+ */
+export class TitledMultiSelectEnum extends Schema.Class<TitledMultiSelectEnum>(
+  "@effect/ai/McpSchema/TitledMultiSelectEnum"
+)({
+  type: Schema.tag("array"),
+  title: optional(Schema.String),
+  description: optional(Schema.String),
+  minItems: optional(Schema.Int),
+  maxItems: optional(Schema.Int),
+  items: Schema.Struct({
+    anyOf: Schema.Array(Schema.Struct({
+      const: Schema.String,
+      title: Schema.String
+    }))
+  }),
+  default: optional(Schema.Array(Schema.String))
+}) {}
+
+/**
+ * Schema for every multi-select field in an MCP elicitation form.
+ *
+ * @category elicitation
+ * @since 4.0.0
+ */
+export const MultiSelectEnum = Schema.Union([
+  UntitledMultiSelectEnum,
+  TitledMultiSelectEnum
+])
+
+/**
+ * Type represented by the multi-select elicitation field schema.
+ *
+ * @category models
+ * @since 4.0.0
+ */
+export type MultiSelectEnum = typeof MultiSelectEnum.Type
+
+/**
+ * Schema for the legacy titled single-select elicitation field.
+ *
+ * @deprecated Use {@link TitledSingleSelectEnum} instead.
+ * @category elicitation
+ * @since 4.0.0
+ */
+export class LegacyTitledEnum extends Schema.Class<LegacyTitledEnum>(
+  "@effect/ai/McpSchema/LegacyTitledEnum"
+)({
+  type: Schema.tag("string"),
+  title: optional(Schema.String),
+  description: optional(Schema.String),
+  enum: Schema.Array(Schema.String),
+  enumNames: optional(Schema.Array(Schema.String)),
+  default: optional(Schema.String)
+}) {}
+
+/**
+ * Schema for every enumeration field in an MCP elicitation form.
+ *
+ * @category elicitation
+ * @since 4.0.0
+ */
+export const ElicitationEnum = Schema.Union([
+  LegacyTitledEnum,
+  SingleSelectEnum,
+  MultiSelectEnum
+])
+
+/**
+ * Type represented by the elicitation enumeration field schema.
+ *
+ * @category models
+ * @since 4.0.0
+ */
+export type ElicitationEnum = typeof ElicitationEnum.Type
+
+/**
+ * Schema for primitive field definitions accepted by MCP elicitation forms.
+ *
+ * @category elicitation
+ * @since 4.0.0
+ */
+export const PrimitiveSchemaDefinition = Schema.Union([
+  ElicitationEnum,
+  ElicitationString,
+  ElicitationNumber,
+  ElicitationBoolean
+])
+
+/**
+ * Type represented by the primitive elicitation field schema.
+ *
+ * @category models
+ * @since 4.0.0
+ */
+export type PrimitiveSchemaDefinition = typeof PrimitiveSchemaDefinition.Type
+
+const ElicitationForm = Schema.Struct({
+  $schema: optional(Schema.String),
+  type: Schema.tag("object"),
+  properties: Schema.Record(Schema.String, PrimitiveSchemaDefinition),
+  required: optional(Schema.Array(Schema.String))
+})
+
+/**
+ * Schema for form-mode MCP elicitation requests.
+ *
+ * @category elicitation
+ * @since 4.0.0
+ */
+export class ElicitRequestFormParams extends Schema.Class<ElicitRequestFormParams>(
+  "@effect/ai/McpSchema/ElicitRequestFormParams"
+)({
+  ...RequestMeta.fields,
+  mode: optional(Schema.Literal("form")),
+  message: Schema.String,
+  requestedSchema: ElicitationForm
+}) {}
+
+/**
+ * Schema for URL-mode MCP elicitation requests.
+ *
+ * @category elicitation
+ * @since 4.0.0
+ */
+export class ElicitRequestURLParams extends Schema.Class<ElicitRequestURLParams>(
+  "@effect/ai/McpSchema/ElicitRequestURLParams"
+)({
+  ...RequestMeta.fields,
+  mode: Schema.Literal("url"),
+  message: Schema.String,
+  elicitationId: Schema.String,
+  url: Schema.String
+}) {}
+
+/**
+ * Schema for every MCP elicitation request mode.
+ *
+ * @category elicitation
+ * @since 4.0.0
+ */
+export const ElicitRequestParams = Schema.Union([
+  ElicitRequestFormParams,
+  ElicitRequestURLParams
+])
+
+/**
+ * Type represented by the MCP elicitation request parameters schema.
+ *
+ * @category models
+ * @since 4.0.0
+ */
+export type ElicitRequestParams = typeof ElicitRequestParams.Type
+
+/**
+ * Schema for an accepted client response to an elicitation request.
+ *
+ * @category schemas
  * @since 4.0.0
  */
 export class ElicitAcceptResult extends Schema.Class<ElicitAcceptResult>(
@@ -2066,13 +2617,16 @@ export class ElicitAcceptResult extends Schema.Class<ElicitAcceptResult>(
    * The submitted form data, only present when action is "accept".
    * Contains values matching the requested schema.
    */
-  content: Schema.Any
+  content: optional(Schema.Record(
+    Schema.String,
+    Schema.Union([Schema.String, Schema.Finite, Schema.Boolean, Schema.Array(Schema.String)])
+  ))
 }) {}
 
 /**
  * Schema for a declined or canceled client response to an elicitation request.
  *
- * @category elicitation
+ * @category schemas
  * @since 4.0.0
  */
 export class ElicitDeclineResult extends Schema.Class<ElicitDeclineResult>(
@@ -2091,13 +2645,77 @@ export class ElicitDeclineResult extends Schema.Class<ElicitDeclineResult>(
 /**
  * Schema for every client response to an elicitation request.
  *
- * @category elicitation
+ * @category schemas
  * @since 4.0.0
  */
 export const ElicitResult = Schema.Union([
   ElicitAcceptResult,
   ElicitDeclineResult
 ])
+
+/**
+ * Type represented by the MCP elicitation result schema.
+ *
+ * @category models
+ * @since 4.0.0
+ */
+export type ElicitResult = typeof ElicitResult.Type
+
+/**
+ * Version-neutral request for additional MCP client input.
+ *
+ * @category models
+ * @since 4.0.0
+ */
+export type McpInputRequest =
+  | { readonly method: "roots/list"; readonly params?: Schema.JsonObject | undefined }
+  | { readonly method: "sampling/createMessage"; readonly params: Schema.JsonObject }
+  | { readonly method: "elicitation/create"; readonly params: Schema.JsonObject }
+
+/**
+ * Version-neutral response supplied by an MCP client for a prior input request.
+ *
+ * @category models
+ * @since 4.0.0
+ */
+export type McpInputResponse = Schema.JsonObject
+
+/**
+ * Indicates that an MCP operation requires additional keyed input from the client.
+ *
+ * **When to use**
+ *
+ * Use when a handler cannot complete until the client supplies roots, sampling,
+ * or elicitation input in a later request.
+ *
+ * **Details**
+ *
+ * `requestState` is opaque to the client and is returned unchanged with the
+ * keyed input responses.
+ *
+ * @category models
+ * @since 4.0.0
+ */
+export class InputRequired extends Data.TaggedClass("InputRequired")<{
+  readonly inputRequests?: Readonly<Record<string, McpInputRequest>> | undefined
+  readonly requestState?: string | undefined
+}> {
+  // The overload preserves the requirement that at least one of inputRequests or requestState is present.
+  // oxlint-disable-next-line no-useless-constructor
+  constructor(
+    fields:
+      | {
+        readonly inputRequests: Readonly<Record<string, McpInputRequest>>
+        readonly requestState?: string | undefined
+      }
+      | {
+        readonly inputRequests?: Readonly<Record<string, McpInputRequest>> | undefined
+        readonly requestState: string
+      }
+  ) {
+    super(fields)
+  }
+}
 
 /**
  * Sent from the server asking the client to collect structured input from the
@@ -2108,23 +2726,24 @@ export const ElicitResult = Schema.Union([
  * The client responds with accepted content, an explicit decline, or a
  * cancellation.
  *
- * @category elicitation
+ * @category protocols
  * @since 4.0.0
  */
 export class Elicit extends Rpc.make("elicitation/create", {
   success: ElicitResult,
   error: McpError,
+  payload: ElicitRequestParams
+}) {}
+
+/**
+ * Notifies a client that a URL-mode elicitation completed.
+ *
+ * @category elicitation
+ * @since 4.0.0
+ */
+export class ElicitationCompleteNotification extends Rpc.make("notifications/elicitation/complete", {
   payload: {
-    /**
-     * A message to display to the user, explaining what they are being
-     * elicited for.
-     */
-    message: Schema.String,
-    /**
-     * A restricted subset of JSON Schema.
-     * Only top-level properties are allowed, without nesting.
-     */
-    requestedSchema: Schema.Any
+    elicitationId: Schema.String
   }
 }) {}
 
@@ -2137,37 +2756,106 @@ export class Elicit extends Rpc.make("elicitation/create", {
  * The error stores the original elicitation request and, when available, the
  * underlying cause.
  *
- * @category elicitation
+ * @category schemas
  * @since 4.0.0
  */
-export class ElicitationDeclined
-  extends Schema.ErrorClass<ElicitationDeclined>("@effect/ai/McpSchema/ElicitationDeclined")({
-    _tag: Schema.tag("ElicitationDeclined"),
-    request: Elicit.payloadSchema,
-    cause: optional(Schema.Defect())
-  })
-{}
+export class ElicitationDeclined extends Schema.Error<ElicitationDeclined>("@effect/ai/McpSchema/ElicitationDeclined")({
+  _tag: Schema.tag("ElicitationDeclined"),
+  request: Elicit.payloadSchema,
+  cause: optional(Schema.Defect())
+}) {}
 
 // =============================================================================
 // McpServerClient
 // =============================================================================
 
 /**
- * Service available while handling an MCP client request.
+ * Raised when the negotiated MCP revision or client capabilities do not
+ * support a server-initiated operation.
  *
- * **Details**
+ * @category errors
+ * @since 4.0.0
+ */
+export class McpReverseOperationUnsupported extends Data.TaggedError("McpReverseOperationUnsupported")<{
+  readonly operation: "roots/list" | "sampling/createMessage" | "elicitation/create"
+  readonly protocolVersion: ProtocolVersion
+  readonly reason: string
+}> {}
+
+/**
+ * A reverse MCP operation failed while being sent or projected through a
+ * version adapter.
  *
- * It exposes the current client id, the client's initialize payload, and a
- * scoped RPC client for server-initiated requests back to that client.
+ * @category errors
+ * @since 4.0.0
+ */
+export class McpReverseOperationError extends Data.TaggedError("McpReverseOperationError")<{
+  readonly operation: "roots/list" | "sampling/createMessage" | "elicitation/create"
+  readonly cause: unknown
+}> {}
+
+/**
+ * Version-neutral operations that an MCP server may request from its client.
  *
  * @category client
  * @since 4.0.0
  */
+export interface McpReverseClient {
+  readonly listRoots: (
+    request?: typeof ListRoots.payloadSchema.Type
+  ) => Effect.Effect<ListRootsResult, McpReverseOperationError | McpReverseOperationUnsupported>
+  readonly createMessage: (
+    request: typeof CreateMessage.payloadSchema.Type
+  ) => Effect.Effect<CreateMessageResult, McpReverseOperationError | McpReverseOperationUnsupported>
+  readonly elicit: (
+    request: typeof Elicit.payloadSchema.Type
+  ) => Effect.Effect<ElicitResult, McpReverseOperationError | McpReverseOperationUnsupported>
+}
+
+/**
+ * Protocol-neutral context available while handling an MCP request.
+ *
+ * **Details**
+ *
+ * Unlike `McpServerClient`, this service does not imply an initialized session
+ * or support for server-initiated requests.
+ *
+ * @category services
+ * @since 4.0.0
+ */
+export class McpRequestContext extends Context.Service<McpRequestContext, {
+  readonly clientId: number
+  readonly protocolVersion: string
+  readonly clientCapabilities: ClientCapabilities
+  readonly clientInfo?: Implementation | undefined
+  readonly requestMetadata?:
+    | NonNullable<typeof Initialize.payloadSchema.Type["_meta"]>
+    | Schema.JsonObject
+    | undefined
+  readonly inputResponses?: Readonly<Record<string, McpInputResponse>> | undefined
+  readonly requestState?: string | undefined
+}>()("effect/ai/McpSchema/McpRequestContext") {}
+
+/**
+ * Service available while handling an MCP client request.
+ *
+ * **Details**
+ *
+ * It exposes the current client id, normalized initialization data, and a
+ * scoped version-neutral facade for server-initiated requests.
+ *
+ * @category services
+ * @since 4.0.0
+ */
 export class McpServerClient extends Context.Service<McpServerClient, {
   readonly clientId: number
+  readonly protocolVersion: StatefulProtocolVersion
+  readonly clientCapabilities: ClientCapabilities
+  readonly clientInfo: Implementation
   readonly initializePayload: typeof Initialize.payloadSchema["Type"]
+  readonly requestMetadata?: Schema.JsonObject | undefined
   readonly getClient: Effect.Effect<
-    RpcClient.RpcClient<RpcGroup.Rpcs<typeof ServerRequestRpcs>, RpcClientError>,
+    McpReverseClient,
     never,
     Scope.Scope
   >
@@ -2400,7 +3088,8 @@ export class ServerNotificationRpcs extends RpcGroup.make(
   ResourceUpdatedNotification,
   ResourceListChangedNotification,
   ToolListChangedNotification,
-  PromptListChangedNotification
+  PromptListChangedNotification,
+  ElicitationCompleteNotification
 ) {}
 
 /**
@@ -2459,7 +3148,7 @@ const ParamSchemaTypeId = "~effect/ai/McpSchema/ParamSchema"
  * Returns `true` when a schema was created with `param` and therefore carries
  * a resource URI template parameter name.
  *
- * @category parameters
+ * @category guards
  * @since 4.0.0
  */
 export function isParam(schema: Schema.Constraint): schema is Param<string, Schema.Top> {
@@ -2519,11 +3208,16 @@ export function param<const Name extends string, S extends Schema.Constraint>(
  * Annotation to conditionally enable or disable tools based on client
  * information.
  *
- * @category annotations
+ * @category services
  * @since 4.0.0
  */
-export class EnabledWhen
-  extends Context.Service<EnabledWhen, Predicate.Predicate<typeof Initialize.payloadSchema.Type>>()(
-    "effect/unstable/ai/McpSchema/EnabledWhen"
-  )
-{}
+export class EnabledWhen extends Context.Service<
+  EnabledWhen,
+  Predicate.Predicate<{
+    readonly protocolVersion: string
+    readonly capabilities: ClientCapabilities
+    readonly clientInfo?: Implementation | undefined
+  }>
+>()(
+  "effect/unstable/ai/McpSchema/EnabledWhen"
+) {}

@@ -8411,7 +8411,9 @@ export type WebSearchToolCall = {
       readonly "type": "search"
       readonly "query"?: string
       readonly "queries"?: ReadonlyArray<string>
-      readonly "sources"?: ReadonlyArray<{ readonly "type": "url"; readonly "url": string }>
+      readonly "sources"?: ReadonlyArray<
+        { readonly "type": "url"; readonly "url": string } | { readonly "type": "api"; readonly "name": string }
+      >
     }
     | { readonly "type": "open_page"; readonly "url"?: string | null }
     | { readonly "type": "find_in_page"; readonly "url": string; readonly "pattern": string }
@@ -8436,10 +8438,18 @@ export const WebSearchToolCall = Schema.Struct({
       ),
       "sources": Schema.optionalKey(
         Schema.Array(
-          Schema.Struct({
-            "type": Schema.Literal("url").annotate({ "description": "The type of source. Always `url`.\n" }),
-            "url": Schema.String.annotate({ "description": "The URL of the source.\n", "format": "uri" })
-          }).annotate({ "title": "Web search source", "description": "A source used in the search.\n" })
+          Schema.Union([
+            Schema.Struct({
+              "type": Schema.Literal("url").annotate({ "description": "The type of source. Always `url`.\n" }),
+              "url": Schema.String.annotate({ "description": "The URL of the source.\n", "format": "uri" })
+            }).annotate({ "title": "Web search source", "description": "A source used in the search.\n" }),
+            Schema.Struct({
+              "type": Schema.Literal("api").annotate({ "description": "The type of source. Always `api`.\n" }),
+              "name": Schema.String.annotate({
+                "description": "The name of the API source, such as `oai-weather`, `oai-sports`, or `oai-finance`.\n"
+              })
+            }).annotate({ "title": "Web search API source", "description": "An API source used in the search.\n" })
+          ])
         ).annotate({ "title": "Web search sources", "description": "The sources used in the search.\n" })
       )
     }).annotate({
@@ -22773,7 +22783,9 @@ export type InputItem =
         readonly "type": "search"
         readonly "query"?: string
         readonly "queries"?: ReadonlyArray<string>
-        readonly "sources"?: ReadonlyArray<{ readonly "type": "url"; readonly "url": string }>
+        readonly "sources"?: ReadonlyArray<
+          { readonly "type": "url"; readonly "url": string } | { readonly "type": "api"; readonly "name": string }
+        >
       }
       | { readonly "type": "open_page"; readonly "url"?: string | null }
       | { readonly "type": "find_in_page"; readonly "url": string; readonly "pattern": string }
@@ -23067,10 +23079,19 @@ export const InputItem = Schema.Union([
           ),
           "sources": Schema.optionalKey(
             Schema.Array(
-              Schema.Struct({
-                "type": Schema.Literal("url").annotate({ "description": "The type of source. Always `url`.\n" }),
-                "url": Schema.String.annotate({ "description": "The URL of the source.\n", "format": "uri" })
-              }).annotate({ "title": "Web search source", "description": "A source used in the search.\n" })
+              Schema.Union([
+                Schema.Struct({
+                  "type": Schema.Literal("url").annotate({ "description": "The type of source. Always `url`.\n" }),
+                  "url": Schema.String.annotate({ "description": "The URL of the source.\n", "format": "uri" })
+                }).annotate({ "title": "Web search source", "description": "A source used in the search.\n" }),
+                Schema.Struct({
+                  "type": Schema.Literal("api").annotate({ "description": "The type of source. Always `api`.\n" }),
+                  "name": Schema.String.annotate({
+                    "description":
+                      "The name of the API source, such as `oai-weather`, `oai-sports`, or `oai-finance`.\n"
+                  })
+                }).annotate({ "title": "Web search API source", "description": "An API source used in the search.\n" })
+              ])
             ).annotate({ "title": "Web search sources", "description": "The sources used in the search.\n" })
           )
         }).annotate({
@@ -30441,7 +30462,7 @@ export const make = (
     request: HttpClientRequest.HttpClientRequest
   ): Stream.Stream<
     { readonly event: string; readonly id: string | undefined; readonly data: Type },
-    HttpClientError.HttpClientError | SchemaError | Sse.Retry,
+    HttpClientError.HttpClientError | SchemaError | Sse.Retry | Sse.SseError,
     DecodingServices
   > =>
     HttpClient.filterStatusOk(httpClient).execute(request).pipe(
@@ -32832,7 +32853,7 @@ export interface OpenAiClient {
     options: { readonly payload: typeof CreateSpeechRequestJson.Encoded }
   ) => Stream.Stream<
     { readonly event: string; readonly id: string | undefined; readonly data: typeof CreateSpeech200Sse.Type },
-    HttpClientError.HttpClientError | SchemaError | Sse.Retry,
+    HttpClientError.HttpClientError | SchemaError | Sse.Retry | Sse.SseError,
     typeof CreateSpeech200Sse.DecodingServices
   >
   /**
@@ -32868,7 +32889,7 @@ export interface OpenAiClient {
     options: { readonly payload: typeof CreateTranscriptionRequestFormData.Encoded }
   ) => Stream.Stream<
     { readonly event: string; readonly id: string | undefined; readonly data: typeof CreateTranscription200Sse.Type },
-    HttpClientError.HttpClientError | SchemaError | Sse.Retry,
+    HttpClientError.HttpClientError | SchemaError | Sse.Retry | Sse.SseError,
     typeof CreateTranscription200Sse.DecodingServices
   >
   /**
@@ -33058,7 +33079,7 @@ export interface OpenAiClient {
     options: { readonly payload: typeof CreateChatCompletionRequestJson.Encoded }
   ) => Stream.Stream<
     { readonly event: string; readonly id: string | undefined; readonly data: typeof CreateChatCompletion200Sse.Type },
-    HttpClientError.HttpClientError | SchemaError | Sse.Retry,
+    HttpClientError.HttpClientError | SchemaError | Sse.Retry | Sse.SseError,
     typeof CreateChatCompletion200Sse.DecodingServices
   >
   /**
@@ -33659,7 +33680,7 @@ export interface OpenAiClient {
     options: { readonly payload: typeof CreateImageEditRequestFormData.Encoded }
   ) => Stream.Stream<
     { readonly event: string; readonly id: string | undefined; readonly data: typeof CreateImageEdit200Sse.Type },
-    HttpClientError.HttpClientError | SchemaError | Sse.Retry,
+    HttpClientError.HttpClientError | SchemaError | Sse.Retry | Sse.SseError,
     typeof CreateImageEdit200Sse.DecodingServices
   >
   /**
@@ -33678,7 +33699,7 @@ export interface OpenAiClient {
     options: { readonly payload: typeof CreateImageRequestJson.Encoded }
   ) => Stream.Stream<
     { readonly event: string; readonly id: string | undefined; readonly data: typeof CreateImage200Sse.Type },
-    HttpClientError.HttpClientError | SchemaError | Sse.Retry,
+    HttpClientError.HttpClientError | SchemaError | Sse.Retry | Sse.SseError,
     typeof CreateImage200Sse.DecodingServices
   >
   /**
@@ -34879,7 +34900,7 @@ export interface OpenAiClient {
     options: { readonly payload: typeof CreateResponseRequestJson.Encoded }
   ) => Stream.Stream<
     { readonly event: string; readonly id: string | undefined; readonly data: typeof CreateResponse200Sse.Type },
-    HttpClientError.HttpClientError | SchemaError | Sse.Retry,
+    HttpClientError.HttpClientError | SchemaError | Sse.Retry | Sse.SseError,
     typeof CreateResponse200Sse.DecodingServices
   >
   /**

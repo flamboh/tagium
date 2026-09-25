@@ -20,7 +20,74 @@ import { hasProperty } from "../../Predicate.ts"
 import * as Pull from "../../Pull.ts"
 import * as Result from "../../Result.ts"
 import * as Schema from "../../Schema.ts"
+import type * as SchemaAST from "../../SchemaAST.ts"
 import * as SchemaTransformation from "../../SchemaTransformation.ts"
+
+const SseErrorTypeId = "~effect/encoding/Sse/SseError"
+
+/**
+ * Error reason raised when pending Server-Sent Events state exceeds the
+ * configured maximum size.
+ *
+ * @category errors
+ * @since 4.0.0
+ */
+export class EventTooLarge extends Data.TaggedError("EventTooLarge")<{
+  readonly maxEventSize: number
+}> {
+  override get message() {
+    return `Pending SSE event exceeded the maximum size of ${this.maxEventSize}`
+  }
+}
+
+/**
+ * Union of Server-Sent Events decoding error reasons.
+ *
+ * @category errors
+ * @since 4.0.0
+ */
+export type SseErrorReason = EventTooLarge
+
+/**
+ * Error raised when decoding a Server-Sent Events stream fails.
+ *
+ * @category errors
+ * @since 4.0.0
+ */
+export class SseError extends Data.TaggedError("SseError")<{
+  readonly reason: SseErrorReason
+}> {
+  /**
+   * Marks this value as an SSE decoding error.
+   *
+   * @since 4.0.0
+   */
+  readonly [SseErrorTypeId] = SseErrorTypeId
+
+  /**
+   * Delegates the public message to the underlying SSE error reason.
+   *
+   * @since 4.0.0
+   */
+  override get message() {
+    return this.reason.message
+  }
+}
+
+/**
+ * Options for decoding Server-Sent Events streams.
+ *
+ * @category decoding
+ * @since 4.0.0
+ */
+export interface DecodeOptions {
+  /**
+   * Maximum number of string code units retained for a pending event. The default is 10 MiB.
+   */
+  readonly maxEventSize?: number | undefined
+}
+
+const defaultMaxEventSize = 10 * 1024 * 1024
 
 /**
  * Creates a channel that parses Server-Sent Events text chunks into `Event` values.
@@ -33,9 +100,9 @@ import * as SchemaTransformation from "../../SchemaTransformation.ts"
  * @category decoding
  * @since 4.0.0
  */
-export const decode = <IE, Done>(): Channel.Channel<
+export const decode = <IE, Done>(options?: DecodeOptions): Channel.Channel<
   NonEmptyReadonlyArray<Event>,
-  IE | Retry,
+  IE | Retry | SseError,
   Done,
   NonEmptyReadonlyArray<string>,
   IE,
@@ -51,16 +118,19 @@ export const decode = <IE, Done>(): Channel.Channel<
         } else {
           buffer.push(event)
         }
-      })
+      }, options)
 
       const pump = Effect.flatMap(upstream, (arr) => {
         for (let i = 0; i < arr.length; i++) {
-          parser.feed(arr[i])
+          const error = parser.feed(arr[i])
+          if (error !== undefined) {
+            return Effect.fail(error)
+          }
         }
         return Effect.void
       })
 
-      return Effect.suspend(function loop(): Pull.Pull<NonEmptyReadonlyArray<Event>, IE | Retry, Done> {
+      return Effect.suspend(function loop(): Pull.Pull<NonEmptyReadonlyArray<Event>, IE | Retry | SseError, Done> {
         if (Arr.isArrayNonEmpty(buffer)) {
           const out = buffer
           buffer = []
@@ -80,15 +150,15 @@ export const decode = <IE, Done>(): Channel.Channel<
  * @since 4.0.0
  */
 export interface EventCodec extends
-  Schema.Codec<
+  Schema.ConstraintCodec<
     any,
     {
       readonly id?: string | undefined
       readonly event?: string | undefined
       readonly data: string
     },
-    any,
-    any
+    unknown,
+    unknown
   >
 {}
 
@@ -97,8 +167,12 @@ export interface EventCodec extends
  *
  * **Details**
  *
- * The schema receives the untagged event shape containing `id`, `event`, and
- * string `data`.
+ * The schema receives `{ event, data, id? }`, with string `data`. Absent IDs are
+ * omitted, even with default options: use `Schema.optional(Schema.String)`, not
+ * `Schema.UndefinedOr(Schema.String)`, to accept events without an ID.
+ *
+ * With `onExcessProperty: "error"`, declare `event` (default: `"message"`) and
+ * `id` if the stream carries IDs, including inherited IDs.
  *
  * @category decoding
  * @since 4.0.0
@@ -108,10 +182,12 @@ export const decodeSchema = <
   IE,
   Done
 >(
-  schema: S
+  schema: S,
+  options?: DecodeOptions,
+  parseOptions?: SchemaAST.ParseOptions
 ): Channel.Channel<
   NonEmptyReadonlyArray<S["Type"]>,
-  IE | Retry | Schema.SchemaError,
+  IE | Retry | SseError | Schema.SchemaError,
   Done,
   NonEmptyReadonlyArray<string>,
   IE,
@@ -119,10 +195,13 @@ export const decodeSchema = <
   S["DecodingServices"]
 > =>
   Channel.pipeTo(
-    decode<IE, Done>(),
-    ChannelSchema.decode(EventEncoded.pipe(
-      Schema.decodeTo(schema)
-    ))()
+    decode<IE, Done>(options),
+    ChannelSchema.decode(
+      Event.pipe(
+        Schema.decodeTo(schema, transformEvent)
+      ),
+      parseOptions
+    )()
   )
 
 /**
@@ -137,14 +216,15 @@ export const decodeSchema = <
  * @since 4.0.0
  */
 export const decodeDataSchema = <Type, DecodingServices, IE, Done>(
-  schema: Schema.ConstraintDecoder<Type, DecodingServices>
+  schema: Schema.ConstraintDecoder<Type, DecodingServices>,
+  options?: DecodeOptions
 ): Channel.Channel<
   NonEmptyReadonlyArray<{
     readonly event: string
     readonly id: string | undefined
     readonly data: Type
   }>,
-  IE | Retry | Schema.SchemaError,
+  IE | Retry | SseError | Schema.SchemaError,
   Done,
   NonEmptyReadonlyArray<string>,
   IE,
@@ -156,7 +236,7 @@ export const decodeDataSchema = <Type, DecodingServices, IE, Done>(
     data: Schema.fromJsonString(schema)
   })
   return Channel.pipeTo(
-    decode<IE, Done>(),
+    decode<IE, Done>(options),
     Channel.map(
       ChannelSchema.decode(eventSchema)(),
       Arr.map((event) => ({ ...event, id: event.id }))
@@ -170,20 +250,23 @@ export const decodeDataSchema = <Type, DecodingServices, IE, Done>(
  * **Details**
  *
  * Call `feed` with text chunks to parse `Event` and `Retry` values through the
- * callback, and call `reset` to clear any buffered event state.
+ * callback, and call `reset` to clear any buffered event state. `feed` returns
+ * an `SseError` if the pending event exceeds `maxEventSize`.
  *
  * @category decoding
  * @since 4.0.0
  */
-export function makeParser(onParse: (event: AnyEvent) => void): Parser {
+export function makeParser(onParse: (event: AnyEvent) => void, options?: DecodeOptions): Parser {
+  const maxEventSize = options?.maxEventSize ?? defaultMaxEventSize
+
   // Processing state
   let isFirstChunk: boolean
   let buffer: string
   let startingPosition: number
   let startingFieldLength: number
+  let discardTrailingNewline: boolean
 
   // Event state
-  let eventId: string | undefined
   let lastEventId: string | undefined
   let eventName: string | undefined
   let data: string
@@ -196,19 +279,20 @@ export function makeParser(onParse: (event: AnyEvent) => void): Parser {
     buffer = ""
     startingPosition = 0
     startingFieldLength = -1
+    discardTrailingNewline = false
 
-    eventId = undefined
+    lastEventId = undefined
     eventName = undefined
     data = ""
   }
 
-  function feed(chunk: string): void {
+  function feed(chunk: string): SseError | undefined {
     buffer = buffer ? buffer + chunk : chunk
 
-    // Strip any UTF8 byte order mark (BOM) at the start of the stream.
+    // Strip any UTF-8 byte order mark (BOM) at the start of the stream.
     // Note that we do not strip any non - UTF8 BOM, as eventsource streams are
     // always decoded as UTF8 as per the specification.
-    if (isFirstChunk && hasBom(buffer)) {
+    if (isFirstChunk && buffer.startsWith(BOM)) {
       buffer = buffer.slice(BOM.length)
     }
 
@@ -217,7 +301,6 @@ export function makeParser(onParse: (event: AnyEvent) => void): Parser {
     // Set up chunk-specific processing state
     const length = buffer.length
     let position = 0
-    let discardTrailingNewline = false
 
     // Read the current buffer byte by byte
     while (position < length) {
@@ -237,7 +320,7 @@ export function makeParser(onParse: (event: AnyEvent) => void): Parser {
       let fieldLength = startingFieldLength
       let character: string
 
-      for (let index = startingPosition; lineLength < 0 && index < length; ++index) {
+      for (let index = position + startingPosition; lineLength < 0 && index < length; ++index) {
         character = buffer[index]
         if (character === ":" && fieldLength < 0) {
           fieldLength = index - position
@@ -271,6 +354,12 @@ export function makeParser(onParse: (event: AnyEvent) => void): Parser {
       // portion of the buffer only
       buffer = buffer.slice(position)
     }
+
+    if (buffer.length + data.length > maxEventSize) {
+      const error = new SseError({ reason: new EventTooLarge({ maxEventSize }) })
+      reset()
+      return error
+    }
   }
 
   function parseEventStreamLine(
@@ -284,12 +373,11 @@ export function makeParser(onParse: (event: AnyEvent) => void): Parser {
       if (data.length > 0) {
         onParse({
           _tag: "Event",
-          id: eventId,
-          event: eventName ?? "message",
+          id: lastEventId,
+          event: eventName || "message",
           data: data.slice(0, -1) // remove trailing newline
         })
         data = ""
-        eventId = undefined
       }
       eventName = undefined
       return
@@ -316,35 +404,30 @@ export function makeParser(onParse: (event: AnyEvent) => void): Parser {
     } else if (field === "event") {
       eventName = value
     } else if (field === "id" && !value.includes("\u0000")) {
-      eventId = value
       lastEventId = value
-    } else if (field === "retry") {
+    } else if (field === "retry" && /^\d+$/.test(value)) {
       const retry = parseInt(value, 10)
-      if (!Number.isNaN(retry)) {
-        onParse(new Retry({ duration: Duration.millis(retry), lastEventId }))
-      }
+      onParse(new Retry({ duration: Duration.millis(retry), lastEventId }))
     }
   }
 }
 
-const BOM = [239, 187, 191]
-
-function hasBom(buffer: string) {
-  return BOM.every((charCode: number, index: number) => buffer.charCodeAt(index) === charCode)
-}
+const BOM = "\uFEFF"
 
 /**
  * Stateful Server-Sent Events parser returned by `makeParser`.
  *
  * **Details**
  *
- * `feed` accepts additional text chunks and `reset` clears buffered parser state.
+ * `feed` accepts additional text chunks and returns an `SseError` when the
+ * configured pending event size is exceeded. `reset` clears buffered parser
+ * state.
  *
  * @category decoding
  * @since 4.0.0
  */
 export interface Parser {
-  feed(chunk: string): void
+  feed(chunk: string): SseError | undefined
   reset(): void
 }
 
@@ -487,7 +570,10 @@ export const transformEvent = SchemaTransformation.transform<{
   readonly event: string
   readonly data: string
 }>({
-  decode: (event) => event,
+  decode: (event) =>
+    event.id === undefined
+      ? { event: event.event, data: event.data }
+      : { id: event.id, event: event.event, data: event.data },
   encode: (event) => ({
     _tag: "Event",
     id: event.id,
@@ -580,9 +666,7 @@ export const encoder: Encoder = {
         if (event.event !== "message") {
           data += `event: ${event.event}\n`
         }
-        if (event.data !== "") {
-          data += `data: ${event.data.replace(/\n/g, "\ndata: ")}\n`
-        }
+        data += `data: ${event.data.replace(/\n/g, "\ndata: ")}\n`
         return data + "\n"
       }
       case "Retry": {
