@@ -22,7 +22,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { spotlightItemClassName } from "@/components/ui/spotlight";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { AlbumCoverThumb } from "@/features/library/AlbumCoverThumb";
@@ -230,7 +229,6 @@ export function SortableTrackRow({
                 data-spotlight={spotlight?.actionId === action.id ? "active" : undefined}
                 className={cn(
                   "[@media(pointer:coarse)]:min-h-10",
-                  spotlightItemClassName,
                   action.destructive &&
                     "text-destructive focus:bg-destructive/10 focus:text-destructive",
                 )}
@@ -439,7 +437,6 @@ export function SortableAlbumCard({
                   data-spotlight={spotlight?.actionId === action.id ? "active" : undefined}
                   className={cn(
                     "[@media(pointer:coarse)]:min-h-10",
-                    spotlightItemClassName,
                     action.destructive &&
                       "text-destructive focus:bg-destructive/10 focus:text-destructive",
                   )}

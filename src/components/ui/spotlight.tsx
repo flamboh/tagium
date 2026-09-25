@@ -8,9 +8,6 @@ import { cn } from "@/lib/utils";
 const spotlightTargetClassName =
   "data-[spotlight=active]:opacity-100 data-[spotlight=active]:outline-2 data-[spotlight=active]:outline-offset-1 data-[spotlight=active]:outline-solid data-[spotlight=active]:outline-brand data-[spotlight=active]:animate-spotlight-pulse motion-reduce:data-[spotlight=active]:animate-none";
 
-const spotlightItemClassName =
-  "data-[spotlight=active]:bg-brand/10 data-[spotlight=active]:text-foreground data-[spotlight=active]:shadow-[inset_2px_0_0_var(--brand)] data-[spotlight=active]:focus:bg-brand/15";
-
 const SpotlightContext = React.createContext<{
   open: boolean;
   anchorRef: React.RefObject<HTMLElement | null>;
@@ -18,8 +15,9 @@ const SpotlightContext = React.createContext<{
 
 function Spotlight({ open = false, ...props }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
   const anchorRef = React.useRef<HTMLElement | null>(null);
+  const context = React.useMemo(() => ({ open, anchorRef }), [open]);
   return (
-    <SpotlightContext.Provider value={{ open, anchorRef }}>
+    <SpotlightContext.Provider value={context}>
       <PopoverPrimitive.Root data-slot="spotlight" open={open} {...props} />
     </SpotlightContext.Provider>
   );
@@ -128,5 +126,4 @@ export {
   SpotlightDescription,
   SpotlightFooter,
   SpotlightClose,
-  spotlightItemClassName,
 };
