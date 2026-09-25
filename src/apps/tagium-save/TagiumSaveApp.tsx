@@ -620,7 +620,7 @@ function SaveThemeToggle() {
   return (
     <button
       type="button"
-      className="absolute top-4 left-1/2 inline-flex size-11 -translate-x-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none transition-[color,scale] hover:text-foreground active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:active:scale-100 sm:top-8"
+      className="page-enter absolute top-4 left-1/2 inline-flex size-11 -translate-x-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none transition-[color,scale] hover:text-foreground active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:active:scale-100 sm:top-8"
       aria-label={`switch to ${theme === "light" ? "dark" : "light"} mode`}
       onClick={toggleTheme}
     >
@@ -854,7 +854,7 @@ function TagiumSaveView({
           recent list and pinned attribution so the layout shifts up continuously as the
           viewport shrinks, and the top cap keeps phones anchored high. */}
       <div aria-hidden className="pointer-events-none min-h-12 w-full flex-1 max-sm:max-h-28" />
-      <div className="flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6">
+      <div className="page-enter [--page-enter-delay:60ms] flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6">
         <TagiumBrand product="save" />
 
         <div className="h-14 w-full shrink-0" data-save-download-stage>

@@ -132,19 +132,21 @@ export default function AudioTagger() {
 
   if (shareLinksEnabled && sharing.page) {
     return (
-      <SharedAlbumPage
-        state={sharing.page}
-        workspaceTrackCount={files.length}
-        anotherTabOpen={sharing.anotherTabOpen}
-        alreadyAddedTargetId={sharing.alreadyAddedTargetId}
-        adding={sharing.adding}
-        canStopSharing={sharing.canStopSharing}
-        onBack={sharing.back}
-        onOpenTagium={sharing.openTagium}
-        onAdd={sharing.addSharedContent}
-        onViewAdded={sharing.viewAlreadyAdded}
-        onStopSharing={sharing.stopPageShare}
-      />
+      <div className="page-enter">
+        <SharedAlbumPage
+          state={sharing.page}
+          workspaceTrackCount={files.length}
+          anotherTabOpen={sharing.anotherTabOpen}
+          alreadyAddedTargetId={sharing.alreadyAddedTargetId}
+          adding={sharing.adding}
+          canStopSharing={sharing.canStopSharing}
+          onBack={sharing.back}
+          onOpenTagium={sharing.openTagium}
+          onAdd={sharing.addSharedContent}
+          onViewAdded={sharing.viewAlreadyAdded}
+          onStopSharing={sharing.stopPageShare}
+        />
+      </div>
     );
   }
 
@@ -224,7 +226,7 @@ export default function AudioTagger() {
           onRetryPlaylistDownloadQueue={importing.commands.retryQueue}
         />
         <div
-          className={`relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1 ${mobileNavigation.isMobile ? "transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-opacity" : ""} ${mobileNavigation.isMobile && mobileNavigation.drawerOpen ? "translate-x-[min(88vw,22rem)]" : mobileNavigation.isMobile ? "translate-x-0" : ""}`}
+          className={`page-enter [--page-enter-y:0px] relative order-1 flex-shrink-0 flex flex-col md:order-none md:min-h-0 md:flex-1 ${mobileNavigation.isMobile ? "transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-opacity" : ""} ${mobileNavigation.isMobile && mobileNavigation.drawerOpen ? "translate-x-[min(88vw,22rem)]" : mobileNavigation.isMobile ? "translate-x-0" : ""}`}
         >
           {mobileNavigation.isMobile && (
             <div
