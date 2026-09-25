@@ -278,16 +278,24 @@
   }
 }
 
+@utility page-enter-from-left {
+  --page-enter-x: -16px;
+  --page-enter-y: 0px;
+}
+
 @keyframes page-enter {
   from {
     opacity: 0;
-    transform: translateY(var(--page-enter-shift, 6px));
+    transform: translate(
+      calc(var(--page-enter-x, 0px) * var(--page-enter-motion, 1)),
+      calc(var(--page-enter-y, 6px) * var(--page-enter-motion, 1))
+    );
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --page-enter-shift: 0px;
+    --page-enter-motion: 0;
   }
 }
 
