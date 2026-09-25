@@ -36,6 +36,7 @@ import {
 } from "@/features/share/shareLink";
 import { useShareWorkflow } from "@/features/share/useShareWorkflow";
 import { shareLinksEnabled } from "@/features/share/shareFeature";
+import { useShareLinkSpotlight } from "@/features/share/useShareLinkSpotlight";
 import { useAudioTaggerMobileNavigation } from "@/features/workspace/useAudioTaggerMobileNavigation";
 import { useWorkspaceNavigation } from "@/features/workspace/workspaceNavigation";
 
@@ -76,6 +77,15 @@ export default function AudioTagger() {
   } = useAudioTaggerMobileNavigation({ navigation: workspaceNavigation, workspace });
   const { files, albums, looseTrackIds, selectedFileId, selectedAlbumId, selectedFileIds } =
     library.state;
+  const shareAlbumActions = shareLinksEnabled ? sharing.shareActions : undefined;
+  const shareTrackActions = shareLinksEnabled ? sharing.shareTrackActions : undefined;
+  const shareSpotlight = useShareLinkSpotlight({
+    albums,
+    files,
+    shareAlbumActions,
+    shareTrackActions,
+    visible: !mobileNavigation.isMobile || mobileNavigation.drawerOpen,
+  });
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
   const landingIsActive = libraryIsEmpty && activeView === "editor";
   useBeforeUnloadProtection(
@@ -193,7 +203,7 @@ export default function AudioTagger() {
                   })
               : undefined
           }
-          shareAlbumActions={shareLinksEnabled ? sharing.shareActions : undefined}
+          shareAlbumActions={shareAlbumActions}
           onShareTrack={
             shareLinksEnabled
               ? (fileId) =>
@@ -202,7 +212,9 @@ export default function AudioTagger() {
                   })
               : undefined
           }
-          shareTrackActions={shareLinksEnabled ? sharing.shareTrackActions : undefined}
+          shareTrackActions={shareTrackActions}
+          shareSpotlight={shareSpotlight.target}
+          onShareSpotlightDismiss={shareSpotlight.dismiss}
           onUploadToAlbum={(albumId, filesToUpload) =>
             runPrimaryAction(() => void importing.commands.upload(filesToUpload, albumId))
           }

@@ -24,6 +24,10 @@ import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import { isTrackReadyForDownload } from "@/features/export/downloadLibrary";
 import { useAlbumSidebarDragController } from "@/features/library/useAlbumSidebarDragController";
 import type { ShareActionState } from "@/features/share/sharePublication";
+import {
+  shareLinkSpotlightCopy,
+  type ShareLinkSpotlightTarget,
+} from "@/features/share/useShareLinkSpotlight";
 import { createAlbumActionItems } from "@/features/library/albumActionItems";
 import { createTrackActionItems } from "@/features/library/trackActionItems";
 import type { TrackFilenamePreviewStore } from "@/features/library/trackFilenamePreview";
@@ -52,6 +56,8 @@ interface AlbumSidebarProps {
   shareAlbumActions?: Readonly<Record<string, ShareActionState>>;
   onShareTrack?: (trackId: string) => void;
   shareTrackActions?: Readonly<Record<string, ShareActionState>>;
+  shareSpotlight?: ShareLinkSpotlightTarget | null;
+  onShareSpotlightDismiss?: () => void;
   onUploadToAlbum: (albumId: string, files: File[]) => void;
   onMoveTrackToAlbum: (
     trackId: string,
@@ -99,6 +105,8 @@ export default function AlbumSidebar({
   shareAlbumActions = {},
   onShareTrack,
   shareTrackActions = {},
+  shareSpotlight = null,
+  onShareSpotlightDismiss,
   onUploadToAlbum,
   onMoveTrackToAlbum,
   onMoveTrackToLoose,
@@ -132,6 +140,15 @@ export default function AlbumSidebar({
     if (selectedFileId === trackId) return "secondary";
     return null;
   };
+
+  const shareSpotlightFor = (kind: ShareLinkSpotlightTarget["kind"], id: string) =>
+    shareSpotlight?.kind === kind && shareSpotlight.id === id && onShareSpotlightDismiss
+      ? {
+          actionId: "share" as const,
+          ...shareLinkSpotlightCopy(kind),
+          onDismiss: onShareSpotlightDismiss,
+        }
+      : null;
 
   const actionsForTrack = (track: TagiumFile) => {
     const shareAction = shareTrackActions[track.id];
@@ -205,6 +222,7 @@ export default function AlbumSidebar({
                   selectedTone={selectedTone(track.id)}
                   muted={track.downloadStatus === "downloading"}
                   actions={actionsForTrack(track)}
+                  spotlight={shareSpotlightFor("track", track.id)}
                   onSelect={(event) => onSelectLooseTrack(track.id, event)}
                 />
               ))}
@@ -259,6 +277,7 @@ export default function AlbumSidebar({
                   canDownload={canDownloadAlbum}
                   cleanupSuggestionCount={cleanupSuggestionCount}
                   actions={actions}
+                  spotlight={shareSpotlightFor("album", album.id)}
                   onSelect={(event) => onSelectAlbum(album.id, event)}
                   onDownload={() => onDownloadAlbum(album.id)}
                   {...fileDropProps}
@@ -292,6 +311,7 @@ export default function AlbumSidebar({
                               selectedTone={selectedTone(track.id)}
                               muted={track.downloadStatus === "downloading"}
                               actions={actionsForTrack(track)}
+                              spotlight={shareSpotlightFor("track", track.id)}
                               onSelect={(event) => onSelectFile(album.id, track.id, event)}
                             />
                           );
