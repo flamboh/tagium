@@ -5,7 +5,6 @@ import {
   validateAdvancedMetadataNumber,
 } from "@/features/audio/metadataFields";
 import type { Playlist } from "@/features/import/playlist";
-import type { SoundCloudSet } from "@/features/import/soundcloudSet";
 import type {
   AlbumGroup,
   AppSettings,
@@ -505,30 +504,6 @@ export function applyPlaylistImportedCover(
     ...applyAlbumCoverToFilesWithSelectedMetadata(files, trackIds, cover, selectedFileId, settings),
   };
 }
-
-export const applySoundCloudSetImportedCover = (
-  files: TagiumFile[],
-  albums: AlbumGroup[],
-  albumId: string,
-  trackIds: string[],
-  set: Pick<SoundCloudSet, "isAlbum">,
-  settings: Pick<
-    AppSettings,
-    "applySoundCloudAlbumCoverToTracks" | "metadataLinks" | "syncTrackNumbers"
-  >,
-  cover: AudioMetadata["picture"],
-  selectedFileId: string | null,
-) =>
-  applyPlaylistImportedCover(
-    files,
-    albums,
-    albumId,
-    trackIds,
-    set,
-    settings,
-    cover,
-    selectedFileId,
-  );
 
 export function prepareDownloadedTrackHydration(
   currentFile: TagiumFile,
