@@ -97,4 +97,51 @@ describe("share eligibility", () => {
       ),
     ).toMatch(/cover format/i);
   });
+
+  it("waits for every album track to finish downloading before sharing", () => {
+    const tracks = ["one", "two", "three"].map((id) => ({ ...importedTrack, id }));
+    const albumOfThree = { ...album, trackIds: tracks.map((track) => track.id) };
+    const downloading = { ...tracks[1]!, downloadStatus: "downloading" as const };
+    const failed = { ...tracks[2]!, downloadStatus: "error" as const };
+
+    expect(shareEligibility(albumOfThree, [tracks[0], downloading, tracks[2]])).toBe(
+      "1 of 3 tracks is still downloading",
+    );
+    expect(
+      shareEligibility(albumOfThree, [
+        { ...tracks[0]!, downloadStatus: "downloading" },
+        downloading,
+        failed,
+      ]),
+    ).toBe("2 of 3 tracks are still downloading");
+    expect(shareEligibility(albumOfThree, [tracks[0], tracks[1], failed])).toBe(
+      "retry or remove the failed track to share this album",
+    );
+    expect(
+      shareEligibility(albumOfThree, [
+        tracks[0],
+        { ...tracks[1]!, downloadStatus: "canceled" },
+        failed,
+      ]),
+    ).toBe("retry or remove 2 failed tracks to share this album");
+  });
+
+  it("waits for a pending album cover before sharing", () => {
+    expect(shareEligibility({ ...album, coverPending: true }, [importedTrack])).toBe(
+      "the album cover is still loading",
+    );
+    expect(shareEligibility({ ...album, coverPending: false }, [importedTrack])).toBeNull();
+  });
+
+  it("waits for a single track to finish downloading before sharing", () => {
+    expect(shareTrackEligibility({ ...importedTrack, downloadStatus: "downloading" })).toBe(
+      "this track is still downloading",
+    );
+    expect(shareTrackEligibility({ ...importedTrack, downloadStatus: "error" })).toBe(
+      "retry this track's download to share it",
+    );
+    expect(shareTrackEligibility({ ...importedTrack, downloadStatus: "canceled" })).toBe(
+      "retry this track's download to share it",
+    );
+  });
 });

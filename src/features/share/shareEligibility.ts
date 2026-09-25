@@ -9,6 +9,9 @@ const supportedSource = (value: string) => {
   }
 };
 
+const downloadFailed = (file: TagiumFile) =>
+  file.downloadStatus === "error" || file.downloadStatus === "canceled";
+
 /** Client-side preflight mirrors the publishable parts of the manifest contract. */
 export const shareEligibility = (album: AlbumGroup, files: readonly (TagiumFile | undefined)[]) => {
   if (album.sourceManifestSlug) return "shared albums cannot be shared again";
@@ -19,6 +22,15 @@ export const shareEligibility = (album: AlbumGroup, files: readonly (TagiumFile 
   if (files.some((file) => !file)) return "this album has a missing track.";
   if (files.some((file) => !file?.downloadRequest))
     return "only albums made entirely from imported tracks can be shared.";
+  const downloading = files.filter((file) => file?.downloadStatus === "downloading").length;
+  if (downloading > 0)
+    return `${downloading} of ${files.length} tracks ${downloading === 1 ? "is" : "are"} still downloading`;
+  const failed = files.filter((file) => file && downloadFailed(file)).length;
+  if (failed > 0)
+    return failed === 1
+      ? "retry or remove the failed track to share this album"
+      : `retry or remove ${failed} failed tracks to share this album`;
+  if (album.coverPending) return "the album cover is still loading";
   if (files.some((file) => !file?.metadata))
     return "wait for every imported track's metadata before sharing.";
   if (files.some((file) => !supportedSource(file!.downloadRequest!.sourceUrl)))
@@ -38,6 +50,8 @@ export const shareEligibility = (album: AlbumGroup, files: readonly (TagiumFile 
 export const shareTrackEligibility = (file: TagiumFile) => {
   if (file.sourceManifestSlug) return "tracks added from share links cannot be shared again";
   if (!file.downloadRequest) return "local tracks cannot be shared";
+  if (file.downloadStatus === "downloading") return "this track is still downloading";
+  if (downloadFailed(file)) return "retry this track's download to share it";
   if (!file.metadata) return "wait for this track's metadata before sharing";
   if (!supportedSource(file.downloadRequest.sourceUrl))
     return "tagium cannot replay this track's source";

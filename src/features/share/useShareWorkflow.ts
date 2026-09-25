@@ -24,7 +24,10 @@ import { detectAnotherTagiumTab, listenForTagiumPresence } from "@/features/shar
 import { shareLinkForSlug, shareSlugFromPathname } from "@/features/share/shareLink";
 import { shareEligibility, shareTrackEligibility } from "@/features/share/shareEligibility";
 import { manifestArtwork, manifestTrackCount, type Manifest } from "@/features/share/shareManifest";
-import { sharePublicationErrorMessage } from "@/features/share/sharePublicationError";
+import {
+  ShareIneligibleError,
+  sharePublicationErrorMessage,
+} from "@/features/share/sharePublicationError";
 import type { ShareDialogState } from "@/features/share/ShareAlbumDialog";
 import { buildShareAlbumPreview, buildShareTrackPreview } from "@/features/share/sharePreview";
 import {
@@ -595,6 +598,8 @@ export const useShareWorkflow = ({
           if (!file) throw new Error("the album has a missing track");
           return file;
         });
+        const ineligibleReason = shareEligibility(album, files);
+        if (ineligibleReason) throw new ShareIneligibleError(ineligibleReason);
         existingPublication = album.sharePublication;
         shareSnapshot = await projectAlbumShareSnapshot(album, files);
         latestAction = shareAlbumActionState(
@@ -605,6 +610,8 @@ export const useShareWorkflow = ({
       } else {
         const file = snapshot.files.find((entry) => entry.id === target.id);
         if (!file) throw new Error("the track is no longer in your library");
+        const ineligibleReason = shareTrackEligibility(file);
+        if (ineligibleReason) throw new ShareIneligibleError(ineligibleReason);
         existingPublication = file.sharePublication;
         shareSnapshot = await projectTrackShareSnapshot(file);
         latestAction = shareTrackActionState(
@@ -701,13 +708,17 @@ export const useShareWorkflow = ({
         error instanceof Error ? error : new Error("unknown share publication failure"),
         target.kind,
       ).replace(/[.!?]+$/, "");
+      const updateError =
+        error instanceof ShareIneligibleError
+          ? createError
+          : `the shared ${target.kind} could not be updated`;
       setDialog({
         status: "error",
         preview: currentDialog.preview,
         intent: attemptedIntent,
         message:
           attemptedIntent === "update"
-            ? `the shared ${target.kind} could not be updated. the link still has the previous version.`
+            ? `${updateError}. the link still has the previous version.`
             : createError === "the share link could not be created"
               ? `${createError}.`
               : `${createError}. no link was created.`,

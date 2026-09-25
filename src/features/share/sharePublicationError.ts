@@ -8,8 +8,11 @@ const userFacingMessages = new Set([
   "your browser did not allow tagium to save the sharing permission",
 ]);
 
+export class ShareIneligibleError extends Error {}
+
 /** Converts implementation-level publish failures into copy safe for the share dialog. */
 export const sharePublicationErrorMessage = (error: Error, kind: "album" | "track" = "album") => {
+  if (error instanceof ShareIneligibleError) return error.message;
   if (metadataContractError(error.message))
     return `this ${kind} contains too much metadata to share.`;
   if (error.message === "only downloaded-source tracks with metadata can be shared") {

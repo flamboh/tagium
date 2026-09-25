@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vite-plus/test";
+import { act } from "react-test-renderer";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   FEATURE_DISCOVERY_STORAGE_KEY,
   markFeatureSeen,
 } from "@/features/discovery/featureDiscovery";
 import type { ShareActionState } from "@/features/share/sharePublication";
 import {
+  SHARE_LINK_SPOTLIGHT_DELAY_MS,
   shareLinkSpotlightCopy,
   useShareLinkSpotlight,
 } from "@/features/share/useShareLinkSpotlight";
@@ -41,7 +43,10 @@ type SpotlightProps = Parameters<typeof useShareLinkSpotlight>[0];
 
 const props = (overrides: Partial<SpotlightProps> = {}): SpotlightProps => ({
   albums: [{ id: "shared-album" }, { id: "local-album" }, { id: "playlist" }],
-  files: [{ id: "local" }, { id: "imported" }],
+  files: [
+    { id: "local", downloadStatus: "ready" },
+    { id: "imported", downloadStatus: "ready" },
+  ],
   shareAlbumActions: {
     "shared-album": viewOnly,
     "local-album": unavailable("share album"),
@@ -53,9 +58,61 @@ const props = (overrides: Partial<SpotlightProps> = {}): SpotlightProps => ({
   ...overrides,
 });
 
+const waitForHint = () =>
+  act(() => {
+    vi.advanceTimersByTime(SHARE_LINK_SPOTLIGHT_DELAY_MS);
+  });
+
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => vi.useRealTimers());
+
 describe("share link spotlight", () => {
+  it("waits two seconds after something becomes shareable before hinting", () => {
+    const hook = renderHook(useShareLinkSpotlight, props());
+    expect(hook.result.target).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(SHARE_LINK_SPOTLIGHT_DELAY_MS - 1);
+    });
+    expect(hook.result.target).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(hook.result.target).toEqual({ kind: "album", id: "playlist" });
+    hook.unmount();
+  });
+
+  it("restarts the wait when another import starts before the hint shows", () => {
+    const storage = memoryStorage();
+    const hook = renderHook(useShareLinkSpotlight, props({ storage }));
+    act(() => {
+      vi.advanceTimersByTime(1_500);
+    });
+
+    const busy = props({
+      storage,
+      files: [...props().files, { id: "queued", downloadStatus: "downloading" }],
+    });
+    hook.rerender(busy);
+    act(() => {
+      vi.advanceTimersByTime(SHARE_LINK_SPOTLIGHT_DELAY_MS);
+    });
+    expect(hook.result.target).toBeNull();
+
+    hook.rerender(props({ storage }));
+    act(() => {
+      vi.advanceTimersByTime(1_500);
+    });
+    expect(hook.result.target).toBeNull();
+    waitForHint();
+    expect(hook.result.target).toEqual({ kind: "album", id: "playlist" });
+    hook.unmount();
+  });
+
   it("prefers a shareable album over a shareable track", () => {
     const hook = renderHook(useShareLinkSpotlight, props());
+    waitForHint();
     expect(hook.result.target).toEqual({ kind: "album", id: "playlist" });
   });
 
@@ -64,6 +121,7 @@ describe("share link spotlight", () => {
       useShareLinkSpotlight,
       props({ shareAlbumActions: { playlist: unavailable("share album") } }),
     );
+    waitForHint();
     expect(hook.result.target).toEqual({ kind: "track", id: "imported" });
   });
 
@@ -71,11 +129,41 @@ describe("share link spotlight", () => {
     const storage = memoryStorage();
     const hook = renderHook(
       useShareLinkSpotlight,
-      props({ albums: [], files: [{ id: "local" }], storage }),
+      props({ albums: [], files: [{ id: "local", downloadStatus: "ready" }], storage }),
     );
     expect(hook.result.target).toBeNull();
 
     hook.rerender(props({ storage }));
+    waitForHint();
+    expect(hook.result.target).toEqual({ kind: "album", id: "playlist" });
+  });
+
+  it("waits for running imports to settle before pointing anywhere", () => {
+    const storage = memoryStorage();
+    const hook = renderHook(
+      useShareLinkSpotlight,
+      props({
+        files: [
+          { id: "local", downloadStatus: "ready" },
+          { id: "imported", downloadStatus: "ready" },
+          { id: "queued", downloadStatus: "downloading" },
+        ],
+        storage,
+      }),
+    );
+    expect(hook.result.target).toBeNull();
+
+    hook.rerender(
+      props({
+        albums: [{ id: "playlist", coverPending: true }],
+        shareAlbumActions: { playlist: unavailable("share album") },
+        storage,
+      }),
+    );
+    expect(hook.result.target).toBeNull();
+
+    hook.rerender(props({ storage }));
+    waitForHint();
     expect(hook.result.target).toEqual({ kind: "album", id: "playlist" });
   });
 

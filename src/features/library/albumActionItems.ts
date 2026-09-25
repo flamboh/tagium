@@ -58,7 +58,6 @@ export function createAlbumActionItems({
     {
       id: "share",
       label: shareLabel,
-      trailingText: canShare ? undefined : "unavailable",
       description: canShare ? undefined : shareDisabledReason,
       disabled: !canShare,
       shareVariant,

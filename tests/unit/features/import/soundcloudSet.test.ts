@@ -234,6 +234,7 @@ describe("soundcloud set import", () => {
         title: "Imported Set",
         artist: "Set Artist",
         genre: "Electronic",
+        coverPending: true,
         trackIds: ["track-1", "track-2"],
         year: 2024,
       },
@@ -303,6 +304,7 @@ describe("soundcloud set import", () => {
     await settle();
 
     expect(harness.albums[0].cover).toEqual(cover);
+    expect(harness.albums[0].coverPending).toBe(false);
     expect(harness.files.map((file) => file.metadata?.picture)).toEqual([cover, cover]);
     expect(harness.files.map((file) => file.hasBufferedChanges)).toEqual([true, true]);
     expect(harness.updateTagsCalls).toEqual(["track-1"]);

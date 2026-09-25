@@ -250,6 +250,24 @@ const trackActionIcon = (action: TrackActionItem) => {
   return action.shareVariant === "create" ? Share08Icon : Link02Icon;
 };
 
+function ActionItemLabel({ action }: { action: TrackActionItem | AlbumActionItem }) {
+  if (!action.disabled || !action.description) {
+    return (
+      <>
+        <span className="min-w-0 flex-1 truncate">{action.label}</span>
+        {action.description && <span className="sr-only">{action.description}</span>}
+      </>
+    );
+  }
+
+  return (
+    <span className="flex min-w-0 flex-1 flex-col">
+      <span className="truncate">{action.label}</span>
+      <span className="text-xs leading-snug text-muted-foreground">{action.description}</span>
+    </span>
+  );
+}
+
 export function TrackActionItemContent({ action }: { action: TrackActionItem }) {
   const actionIcon = trackActionIcon(action);
 
@@ -261,8 +279,7 @@ export function TrackActionItemContent({ action }: { action: TrackActionItem }) 
         aria-hidden="true"
         className={cn(action.destructive && "text-destructive")}
       />
-      <span className="min-w-0 flex-1 truncate">{action.label}</span>
-      {action.description && <span className="sr-only">{action.description}</span>}
+      <ActionItemLabel action={action} />
     </>
   );
 }
@@ -305,7 +322,7 @@ export function AlbumActionItemContent({ action }: { action: AlbumActionItem }) 
           action.destructive && "text-destructive",
         )}
       />
-      <span className="min-w-0 flex-1 truncate">{action.label}</span>
+      <ActionItemLabel action={action} />
       {action.trailingText && (
         <span
           aria-hidden="true"
@@ -317,7 +334,6 @@ export function AlbumActionItemContent({ action }: { action: AlbumActionItem }) 
           {action.trailingText}
         </span>
       )}
-      {action.description && <span className="sr-only">{action.description}</span>}
     </>
   );
 }
