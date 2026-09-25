@@ -24,6 +24,7 @@ import {
   type CobaltRuntimeEnv as DevControlRuntimeEnv,
 } from "../../utils/dev-controls";
 import { decodeRequestBody, urlStringSchema } from "../../utils/schema";
+import { reportDownloadFailure } from "../../utils/download-failure-report";
 import { getYouTubeVideoId, resolveYouTubeUploadYear } from "../../utils/youtube";
 import { isSoundCloudHost } from "../../../src/lib/media-link";
 
@@ -503,6 +504,7 @@ export default defineHandler(async (event) => {
   const startedAt = Date.now();
   let context = getRequestLogContext(event.req);
   let sourceFingerprint: string | undefined;
+  let sourceUrl: string | undefined;
   try {
     const runtimeEnv = getRuntimeEnv(event.req);
     const forbidden = enforceSameOrigin(event.req, runtimeEnv);
@@ -517,6 +519,7 @@ export default defineHandler(async (event) => {
     }
 
     const body = await decodeRequestBody(event.req, audioRequestSchema);
+    sourceUrl = body.url;
     context = getRequestLogContext(event.req, body.url);
     const requestSourceFingerprint = await fingerprintUrl(body.url);
     if (!requestSourceFingerprint) throw new Error("Download URL fingerprint is unavailable.");
@@ -555,8 +558,9 @@ export default defineHandler(async (event) => {
     const cobaltResponse = cobaltResult.response;
 
     if (cobaltResponse.status === CobaltResponseType.Error) {
+      const stage = cobaltResult.failureStage ?? "cobalt.resolve_error";
       const failureDetails: CobaltAudioLogDetails = {
-        stage: cobaltResult.failureStage ?? "cobalt.resolve_error",
+        stage,
         elapsedMs: Date.now() - startedAt,
         errorCode: cobaltResponse.error.code,
       };
@@ -567,6 +571,15 @@ export default defineHandler(async (event) => {
       if (cobaltResult.retryAfter) failureDetails.retryAfter = cobaltResult.retryAfter;
       if (cobaltResult.machineId) failureDetails.machineId = cobaltResult.machineId;
       if (cobaltResult.failureReason) failureDetails.failureReason = cobaltResult.failureReason;
+      reportDownloadFailure({
+        route: "audio",
+        stage,
+        requestId: context.requestId,
+        errorCode: cobaltResponse.error.code,
+        sourceUrl: body.url,
+        upstreamStatus: cobaltResult.upstreamStatus,
+        machineId: cobaltResult.machineId,
+      });
       logCobaltAudioEvent(
         "cobalt_audio_failure",
         context,
@@ -649,6 +662,13 @@ export default defineHandler(async (event) => {
     if (HTTPError.isError(error)) throw error;
 
     if (sourceFingerprint) {
+      reportDownloadFailure({
+        route: "audio",
+        stage: "tagium.audio_handler",
+        requestId: context.requestId,
+        errorCode: "error.api.handler_failure",
+        sourceUrl,
+      });
       logCobaltAudioEvent("cobalt_audio_failure", context, sourceFingerprint, {
         stage: "tagium.audio_handler",
         elapsedMs: Date.now() - startedAt,
