@@ -65,7 +65,11 @@ function SpotlightContent({
         hideWhenDetached
         onOpenAutoFocus={(event) => event.preventDefault()}
         onInteractOutside={(event) => {
-          if (event.target instanceof Node && anchorRef.current?.contains(event.target)) {
+          const target = event.target;
+          if (
+            (target instanceof Node && anchorRef.current?.contains(target)) ||
+            (target instanceof Element && target.closest("[data-spotlight-ignore]"))
+          ) {
             event.preventDefault();
             return;
           }
