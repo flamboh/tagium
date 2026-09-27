@@ -186,6 +186,35 @@ describe("script share endpoint", () => {
     expect(new Uint8Array(await artwork.arrayBuffer())).toEqual(png);
   });
 
+  it("publishes an indefinite share with a cover outside the expiring prefix", async () => {
+    const runtime = createRuntime();
+    stubYouTube();
+
+    const response = await create(
+      {
+        source: albumPlaylistUrl,
+        lifetime: "indefinite",
+        cover: new File([png], "cover.png", { type: "image/png" }),
+      },
+      runtime.env,
+    );
+
+    expect(response.status).toBe(201);
+    const receipt = (await response.json()) as { slug: string; expiresAt: string | null };
+    expect(receipt.expiresAt).toBeNull();
+    const record = runtime.records.get(receipt.slug)!;
+    expect(record.expiresAt).toBeNull();
+    expect(record.artworkKey).toMatch(new RegExp(`^permanent-shares/${receipt.slug}/`));
+    const loaded = await manifestHandler(
+      event(
+        request(`https://tagium.test/api/manifests/${receipt.slug}`, {}, runtime.env),
+        receipt.slug,
+      ),
+    );
+    expect(loaded.status).toBe(200);
+    expect(((await loaded.json()) as { expiresAt: string | null }).expiresAt).toBeNull();
+  });
+
   it("resolves soundcloud sets with their genre and release year", async () => {
     const runtime = createRuntime();
     vi.stubGlobal(
@@ -247,6 +276,7 @@ describe("script share endpoint", () => {
     ["an unknown field", { source: albumPlaylistUrl, manifest: "{}" }],
     ["malformed album json", { source: albumPlaylistUrl, album: "{" }],
     ["unknown album keys", { source: albumPlaylistUrl, album: '{"coverUrl":"https://x.test"}' }],
+    ["an unknown lifetime", { source: albumPlaylistUrl, lifetime: "forever" }],
     [
       "an invalid cover",
       { source: albumPlaylistUrl, cover: new File(["nope"], "cover.png", { type: "image/png" }) },

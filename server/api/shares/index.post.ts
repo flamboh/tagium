@@ -24,7 +24,7 @@ import { projectPlaylistAlbumManifest } from "../../../src/features/share/playli
 import { parseMediaLink } from "../../../src/lib/media-link";
 
 const MAX_SHARE_REQUEST_BYTES = SHARE_ARTWORK_MAX_BYTES + 64 * 1024;
-const FIELDS = new Set(["source", "album", "cover"]);
+const FIELDS = new Set(["source", "album", "cover", "lifetime"]);
 
 const albumOverrideSchema = Schema.Struct({
   title: Schema.optionalKey(Schema.String),
@@ -91,11 +91,14 @@ export default defineHandler(async (event) => {
     const sources = form.getAll("source");
     const albums = form.getAll("album");
     const covers = form.getAll("cover");
+    const lifetimes = form.getAll("lifetime");
     const isString = Schema.is(Schema.String);
     if (
       sources.length !== 1 ||
       albums.length > 1 ||
       covers.length > 1 ||
+      lifetimes.length > 1 ||
+      (lifetimes[0] !== undefined && lifetimes[0] !== "indefinite") ||
       !isString(sources[0]) ||
       (albums[0] !== undefined && !isString(albums[0])) ||
       (covers[0] !== undefined && !(covers[0] instanceof File))
@@ -107,7 +110,10 @@ export default defineHandler(async (event) => {
     const artwork = await parseShareArtwork(covers[0] instanceof File ? covers[0] : undefined);
     const playlist = await resolvePlaylist(request, source.provider, source.canonicalUrl);
     const manifest = projectManifest({ ...playlist, ...album, sourceUrl: source.canonicalUrl });
-    return publicationCreated(request, await store.publish(manifest, artwork));
+    return publicationCreated(
+      request,
+      await store.publish(manifest, artwork, { indefinite: lifetimes[0] === "indefinite" }),
+    );
   } catch (error) {
     if (
       error instanceof Error &&

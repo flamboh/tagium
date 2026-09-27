@@ -1,12 +1,18 @@
 # Share-link operations
 
-Share links are unavailable immediately when their D1 row is disabled or reaches its 90-day expiry. R2 artwork deletion becomes eligible at 90 days and Cloudflare completes lifecycle deletion asynchronously (typically within the following day); it is not the availability control. The D1 row is retained only as minimal operational lifecycle metadata after expiry, so product copy must promise a **90-day link lifetime**, not instantaneous physical deletion of every record at the expiry timestamp.
+Share links are unavailable immediately when their D1 row is disabled or reaches its 90-day expiry. [Indefinite shares](#indefinite-shares) have no expiry. R2 artwork deletion becomes eligible at 90 days and Cloudflare completes lifecycle deletion asynchronously (typically within the following day); it is not the availability control. The D1 row is retained only as minimal operational lifecycle metadata after expiry, so product copy must promise a **90-day link lifetime**, not instantaneous physical deletion of every record at the expiry timestamp.
 
 A publication update replaces the track or album manifest (and optionally its artwork) behind the existing slug using the creator capability. It preserves the original expiry and never creates or rotates a link. D1 replacement is conditional on the previously-read row; R2 uploads are compensated on a lost update, and superseded artwork is deleted best-effort after the D1 commit.
 
 ## Script publishing
 
 `POST /api/shares` publishes an album share link from a YouTube playlist (including YouTube Music `OLAK5uy_` album playlists) or a SoundCloud set, for callers without a browser. It takes `multipart/form-data` with a required `source` URL, an optional `album` JSON object (`title`, `artist`, `genre`, `year`) that overrides the resolved values on the album and every track, and an optional `cover` JPEG/PNG validated like `POST /api/manifests`. The server resolves the source with the same code as the import endpoints and builds the manifest the web client would share for a freshly loaded playlist (320 kbps, filenames from track titles, provider track numbers). It never fetches artwork itself. Responses match `POST /api/manifests`: `201` with `{ slug, url, expiresAt, revocationToken, analyticsId }`, `400` for bad input or an unresolvable source, `429` from `SHARE_CREATE_RATE_LIMITER`, and `503` without storage.
+
+### Indefinite shares
+
+`POST /api/shares` (and no other route) also accepts an optional `lifetime` field whose only valid value is `indefinite`; any other value is a `400`, and leaving it out gives the normal 90-day link. An indefinite link never expires: the `201`, `GET /api/manifests/:slug`, and publication updates all return `expiresAt: null` for it. The web app never sends this field or mentions it.
+
+Indefinite rows store a null `expires_at`, and their artwork lives under `permanent-shares/<slug>/`, which the 90-day R2 lifecycle rule (prefix `shares/`) does not match; replacement artwork stays under the same prefix. Nothing removes an indefinite link on its own: it ends only when revoked with its `revocationToken` (`DELETE /api/manifests/:slug`) or with the takedown script below, so keep the token.
 
 YouTube playlist titles and upload years are not album metadata (`Album - Red Headed Stranger`, the year the video was uploaded, and often no artist), so scripts should pass `album` when they know better.
 
@@ -20,9 +26,14 @@ bun run deploy:preview --no-upload
 bunx wrangler@4.110.0 d1 execute tagium-share-manifests-preview --local \
   --config .output/server/wrangler.json --persist-to .wrangler/state \
   --file migrations/0001_share_manifests.sql
+bunx wrangler@4.110.0 d1 execute tagium-share-manifests-preview --local \
+  --config .output/server/wrangler.json --persist-to .wrangler/state \
+  --file migrations/0002_nullable_share_expiry.sql
 bunx wrangler@4.110.0 dev --config .output/server/wrangler.json --local \
   --persist-to .wrangler/state --ip 127.0.0.1 --port 8787 --local-upstream 127.0.0.1:8787
 ```
+
+`0002` rebuilds the table to make `expires_at` nullable and only needs to run once per local state.
 
 `deploy:preview --no-upload` only writes the binding names into the generated config; nothing touches the remote preview resources without `--remote`. `--local-upstream` keeps share URLs on `127.0.0.1` instead of the first production route. Use `bunx` rather than `npx`, which refuses to run under the pinned `devEngines` Node version.
 
@@ -46,6 +57,8 @@ TAGIUM_DEPLOY_ENV=production bun run migrate:share:production
 TAGIUM_DEPLOY_ENV=production bun run configure:share-artwork-lifecycle:production
 ```
 
+`migrate:share:*` runs only the reviewed migrations, in order: the additive `0001_share_manifests.sql` every time, then `0002_nullable_share_expiry.sql` only while `share_manifests.expires_at` is still `NOT NULL`. `0002` copies every row into a rebuilt table with a nullable `expires_at` and recreates the expiry index. The script fails closed unless `PRAGMA table_info` then reports `expires_at` as nullable. Apply it before deploying a Worker that can create indefinite shares.
+
 There is one Worker service named `tagium`. Preview uses `wrangler versions upload` and production uses `wrangler deploy` against that same service; no named Wrangler environments are used, so production routes remain attached to `tagium`.
 
 Cloudflare Build variables still required: `WORKERS_CI_BRANCH`, `WORKERS_CI_COMMIT_SHA`, `VITE_PUBLIC_POSTHOG_HOST=https://t.tagium.app`, and `VITE_PUBLIC_POSTHOG_KEY`. Deploy credentials (`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`) are supplied by the operator or Workers Build environment.
@@ -59,6 +72,6 @@ TAGIUM_DEPLOY_ENV=production SHARE_MAINTAINER_CONFIRM=disable \
   bun run disable:share-manifest -- <6-character-slug>
 ```
 
-It validates the environment and server-derived key, disables the D1 row first, then deletes the corresponding R2 object. A missing or previously-disabled row is safe to retry. If R2 deletion fails, the link remains disabled; repeat the exact command once R2 is available. Never use preview resource values for production (or vice versa).
+It validates the environment and server-derived key (`shares/<slug>/` or `permanent-shares/<slug>/`), disables the D1 row first, then deletes the corresponding R2 object. A missing or previously-disabled row is safe to retry. If R2 deletion fails, the link remains disabled; repeat the exact command once R2 is available. Never use preview resource values for production (or vice versa).
 
-Both deployment commands fail closed unless their isolated D1/R2 bindings, the additive D1 migration, and the verified 90-day R2 lifecycle rule are present.
+Both deployment commands fail closed unless their isolated D1/R2 bindings, the D1 migrations, and the verified 90-day R2 lifecycle rule are present.

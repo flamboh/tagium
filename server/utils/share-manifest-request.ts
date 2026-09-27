@@ -69,7 +69,7 @@ export const infrastructureFailure = () => new Response(null, { status: 503, hea
 
 export const publicationCreated = (
   request: Request,
-  published: Omit<SharePublicationResponse, "expiresAt" | "url"> & { expiresAt: number },
+  published: Omit<SharePublicationResponse, "expiresAt" | "url"> & { expiresAt: number | null },
 ) => {
   const body: SharePublicationResponse = {
     ...published,

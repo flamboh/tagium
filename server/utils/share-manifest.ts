@@ -42,7 +42,8 @@ export type StoredShareManifest = {
   payloadBytes: number;
   status: "active" | "disabled";
   createdAt: number;
-  expiresAt: number;
+  /** Null for indefinite publications, which never expire. */
+  expiresAt: number | null;
 };
 
 export interface ShareManifestPersistence {
@@ -51,7 +52,7 @@ export interface ShareManifestPersistence {
     bytes: Uint8Array;
     type: ShareArtwork["type"];
     sha256: string;
-    expiresAt: number;
+    expiresAt: number | null;
   }) => Promise<void>;
   deleteArtwork: (key: string) => Promise<void>;
   getArtwork: (
@@ -80,7 +81,7 @@ export type ShareManifestUnavailable = { kind: "unavailable" };
 export type ShareManifestLoaded = {
   kind: "available";
   manifest: ShareManifest;
-  expiresAt: number;
+  expiresAt: number | null;
   analyticsId: string;
 };
 export type ShareManifestRevokeResult = "revoked" | "unavailable" | "artwork_unavailable";
@@ -100,7 +101,7 @@ interface TrackWithArtwork extends ManifestTrack {
   artwork?: ManifestArtwork;
 }
 export type ShareManifestUpdateResult =
-  | { kind: "updated"; slug: string; expiresAt: number; analyticsId: string }
+  | { kind: "updated"; slug: string; expiresAt: number | null; analyticsId: string }
   | ShareManifestUnavailable;
 const unavailable = (): ShareManifestUnavailable => ({ kind: "unavailable" });
 
@@ -305,7 +306,18 @@ const decodeStored = (payloadJson: string): ShareManifest | undefined => {
 };
 
 const active = (record: StoredShareManifest | undefined, now: number) =>
-  record && record.status === "active" && record.expiresAt > now ? record : undefined;
+  record && record.status === "active" && (record.expiresAt === null || record.expiresAt > now)
+    ? record
+    : undefined;
+
+// Indefinite artwork lives outside the `shares/` prefix matched by the 90-day R2 lifecycle rule.
+const artworkKeyFor = (
+  slug: string,
+  expiresAt: number | null,
+  suffix: string,
+  type: ShareArtwork["type"],
+) =>
+  `${expiresAt === null ? "permanent-shares" : "shares"}/${slug}/${suffix}.${type === "image/png" ? "png" : "jpg"}`;
 
 const equalSecretHashes = (left: string, right: string) => {
   if (left.length !== right.length) return false;
@@ -333,13 +345,17 @@ export const createShareManifestStore = (
   const token = options.randomToken ?? randomToken;
   const slugToken = options.randomSlug ?? createShareSlug;
   return {
-    publish: async (manifest: ShareManifest, artwork: ShareArtwork | undefined) => {
+    publish: async (
+      manifest: ShareManifest,
+      artwork: ShareArtwork | undefined,
+      { indefinite = false }: { indefinite?: boolean } = {},
+    ) => {
       const payload = JSON.stringify(withArtwork(manifest, artwork));
       const payloadBytes = utf8.encode(payload).byteLength;
       if (payloadBytes > SHARE_MANIFEST_MAX_BYTES)
         throw new ShareManifestValidationError("share_manifest_too_large");
       const createdAt = clock();
-      const expiresAt = createdAt + SHARE_MANIFEST_LIFETIME_MS;
+      const expiresAt = indefinite ? null : createdAt + SHARE_MANIFEST_LIFETIME_MS;
       const revocationToken = token();
       const revocationTokenHash = await hashShareSecret(revocationToken);
       const analyticsId = await shareAnalyticsId(revocationTokenHash);
@@ -348,7 +364,7 @@ export const createShareManifestStore = (
         const slug = slugToken();
         // An attempt-specific key prevents a slug collision from overwriting an existing cover.
         const artworkKey = artwork
-          ? `shares/${slug}/${token(8)}.${artwork.type === "image/png" ? "png" : "jpg"}`
+          ? artworkKeyFor(slug, expiresAt, token(8), artwork.type)
           : undefined;
         if (artwork && artworkKey) {
           try {
@@ -411,10 +427,9 @@ export const createShareManifestStore = (
         throw new ShareManifestValidationError("share_manifest_too_large");
 
       let artworkKey = artworkUpdate.kind === "retain" ? previous.artworkKey : undefined;
-      if (artworkUpdate.kind === "replace") {
-        const extension = artwork?.type === "image/png" ? "png" : "jpg";
+      if (artwork) {
         for (let attempt = 0; attempt < 3; attempt++) {
-          const candidate = `shares/${slug}/${token(8)}.${extension}`;
+          const candidate = artworkKeyFor(slug, previous.expiresAt, token(8), artwork.type);
           if (candidate !== previous.artworkKey) {
             artworkKey = candidate;
             break;

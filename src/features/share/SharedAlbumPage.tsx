@@ -39,7 +39,7 @@ export type SharedContentPageState =
       status: "ready";
       slug: string;
       manifest: Manifest;
-      expiresAt: string;
+      expiresAt: string | null;
       analyticsId: string;
     };
 
@@ -342,12 +342,13 @@ function RecipientContext({
 }: {
   kind: Manifest["kind"];
   trackCount: number;
-  expiresAt: string;
+  expiresAt: string | null;
 }) {
   const noun = trackCount === 1 ? "track" : "tracks";
   return (
     <p className="mb-5 text-sm text-muted-foreground">
-      shared {kind} · {trackCount} {noun} · link expires {formatExpiry(expiresAt)}
+      shared {kind} · {trackCount} {noun}
+      {expiresAt === null ? null : ` · link expires ${formatExpiry(expiresAt)}`}
     </p>
   );
 }

@@ -14,7 +14,7 @@ type ShareRecord = {
   payloadBytes: number;
   status: "active" | "disabled";
   createdAt: number;
-  expiresAt: number;
+  expiresAt: number | null;
 };
 
 export const png = Uint8Array.from(
@@ -44,7 +44,7 @@ export const createRuntime = () => {
               record.revocationTokenHash !== values[9] ||
               record.status !== "active" ||
               record.expiresAt !== values[10] ||
-              record.expiresAt <= Number(values[11]) ||
+              (record.expiresAt !== null && record.expiresAt <= Number(values[11])) ||
               record.payloadJson !== values[12] ||
               record.artworkKey !== values[13]
             )
@@ -88,7 +88,7 @@ export const createRuntime = () => {
             if (
               !record ||
               record.revocationTokenHash !== values[1] ||
-              record.expiresAt <= Number(values[2])
+              (record.expiresAt !== null && record.expiresAt <= Number(values[2]))
             )
               return null;
             record.status = "disabled";
