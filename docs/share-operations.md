@@ -4,6 +4,28 @@ Share links are unavailable immediately when their D1 row is disabled or reaches
 
 A publication update replaces the track or album manifest (and optionally its artwork) behind the existing slug using the creator capability. It preserves the original expiry and never creates or rotates a link. D1 replacement is conditional on the previously-read row; R2 uploads are compensated on a lost update, and superseded artwork is deleted best-effort after the D1 commit.
 
+## Script publishing
+
+`POST /api/shares` publishes an album share link from a YouTube playlist (including YouTube Music `OLAK5uy_` album playlists) or a SoundCloud set, for callers without a browser. It takes `multipart/form-data` with a required `source` URL, an optional `album` JSON object (`title`, `artist`, `genre`, `year`) that overrides the resolved values on the album and every track, and an optional `cover` JPEG/PNG validated like `POST /api/manifests`. The server resolves the source with the same code as the import endpoints and builds the manifest the web client would share for a freshly loaded playlist (320 kbps, filenames from track titles, provider track numbers). It never fetches artwork itself. Responses match `POST /api/manifests`: `201` with `{ slug, url, expiresAt, revocationToken, analyticsId }`, `400` for bad input or an unresolvable source, `429` from `SHARE_CREATE_RATE_LIMITER`, and `503` without storage.
+
+YouTube playlist titles and upload years are not album metadata (`Album - Red Headed Stranger`, the year the video was uploaded, and often no artist), so scripts should pass `album` when they know better.
+
+## Local share storage
+
+`vp dev` has no D1/R2 bindings, so share endpoints return `503` there. To run the built Worker with local Miniflare D1/R2 (state persists in `.wrangler/state`):
+
+```sh
+bun run build:cloudflare
+bun run deploy:preview --no-upload
+bunx wrangler@4.110.0 d1 execute tagium-share-manifests-preview --local \
+  --config .output/server/wrangler.json --persist-to .wrangler/state \
+  --file migrations/0001_share_manifests.sql
+bunx wrangler@4.110.0 dev --config .output/server/wrangler.json --local \
+  --persist-to .wrangler/state --ip 127.0.0.1 --port 8787 --local-upstream 127.0.0.1:8787
+```
+
+`deploy:preview --no-upload` only writes the binding names into the generated config; nothing touches the remote preview resources without `--remote`. `--local-upstream` keeps share URLs on `127.0.0.1` instead of the first production route. Use `bunx` rather than `npx`, which refuses to run under the pinned `devEngines` Node version.
+
 ## Deployments and one-time setup
 
 The committed `scripts/share-deployment-bindings.ts` target map is the binding source of truth. Preview and production use separate, stable D1 databases, R2 buckets, and rate-limit namespaces; no `SHARE_PREVIEW_*` build variables or Prisma are used. Native Workers Builds should use exactly:
