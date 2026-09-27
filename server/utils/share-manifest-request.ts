@@ -9,7 +9,11 @@ import {
   ShareManifestValidationError,
   type ShareManifest,
 } from "./share-manifest";
-import { decodeManifest } from "../../src/features/share/shareManifest";
+import {
+  decodeManifest,
+  toShareExpiryIso,
+  type SharePublicationResponse,
+} from "../../src/features/share/shareManifest";
 
 export type ShareRuntimeEnv = {
   SHARE_MANIFESTS?: D1DatabaseBinding;
@@ -62,6 +66,18 @@ export const noStore = { "Cache-Control": "no-store" };
 export const unavailable = () => new Response(null, { status: 404, headers: noStore });
 export const badRequest = () => new Response(null, { status: 400, headers: noStore });
 export const infrastructureFailure = () => new Response(null, { status: 503, headers: noStore });
+
+export const publicationCreated = (
+  request: Request,
+  published: Omit<SharePublicationResponse, "expiresAt" | "url"> & { expiresAt: number },
+) => {
+  const body: SharePublicationResponse = {
+    ...published,
+    expiresAt: toShareExpiryIso(published.expiresAt),
+    url: new URL(`/share/${published.slug}`, request.url).toString(),
+  };
+  return Response.json(body, { status: 201, headers: noStore });
+};
 
 export const isSameOriginBrowserRequest = (request: Request) => {
   const origin = request.headers.get("origin");
