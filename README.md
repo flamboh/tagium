@@ -46,9 +46,7 @@ bun run lint
 
 URL imports need a Cobalt instance. Point `COBALT_API_URL` at one, or run a local checkout
 with `bun run dev:cobalt`. Share links stay off unless `VITE_PUBLIC_SHARE_LINKS_ENABLED=true`
-and their Cloudflare bindings are present; see
-[share operations](./docs/share-operations.md#local-share-storage) to run them locally and to
-publish share links from scripts with `POST /api/shares`.
+and their Cloudflare bindings are present.
 
 Deploys go through Cloudflare Workers Builds; `bun run deploy:preview` and
 `deploy:production` exist for manual uploads.

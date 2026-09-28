@@ -123,7 +123,6 @@ export const isShareAnalyticsId = (value: unknown): value is string =>
 export interface SharePublicationResponse {
   slug: string;
   url: string;
-  /** Null for indefinite publications, which only `POST /api/shares` can create. */
   expiresAt: string | null;
   revocationToken: string;
   analyticsId: string;

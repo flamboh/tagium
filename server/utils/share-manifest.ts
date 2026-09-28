@@ -42,7 +42,6 @@ export type StoredShareManifest = {
   payloadBytes: number;
   status: "active" | "disabled";
   createdAt: number;
-  /** Null for indefinite publications, which never expire. */
   expiresAt: number | null;
 };
 

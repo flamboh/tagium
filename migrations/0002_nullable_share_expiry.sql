@@ -1,6 +1,3 @@
--- Rebuilds share_manifests so indefinite shares can store a null expires_at. Existing rows are
--- copied unchanged. Run it once; scripts/apply-share-migrations.ts skips it after expires_at is
--- nullable.
 CREATE TABLE share_manifests_next (
   slug TEXT PRIMARY KEY,
   version INTEGER NOT NULL,

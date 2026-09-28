@@ -44,7 +44,6 @@ const execute = (migration: string) => {
   if (result.status !== 0) exit(result.status ?? 1);
 };
 
-/** Returns whether `share_manifests.expires_at` is NOT NULL, or undefined when unverifiable. */
 const expiryRequired = () => {
   const result = spawnSync(
     "npx",
@@ -72,9 +71,7 @@ const expiryRequired = () => {
   }
 };
 
-// Only these reviewed migrations run, in order; do not glob this directory. The first is
-// additive and safe to re-run. The second rebuilds the table, so it runs only while
-// expires_at is still NOT NULL.
+// Only these reviewed migrations run; do not glob this directory.
 execute(createMigration);
 const required = expiryRequired();
 if (required === undefined) {
