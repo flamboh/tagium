@@ -4,6 +4,25 @@ Share links are unavailable immediately when their D1 row is disabled or reaches
 
 A publication update replaces the track or album manifest (and optionally its artwork) behind the existing slug using the creator capability. It preserves the original expiry and never creates or rotates a link. D1 replacement is conditional on the previously-read row; R2 uploads are compensated on a lost update, and superseded artwork is deleted best-effort after the D1 commit.
 
+## Script publishing
+
+`POST /api/shares` publishes an album share from a YouTube playlist or SoundCloud set URL, for scripts such as uoalbum.club's `add-album`. The unadvertised `lifetime=indefinite` field makes a link that never expires; only its revocation token or the takedown script ends it.
+
+## Local share storage
+
+`vp dev` has no D1/R2 bindings. To run the built Worker with local ones:
+
+```sh
+bun run build:cloudflare
+bun run deploy:preview --no-upload
+for migration in migrations/0001_share_manifests.sql migrations/0002_nullable_share_expiry.sql; do
+  bunx wrangler@4.110.0 d1 execute tagium-share-manifests-preview --local \
+    --config .output/server/wrangler.json --persist-to .wrangler/state --file "$migration"
+done
+bunx wrangler@4.110.0 dev --config .output/server/wrangler.json --local \
+  --persist-to .wrangler/state --port 8787 --local-upstream 127.0.0.1:8787
+```
+
 ## Deployments and one-time setup
 
 The committed `scripts/share-deployment-bindings.ts` target map is the binding source of truth. Preview and production use separate, stable D1 databases, R2 buckets, and rate-limit namespaces; no `SHARE_PREVIEW_*` build variables or Prisma are used. Native Workers Builds should use exactly:

@@ -1,10 +1,14 @@
-import filenamify from "filenamify";
 import {
   coverArtFileToPicture,
   MAX_COVER_ART_UPLOAD_BYTES,
   normalizeCoverArtType,
   optimizeCoverArt,
 } from "@/features/editor/coverArtProcessing";
+import {
+  createDownloadMetadata,
+  createPlaylistPendingMetadataPatch,
+  createPlaylistTrackMetadata,
+} from "@/features/import/downloadMetadata";
 import type { Playlist } from "@/features/import/playlist";
 import type { TrackMetadata } from "@/features/import/trackMetadata";
 import type {
@@ -76,12 +80,6 @@ export interface CreatePlaylistDownloadPlanInput {
   importId?: string;
 }
 
-const filenameFromTitle = (title: string) => {
-  const filename = filenamify(title.trim(), { replacement: "-" });
-  if (filename) return `${filename}.mp3`;
-  return "downloading-track.mp3";
-};
-
 export const titleFromSourceUrl = (sourceUrl: string) => {
   try {
     const url = new URL(sourceUrl);
@@ -92,41 +90,6 @@ export const titleFromSourceUrl = (sourceUrl: string) => {
     return "downloading audio";
   }
 };
-
-export const createDownloadMetadata = ({
-  title,
-  artist,
-  album,
-  genre,
-  year,
-  duration,
-  trackNumber,
-}: {
-  title: string;
-  artist: string;
-  album: string;
-  genre: string;
-  year?: number;
-  duration?: number;
-  trackNumber?: number;
-}): AudioMetadata => ({
-  filename: filenameFromTitle(title).replace(/\.mp3$/i, ""),
-  title,
-  artist,
-  albumArtist: artist,
-  album,
-  genre,
-  duration: duration ?? 0,
-  bitrate: 0,
-  sampleRate: 0,
-  picture: [],
-  year: year ?? null,
-  trackNumber: trackNumber ?? null,
-  composer: "",
-  comment: "",
-  discNumber: null,
-  bpm: null,
-});
 
 export const createPendingDownloadTrack = (
   id: string,
@@ -210,21 +173,6 @@ export const createQueuedDownloadTracks = (
   files: readonly PendingDownloadTrack[],
 ): QueuedDownloadTrack[] => files.map(createQueuedDownloadTrack);
 
-const createPlaylistPendingMetadataPatch = (
-  playlist: Playlist,
-  track: Playlist["tracks"][number],
-): MetadataPatch => {
-  const patch: MetadataPatch = {
-    title: track.title,
-    artist: playlist.artist,
-    album: playlist.title,
-    genre: playlist.genre,
-  };
-  if (playlist.year !== undefined) patch.year = playlist.year;
-  if (track.trackNumber !== undefined) patch.trackNumber = track.trackNumber;
-  return patch;
-};
-
 export const createSingleUrlDownloadPlan = ({
   sourceUrl,
   audioBitrate,
@@ -282,15 +230,7 @@ export const createPlaylistDownloadPlan = ({
     if (playlist.year !== undefined) downloadRequest.year = playlist.year;
     return createPendingDownloadTrack(
       createId(),
-      createDownloadMetadata({
-        title: track.title,
-        artist: playlist.artist,
-        album: playlist.title,
-        genre: playlist.genre,
-        year: playlist.year,
-        duration: track.duration,
-        trackNumber: track.trackNumber,
-      }),
+      createPlaylistTrackMetadata(playlist, track),
       true,
       downloadRequest,
       createPlaylistPendingMetadataPatch(playlist, track),
