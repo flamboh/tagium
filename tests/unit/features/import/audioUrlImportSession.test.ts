@@ -93,6 +93,7 @@ describe("audio URL import session", () => {
         editor,
         settings: settings("320"),
         activateEditor: vi.fn(),
+        onImportReady: vi.fn(),
       });
       return { library, importing };
     }, undefined);
@@ -124,6 +125,91 @@ describe("audio URL import session", () => {
     hook.unmount();
   });
 
+  it.each([true, false])(
+    "reports an unblocked single import as ready only when download-after-import is %s",
+    async (downloadAfterImport) => {
+      mocks.resolveTrackMetadata.mockResolvedValue({ title: "Single", artist: "Artist" });
+      const onImportReady = vi.fn();
+      const importSettings = { ...settings("320"), downloadAfterImport };
+      const hook = renderHook(() => {
+        const library = useLibraryStore();
+        const editor = useTrackEditorSession({ library, settings: importSettings });
+        const importing = useAudioImportSession({
+          library,
+          editor,
+          settings: importSettings,
+          activateEditor: vi.fn(),
+          onImportReady,
+        });
+        return { library, importing };
+      }, undefined);
+
+      await act(async () => {
+        await hook.result.importing.commands.importUrl(
+          "https://www.youtube.com/watch?v=abcdefghijk",
+        );
+      });
+      const trackId = hook.result.library.getSnapshot().files[0]!.id;
+      expect(onImportReady).not.toHaveBeenCalled();
+
+      act(() => hook.result.importing.commands.removeTracks([trackId]));
+
+      if (downloadAfterImport) {
+        expect(onImportReady).toHaveBeenCalledExactlyOnceWith({ kind: "track", trackId });
+      } else {
+        expect(onImportReady).not.toHaveBeenCalled();
+      }
+      act(() => hook.result.importing.commands.cancelQueue());
+      hook.unmount();
+    },
+  );
+
+  it("does not report a canceled album import as ready, even after its cover loads", async () => {
+    let resolveCover: ((cover: AudioMetadata["picture"]) => void) | undefined;
+    mocks.fetchImportedCover.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveCover = resolve;
+        }),
+    );
+    mocks.resolveSoundCloudSet.mockResolvedValue({
+      title: "Imported album",
+      artist: "Artist",
+      genre: "Electronic",
+      isAlbum: true,
+      coverUrl: "https://example.com/cover.jpg",
+      tracks: [{ title: "Track", url: "https://soundcloud.com/artist/track", trackNumber: 1 }],
+    });
+    const onImportReady = vi.fn();
+    const importSettings = { ...settings("320"), downloadAfterImport: true };
+    const hook = renderHook(() => {
+      const library = useLibraryStore();
+      const editor = useTrackEditorSession({ library, settings: importSettings });
+      const importing = useAudioImportSession({
+        library,
+        editor,
+        settings: importSettings,
+        activateEditor: vi.fn(),
+        onImportReady,
+      });
+      return { library, importing };
+    }, undefined);
+
+    await act(async () => {
+      await hook.result.importing.commands.importUrl(
+        "https://soundcloud.com/artist/sets/imported-album",
+      );
+    });
+    act(() => hook.result.importing.commands.cancelQueue());
+    await act(async () => {
+      resolveCover?.([]);
+      await Promise.resolve();
+    });
+
+    expect(onImportReady).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
   it("records accepted and rejected URL processing after resolution", async () => {
     mocks.resolveTrackMetadata.mockResolvedValue({ title: "Linked Single", artist: "Artist" });
     const hook = renderHook(() => {
@@ -134,6 +220,7 @@ describe("audio URL import session", () => {
         editor,
         settings: settings("320", "best"),
         activateEditor: vi.fn(),
+        onImportReady: vi.fn(),
       });
       return { library, importing };
     }, undefined);
@@ -201,6 +288,7 @@ describe("audio URL import session", () => {
         editor,
         settings: settings("320"),
         activateEditor: vi.fn(),
+        onImportReady: vi.fn(),
       });
       return { importing, library };
     }, undefined);
@@ -263,6 +351,7 @@ describe("audio URL import session", () => {
           editor,
           settings: coverSettings,
           activateEditor: vi.fn(),
+          onImportReady: vi.fn(),
         });
         return { editor, importing, library };
       }, undefined);
@@ -385,6 +474,7 @@ describe("audio URL import session", () => {
           editor,
           settings: currentSettings,
           activateEditor,
+          onImportReady: vi.fn(),
         });
         return { library, importing };
       },

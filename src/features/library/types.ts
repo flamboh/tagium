@@ -73,6 +73,7 @@ export interface AppSettings {
   audioBitrate: AudioDownloadBitrate;
   audioFormat: AudioDownloadFormat;
   applySoundCloudAlbumCoverToTracks: boolean;
+  downloadAfterImport: boolean;
   advancedMetadata: boolean;
   metadataLinks: MetadataLinks;
 }

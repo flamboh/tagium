@@ -31,7 +31,16 @@ export function useAudioTaggerController() {
   const activeView = workspaceNavigation.activeView;
   const activateEditor = workspaceNavigation.showEditor;
   const exporting = useExportSession({ library, editor: editor.commands, settings });
-  const importing = useAudioImportSession({ library, editor, settings, activateEditor });
+  const importing = useAudioImportSession({
+    library,
+    editor,
+    settings,
+    activateEditor,
+    onImportReady: (target) => {
+      if (target.kind === "album") void exporting.exportAlbum(target.albumId);
+      else void exporting.exportTrack(target.trackId);
+    },
+  });
   const sharing = useShareWorkflow({ library, editor, importing, enabled: shareLinksEnabled });
   const busy = importing.status.importing || exporting.exporting;
   const workspace = useAudioWorkspace({

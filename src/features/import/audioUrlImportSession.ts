@@ -90,6 +90,16 @@ const captureTunnelReadiness = (sourceUrl: string, event: CobaltAudioDownloadLif
   });
 };
 
+export type ImportDownloadTarget =
+  | { kind: "track"; trackId: string }
+  | { kind: "album"; albumId: string };
+
+type PendingImportDownload = {
+  target: ImportDownloadTarget;
+  pendingTrackIds: Set<string>;
+  coverPending: boolean;
+};
+
 export interface AudioUrlImportSession {
   importUrl: (sourceUrl: string) => Promise<void>;
   retryTrack: (fileId: string) => void;
@@ -110,6 +120,7 @@ export const createAudioUrlImportSession = ({
   activateEditor,
   setUrlImporting,
   emitQueueSnapshot,
+  onImportReady,
 }: {
   library: LibraryStore;
   getEditor: () => UrlImportEditor;
@@ -117,8 +128,46 @@ export const createAudioUrlImportSession = ({
   activateEditor: () => void;
   setUrlImporting: (importing: boolean) => void;
   emitQueueSnapshot: (snapshot: PlaylistDownloadControllerSnapshot) => void;
+  onImportReady: (target: ImportDownloadTarget) => void;
 }): AudioUrlImportSession => {
   let queueSnapshot: PlaylistDownloadControllerSnapshot | null = null;
+  // Imports only auto-download when every track completes on the first pass;
+  // a failed or canceled track leaves the result for manual review.
+  const pendingImportDownloads = new Map<string, PendingImportDownload>();
+
+  const watchImportDownload = (
+    target: ImportDownloadTarget,
+    trackIds: string[],
+    coverPending = false,
+  ) => {
+    if (!getSettings().downloadAfterImport || trackIds.length === 0) return null;
+    const pending: PendingImportDownload = {
+      target,
+      pendingTrackIds: new Set(trackIds),
+      coverPending,
+    };
+    for (const trackId of trackIds) pendingImportDownloads.set(trackId, pending);
+    return pending;
+  };
+
+  const releaseImportDownload = (pending: PendingImportDownload) => {
+    if (pending.pendingTrackIds.size > 0 || pending.coverPending) return;
+    onImportReady(pending.target);
+  };
+
+  const settleImportDownload = (trackId: string, completed: boolean) => {
+    const pending = pendingImportDownloads.get(trackId);
+    if (!pending) return;
+    if (!completed) {
+      for (const [id, entry] of pendingImportDownloads) {
+        if (entry === pending) pendingImportDownloads.delete(id);
+      }
+      return;
+    }
+    pendingImportDownloads.delete(trackId);
+    pending.pendingTrackIds.delete(trackId);
+    releaseImportDownload(pending);
+  };
   let controller: PlaylistDownloadController<ManagedDownloadTrack> | null = null;
   const importLifecycleTracker = createImportLifecycleTracker({
     capture: analytics.capture,
@@ -198,6 +247,7 @@ export const createAudioUrlImportSession = ({
       markFailed: markDownloadError,
       onTrackSettled: (event) => {
         const { track, outcome } = event;
+        settleImportDownload(track.fileId, outcome === "completed");
         if (!track.importOperationId) return;
         const settlement: Parameters<typeof importLifecycleTracker.settle>[1] = {
           trackId: track.fileId,
@@ -290,6 +340,9 @@ export const createAudioUrlImportSession = ({
       trackIds: plan.queuedTracks.map((track) => track.fileId),
       hasCover: false,
     });
+    for (const track of plan.queuedTracks) {
+      watchImportDownload({ kind: "track", trackId: track.fileId }, [track.fileId]);
+    }
     queueDownloadTracks(plan.queuedTracks.map((track) => ({ ...track, importOperationId })));
   };
 
@@ -319,6 +372,12 @@ export const createAudioUrlImportSession = ({
         rangeAnchorFileId: plan.selection.lastSelectedFileId,
       },
     });
+
+    const importDownload = watchImportDownload(
+      { kind: "album", albumId: plan.album.id },
+      plan.queuedTracks.map((track) => track.fileId),
+      Boolean(plan.coverImport),
+    );
 
     if (plan.coverImport) {
       const coverImport = plan.coverImport;
@@ -366,6 +425,11 @@ export const createAudioUrlImportSession = ({
             files: current.files,
           });
           reportSystemFailure(error, "cover-import");
+        } finally {
+          if (importDownload) {
+            importDownload.coverPending = false;
+            releaseImportDownload(importDownload);
+          }
         }
       })();
     }
@@ -403,6 +467,16 @@ export const createAudioUrlImportSession = ({
           rangeAnchorFileId: plan.selection.lastSelectedFileId,
         },
       });
+      if (plan.source === "playlist") {
+        watchImportDownload(
+          { kind: "album", albumId: plan.album.id },
+          plan.queuedTracks.map((track) => track.fileId),
+        );
+      } else {
+        for (const track of plan.queuedTracks) {
+          watchImportDownload({ kind: "track", trackId: track.fileId }, [track.fileId]);
+        }
+      }
       queueDownloadTracks(plan.queuedTracks);
     },
     importUrl: async (sourceUrl) => {
@@ -533,6 +607,10 @@ export const createAudioUrlImportSession = ({
       });
       getController().retry(tracks);
     },
-    removeTracks: (trackIds) => controller?.remove(trackIds),
+    removeTracks: (trackIds) => {
+      // A removed track no longer blocks the rest of its import from downloading.
+      for (const trackId of trackIds) settleImportDownload(trackId, true);
+      controller?.remove(trackIds);
+    },
   };
 };
