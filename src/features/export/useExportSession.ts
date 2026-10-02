@@ -1,7 +1,9 @@
+import { Effect } from "effect";
 import filenamify from "filenamify";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { SubmitHandler } from "react-hook-form";
 import { analytics } from "@/analytics";
+import { applyTrackClips, clipAudioFile } from "@/features/audio/audioClip";
 import {
   allTracksReadyForDownload,
   createLibraryDownloadFilename,
@@ -247,10 +249,15 @@ export const useExportSession = ({
         );
         if (!validationPlan || !samePlan(frozenPlan, validationPlan)) return "unavailable";
 
-        const exportFiles = prepared.files.map((file) => {
-          const rewrittenFile = currentFilesById.get(file.id);
-          return rewrittenFile?.file ? { ...file, file: rewrittenFile.file } : file;
-        });
+        const exportFiles = await Effect.runPromise(
+          applyTrackClips(
+            prepared.files.map((file) => {
+              const rewrittenFile = currentFilesById.get(file.id);
+              return rewrittenFile?.file ? { ...file, file: rewrittenFile.file } : file;
+            }),
+            new Set(expectedTrackIds),
+          ),
+        );
         const exportState = { ...frozenState, files: exportFiles };
         const album =
           target.kind === "album"
@@ -392,12 +399,23 @@ export const useExportSession = ({
         await updateTags(selectedFile, submittedData);
         const updatedFile = library.getSnapshot().files.find((file) => file.id === fileId);
         if (!updatedFile?.file) throw new Error("track export was not ready.");
-        downloadBlob(updatedFile.file, updatedFile.filename);
+        const exportFile =
+          updatedFile.clip && updatedFile.metadata
+            ? await Effect.runPromise(
+                clipAudioFile(
+                  updatedFile.file,
+                  updatedFile,
+                  updatedFile.clip,
+                  updatedFile.metadata,
+                ),
+              )
+            : updatedFile.file;
+        downloadBlob(exportFile, updatedFile.filename);
         analytics.capture({
           type: "export_prepared",
           exportKind: "track",
           trackCount: 1,
-          sizeBytes: updatedFile.file.size,
+          sizeBytes: exportFile.size,
         });
       } catch (error) {
         analytics.capture({

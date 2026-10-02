@@ -12,6 +12,12 @@ export interface SharePublication {
   status: "active" | "stopped";
 }
 
+/** Seconds into the source audio kept on export. */
+export interface TrackClip {
+  start: number;
+  end: number;
+}
+
 export interface TagiumFile {
   id: string;
   format?: AudioFormat;
@@ -35,6 +41,8 @@ export interface TagiumFile {
   hasBufferedChanges?: boolean;
   filename: string;
   metadata?: AudioMetadata;
+  /** Portion of the audio kept on export; absent when the whole track is kept. */
+  clip?: TrackClip;
   /** In-memory provenance used to prevent republishing content received through a share link. */
   sourceManifestSlug?: string;
   /** The single creator-owned publication associated with this in-memory track. */
