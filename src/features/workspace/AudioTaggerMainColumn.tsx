@@ -56,6 +56,9 @@ function AudioTaggerViews({ controller, menuInTrackHeader, mobileMenuButton }: C
             editor.commands.preview(field, event.target.value)
           }
           onAudioUpload={importing.commands.upload}
+          onTrackClipChange={(fileId, clip) =>
+            library.dispatch({ type: "track-clip-set", fileId, clip })
+          }
         />
       </div>
       <div
