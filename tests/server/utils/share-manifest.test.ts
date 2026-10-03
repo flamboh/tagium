@@ -6,7 +6,7 @@ import {
   type ShareManifestPersistence,
   type StoredShareManifest,
 } from "../../../server/utils/share-manifest";
-import artworkLifecycle from "../../../migrations/share-artwork-lifecycle.json";
+import artworkLifecycle from "../../../scripts/share-artwork-lifecycle.json";
 
 const manifest = {
   version: 1 as const,
