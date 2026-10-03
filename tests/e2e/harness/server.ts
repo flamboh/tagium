@@ -97,9 +97,24 @@ const toFetchRequest = async (request: MiniflareRequest) =>
         : await request.arrayBuffer(),
   });
 
-const toMiniflareResponse = async (response: Response) =>
+async function* streamBody(body: ReadableStream<Uint8Array>) {
+  const reader = body.getReader();
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) return;
+      yield chunk.value;
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+}
+
+const toMiniflareResponse = (response: Response) =>
   new MiniflareResponse(
-    response.status === 204 || response.status === 304 ? null : await response.arrayBuffer(),
+    response.status === 204 || response.status === 304 || !response.body
+      ? null
+      : streamBody(response.body),
     { status: response.status, headers: [...response.headers] },
   );
 

@@ -1,15 +1,23 @@
 import { randomBytes, randomInt } from "node:crypto";
-import type { AudioFixtureName, ImageFixtureName } from "../fixtures/catalog.ts";
+import type {
+  AudioFixtureName,
+  ImageFixtureName,
+  VideoStreamFixtureName,
+} from "../fixtures/catalog.ts";
 import {
   E2E_CONTROL_URL,
+  linkKey,
   mediaKeyFromUrl,
   shortLinkKey,
   soundcloudKey,
   youtubePlaylistKey,
   youtubeVideoKey,
   type CobaltBehavior,
+  type Json,
   type MediaScenario,
   type MetadataBehavior,
+  type PostMedia,
+  type PostScenario,
   type RateLimitRule,
   type Scenario,
   type Sequence,
@@ -31,7 +39,16 @@ export type MediaOptions = {
   tunnel?: Sequence<TunnelBehavior>;
 };
 
-export type YouTubeVideoOptions = MediaOptions & { id?: string };
+export type YouTubeVideoOptions = MediaOptions & { id?: string; video?: VideoStreamFixtureName[] };
+type PostOptions = {
+  url?: string;
+  cobalt?: Sequence<CobaltBehavior>;
+  tunnel?: Sequence<TunnelBehavior>;
+};
+export type PickerOptions = PostOptions & Omit<Extract<PostMedia, { kind: "picker" }>, "kind">;
+export type GifPostOptions = PostOptions & Omit<Extract<PostMedia, { kind: "gif" }>, "kind">;
+
+const defaultYouTubeVideoStreams: VideoStreamFixtureName[] = ["h264-1080", "h264-720", "h264-480"];
 export type SoundCloudTrackOptions = MediaOptions & { user?: string; slug?: string; id?: number };
 
 export type FakeMedia = {
@@ -92,6 +109,7 @@ export const createUpstreams = (owner: string) => {
       audio: options.audio ?? "m4a",
       cover: options.cover === undefined ? "thumbnail" : options.cover,
       year: options.year,
+      video: options.video ?? defaultYouTubeVideoStreams,
       metadata: options.metadata ?? { kind: "ok" },
       cobalt: options.cobalt ?? { kind: "ok" },
       tunnel: options.tunnel ?? { kind: "ok" },
@@ -237,8 +255,31 @@ export const createUpstreams = (owner: string) => {
         return url.toString();
       },
     },
+    async post(options: PostOptions & { media: PostMedia }) {
+      const url = new URL(
+        options.url ?? `https://x.com/e2e${token(4)}/status/${randomInt(1e9, 2e9)}`,
+      );
+      const scenario: PostScenario = {
+        type: "post",
+        key: linkKey(url),
+        sourceUrl: url.href,
+        media: options.media,
+        cobalt: options.cobalt ?? { kind: "ok" },
+        tunnel: options.tunnel ?? { kind: "ok" },
+      };
+      await register([scenario]);
+      return { key: scenario.key, url: scenario.sourceUrl };
+    },
+    picker({ items, audio, ...options }: PickerOptions) {
+      return this.post({ ...options, media: { kind: "picker", items, audio } });
+    },
+    gifPost({ asset, filename, ...options }: GifPostOptions) {
+      return this.post({ ...options, media: { kind: "gif", asset, filename } });
+    },
     cobalt: {
       respond: overrideCobalt,
+      plan: (url: string, body: Json, status?: number) =>
+        overrideCobalt(url, { kind: "json", body, status }),
       fail: (url: string, code: string, status = 400) =>
         overrideCobalt(url, { kind: "error", code, status }),
       capacity: (url: string, options: { retryAfter?: string; times?: number } = {}) =>
@@ -256,6 +297,7 @@ export const createUpstreams = (owner: string) => {
         overrideTunnel(url, repeat<TunnelBehavior>({ kind: "empty" }, times, { kind: "ok" })),
       slowTunnel: (url: string, delayMs: number) => overrideTunnel(url, { kind: "ok", delayMs }),
       hangTunnel: (url: string) => overrideTunnel(url, { kind: "hang" }),
+      stallTunnel: (url: string, bytes?: number) => overrideTunnel(url, { kind: "stall", bytes }),
     },
     rateLimits: {
       limit: (binding: string, key: string, limit: RateLimitRule["limit"]) =>

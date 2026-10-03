@@ -4,7 +4,13 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { audioFixtures, audioFixtureTags, imageFixtures } from "./catalog.ts";
+import {
+  audioFixtures,
+  audioFixtureTags,
+  imageFixtures,
+  mediaFixtures,
+  videoStreamFixtures,
+} from "./catalog.ts";
 
 const ffmpeg = process.env.FFMPEG ?? "ffmpeg";
 const outputDir = dirname(fileURLToPath(import.meta.url));
@@ -137,3 +143,78 @@ for (const fixture of Object.values(audioFixtures)) {
     output,
   );
 }
+
+const videoCodecs = {
+  h264: ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryslow"],
+  vp9: ["-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p", "-b:v", "0", "-crf", "50", "-row-mt", "0"],
+  av1: [
+    "-c:v",
+    "libaom-av1",
+    "-pix_fmt",
+    "yuv420p",
+    "-b:v",
+    "0",
+    "-crf",
+    "60",
+    "-cpu-used",
+    "8",
+    "-row-mt",
+    "0",
+  ],
+} as const;
+
+const colorVideo = (width: number, height: number) => [
+  "-f",
+  "lavfi",
+  "-i",
+  `color=c=0x5533aa:s=${width}x${height}:r=5:d=${audioFixtureTags.durationSeconds}`,
+];
+
+for (const stream of Object.values(videoStreamFixtures)) {
+  run(
+    ...colorVideo(stream.width, stream.height),
+    ...videoCodecs[stream.codec],
+    "-threads",
+    "1",
+    "-an",
+    "-map_metadata",
+    "-1",
+    ...bitexact,
+    join(outputDir, stream.file),
+  );
+}
+
+run(
+  ...tone(audioFixtures.opus.frequency),
+  "-ac",
+  "1",
+  ...codecs.opus,
+  "-map_metadata",
+  "-1",
+  ...bitexact,
+  join(outputDir, mediaFixtures["opus-webm"].file),
+);
+
+run(
+  ...colorVideo(854, 480),
+  ...tone(audioFixtures.m4a.frequency),
+  ...videoCodecs.h264,
+  "-threads",
+  "1",
+  "-ac",
+  "1",
+  ...codecs.m4a,
+  "-map_metadata",
+  "-1",
+  ...bitexact,
+  join(outputDir, mediaFixtures["h264-aac-480"].file),
+);
+
+run(
+  "-f",
+  "lavfi",
+  "-i",
+  "color=c=0x33aa55:s=32x32:r=2:d=1",
+  ...bitexact,
+  join(outputDir, mediaFixtures["anim-gif"].file),
+);

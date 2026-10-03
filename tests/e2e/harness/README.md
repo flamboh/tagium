@@ -53,3 +53,27 @@ context to target one test's session.
 - Worker logs go to `$TMPDIR/tagium-e2e-harness-<port>.log`.
 - To regenerate the audio fixtures, run
   `FFMPEG=/path/to/ffmpeg node tests/e2e/fixtures/generate.ts`. The output is bit-exact.
+
+## Video, posts and stalled media
+
+The fake Cobalt follows Cobalt's forced local-processing rules for tagium save requests:
+
+- YouTube scenarios carry `video` streams (default `h264-1080`, `h264-720`, `h264-480`; also
+  `vp9-720`, `av1-720`). `downloadMode: "auto"` returns a `merge` plan (video + audio tunnels),
+  `"mute"` a `proxy` plan with the video tunnel only. The codec falls back av1 ↔ vp9 → h264, the
+  quality is the best stream at or below the request, and the filename is Cobalt's `pretty` style,
+  e.g. `Title - Author (720p, vp9, youtube).webm`. VP9/AV1 merges use WebM Opus audio.
+- Audio-only YouTube requests use the vp9 path like Cobalt: with a vp9/av1 stream, `audioFormat:
+"best"` is a `proxy` plan named `.opus` whose bytes are WebM Opus; with h264 only it stays m4a.
+  Explicit formats return an `audio` plan in the requested format.
+- `upstreams.picker({ items, audio })` and `upstreams.gifPost({ asset, filename })` register an
+  `https://x.com/…/status/…` post. Items are Cobalt tunnels, or direct
+  `https://cdn.e2e.test/…` resources (`directFilename`) that exercise the signed direct path.
+- Any other http(s) URL gets a `url:<href>` key, so `cobalt.fail`, `cobalt.respond` and
+  `cobalt.plan(url, json)` work for unsupported links too.
+- `cobalt.stallTunnel(url, bytes?)` sends the first half (or `bytes`) of the media and then holds the
+  connection open until teardown. Outbound responses are streamed to the worker, not buffered.
+  A mid-body connection reset is not modeled: Miniflare's custom outbound service closes a failing
+  body cleanly, so the worker would see a truncated but complete response.
+- `probeMedia(file)` (`support/media.ts`) runs ffprobe from the app's libav.js build in Node and
+  decodes every frame it can (no VP9 decoder, so VP9 reports packets only).

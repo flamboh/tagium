@@ -1,5 +1,10 @@
 import process from "node:process";
-import type { AudioFixtureName, ImageFixtureName } from "../fixtures/catalog.ts";
+import type {
+  AudioFixtureName,
+  ImageFixtureName,
+  MediaFixtureName,
+  VideoStreamFixtureName,
+} from "../fixtures/catalog.ts";
 
 export const E2E_PORT = Number(process.env.E2E_PORT ?? 4317);
 export const E2E_CONTROL_PORT = Number(process.env.E2E_CONTROL_PORT ?? E2E_PORT + 1);
@@ -9,9 +14,18 @@ export const E2E_CONTROL_URL = `http://127.0.0.1:${E2E_CONTROL_PORT}`;
 export const FAKE_COBALT_ORIGIN = "http://cobalt.e2e.test";
 export const FAKE_COBALT_API_KEY = "e2e-cobalt-api-key";
 export const FAKE_COBALT_MACHINE_ID = "e2e-machine-1";
+export const FAKE_DIRECT_MEDIA_ORIGIN = "https://cdn.e2e.test";
 export const FAKE_SOUNDCLOUD_CLIENT_ID = "e2eSoundCloudClientId00000000000";
 
 export type Sequence<T> = T | readonly T[];
+
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly Json[]
+  | { readonly [key: string]: Json };
 
 export type CobaltBehavior =
   | { kind: "ok"; delayMs?: number }
@@ -19,6 +33,7 @@ export type CobaltBehavior =
   | { kind: "capacity"; retryAfter?: string }
   | { kind: "non-json"; status?: number }
   | { kind: "invalid-machine-id" }
+  | { kind: "json"; body: Json; status?: number }
   | { kind: "hang" };
 
 export type TunnelBehavior =
@@ -26,6 +41,7 @@ export type TunnelBehavior =
   | { kind: "empty" }
   | { kind: "capacity"; retryAfter?: string }
   | { kind: "status"; status: number; body?: string }
+  | { kind: "stall"; bytes?: number }
   | { kind: "hang" };
 
 export type MetadataBehavior = { kind: "ok" } | { kind: "status"; status: number };
@@ -44,7 +60,27 @@ export type MediaScenario = {
   genre?: string;
   album?: string;
   soundcloudId?: number;
+  video?: VideoStreamFixtureName[];
   metadata: MetadataBehavior;
+  cobalt: Sequence<CobaltBehavior>;
+  tunnel: Sequence<TunnelBehavior>;
+};
+
+export type PostAsset = AudioFixtureName | ImageFixtureName | MediaFixtureName;
+
+export type PostMedia =
+  | {
+      kind: "picker";
+      items: { type: "photo" | "video" | "gif"; asset: PostAsset; directFilename?: string }[];
+      audio?: { asset: PostAsset; filename: string };
+    }
+  | { kind: "gif"; asset: PostAsset; filename: string };
+
+export type PostScenario = {
+  type: "post";
+  key: string;
+  sourceUrl: string;
+  media: PostMedia;
   cobalt: Sequence<CobaltBehavior>;
   tunnel: Sequence<TunnelBehavior>;
 };
@@ -83,6 +119,7 @@ export type ShortLinkScenario = {
 
 export type Scenario =
   | MediaScenario
+  | PostScenario
   | YouTubePlaylistScenario
   | SoundCloudSetScenario
   | ShortLinkScenario;
@@ -121,6 +158,7 @@ export const youtubePlaylistKey = (id: string) => `ytpl:${id}`;
 export const soundcloudKey = (pathname: string) =>
   `sc:${pathname.toLowerCase().replace(/\/+$/u, "")}`;
 export const shortLinkKey = (url: URL) => `short:${url.hostname.toLowerCase()}${url.pathname}`;
+export const linkKey = (url: URL) => `url:${url.href}`;
 
 export const mediaKeyFromUrl = (value: string) => {
   let url: URL;
@@ -139,5 +177,6 @@ export const mediaKeyFromUrl = (value: string) => {
   }
   if (soundcloudHosts.has(host)) return soundcloudKey(url.pathname);
   if (host === "on.soundcloud.com" || host === "snd.sc") return shortLinkKey(url);
+  if (url.protocol === "http:" || url.protocol === "https:") return linkKey(url);
   return null;
 };

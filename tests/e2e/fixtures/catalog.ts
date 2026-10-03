@@ -56,3 +56,57 @@ export const imageFixtures = {
 } as const;
 
 export type ImageFixtureName = keyof typeof imageFixtures;
+
+export type VideoCodec = "h264" | "vp9" | "av1";
+
+export const videoStreamFixtures = {
+  "h264-1080": {
+    file: "video-h264-1080.mp4",
+    mime: "video/mp4",
+    codec: "h264",
+    height: 1080,
+    width: 1920,
+  },
+  "h264-720": {
+    file: "video-h264-720.mp4",
+    mime: "video/mp4",
+    codec: "h264",
+    height: 720,
+    width: 1280,
+  },
+  "h264-480": {
+    file: "video-h264-480.mp4",
+    mime: "video/mp4",
+    codec: "h264",
+    height: 480,
+    width: 854,
+  },
+  "vp9-720": {
+    file: "video-vp9-720.webm",
+    mime: "video/webm",
+    codec: "vp9",
+    height: 720,
+    width: 1280,
+  },
+  "av1-720": {
+    file: "video-av1-720.webm",
+    mime: "video/webm",
+    codec: "av1",
+    height: 720,
+    width: 1280,
+  },
+} as const satisfies Record<
+  string,
+  { file: string; mime: string; codec: VideoCodec; height: number; width: number }
+>;
+
+export type VideoStreamFixtureName = keyof typeof videoStreamFixtures;
+
+export const mediaFixtures = {
+  ...videoStreamFixtures,
+  "opus-webm": { file: "audio-opus.webm", mime: "audio/webm" },
+  "h264-aac-480": { file: "video-h264-aac-480.mp4", mime: "video/mp4" },
+  "anim-gif": { file: "anim.gif", mime: "image/gif" },
+} as const satisfies Record<string, { file: string; mime: string }>;
+
+export type MediaFixtureName = keyof typeof mediaFixtures;

@@ -1,6 +1,8 @@
 import type {
   CobaltBehavior,
   MediaScenario,
+  PostAsset,
+  PostScenario,
   RateLimitRule,
   Scenario,
   Sequence,
@@ -18,7 +20,12 @@ export type CallFilter = {
   since?: number;
   unexpected?: boolean;
 };
-export type Tunnel = { key: string; part: "audio" | "cover"; machineId: string };
+export type Tunnel = {
+  key: string;
+  part: "audio" | "cover" | "video" | "post";
+  machineId: string;
+  asset?: PostAsset;
+};
 
 const pick = <T>(sequence: Sequence<T>, index: number): T => {
   if (!Array.isArray(sequence)) return sequence as T;
@@ -97,6 +104,10 @@ export const createRegistry = () => {
       const scenario = key ? scenarios.get(key)?.value : undefined;
       return scenario?.type === "media" ? scenario : undefined;
     },
+    post(key: string | null): PostScenario | undefined {
+      const scenario = key ? scenarios.get(key)?.value : undefined;
+      return scenario?.type === "post" ? scenario : undefined;
+    },
     mediaBySoundCloudId(id: number) {
       return this.media(soundcloudIds.get(id) ?? null);
     },
@@ -110,12 +121,14 @@ export const createRegistry = () => {
       );
     },
     nextCobalt(key: string) {
-      const sequence = cobaltOverrides.get(key)?.value ?? this.media(key)?.cobalt;
+      const sequence =
+        cobaltOverrides.get(key)?.value ?? (this.media(key) ?? this.post(key))?.cobalt;
       if (!sequence) return undefined;
       return pick(sequence, cursor(key).cobalt++);
     },
     nextTunnel(key: string) {
-      const sequence = tunnelOverrides.get(key)?.value ?? this.media(key)?.tunnel;
+      const sequence =
+        tunnelOverrides.get(key)?.value ?? (this.media(key) ?? this.post(key))?.tunnel;
       if (!sequence) return undefined;
       return pick(sequence, cursor(key).tunnel++);
     },
