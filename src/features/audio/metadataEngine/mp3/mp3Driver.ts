@@ -646,6 +646,7 @@ const encodeComment = (value: string, version: Id3Version) => {
   return concatBytes(
     Uint8Array.of(encoding),
     asciiBytes("eng"),
+    encodeText("", version).subarray(1),
     terminator,
     encodeText(value, version).subarray(1),
   );

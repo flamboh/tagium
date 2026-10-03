@@ -427,6 +427,18 @@ describe("mp3Driver", () => {
     expect(inspected.metadata.comment).toBe(expected);
   });
 
+  it("writes a byte-order mark on the empty ID3v2.3 comment description", async () => {
+    const input = concat(
+      tagV23(commentFrameV23("", "Old", encoder.encode("XXX"))),
+      validMp3Bytes(),
+    );
+    const plan = await Effect.runPromise(
+      mp3Driver.patch(makeBlobByteSource(new Blob([input])), { comment: "Updated" }),
+    );
+    const output = new Uint8Array(await new Blob(plan.parts).arrayBuffer());
+    expect(includes(output, commentFrameV23("", "Updated", encoder.encode("eng")))).toBe(true);
+  });
+
   it("replaces every user comment alias with one COMM frame and keeps described comments", async () => {
     const audio = validMp3Bytes();
     const staleComments = [
