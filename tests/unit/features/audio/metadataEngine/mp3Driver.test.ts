@@ -33,6 +33,32 @@ const commentFrame = (description: string, value: string, language = "eng") =>
       encoder.encode(value),
     ),
   );
+const userTextFrame = (description: string, value: string) =>
+  rawFrame(
+    "TXXX",
+    concat(Uint8Array.of(3), encoder.encode(description), Uint8Array.of(0), encoder.encode(value)),
+  );
+const utf16 = (value: string) =>
+  concat(
+    Uint8Array.of(0xff, 0xfe),
+    ...Array.from({ length: value.length }, (_, index) =>
+      Uint8Array.of(value.charCodeAt(index) & 0xff, value.charCodeAt(index) >>> 8),
+    ),
+  );
+const commentFrameV23 = (description: string, value: string, language: Uint8Array) =>
+  rawFrame(
+    "COMM",
+    concat(Uint8Array.of(1), language, utf16(description), Uint8Array.of(0, 0), utf16(value)),
+  );
+const tagV23 = (...frames: Uint8Array[]) => {
+  const body = concat(...frames);
+  return concat(
+    encoder.encode("ID3"),
+    Uint8Array.of(3, 0, 0),
+    numberToSynchsafe(body.length),
+    body,
+  );
+};
 const apeItem = (key: string, value: string | Uint8Array, flags = 0) => {
   const bytes = value instanceof Uint8Array ? value : encoder.encode(value);
   return concat(
@@ -368,14 +394,60 @@ describe("mp3Driver", () => {
     expect(inspected.metadata.composer).toBe("");
   });
 
-  it("preserves localized blank-description comments while replacing only English primary", async () => {
-    const localized = commentFrame("", "Comentario", "spa");
-    const input = concat(tag(commentFrame("", "Primary"), localized), validMp3Bytes());
+  it.each([
+    [
+      "an FFmpeg TXXX:comment frame",
+      tag(userTextFrame("comment", "first line\nsecond line")),
+      "first line\nsecond line",
+    ],
+    [
+      "a blank-description COMM in any language",
+      tag(commentFrame("", "Any language", "XXX")),
+      "Any language",
+    ],
+    [
+      "a UTF-16 ID3v2.3 COMM with an unset language",
+      tagV23(commentFrameV23("", "Café 🦊", Uint8Array.of(0, 0, 0))),
+      "Café 🦊",
+    ],
+    [
+      "COMM ahead of a TXXX:comment alias",
+      tag(userTextFrame("COMMENT", "Alias"), commentFrame("", "Primary")),
+      "Primary",
+    ],
+    [
+      "nothing from iTunes machine-data comments",
+      tag(commentFrame("iTunNORM", " 00000001 00000002"), commentFrame("iTunSMPB", " 00000000")),
+      "",
+    ],
+  ])("reads the user comment from %s", async (_case, tagBytes, expected) => {
+    const inspected = await Effect.runPromise(
+      mp3Driver.inspect(makeBlobByteSource(new Blob([tagBytes, validMp3Bytes()]))),
+    );
+    expect(inspected.metadata.comment).toBe(expected);
+  });
+
+  it("replaces every user comment alias with one COMM frame and keeps described comments", async () => {
+    const audio = validMp3Bytes();
+    const staleComments = [
+      userTextFrame("comment", "FFmpeg comment"),
+      commentFrame("", "English comment"),
+      commentFrame("", "Comentario", "spa"),
+    ];
+    const keptFrames = [
+      commentFrame("iTunNORM", " 00000001 00000002"),
+      commentFrame("archive", "Keep alternate"),
+      userTextFrame("source", "Keep user text"),
+    ];
+    const input = concat(tag(...staleComments, ...keptFrames), audio);
     const patchedPlan = await Effect.runPromise(
       mp3Driver.patch(makeBlobByteSource(new Blob([input])), { comment: "Updated" }),
     );
     const patched = new Uint8Array(await new Blob(patchedPlan.parts).arrayBuffer());
-    expect(includes(patched, localized)).toBe(true);
+    expect(patched.slice(-audio.length)).toEqual(audio);
+    expect(includes(patched, commentFrame("", "Updated"))).toBe(true);
+    for (const stale of staleComments) expect(includes(patched, stale)).toBe(false);
+    for (const kept of keptFrames) expect(includes(patched, kept)).toBe(true);
     const inspected = await Effect.runPromise(
       mp3Driver.inspect(makeBlobByteSource(new Blob([patched]))),
     );
@@ -385,7 +457,8 @@ describe("mp3Driver", () => {
       mp3Driver.patch(makeBlobByteSource(new Blob([patched])), { comment: "" }),
     );
     const cleared = new Uint8Array(await new Blob(clearedPlan.parts).arrayBuffer());
-    expect(includes(cleared, localized)).toBe(true);
+    expect(includes(cleared, commentFrame("", "Updated"))).toBe(false);
+    for (const kept of keptFrames) expect(includes(cleared, kept)).toBe(true);
     const clearedInspection = await Effect.runPromise(
       mp3Driver.inspect(makeBlobByteSource(new Blob([cleared]))),
     );
