@@ -135,3 +135,6 @@ export const imageSize = (bytes: Uint8Array) => {
   }
   return undefined;
 };
+
+export const savedAs = (browserName: string, filename: string) =>
+  browserName === "webkit" ? filename.replaceAll(" ", "_") : filename;

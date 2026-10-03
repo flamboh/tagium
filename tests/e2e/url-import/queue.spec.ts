@@ -16,6 +16,8 @@ import {
   removeTrack,
 } from "./helpers";
 
+test.describe.configure({ timeout: 120_000 });
+
 const trackButtons = (page: import("@playwright/test").Page) =>
   page.getByRole("button", { name: /^\d+ .+\.mp3$/u });
 

@@ -67,6 +67,7 @@ type FailureCase = {
   detail: string;
   toast: string;
   retryable: boolean;
+  cobaltCalls?: number;
 };
 
 const youtubeFailing = (code: string) => async (upstreams: Upstreams) => {
@@ -154,6 +155,19 @@ const failureCases: FailureCase[] = [
     detail: "too many download requests. try again shortly.",
     toast: "wait a moment, then try the download again.",
     retryable: true,
+    cobaltCalls: 0,
+  },
+  {
+    name: "a download plan cobalt cannot vouch for",
+    arrange: async (upstreams) => {
+      const video = await upstreams.youtube.video({ title: "Failing Song" });
+      await upstreams.cobalt.respond(video.url, { kind: "invalid-machine-id" });
+      return video;
+    },
+    title: "download failed",
+    detail: "download failed. try again or use another link.",
+    toast: "tagium could not download this track. try again or use another link.",
+    retryable: true,
   },
 ];
 
@@ -173,6 +187,9 @@ for (const failure of failureCases) {
     await expect(downloadTrackButton(page)).toBeDisabled();
     await expect(page.getByRole("button", { name: "download all" })).toBeDisabled();
     await expect(field(page, "title")).toBeEditable();
+    expect(await upstreams.calls({ route: "cobalt.resolve" })).toHaveLength(
+      failure.cobaltCalls ?? 1,
+    );
 
     if (failure.retryable) {
       await page.getByRole("button", { name: /^track actions for / }).click();

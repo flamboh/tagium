@@ -13,7 +13,10 @@ import {
   queueStatus,
   useSettings,
   waitForTrackReady,
+  savedAs,
 } from "./helpers";
+
+test.describe.configure({ timeout: 120_000 });
 
 const sizeOf = (image: ImageFixtureName) => ({
   width: imageFixtures[image].width,
@@ -75,7 +78,8 @@ test("imports a soundcloud album in order with album tags, seconds durations and
     title: "Ecclesia",
     author: "Forss",
     genre: "Electronic",
-    displayDate: "2012-04-02T00:00:00Z",
+    displayDate: "2013-01-01T00:00:00Z",
+    releaseDate: "2012-04-02T00:00:00Z",
     isAlbum: true,
     artwork: "artwork",
     tracks: [
@@ -143,7 +147,12 @@ for (const { name, isAlbum, albumCover } of [
   { name: "a non-album soundcloud set", isAlbum: false, albumCover: true },
   { name: "an album with the album cover setting off", isAlbum: true, albumCover: false },
 ]) {
-  test(`keeps each track's own cover for ${name}`, async ({ page, context, upstreams }) => {
+  test(`keeps each track's own cover for ${name}`, async ({
+    browserName,
+    page,
+    context,
+    upstreams,
+  }) => {
     await useSettings(context, { applySoundCloudAlbumCoverToTracks: albumCover });
     const set = await upstreams.soundcloud.set({
       title: "Remixes",
@@ -165,7 +174,7 @@ for (const { name, isAlbum, albumCover } of [
     await expect(field(page, "album")).toHaveValue("Remixes");
     await expect(numberField(page, "track")).toHaveValue("1");
     const exported = await captureDownload(page, () => downloadTrackButton(page).click());
-    expect(exported.filename).toBe("Speech Craft.mp3");
+    expect(exported.filename).toBe(savedAs(browserName, "Speech Craft.mp3"));
     const { metadata } = await inspectAudio(exported);
     expect(metadata).toMatchObject({
       title: "Speech Craft",

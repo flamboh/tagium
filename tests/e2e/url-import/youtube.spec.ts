@@ -17,9 +17,11 @@ import {
   importUrl,
   numberField,
   waitForTrackReady,
+  savedAs,
 } from "./helpers";
 
 test("imports a youtube video with prefilled tags, then edits and exports the same audio", async ({
+  browserName,
   page,
   upstreams,
 }) => {
@@ -41,7 +43,7 @@ test("imports a youtube video with prefilled tags, then edits and exports the sa
   await expect(page.getByRole("img", { name: "album cover" })).toBeVisible();
 
   const original = await captureDownload(page, () => downloadTrackButton(page).click());
-  expect(original.filename).toBe("Night Drive.mp3");
+  expect(original.filename).toBe(savedAs(browserName, "Night Drive.mp3"));
   const imported = await inspectAudio(original);
   expect(imported.format).toBe("mp3");
   expect(imported.metadata).toMatchObject({
@@ -66,7 +68,7 @@ test("imports a youtube video with prefilled tags, then edits and exports the sa
   await expect(field(page, "album")).toHaveValue("zoo café 日本語");
 
   const edited = await captureDownload(page, () => downloadTrackButton(page).click());
-  expect(edited.filename).toBe("zoo café 日本語.mp3");
+  expect(edited.filename).toBe(savedAs(browserName, "zoo café 日本語.mp3"));
   expect((await inspectAudio(edited)).metadata).toMatchObject({
     title: "zoo café 日本語",
     album: "zoo café 日本語",
@@ -84,7 +86,10 @@ test("imports a youtube video with prefilled tags, then edits and exports the sa
       downloadMode: "audio",
       audioFormat: "mp3",
       audioBitrate: "320",
+      alwaysProxy: true,
       localProcessing: "forced",
+      filenameStyle: "pretty",
+      youtubeHLS: false,
     }),
   ]);
   const [tunnel] = await upstreams.calls({ route: "cobalt.tunnel.audio" });
