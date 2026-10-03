@@ -380,7 +380,8 @@ function TrackDetailsFields({
 }
 
 const nullableNumberRegistration = {
-  setValueAs: (value: string) => (value === "" ? null : Number(value)),
+  setValueAs: (value: string | number | null) =>
+    value === "" || value === null ? null : Number(value),
 };
 
 interface AdvancedFieldRegistrations {
