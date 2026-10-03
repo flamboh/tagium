@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { TagiumAppId } from "@/runtime/resolveApp";
 import { devToastKinds, spawnDevToast } from "./devToast";
+import { DiscoveryFlagsSection } from "./DiscoveryFlagsSection";
 
 type AudioFault = "rate-limit" | "capacity" | "timeout" | "unreachable" | "malformed";
 type TunnelFault = "rate-limit" | "capacity" | "timeout" | "empty-body";
@@ -153,7 +154,7 @@ export function DevPanel({ appId }: { appId: TagiumAppId }) {
   };
 
   return (
-    <div className="fixed right-4 bottom-4 z-50">
+    <div data-spotlight-ignore className="fixed right-4 bottom-4 z-50">
       <Popover>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -171,9 +172,10 @@ export function DevPanel({ appId }: { appId: TagiumAppId }) {
           <TooltipContent side="left">dev panel</TooltipContent>
         </Tooltip>
         <PopoverContent
+          data-spotlight-ignore
           align="end"
           side="top"
-          className="w-[min(24rem,calc(100vw-2rem))] border-foreground/10 bg-background/95 p-0 shadow-xl backdrop-blur"
+          className="max-h-(--radix-popover-content-available-height) w-[min(24rem,calc(100vw-2rem))] overflow-y-auto border-foreground/10 bg-background/95 p-0 shadow-xl backdrop-blur"
         >
           <div className="border-b border-border px-4 py-3">
             <div className="flex items-center justify-between gap-3">
@@ -336,6 +338,8 @@ export function DevPanel({ appId }: { appId: TagiumAppId }) {
                 </Button>
               </div>
             </section>
+
+            {appId === "tagium" && <DiscoveryFlagsSection />}
 
             {appId === "tagium" && (
               <section className="grid gap-3">

@@ -37,6 +37,8 @@ export interface ExportSession {
   downloadAll: () => void;
   downloadAlbum: (albumId: string) => void;
   downloadTrack: SubmitHandler<AudioMetadata>;
+  exportAlbum: (albumId: string) => Promise<void>;
+  exportTrack: (trackId: string) => Promise<void>;
   cancelConfirmation: () => void;
   confirmDownload: () => Promise<void>;
   restoreConfirmationFocus: () => void;
@@ -377,20 +379,14 @@ export const useExportSession = ({
     }
   }, [confirmation, derivePlan, executeConfirmedExport]);
 
-  const downloadTrack = useCallback<SubmitHandler<AudioMetadata>>(
-    async (data) => {
-      const selectedFile = library
-        .getSnapshot()
-        .files.find((file) => file.id === library.getSnapshot().selectedFileId);
-      if (!selectedFile) return;
-      const submittedData = getSubmittedAudioMetadata(data, settingsRef.current.syncFilenames);
-      if (!isValidFilenameBase(submittedData.filename)) return;
-      const fileId = selectedFile.id;
+  const writeAndDownloadTrack = useCallback(
+    async (file: TagiumFile, metadata: AudioMetadata) => {
+      const fileId = file.id;
       analytics.capture({ type: "export_started", exportKind: "track", trackCount: 1 });
       setExporting(true);
       try {
-        await updateTags(selectedFile, submittedData);
-        const updatedFile = library.getSnapshot().files.find((file) => file.id === fileId);
+        await updateTags(file, metadata);
+        const updatedFile = library.getSnapshot().files.find((entry) => entry.id === fileId);
         if (!updatedFile?.file) throw new Error("track export was not ready.");
         downloadBlob(updatedFile.file, updatedFile.filename);
         analytics.capture({
@@ -413,6 +409,47 @@ export const useExportSession = ({
     [library, updateTags],
   );
 
+  const downloadTrack = useCallback<SubmitHandler<AudioMetadata>>(
+    async (data) => {
+      const selectedFile = library
+        .getSnapshot()
+        .files.find((file) => file.id === library.getSnapshot().selectedFileId);
+      if (!selectedFile) return;
+      const submittedData = getSubmittedAudioMetadata(data, settingsRef.current.syncFilenames);
+      if (!isValidFilenameBase(submittedData.filename)) return;
+      await writeAndDownloadTrack(selectedFile, submittedData);
+    },
+    [library, writeAndDownloadTrack],
+  );
+
+  // Skips the confirmation dialog; used when an import finishes with download-after-import on.
+  const exportAlbum = useCallback(
+    async (albumId: string) => {
+      const plan = derivePlan({ kind: "album", albumId });
+      if (plan) await executeConfirmedExport(plan);
+    },
+    [derivePlan, executeConfirmedExport],
+  );
+
+  const exportTrack = useCallback(
+    async (trackId: string) => {
+      const snapshot = library.getSnapshot();
+      const singleTrackIds = snapshot.looseTrackIds.includes(trackId) ? [trackId] : [];
+      const files = applyExportProjection(
+        editor.flush([trackId]),
+        [],
+        snapshot.albums,
+        singleTrackIds,
+        [trackId],
+      );
+      library.dispatch({ type: "content-replaced", files });
+      const file = files.find((entry) => entry.id === trackId);
+      if (!file?.metadata || !isTrackReadyForDownload(file)) return;
+      await writeAndDownloadTrack(file, file.metadata);
+    },
+    [applyExportProjection, editor, library, writeAndDownloadTrack],
+  );
+
   return {
     exporting,
     confirmation,
@@ -420,6 +457,8 @@ export const useExportSession = ({
     downloadAll,
     downloadAlbum,
     downloadTrack,
+    exportAlbum,
+    exportTrack,
     cancelConfirmation,
     confirmDownload,
     restoreConfirmationFocus,

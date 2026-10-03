@@ -123,18 +123,19 @@ export const isShareAnalyticsId = (value: unknown): value is string =>
 export interface SharePublicationResponse {
   slug: string;
   url: string;
-  expiresAt: string;
+  expiresAt: string | null;
   revocationToken: string;
   analyticsId: string;
 }
 
 export interface ShareManifestResponse {
   manifest: Manifest;
-  expiresAt: string;
+  expiresAt: string | null;
   analyticsId: string;
 }
 
-export const toShareExpiryIso = (expiresAt: number) => new Date(expiresAt).toISOString();
+export const toShareExpiryIso = (expiresAt: number | null) =>
+  expiresAt === null ? null : new Date(expiresAt).toISOString();
 
 export const shareExpiryIsoSchema = Schema.String.pipe(
   Schema.refine(
