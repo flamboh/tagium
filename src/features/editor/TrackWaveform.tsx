@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent, ReactNode, RefObject } from "react";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -29,6 +29,8 @@ const PLACEHOLDER_PEAKS = Array.from({ length: 256 }, (_, index) => {
   return Math.min(1, Math.max(0.12, swell + Math.abs(jitter) * 0.35));
 });
 
+const WAVEFORM_LAYER_CLASS =
+  "pointer-events-none absolute inset-0 transition-[opacity,fill] duration-300 ease-out motion-reduce:transition-none";
 const BAR_CLASS =
   "transform-fill transition-transform duration-300 ease-out motion-reduce:transition-none";
 
@@ -241,7 +243,11 @@ function useTrackWaveform({
       ? "waveform unavailable for this track"
       : null;
   const barCount = Math.floor((width + BAR_GAP) / (BAR_WIDTH + BAR_GAP));
-  const bars = width > 0 ? resamplePeaks(waveform?.peaks ?? PLACEHOLDER_PEAKS, barCount) : [];
+  const peaks = waveform?.peaks ?? PLACEHOLDER_PEAKS;
+  const bars = useMemo(
+    () => (barCount > 0 ? resamplePeaks(peaks, barCount) : []),
+    [peaks, barCount],
+  );
   const startRatio = ratio(range.start);
   const endRatio = ratio(range.end);
   const progressRatio = ratio(position);
@@ -420,20 +426,30 @@ export default function TrackWaveform(props: TrackWaveformProps) {
             )}
             style={{ height: WAVEFORM_HEIGHT }}
           >
-            <WaveformBars
-              bars={bars}
-              className={waveform ? "fill-muted-foreground/25" : "fill-muted-foreground/20"}
-            />
-            <WaveformBars
-              bars={bars}
-              className={cn("fill-muted-foreground/70", !waveform && "opacity-0")}
-              clipPath={clipInset(startRatio, endRatio)}
-            />
-            <WaveformBars
-              bars={bars}
-              className={cn("fill-primary", !waveform && "opacity-0")}
-              clipPath={clipInset(startRatio, progressRatio)}
-            />
+            <div
+              className={cn(
+                WAVEFORM_LAYER_CLASS,
+                waveform ? "fill-muted-foreground/25" : "fill-muted-foreground/20",
+              )}
+            >
+              <WaveformBars bars={bars} />
+            </div>
+            <div
+              className={cn(
+                WAVEFORM_LAYER_CLASS,
+                "fill-muted-foreground/70",
+                !waveform && "opacity-0",
+              )}
+              style={{ clipPath: clipInset(startRatio, endRatio) }}
+            >
+              <WaveformBars bars={bars} />
+            </div>
+            <div
+              className={cn(WAVEFORM_LAYER_CLASS, "fill-primary", !waveform && "opacity-0")}
+              style={{ clipPath: clipInset(startRatio, progressRatio) }}
+            >
+              <WaveformBars bars={bars} />
+            </div>
             {canPlay && (
               <>
                 <span
@@ -469,11 +485,11 @@ export default function TrackWaveform(props: TrackWaveformProps) {
             )}
           </div>
         </div>
-        <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
+        <AnimatedWidth className="shrink-0 text-sm text-muted-foreground tabular-nums">
           <span className="text-foreground">{formatTimestamp(position)}</span>
           {" / "}
           {formatTimestamp(duration)}
-        </span>
+        </AnimatedWidth>
       </div>
     </section>
   );
@@ -546,6 +562,33 @@ function useWaveformSource(
   };
 }
 
+function AnimatedWidth({ children, className }: { children: ReactNode; className: string }) {
+  const contentRef = useRef<HTMLSpanElement>(null);
+  const [width, setWidth] = useState<number>();
+  useLayoutEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setWidth(entry.contentRect.width);
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <span
+      className={cn(
+        "flex justify-end overflow-hidden transition-[width] duration-300 ease-out motion-reduce:transition-none",
+        className,
+      )}
+      style={{ width }}
+    >
+      <span ref={contentRef} className="shrink-0 whitespace-nowrap">
+        {children}
+      </span>
+    </span>
+  );
+}
+
 function ClipHandle({
   edge,
   ratio,
@@ -583,28 +626,16 @@ function ClipHandle({
   );
 }
 
-function WaveformBars({
-  bars,
-  className,
-  clipPath,
-}: {
-  bars: number[];
-  className: string;
-  clipPath?: string;
-}) {
+const WaveformBars = memo(function WaveformBars({ bars }: { bars: number[] }) {
   const width = Math.max(1, bars.length * (BAR_WIDTH + BAR_GAP) - BAR_GAP);
   // Bars mirror around a 1px divider through the vertical center; the lower half is fainter.
   const half = (WAVEFORM_HEIGHT - 1) / 2;
   return (
     <svg
       aria-hidden
-      className={cn(
-        "pointer-events-none absolute inset-x-0 top-1 h-[calc(100%-0.5rem)] w-full transition-[opacity,fill] duration-300 ease-out motion-reduce:transition-none",
-        className,
-      )}
+      className="absolute inset-x-0 top-1 h-[calc(100%-0.5rem)] w-full"
       viewBox={`0 0 ${width} ${WAVEFORM_HEIGHT}`}
       preserveAspectRatio="none"
-      style={clipPath ? { clipPath } : undefined}
     >
       {bars.map((bar, index) => {
         const x = index * (BAR_WIDTH + BAR_GAP);
@@ -633,4 +664,4 @@ function WaveformBars({
       })}
     </svg>
   );
-}
+});

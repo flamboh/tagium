@@ -55,7 +55,7 @@ describe("soundcloud set endpoint", () => {
               kind: "track",
               title: " Track ",
               permalink_url: "https://soundcloud.com/artist/track",
-              duration: 123,
+              duration: 123_456,
               future_track_field: true,
             },
           ],
@@ -74,7 +74,7 @@ describe("soundcloud set endpoint", () => {
         {
           title: "Track",
           url: "https://soundcloud.com/artist/track",
-          duration: 123,
+          duration: 123.456,
           trackNumber: 1,
         },
       ],
@@ -118,7 +118,7 @@ describe("soundcloud set endpoint", () => {
               kind: "track",
               title: " Track ",
               permalink_url: "https://soundcloud.com/artist/track",
-              duration: 123,
+              duration: 123_456,
             },
           ],
         });
@@ -135,7 +135,7 @@ describe("soundcloud set endpoint", () => {
         {
           title: "Track",
           url: "https://soundcloud.com/artist/track",
-          duration: 123,
+          duration: 123.456,
           trackNumber: 1,
         },
       ],
