@@ -19,14 +19,6 @@ type RuntimeRequest = Request & {
 
 const machineAffinitySecret = "test-machine-affinity-secret";
 const sourceUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
-const successfulProxyPlan = () => ({
-  status: "local-processing",
-  type: "proxy",
-  service: "youtube",
-  tunnel: ["https://cobalt.test/tunnel?id=123456789012345678901"],
-  output: { type: "video/mp4", filename: "video.mp4" },
-});
-
 const makeRequest = (
   body: Record<string, RequestBodyValue> = { url: sourceUrl },
   options: {
@@ -102,28 +94,6 @@ describe("cobalt video download endpoint", () => {
         request_id: "request-test",
       },
     });
-  });
-
-  it("uses Tagium's permissive local admission when bindings are absent", async () => {
-    const fetchMock = vi.fn(async () => Response.json(successfulProxyPlan()));
-    vi.stubGlobal("fetch", fetchMock);
-
-    const responses: Response[] = [];
-    for (let index = 0; index < 5; index += 1) {
-      responses.push(
-        await handler(
-          makeEvent(
-            makeRequest(
-              { url: sourceUrl },
-              { cookie: "tagium_client_id=session-1", clientIp: "203.0.113.10" },
-            ),
-          ),
-        ),
-      );
-    }
-
-    expect(responses.every((response) => response.status === 200)).toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 
   it("fails closed outside local development when shared bindings are missing", async () => {

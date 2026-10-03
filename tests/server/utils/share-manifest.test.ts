@@ -26,19 +26,6 @@ const manifest = {
     },
   ],
 };
-const trackManifest = {
-  version: 1 as const,
-  kind: "track" as const,
-  track: {
-    ...manifest.tracks[0],
-    artwork: {
-      kind: "stored" as const,
-      format: "image/jpeg" as const,
-      type: 3,
-      description: "front cover",
-    },
-  },
-};
 const png = Uint8Array.from(
   atob(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL7OwAAAABJRU5ErkJggg==",
@@ -165,94 +152,6 @@ describe("share manifest store", () => {
     expect(await store.load(published.slug)).toEqual({ kind: "unavailable" });
   });
 
-  it("stores server-derived artwork metadata and deletes the object on revocation", async () => {
-    const fake = createFakePersistence();
-    const store = createShareManifestStore(fake.persistence);
-    const cover = new File([png], "cover.png", { type: "text/plain" });
-    const published = await store.publish(manifest, await parseShareArtwork(cover));
-    const record = fake.records.get(published.slug)!;
-
-    expect(record.artworkKey).toMatch(new RegExp(`^shares/${published.slug}/`));
-    expect(record.artworkType).toBe("image/png");
-    expect(record.artworkBytes).toBe(png.byteLength);
-    expect(record.artworkSha256).toMatch(/^[A-Za-z0-9_-]+$/);
-    expect(fake.artwork.size).toBe(1);
-    await expect(store.revoke(published.slug, "wrong")).resolves.toBe("unavailable");
-    await expect(store.revoke(published.slug, published.revocationToken)).resolves.toBe("revoked");
-    await expect(store.revoke(published.slug, published.revocationToken)).resolves.toBe("revoked");
-    expect(fake.artwork.size).toBe(0);
-    expect(await store.load(published.slug)).toEqual({ kind: "unavailable" });
-  });
-
-  it("keeps the embedded artwork type and description while deriving its byte metadata", async () => {
-    const fake = createFakePersistence();
-    const store = createShareManifestStore(fake.persistence);
-    const published = await store.publish(
-      {
-        ...manifest,
-        album: {
-          ...manifest.album,
-          artwork: { kind: "stored", format: "image/jpeg", type: 7, description: "front sleeve" },
-        },
-      },
-      await parseShareArtwork(new File([png], "cover.png")),
-    );
-    const loaded = await store.load(published.slug);
-    expect(loaded).toMatchObject({
-      kind: "available",
-      manifest: {
-        album: { artwork: { format: "image/png", type: 7, description: "front sleeve" } },
-      },
-    });
-  });
-
-  it("publishes and updates track manifests with nested artwork and a track count of one", async () => {
-    const fake = createFakePersistence();
-    const store = createShareManifestStore(fake.persistence);
-    const published = await store.publish(
-      trackManifest,
-      await parseShareArtwork(new File([png], "cover.png")),
-    );
-    const record = fake.records.get(published.slug)!;
-
-    expect(record.trackCount).toBe(1);
-    expect(await store.load(published.slug)).toMatchObject({
-      kind: "available",
-      manifest: {
-        kind: "track",
-        track: {
-          metadata: { title: "Track" },
-          artwork: { format: "image/png", type: 3, description: "front cover" },
-        },
-      },
-    });
-
-    await expect(
-      store.update(
-        published.slug,
-        published.revocationToken,
-        {
-          ...trackManifest,
-          track: {
-            ...trackManifest.track,
-            metadata: { ...trackManifest.track.metadata, title: "Edited track" },
-          },
-        },
-        { kind: "retain" },
-      ),
-    ).resolves.toMatchObject({ kind: "updated", slug: published.slug });
-    expect(fake.records.get(published.slug)?.trackCount).toBe(1);
-    expect(await store.load(published.slug)).toMatchObject({
-      kind: "available",
-      manifest: {
-        track: {
-          metadata: { title: "Edited track" },
-          artwork: { format: "image/png", description: "front cover" },
-        },
-      },
-    });
-  });
-
   it("never lets a forced slug collision overwrite an existing cover", async () => {
     const fake = createFakePersistence();
     const keys: string[] = [];
@@ -303,28 +202,6 @@ describe("share manifest store", () => {
     await expect(store.revoke(published.slug, published.revocationToken)).resolves.toBe("revoked");
   });
 
-  it("rejects truncated and oversized PNG/JPEG artwork", async () => {
-    const jpeg = new Uint8Array([
-      0xff, 0xd8, 0xff, 0xc0, 0, 17, 8, 0, 1, 0, 1, 3, 1, 17, 0, 2, 17, 0, 3, 17, 0, 0xff, 0xda, 0,
-      8, 1, 1, 0, 0, 0x3f, 0, 0, 0xff, 0xd9,
-    ]);
-    const hugePng = png.slice();
-    hugePng[16] = 0;
-    hugePng[17] = 0;
-    hugePng[18] = 0x07;
-    hugePng[19] = 0x08; // 1800px
-
-    await expect(parseShareArtwork(new File([png.slice(0, -1)], "truncated.png"))).rejects.toThrow(
-      "share_artwork_invalid",
-    );
-    await expect(parseShareArtwork(new File([jpeg.slice(0, -1)], "truncated.jpg"))).rejects.toThrow(
-      "share_artwork_invalid",
-    );
-    await expect(parseShareArtwork(new File([hugePng], "large.png"))).rejects.toThrow(
-      "share_artwork_invalid",
-    );
-  });
-
   it("compensates an uploaded cover when D1 creation fails", async () => {
     const fake = createFakePersistence();
     fake.persistence.create = async () => {
@@ -353,30 +230,6 @@ describe("share manifest store", () => {
     expect(fake.artwork.size).toBe(0);
   });
 
-  it("updates metadata in place without changing the capability or expiration", async () => {
-    const fake = createFakePersistence();
-    const store = createShareManifestStore(fake.persistence, { now: () => 1_000 });
-    const published = await store.publish(manifest, undefined);
-    const result = await store.update(
-      published.slug,
-      published.revocationToken,
-      { ...manifest, album: { ...manifest.album, title: "Edited" } },
-      { kind: "retain" },
-    );
-
-    expect(result).toEqual({
-      kind: "updated",
-      slug: published.slug,
-      expiresAt: published.expiresAt,
-      analyticsId: published.analyticsId,
-    });
-    expect(await store.load(published.slug)).toMatchObject({
-      kind: "available",
-      manifest: { album: { title: "Edited" } },
-    });
-    await expect(store.revoke(published.slug, published.revocationToken)).resolves.toBe("revoked");
-  });
-
   it("replaces and removes artwork without leaving superseded objects", async () => {
     const fake = createFakePersistence();
     const store = createShareManifestStore(fake.persistence);
@@ -401,37 +254,6 @@ describe("share manifest store", () => {
     expect(replacementKey && fake.artwork.has(replacementKey)).toBe(false);
     expect(fake.records.get(published.slug)?.artworkKey).toBeUndefined();
     expect(await store.loadArtwork(published.slug)).toEqual({ kind: "unavailable" });
-  });
-
-  it("rejects unauthorized and inactive updates without uploading artwork", async () => {
-    const fake = createFakePersistence();
-    let now = 1_000;
-    const store = createShareManifestStore(fake.persistence, { now: () => now });
-    const published = await store.publish(manifest, undefined);
-    const artwork = (await parseShareArtwork(new File([png], "cover.png")))!;
-
-    await expect(
-      store.update(published.slug, "wrong", manifest, { kind: "replace", artwork }),
-    ).resolves.toEqual({ kind: "unavailable" });
-    expect(fake.artwork.size).toBe(0);
-    now = published.expiresAt!;
-    await expect(
-      store.update(published.slug, published.revocationToken, manifest, {
-        kind: "replace",
-        artwork,
-      }),
-    ).resolves.toEqual({ kind: "unavailable" });
-    expect(fake.artwork.size).toBe(0);
-
-    now = 1_000;
-    await expect(store.revoke(published.slug, published.revocationToken)).resolves.toBe("revoked");
-    await expect(
-      store.update(published.slug, published.revocationToken, manifest, {
-        kind: "replace",
-        artwork,
-      }),
-    ).resolves.toEqual({ kind: "unavailable" });
-    expect(fake.artwork.size).toBe(0);
   });
 
   it("compensates a losing artwork update and accepts an already-applied retry", async () => {

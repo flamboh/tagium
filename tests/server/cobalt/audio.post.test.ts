@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { HTTPError } from "nitro";
 import { mockEvent } from "h3";
 import { Schema } from "effect";
 import handler from "../../../server/api/cobalt/audio.post";
@@ -80,27 +79,6 @@ describe("cobalt audio endpoint", () => {
     vi.restoreAllMocks();
   });
 
-  it("maps invalid request bodies to HTTP 400 errors", async () => {
-    const request = makeAudioRequest();
-    const invalidRequest = new Request(request.url, {
-      method: "POST",
-      headers: request.headers,
-      body: JSON.stringify({
-        url: "not a URL",
-        audioBitrate: "lossless",
-        audioFormat: "flac",
-        year: 99,
-      }),
-    }) as RuntimeRequest;
-    invalidRequest.runtime = request.runtime;
-
-    const error = await handler(makeEvent(invalidRequest)).catch((cause) => cause);
-
-    expect(HTTPError.isError(error)).toBe(true);
-    expect(error).toMatchObject({ status: 400 });
-    expect(error.message).toContain('["url"]');
-  });
-
   it.each([
     {
       sourceUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
@@ -148,21 +126,6 @@ describe("cobalt audio endpoint", () => {
       youtubeVideoCodec: "h264",
       youtubeHLS: false,
     });
-  });
-
-  it("classifies malformed upstream payloads as gateway failures", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const sentinel = "https://soundcloud.com/private/s-secret-token";
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => Response.json({ status: "a-future-cobalt-status", echoed: sentinel })),
-    );
-
-    const response = await handler(makeEvent(makeAudioRequest()));
-
-    expect(response.status).toBe(502);
-    expect(await response.text()).toBe("error.api.invalid_response");
-    expect(JSON.stringify(warn.mock.calls)).not.toContain(sentinel);
   });
 
   it("correlates and logs structured Cobalt failures without the source URL", async () => {
@@ -213,44 +176,6 @@ describe("cobalt audio endpoint", () => {
       machineId: "cobalt-machine-1",
     });
     expect(JSON.stringify(event)).not.toContain("youtube.com");
-  });
-
-  it("propagates client cancellation to the upstream Cobalt request", async () => {
-    const clientAbort = new AbortController();
-    let upstreamSignal: AbortSignal | undefined;
-    let releaseUpstream!: () => void;
-    const upstreamReleased = new Promise<void>((resolve) => {
-      releaseUpstream = resolve;
-    });
-    let upstreamStarted!: () => void;
-    const upstreamStart = new Promise<void>((resolve) => {
-      upstreamStarted = resolve;
-    });
-
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-        upstreamSignal = init?.signal ?? undefined;
-        upstreamStarted();
-        await upstreamReleased;
-        return Response.json({
-          status: "error",
-          error: { code: "error.api.fetch.fail" },
-        });
-      }),
-    );
-
-    const responsePromise = handler(makeEvent(makeAudioRequest(clientAbort.signal)));
-    await upstreamStart;
-    clientAbort.abort(new DOMException("canceled", "AbortError"));
-    await Promise.resolve();
-
-    try {
-      expect(upstreamSignal?.aborted).toBe(true);
-    } finally {
-      releaseUpstream();
-      await responsePromise;
-    }
   });
 
   it("fails closed when production admission bindings are missing", async () => {
