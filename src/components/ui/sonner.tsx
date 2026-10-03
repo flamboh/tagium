@@ -4,10 +4,12 @@ import type { CSSProperties } from "react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 import { cn } from "@/lib/utils";
 
-const Toaster = ({ className, ...props }: ToasterProps) => (
+const Toaster = ({ className, toastOptions, ...props }: ToasterProps) => (
   <Sonner
     theme="system"
     duration={12_000}
+    customAriaLabel="notifications alt+t"
+    toastOptions={{ closeButtonAriaLabel: "close notification", ...toastOptions }}
     className={cn("toaster tagium-toaster group", className)}
     style={
       // SAFETY: Sonner forwards CSS custom properties through its style object.

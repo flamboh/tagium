@@ -182,7 +182,7 @@ export function DevPanel({ appId }: { appId: TagiumAppId }) {
               <div>
                 <p className="text-sm font-semibold leading-tight">dev panel</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {config.deployEnv} / {config.detectedFrom}
+                  {`${config.deployEnv} / ${config.detectedFrom}`.toLowerCase()}
                 </p>
               </div>
               <div className="flex items-center gap-1">
