@@ -65,7 +65,7 @@ describe("workspace title cleanup", () => {
         const library = useLibraryStore();
         const cleanup = useWorkspaceCleanup({
           library,
-          editor: { form: { reset: vi.fn() } },
+          editor: { commands: { flush: vi.fn(() => []) }, form: { reset: vi.fn() } },
           settings,
           busy,
         });
@@ -106,12 +106,49 @@ describe("workspace title cleanup", () => {
     hook.unmount();
   });
 
+  it("flushes the active track's pending edits before building the review", () => {
+    const hook = renderHook(() => {
+      const library = useLibraryStore();
+      const flush = () => {
+        const [one, two] = library.getSnapshot().files;
+        const files = [
+          one,
+          { ...two, metadata: { ...two.metadata!, title: "Burial - Near Dark (Official Audio)" } },
+        ];
+        library.dispatch({ type: "content-replaced", files });
+        return files;
+      };
+      const cleanup = useWorkspaceCleanup({
+        library,
+        editor: { commands: { flush }, form: { reset: vi.fn() } },
+        settings,
+        busy: true,
+      });
+      return { library, cleanup };
+    }, undefined);
+
+    act(() => {
+      hook.result.library.dispatch({
+        type: "content-replaced",
+        files: [file("one", "Burial - Archangel (Official Audio)"), file("two", "Near Dark")],
+        albums: [album(["one", "two"])],
+      });
+    });
+    act(() => hook.result.cleanup.onReviewAlbum("album", null));
+
+    expect(hook.result.cleanup.dialogProps.suggestions.map(({ trackId }) => trackId)).toEqual([
+      "one",
+      "two",
+    ]);
+    hook.unmount();
+  });
+
   it("starts a fresh selection session on each open and keeps toast entry on normal focus", () => {
     const hook = renderHook(() => {
       const library = useLibraryStore();
       const cleanup = useWorkspaceCleanup({
         library,
-        editor: { form: { reset: vi.fn() } },
+        editor: { commands: { flush: vi.fn(() => []) }, form: { reset: vi.fn() } },
         settings,
         busy: false,
       });
@@ -141,7 +178,7 @@ describe("workspace title cleanup", () => {
       const library = useLibraryStore();
       const cleanup = useWorkspaceCleanup({
         library,
-        editor: { form: { reset: vi.fn() } },
+        editor: { commands: { flush: vi.fn(() => []) }, form: { reset: vi.fn() } },
         settings,
         busy: false,
       });
