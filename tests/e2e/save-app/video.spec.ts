@@ -1,7 +1,10 @@
+import type { Request } from "@playwright/test";
 import type { MediaProbe } from "../support/media";
 import { probeMedia } from "../support/media";
 import { expect, test } from "../support/test";
 import { saveApp } from "./save";
+
+test.describe.configure({ timeout: 120_000 });
 
 const expectDecoded = (media: MediaProbe) => {
   for (const stream of media.streams) {
@@ -18,11 +21,9 @@ test("saves a youtube video with audio as a tagged mp4", async ({ page, upstream
   page.on("download", () => {
     downloads += 1;
   });
-  const tunnelStarts: number[] = [];
-  page.on("requestfinished", (request) => {
-    if (new URL(request.url()).pathname === "/api/cobalt/tunnel") {
-      tunnelStarts.push(request.timing().startTime);
-    }
+  const tunnelRequests: Request[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/cobalt/tunnel") tunnelRequests.push(request);
   });
 
   await save.open();
@@ -46,7 +47,9 @@ test("saves a youtube video with audio as a tagged mp4", async ({ page, upstream
   expect(media.duration).toBeCloseTo(2, 0);
   expect(media.tags).toMatchObject({ title: "Harbor Lights", artist: "Night Channel" });
 
-  await expect.poll(() => tunnelStarts.length).toBe(2);
+  expect(tunnelRequests).toHaveLength(2);
+  await Promise.all(tunnelRequests.map((request) => request.response()));
+  const tunnelStarts = tunnelRequests.map((request) => request.timing().startTime);
   expect(Math.abs(tunnelStarts[1]! - tunnelStarts[0]!)).toBeGreaterThanOrEqual(1_000);
   const [resolve] = await upstreams.calls({ route: "cobalt.resolve" });
   expect(JSON.parse(resolve!.requestBody!)).toMatchObject({

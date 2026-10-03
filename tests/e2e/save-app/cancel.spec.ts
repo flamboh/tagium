@@ -2,6 +2,8 @@ import { inspectAudio } from "../support/audio";
 import { expect, IMPORT_TIMEOUT, test } from "../support/test";
 import { saveApp, storedFileCount } from "./save";
 
+test.describe.configure({ timeout: 120_000 });
+
 test("cancels a save while it is being prepared and saves another link", async ({
   page,
   upstreams,

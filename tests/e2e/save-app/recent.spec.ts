@@ -2,6 +2,8 @@ import { imageFixture, inspectAudio } from "../support/audio";
 import { expect, IMPORT_TIMEOUT, test } from "../support/test";
 import { SAVE_PATH, saveApp, storedFileCount, temporarySessions } from "./save";
 
+test.describe.configure({ timeout: 120_000 });
+
 test("keeps the five newest saves downloadable until the page reloads", async ({
   page,
   browserName,

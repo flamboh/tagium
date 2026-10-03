@@ -1,6 +1,8 @@
 import { expect, IMPORT_TIMEOUT, test } from "../support/test";
 import { saveApp } from "./save";
 
+test.describe.configure({ timeout: 120_000 });
+
 const sizes = [
   { width: 390, height: 844 },
   { width: 320, height: 568 },

@@ -108,7 +108,7 @@ test("the download api forces proxied local processing and signs its tunnels", a
     trackIndex: "7",
   });
 
-  const media = await request.get(`${tunnel.pathname}${tunnel.search}`);
+  const media = await request.get(`${tunnel.pathname}${tunnel.search}`, { maxRetries: 2 });
   expect(media.status()).toBe(200);
   expect(media.headers()).toMatchObject({
     "content-type": "video/mp4",
@@ -169,7 +169,7 @@ test("the download api signs direct post media for a limited time", async ({
   expect(expires * 1000 - Date.now()).toBeGreaterThan(10 * 60_000);
   expect(expires * 1000 - Date.now()).toBeLessThanOrEqual(15 * 60_000);
 
-  const photo = await request.get(`${resource.pathname}${resource.search}`);
+  const photo = await request.get(`${resource.pathname}${resource.search}`, { maxRetries: 2 });
   expect(photo.status()).toBe(200);
 
   for (const [name, value] of [

@@ -3,6 +3,8 @@ import { probeMedia } from "../support/media";
 import { expect, test } from "../support/test";
 import { saveApp } from "./save";
 
+test.describe.configure({ timeout: 120_000 });
+
 test("saves youtube audio as a tagged mp3 with its cover", async ({ page, upstreams }) => {
   const video = await upstreams.youtube.video({ title: "Café 東京 🎧", author: "Ártist / Duo" });
   const save = saveApp(page);

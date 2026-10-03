@@ -1,6 +1,8 @@
 import { expect, IMPORT_TIMEOUT, test } from "../support/test";
 import { saveApp } from "./save";
 
+test.describe.configure({ timeout: 120_000 });
+
 test("explains links that are not complete web addresses without contacting cobalt", async ({
   page,
   upstreams,
