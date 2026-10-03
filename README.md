@@ -39,7 +39,8 @@ Bun and Node 24 (see `.node-version`). Vite+ (`vp`) drives dev, build, lint, and
 bun install
 bun run dev        # app + api routes together
 bun run test       # unit + server tests
-bun run test:e2e   # playwright
+bun run test:e2e   # playwright against the built worker with faked upstreams (E2E_BROWSERS=all for firefox + webkit)
+bun run test:live  # small smoke test against LIVE_BASE_URL (default https://tagium.app)
 bun run typecheck
 bun run lint
 ```

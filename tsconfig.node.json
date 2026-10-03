@@ -24,9 +24,11 @@
     "vite.config.ts",
     "nitro.config.ts",
     "playwright.config.ts",
+    "playwright.live.config.ts",
     "server",
     "scripts",
     "tests/e2e",
+    "tests/live",
     "tests/server"
   ]
 }

@@ -35,9 +35,10 @@ jobs:
       - run: vp install
       - run: vp check
       - run: vp test run
-      - run: vp build
       - run: vp exec playwright install --with-deps
       - run: vp exec playwright test
+        env:
+          E2E_BROWSERS: all
 
       - name: Upload browser test diagnostics
         if: failure()
