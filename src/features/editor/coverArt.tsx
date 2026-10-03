@@ -256,6 +256,7 @@ export default function CoverArt({
             <Button
               type="button"
               variant="outline"
+              data-cover-upload
               disabled={isProcessing || disabled}
               aria-busy={isProcessing}
               aria-invalid={Boolean(coverError)}
