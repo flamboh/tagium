@@ -73,6 +73,11 @@ function useTrackWaveform({
   const position = Math.min(duration, Math.max(0, currentTime));
   const ratio = (time: number) => (duration > 0 ? Math.min(1, Math.max(0, time / duration)) : 0);
   const clipped = normalizeClip(range, duration) !== undefined;
+  // Hold the last clip so the label doesn't flash the full range while it fades out on reset.
+  const [labelRange, setLabelRange] = useState(range);
+  if (clipped && (labelRange.start !== range.start || labelRange.end !== range.end)) {
+    setLabelRange(range);
+  }
 
   useLayoutEffect(() => {
     const surface = surfaceRef.current;
@@ -241,6 +246,7 @@ function useTrackWaveform({
     status,
     statusMessage,
     clipped,
+    labelRange,
     range,
     duration,
     position,
@@ -275,6 +281,7 @@ export default function TrackWaveform(props: TrackWaveformProps) {
     status,
     statusMessage,
     clipped,
+    labelRange,
     range,
     duration,
     position,
@@ -367,14 +374,14 @@ export default function TrackWaveform(props: TrackWaveformProps) {
               clipped ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-1 opacity-0",
             )}
           >
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 py-px pr-0.5 pl-2 text-primary">
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted py-px pr-0.5 pl-2 text-foreground/80">
               <span className="tabular-nums">
-                clip {formatTimestamp(range.start)}–{formatTimestamp(range.end)}
+                clip {formatTimestamp(labelRange.start)}–{formatTimestamp(labelRange.end)}
               </span>
               <button
                 type="button"
                 aria-label="reset clip"
-                className="inline-flex size-4 cursor-pointer items-center justify-center rounded-full transition-colors outline-none hover:bg-primary hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="inline-flex size-4 cursor-pointer items-center justify-center rounded-full transition-colors outline-none text-muted-foreground hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
                 onClick={() => onClipChange(undefined)}
               >
                 <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2.5} className="size-2.5" />
