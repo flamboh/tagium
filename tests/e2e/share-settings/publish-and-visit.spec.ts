@@ -228,7 +228,12 @@ test("a single imported track is shared on its own, and a share without artwork 
   ).toBeVisible();
   await expect(page.getByRole("dialog")).not.toBeAttached();
 
-  await title.fill("Single (shared)");
+  await expect(async () => {
+    await title.fill("Single (shared)");
+    await expect(
+      page.getByRole("button", { name: "track actions for Single (shared).mp3" }),
+    ).toBeVisible({ timeout: 5_000 });
+  }).toPass();
   menu = await trackMenu(page, "Single (shared).mp3");
   await menu.getByRole("menuitem", { name: "share track", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "share track: Single (shared)" });
