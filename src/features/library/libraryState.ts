@@ -1,4 +1,4 @@
-import type { AlbumGroup, TagiumFile } from "@/features/library/types";
+import type { AlbumGroup, TagiumFile, TrackClip } from "@/features/library/types";
 
 export type TrackSelectionMode = "replace" | "toggle" | "range";
 
@@ -53,7 +53,8 @@ export type LibraryAction =
       type: "track-share-publication-set";
       fileId: string;
       publication: NonNullable<TagiumFile["sharePublication"]>;
-    };
+    }
+  | { type: "track-clip-set"; fileId: string; clip: TrackClip | undefined };
 
 const uniqueExistingTrackIds = (trackIds: Iterable<string>, fileIdSet: ReadonlySet<string>) => {
   const result: string[] = [];
@@ -377,6 +378,13 @@ export const libraryReducer = (state: LibraryState, action: LibraryAction): Libr
         ...state,
         files: state.files.map((file) =>
           file.id === action.fileId ? { ...file, sharePublication: action.publication } : file,
+        ),
+      };
+    case "track-clip-set":
+      return {
+        ...state,
+        files: state.files.map((file) =>
+          file.id === action.fileId ? { ...file, clip: action.clip } : file,
         ),
       };
   }
