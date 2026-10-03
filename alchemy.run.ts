@@ -14,6 +14,8 @@ const shareArtworkRetentionSeconds = 90 * 24 * 60 * 60;
 const flyRegistry = "registry.fly.io";
 const cobaltAppNamePattern = /^tagium-cobalt-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 const cobaltProxyPort = 9000;
+const sentryDsn =
+  "https://4e610dc86e5ffd151308b361352a1342@o4511707616182272.ingest.us.sentry.io/4511707631124480";
 
 const cobaltEnv = {
   CUSTOM_INNERTUBE_CLIENT: "TV_SIMPLY",
@@ -178,6 +180,7 @@ export default Alchemy.Stack(
         COBALT_API_KEY: cobaltApiKey,
         COBALT_MACHINE_AFFINITY_SECRET: cobaltMachineAffinitySecret,
         TAGIUM_DEPLOY_ENV: "preview",
+        SENTRY_DSN: sentryDsn,
         SHARE_MANIFESTS: shareManifests,
         SHARE_ARTWORK: shareArtwork,
         COBALT_SESSION_RATE_LIMITER: rateLimit("COBALT_SESSION_RATE_LIMITER", "128300001", 20),

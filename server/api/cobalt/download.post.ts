@@ -19,6 +19,7 @@ import {
   type RequestLogContext,
 } from "../../utils/request-observability";
 import { decodeRequestBody } from "../../utils/schema";
+import { reportDownloadFailure } from "../../utils/download-failure-report";
 import type { CobaltRuntimeEnv as DevControlRuntimeEnv } from "../../utils/dev-controls";
 
 type CobaltRuntimeEnv = {
@@ -249,18 +250,30 @@ const logCompletion = (
 
 const logFailure = (
   context: RequestLogContext,
+  sourceUrl: string,
   sourceFingerprint: string,
   result: CobaltDownloadResult,
   elapsedMs: number,
 ) => {
+  const stage = result.failureStage ?? "cobalt.resolve_error";
+  const errorCode = result.response.status === "error" ? result.response.error.code : undefined;
+  reportDownloadFailure({
+    route: "download",
+    stage,
+    requestId: context.requestId,
+    errorCode,
+    sourceUrl,
+    upstreamStatus: result.upstreamStatus,
+    machineId: result.machineId,
+  });
   console.warn(
     JSON.stringify({
       event: "cobalt_video_failure",
       requestId: context.requestId,
       sourceFingerprint,
       elapsedMs,
-      stage: result.failureStage ?? "cobalt.resolve_error",
-      errorCode: result.response.status === "error" ? result.response.error.code : undefined,
+      stage,
+      errorCode,
       upstreamStatus: result.upstreamStatus,
       contentType: result.contentType,
       retryAfter: result.retryAfter,
@@ -274,6 +287,7 @@ export default defineHandler(async (event) => {
   const startedAt = Date.now();
   let context = getRequestLogContext(event.req);
   let sourceFingerprint: string | undefined;
+  let sourceUrl: string | undefined;
 
   try {
     const runtimeEnv = getRuntimeEnv(event.req);
@@ -281,6 +295,7 @@ export default defineHandler(async (event) => {
     if (forbidden) return forbidden;
 
     const body = await decodeRequestBody(event.req, cobaltDownloadRequestSchema);
+    sourceUrl = body.url;
     context = getRequestLogContext(event.req, body.url);
     const requestSourceFingerprint = await fingerprintUrl(body.url);
     if (!requestSourceFingerprint) throw new Error("Download URL fingerprint is unavailable.");
@@ -309,7 +324,7 @@ export default defineHandler(async (event) => {
       requestSourceFingerprint,
     );
     if (result.response.status === "error") {
-      logFailure(context, requestSourceFingerprint, result, Date.now() - startedAt);
+      logFailure(context, body.url, requestSourceFingerprint, result, Date.now() - startedAt);
       if (isCobaltCapacityError(result.response)) {
         return respond(cobaltCapacityErrorResponse(result.response, result.retryAfter));
       }
@@ -328,7 +343,13 @@ export default defineHandler(async (event) => {
         failureStage: "cobalt.resolve_policy",
         failureReason: "remote_processing_plan",
       } as const satisfies CobaltDownloadResult;
-      logFailure(context, requestSourceFingerprint, policyFailure, Date.now() - startedAt);
+      logFailure(
+        context,
+        body.url,
+        requestSourceFingerprint,
+        policyFailure,
+        Date.now() - startedAt,
+      );
       return respond(cobaltErrorResponse(policyFailure.response, 422));
     }
 
@@ -348,6 +369,13 @@ export default defineHandler(async (event) => {
     if (HTTPError.isError(error)) throw error;
 
     if (sourceFingerprint) {
+      reportDownloadFailure({
+        route: "download",
+        stage: "tagium.video_handler",
+        requestId: context.requestId,
+        errorCode: "error.api.handler_failure",
+        sourceUrl,
+      });
       console.warn(
         JSON.stringify({
           event: "cobalt_video_failure",
