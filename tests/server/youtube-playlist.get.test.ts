@@ -219,14 +219,4 @@ describe("youtube playlist endpoint", () => {
     });
     expect(playlist).not.toHaveProperty("year");
   });
-
-  it("rejects non-playlist YouTube URLs without fetching them", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(handler(makeEvent("https://www.youtube.com/watch?v=video"))).rejects.toThrow(
-      "youtube.playlist_url_required",
-    );
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
 });

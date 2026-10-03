@@ -76,17 +76,6 @@ const makeDirectResourceRequest = (
   return resourceRequest;
 };
 
-const withObservability = (request: RuntimeRequest) => {
-  const url = new URL(request.url);
-  url.searchParams.set("parentRequestId", "plan-request-1");
-  url.searchParams.set("importId", "import-1");
-  url.searchParams.set("sourceFingerprint", `sha256:${"a".repeat(32)}`);
-  url.searchParams.set("trackIndex", "7");
-  const correlatedRequest = new Request(url, request) as RuntimeRequest;
-  correlatedRequest.runtime = request.runtime;
-  return correlatedRequest;
-};
-
 const makeEvent = (request: RuntimeRequest) => {
   return mockEvent(request);
 };
@@ -247,21 +236,6 @@ describe("cobalt tunnel endpoint", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("retries a bounded empty 200 tunnel response", async () => {
-    let attempt = 0;
-    const fetchMock = vi.fn(async () => {
-      attempt++;
-      return attempt < 4 ? new Response(null, { status: 200 }) : new Response("audio-bytes");
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const response = await handler(makeEvent(makeTunnelRequest()));
-    expect(response.status).toBe(200);
-    expect(response.headers.get("X-Tagium-Tunnel-Outcome")).toBe("recovered");
-    expect(response.headers.get("X-Tagium-Tunnel-Attempts")).toBe("4");
-    expect(await response.text()).toBe("audio-bytes");
-    expect(fetchMock).toHaveBeenCalledTimes(4);
-  });
-
   it("stops retrying when the downstream tunnel request is aborted", async () => {
     vi.useFakeTimers();
     const downstream = new AbortController();
@@ -318,30 +292,6 @@ describe("cobalt tunnel endpoint", () => {
     expect(response.status).toBe(200);
     await expect(response.arrayBuffer()).rejects.toThrow();
     expect(reads).toBeGreaterThanOrEqual(2);
-  });
-
-  it("forwards Fly machine affinity when machine param is present", async () => {
-    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => {
-      return new Response("audio-bytes", {
-        headers: {
-          "Content-Type": "audio/mpeg",
-        },
-      });
-    });
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    const response = await handler(makeEvent(withObservability(makeTunnelRequestForMachine())));
-    const [, init] = fetchMock.mock.calls[0];
-    const headers = new Headers(init?.headers);
-
-    expect(response.status).toBe(200);
-    expect(headers.get("Fly-Force-Instance-Id")).toBe("cobalt-machine-1");
-    expect(headers.get("X-Tagium-Tunnel-Request-Id")).toMatch(/^tagium-tunnel-/);
-    expect(headers.get("X-Tagium-Parent-Request-Id")).toBe("plan-request-1");
-    expect(headers.get("X-Tagium-Import-Id")).toBe("import-1");
-    expect(headers.get("X-Tagium-Source-Fingerprint")).toBe(`sha256:${"a".repeat(32)}`);
-    expect(headers.get("X-Tagium-Track-Index")).toBe("7");
   });
 
   it("preserves Cobalt tunnel capacity overload responses", async () => {

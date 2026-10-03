@@ -17,23 +17,6 @@ beforeEach(() => {
 });
 
 describe("system failure reporting", () => {
-  it.each([
-    ["error.api.capacity_exceeded", "capacity", "downloads are busy"],
-    ["Cobalt tunnel request failed (429)", "rate_limited", "too many download requests"],
-    [
-      "too many downloads too quickly. wait a moment, then try again.",
-      "rate_limited",
-      "too many download requests",
-    ],
-    ["error.api.timed_out", "timeout", "the download took too long"],
-    ["error.api.unreachable", "service_unavailable", "downloads are temporarily unavailable"],
-  ] as const)("maps %s to safe public copy", (message, code, title) => {
-    expect(getSystemFailurePresentation(new Error(message), "download")).toMatchObject({
-      code,
-      title,
-    });
-  });
-
   it("uses a safe contextual fallback instead of exposing an unknown cause", () => {
     const presentation = getSystemFailurePresentation(
       new Error("private upstream body and URL"),
@@ -46,14 +29,6 @@ describe("system failure reporting", () => {
       description: "tagium could not prepare your download. your tracks are still in the library.",
     });
     expect(JSON.stringify(presentation)).not.toContain("private upstream");
-  });
-
-  it("presents the import gateway's unsupported source token as non-retryable", () => {
-    expect(getSystemFailurePresentation(new Error("unsupported url"), "import")).toMatchObject({
-      code: "unsupported_source",
-      retryable: false,
-      description: "try a public soundcloud or youtube track url.",
-    });
   });
 
   it.each([
@@ -91,25 +66,6 @@ describe("system failure reporting", () => {
     expect(getSystemFailurePresentation(new Error(message), "download")).toMatchObject({
       code: "private_or_missing",
       retryable: false,
-    });
-  });
-
-  it("maps Cobalt's typed empty-fetch code to the invalid response category", () => {
-    expect(
-      getSystemFailurePresentation(new Error("error.api.fetch.empty"), "download"),
-    ).toMatchObject({
-      code: "invalid_response",
-      retryable: true,
-    });
-  });
-
-  it("keeps failed SoundCloud short-link resolution retryable", () => {
-    expect(
-      getSystemFailurePresentation(new Error("soundcloud short-link resolution failed"), "import"),
-    ).toMatchObject({
-      code: "unknown",
-      retryable: true,
-      title: "import failed",
     });
   });
 

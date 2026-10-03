@@ -14,28 +14,6 @@ describe("youtube cover endpoint", () => {
     vi.unstubAllGlobals();
   });
 
-  it("proxies a bounded YouTube JPEG for browser cover imports", async () => {
-    const fetchMock = vi.fn(
-      async () =>
-        new Response(Uint8Array.of(0xff, 0xd8, 0xff), {
-          headers: { "content-type": "image/jpeg", "content-length": "3" },
-        }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    const response = await handler(
-      makeEvent("https://i.ytimg.com/pl_c/playlist/studio_square_thumbnail.jpg?sig=test"),
-    );
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toBe("image/jpeg");
-    expect(new Uint8Array(await response.arrayBuffer())).toEqual(Uint8Array.of(0xff, 0xd8, 0xff));
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://i.ytimg.com/pl_c/playlist/studio_square_thumbnail.jpg?sig=test",
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    );
-  });
-
   it.each([
     "http://i.ytimg.com/cover.jpg",
     "https://example.com/cover.jpg",

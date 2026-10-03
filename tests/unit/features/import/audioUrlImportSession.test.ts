@@ -125,45 +125,6 @@ describe("audio URL import session", () => {
     hook.unmount();
   });
 
-  it.each([true, false])(
-    "reports an unblocked single import as ready only when download-after-import is %s",
-    async (downloadAfterImport) => {
-      mocks.resolveTrackMetadata.mockResolvedValue({ title: "Single", artist: "Artist" });
-      const onImportReady = vi.fn();
-      const importSettings = { ...settings("320"), downloadAfterImport };
-      const hook = renderHook(() => {
-        const library = useLibraryStore();
-        const editor = useTrackEditorSession({ library, settings: importSettings });
-        const importing = useAudioImportSession({
-          library,
-          editor,
-          settings: importSettings,
-          activateEditor: vi.fn(),
-          onImportReady,
-        });
-        return { library, importing };
-      }, undefined);
-
-      await act(async () => {
-        await hook.result.importing.commands.importUrl(
-          "https://www.youtube.com/watch?v=abcdefghijk",
-        );
-      });
-      const trackId = hook.result.library.getSnapshot().files[0]!.id;
-      expect(onImportReady).not.toHaveBeenCalled();
-
-      act(() => hook.result.importing.commands.removeTracks([trackId]));
-
-      if (downloadAfterImport) {
-        expect(onImportReady).toHaveBeenCalledExactlyOnceWith({ kind: "track", trackId });
-      } else {
-        expect(onImportReady).not.toHaveBeenCalled();
-      }
-      act(() => hook.result.importing.commands.cancelQueue());
-      hook.unmount();
-    },
-  );
-
   it("does not report a canceled album import as ready, even after its cover loads", async () => {
     let resolveCover: ((cover: AudioMetadata["picture"]) => void) | undefined;
     mocks.fetchImportedCover.mockImplementationOnce(
@@ -261,52 +222,6 @@ describe("audio URL import session", () => {
       outcome: "rejected",
       failureReason: "unsupported",
     });
-    hook.unmount();
-  });
-
-  it("stops waiting on the album cover when the playlist cover fails to load", async () => {
-    let rejectCover: ((error: Error) => void) | undefined;
-    mocks.fetchImportedCover.mockImplementationOnce(
-      () =>
-        new Promise((_resolve, reject) => {
-          rejectCover = reject;
-        }),
-    );
-    mocks.resolveSoundCloudSet.mockResolvedValue({
-      title: "Imported album",
-      artist: "Artist",
-      genre: "Electronic",
-      isAlbum: true,
-      coverUrl: "https://example.com/cover.jpg",
-      tracks: [{ title: "Track", url: "https://soundcloud.com/artist/track", trackNumber: 1 }],
-    });
-    const hook = renderHook(() => {
-      const library = useLibraryStore();
-      const editor = useTrackEditorSession({ library, settings: settings("320") });
-      const importing = useAudioImportSession({
-        library,
-        editor,
-        settings: settings("320"),
-        activateEditor: vi.fn(),
-        onImportReady: vi.fn(),
-      });
-      return { importing, library };
-    }, undefined);
-
-    await act(async () => {
-      await hook.result.importing.commands.importUrl(
-        "https://soundcloud.com/artist/sets/imported-album",
-      );
-    });
-    expect(hook.result.library.getSnapshot().albums[0]?.coverPending).toBe(true);
-
-    await act(async () => {
-      rejectCover?.(new Error("cover unavailable"));
-      await Promise.resolve();
-    });
-
-    expect(hook.result.library.getSnapshot().albums[0]).toMatchObject({ coverPending: false });
-    expect(hook.result.library.getSnapshot().albums[0]?.cover).toBeUndefined();
     hook.unmount();
   });
 

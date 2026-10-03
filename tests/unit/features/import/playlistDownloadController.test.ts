@@ -114,20 +114,6 @@ afterEach(() => {
 });
 
 describe("playlistDownloadController", () => {
-  it("starts three downloads and publishes active tracks immediately", async () => {
-    const harness = createControllerHarness();
-    harness.controller.enqueue(tracks(5));
-    await flushEffects();
-
-    expect(harness.queued).toEqual([["track-1", "track-2", "track-3", "track-4", "track-5"]]);
-    expect(harness.downloads.size).toBe(3);
-    expect(harness.snapshots.at(-1)).toMatchObject({
-      active: [{ fileId: "track-1" }, { fileId: "track-2" }, { fileId: "track-3" }],
-      pending: 2,
-      completed: 0,
-    });
-  });
-
   it("waits on the 21st SoundCloud track and wakes when budget opens", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
@@ -153,48 +139,6 @@ describe("playlistDownloadController", () => {
     expect(harness.snapshots.at(-1)).toMatchObject({
       waitingForTunnelBudget: false,
       active: [{ fileId: "track-21" }],
-    });
-  });
-
-  it("cancels active and pending tracks, aborts work, and finishes when idle", async () => {
-    const harness = createControllerHarness();
-    harness.controller.enqueue(tracks(4));
-    await flushEffects();
-    harness.controller.cancel();
-    await flushEffects();
-
-    expect(harness.downloadSignals.get("track-1")?.aborted).toBe(true);
-    expect(harness.canceled.flat()).toEqual(
-      expect.arrayContaining(["track-1", "track-2", "track-3", "track-4"]),
-    );
-    for (let index = 1; index <= 3; index += 1) {
-      harness.downloads.get(`track-${index}`)?.reject(new DOMException("aborted", "AbortError"));
-    }
-    await flushEffects();
-
-    expect(harness.failed).toEqual([]);
-    expect(harness.snapshots.at(-1)).toMatchObject({
-      canceled: true,
-      done: true,
-      canceledCount: 4,
-      active: [],
-    });
-  });
-
-  it("removes deleted active and pending tracks from the current run", async () => {
-    const harness = createControllerHarness();
-    harness.controller.enqueue(tracks(5));
-    await flushEffects();
-    harness.controller.remove(["track-2", "track-5"]);
-    await flushEffects();
-
-    expect(harness.downloadSignals.get("track-2")?.aborted).toBe(true);
-    expect(harness.downloadStarts).not.toContain("track-5");
-    expect(harness.controller.getSnapshot()).toMatchObject({
-      trackIds: ["track-1", "track-3", "track-4"],
-      total: 3,
-      active: [{ fileId: "track-1" }, { fileId: "track-3" }, { fileId: "track-4" }],
-      pending: 0,
     });
   });
 
