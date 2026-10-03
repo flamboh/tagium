@@ -198,7 +198,7 @@ export const useTrackEditorSession = ({
         const filenameBase = sanitizeFilenameBase(value);
         filenamePreviewStore.set(
           selectedId,
-          filenameBase ? audioFilename(filenameBase, getAudioFormat(currentFile)) : undefined,
+          filenameBase ? audioFilename(filenameBase, getAudioFormat(currentFile)) : "",
         );
       }
     }
@@ -360,7 +360,7 @@ export const useTrackEditorSession = ({
       const filenameBase = sanitizeFilenameBase(value);
       filenamePreviewStore.set(
         selectedId,
-        filenameBase ? audioFilename(filenameBase, getAudioFormat(currentFile)) : undefined,
+        filenameBase ? audioFilename(filenameBase, getAudioFormat(currentFile)) : "",
       );
     },
     [filenamePreviewStore, library],

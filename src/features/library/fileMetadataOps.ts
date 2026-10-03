@@ -1,4 +1,4 @@
-import filenamify from "filenamify";
+import { sanitizeFilenameBase } from "@/features/library/filename";
 import { audioFilename, getAudioFormat } from "@/features/audio/audioFormat";
 import {
   EDITABLE_METADATA_FIELDS,
@@ -273,7 +273,7 @@ export function applySyncedFilenamesToFiles(files: TagiumFile[], trackIds?: stri
     if (trackIdSet && !trackIdSet.has(file.id)) return file;
     if (!file.metadata) return file;
 
-    const syncedFilename = filenamify(file.metadata.title, { replacement: "-" });
+    const syncedFilename = sanitizeFilenameBase(file.metadata.title);
     if (!syncedFilename) return file;
     const nextFilename = audioFilename(syncedFilename, getAudioFormat(file));
     if (file.filename === nextFilename && file.metadata.filename === syncedFilename) {
