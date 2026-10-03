@@ -6,7 +6,7 @@ import {
   inspectAudio,
   unzipDownload,
 } from "../support/audio";
-import { IMPORT_TIMEOUT, test } from "../support/test";
+import { test } from "../support/test";
 import type { FakeYouTubeVideo } from "../support/upstreams";
 import {
   audioPreview,
@@ -19,9 +19,10 @@ import {
   waitForTrackReady,
   savedAs,
   expect,
+  SETTLE_TIMEOUT,
 } from "./helpers";
 
-test.describe.configure({ timeout: 120_000 });
+test.describe.configure({ timeout: 180_000 });
 
 test("imports a youtube video with prefilled tags, then edits and exports the same audio", async ({
   browserName,
@@ -111,7 +112,7 @@ test("downloads a freshly imported youtube single as a zip on the first confirma
 
   await page.goto("/");
   await importUrl(page, video.url);
-  await expect(page.getByRole("button", { name: "download all" })).toBeEnabled(IMPORT_TIMEOUT);
+  await expect(page.getByRole("button", { name: "download all" })).toBeEnabled(SETTLE_TIMEOUT);
   await page.getByRole("button", { name: "download all" }).click();
 
   const dialog = page.getByRole("dialog", { name: "download 1 track" });

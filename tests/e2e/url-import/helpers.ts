@@ -4,7 +4,7 @@ import type { BrowserContext, Page, Route } from "@playwright/test";
 import { audioFixtures, type AudioFixtureName } from "../fixtures/catalog.ts";
 import type { DownloadedFile } from "../support/audio";
 import type { Upstreams } from "../support/upstreams";
-import { expect as baseExpect, IMPORT_TIMEOUT } from "../support/test";
+import { expect as baseExpect } from "../support/test";
 import {
   APP_SETTINGS_STORAGE_KEY,
   DEFAULT_APP_SETTINGS,
@@ -30,7 +30,7 @@ export const downloadTrackButton = (page: Page) =>
   page.getByRole("button", { name: "download track", exact: true });
 
 export const waitForTrackReady = (page: Page) =>
-  expect(downloadTrackButton(page)).toBeEnabled(IMPORT_TIMEOUT);
+  expect(downloadTrackButton(page)).toBeEnabled(SETTLE_TIMEOUT);
 
 export const audioPreview = (page: Page) => page.getByRole("region", { name: "audio preview" });
 

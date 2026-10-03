@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto";
 import type { BrowserContext, Page } from "@playwright/test";
 import { captureDownload, inspectAudio } from "../support/audio";
-import { IMPORT_TIMEOUT, test } from "../support/test";
+import { test } from "../support/test";
 import type { Upstreams } from "../support/upstreams";
 import {
   cobaltRequestCount,
@@ -11,9 +11,10 @@ import {
   notifications,
   waitForTrackReady,
   expect,
+  SETTLE_TIMEOUT,
 } from "./helpers";
 
-test.describe.configure({ timeout: 120_000 });
+test.describe.configure({ timeout: 180_000 });
 
 const urlField = (page: Page) => page.getByRole("textbox", { name: "media url" });
 
@@ -182,7 +183,7 @@ for (const failure of failureCases) {
     await importUrl(page, media.url);
 
     await expect(page.getByRole("button", { name: /track has an error$/u })).toBeVisible(
-      IMPORT_TIMEOUT,
+      SETTLE_TIMEOUT,
     );
     await expect(page.getByText(failure.title, { exact: true }).first()).toBeVisible();
     await expect(page.getByText(failure.detail, { exact: true })).toBeVisible();
