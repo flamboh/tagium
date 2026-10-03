@@ -29,7 +29,10 @@ export type SystemFailurePresentation = {
   dedupeKey: string;
 };
 
-export type TrackFailureDisplay = Pick<SystemFailurePresentation, "title" | "description">;
+export type TrackFailureDisplay = Pick<
+  SystemFailurePresentation,
+  "title" | "description" | "retryable"
+>;
 
 const DOWNLOAD_DEBOUNCE_MS = 15_000;
 const lastDownloadNotificationAt = new Map<string, number>();
@@ -289,21 +292,32 @@ export const getTrackFailureDisplay = (message: string): TrackFailureDisplay => 
     (presentation) => presentation.trackDescription === message,
   );
   if (storedPresentation) {
-    return { title: storedPresentation.title, description: storedPresentation.trackDescription };
+    return {
+      title: storedPresentation.title,
+      description: storedPresentation.trackDescription,
+      retryable: storedPresentation.retryable,
+    };
   }
   const storedFallback = Object.values(FALLBACKS).find(
     (presentation) => presentation.trackDescription === message,
   );
   if (storedFallback) {
-    return { title: storedFallback.title, description: storedFallback.trackDescription };
+    return {
+      title: storedFallback.title,
+      description: storedFallback.trackDescription,
+      retryable: true,
+    };
   }
 
   const known = knownDownloadFailureFrom(message);
-  if (known) return { title: known.title, description: known.trackDescription };
+  if (known) {
+    return { title: known.title, description: known.trackDescription, retryable: known.retryable };
+  }
 
   return {
     title: "track error",
     description: "this track needs attention before it can be exported.",
+    retryable: true,
   };
 };
 

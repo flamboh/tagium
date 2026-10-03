@@ -235,10 +235,11 @@ for (const failure of failureCases) {
       failure.cobaltCalls ?? 1,
     );
 
-    if (failure.retryable) {
-      await page.getByRole("button", { name: /^track actions for / }).click();
-      await expect(page.getByRole("menuitem", { name: "retry download" })).toBeVisible();
-    }
+    await page.getByRole("button", { name: /^track actions for / }).click();
+    await expect(page.getByRole("menuitem", { name: "remove track" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "retry download" })).toHaveCount(
+      failure.retryable ? 1 : 0,
+    );
   });
 }
 
