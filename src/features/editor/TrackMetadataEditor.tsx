@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { FloatingLabelInput, FloatingLabelTextarea } from "@/components/ui/floating-label-field";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CoverArt from "@/features/editor/coverArt";
+import TrackWaveform from "@/features/editor/TrackWaveform";
 import AudioImportDropzone from "@/features/import/AudioImportDropzone";
 import { isValidFilenameBase, sanitizeFilenameBase } from "@/features/library/filename";
 import { getSampleTrack, type SampleTrackMetadata } from "@/features/editor/sampleMetadata";
@@ -33,7 +34,7 @@ import {
   type MetadataEditorMode,
 } from "@/features/editor/useMetadataEditorMode";
 import { getTrackFailureDisplay } from "@/shared/systemFailure";
-import type { AlbumGroup, AudioMetadata, TagiumFile } from "@/features/library/types";
+import type { AlbumGroup, AudioMetadata, TagiumFile, TrackClip } from "@/features/library/types";
 import { getAudioFormat } from "@/features/audio/audioFormat";
 import {
   getMetadataLinkDescriptor,
@@ -69,6 +70,7 @@ interface TrackMetadataEditorProps {
     event: ChangeEvent<HTMLInputElement>,
   ) => void;
   onAudioUpload: (files: File[]) => void | Promise<void>;
+  onTrackClipChange: (fileId: string, clip: TrackClip | undefined) => void;
 }
 
 interface LoadedTrackMetadataEditorProps extends Omit<TrackMetadataEditorProps, "selectedFile"> {
@@ -526,26 +528,22 @@ const useAdvancedMetadataFormBoundary = ({
   return { registrations, errors };
 };
 
-function TrackFileSummary({ selectedFile }: { selectedFile: LoadedTrack }) {
+const getCoverUpload = (editorBody: HTMLElement | null) =>
+  editorBody?.querySelector<HTMLElement>("[data-cover-upload]") ?? null;
+
+function TrackFileSize({ selectedFile }: { selectedFile: LoadedTrack }) {
   return (
-    <div data-track-file-summary className="grid grid-cols-2 gap-2 text-xs md:text-sm">
-      <div>
-        <span className="font-medium">duration: </span>
-        {`${Math.floor(selectedFile.metadata.duration / 60)}:${String(Math.round(selectedFile.metadata.duration % 60)).padStart(2, "0")}`}
-      </div>
-      <div className="justify-self-end text-right">
-        <span className="font-medium">size: </span>
-        {selectedFile.file &&
-          selectedFile.status !== "error" &&
-          `${(selectedFile.file.size / (1024 * 1024)).toFixed(2)} mb`}
-        {selectedFile.file &&
-          selectedFile.status === "error" &&
-          `${(selectedFile.file.size / (1024 * 1024)).toFixed(2)} mb (metadata failed)`}
-        {!selectedFile.file && selectedFile.downloadStatus === "downloading" && "downloading"}
-        {!selectedFile.file && selectedFile.downloadStatus === "error" && "download failed"}
-        {!selectedFile.file && selectedFile.downloadStatus === "canceled" && "download canceled"}
-      </div>
-    </div>
+    <span data-track-file-size>
+      {selectedFile.file &&
+        selectedFile.status !== "error" &&
+        `${(selectedFile.file.size / (1024 * 1024)).toFixed(2)} mb`}
+      {selectedFile.file &&
+        selectedFile.status === "error" &&
+        `${(selectedFile.file.size / (1024 * 1024)).toFixed(2)} mb (metadata failed)`}
+      {!selectedFile.file && selectedFile.downloadStatus === "downloading" && "downloading"}
+      {!selectedFile.file && selectedFile.downloadStatus === "error" && "download failed"}
+      {!selectedFile.file && selectedFile.downloadStatus === "canceled" && "download canceled"}
+    </span>
   );
 }
 
@@ -559,7 +557,7 @@ function DownloadTrackButton({
   disabledReason: string;
 }) {
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-end gap-2 pt-1 max-lg:[@media(max-height:700px)]:flex-none max-lg:[@media(max-height:700px)]:pt-0 lg:flex-none lg:pt-2">
+    <div className="flex items-center justify-end gap-2">
       <DisabledReason disabled={disabled} reason={disabledReason}>
         <Button
           type="button"
@@ -656,6 +654,7 @@ function PendingTrackMetadataEditor({
 }
 
 function LoadedTrackMetadataEditor({
+  viewActive,
   headerLeadingAction,
   selectedFile,
   selectedFileId,
@@ -677,6 +676,7 @@ function LoadedTrackMetadataEditor({
   onPreviewMetadataChange,
   editorMode,
   onEditorModeChange,
+  onTrackClipChange,
 }: LoadedTrackMetadataEditorProps) {
   const watchedTitle = useWatch({
     control,
@@ -695,6 +695,72 @@ function LoadedTrackMetadataEditor({
     enabled: advancedMetadata,
   });
   const pendingAdvancedFocusRef = useRef<"discNumber" | "bpm" | null>(null);
+  const editorBodyRef = useRef<HTMLDivElement>(null);
+  const editorActionsRef = useRef<HTMLDivElement>(null);
+  const editorActionsTopRef = useRef<number | null>(null);
+  const editorActionsStartTopRef = useRef<number | null>(null);
+  const coverUploadHeightRef = useRef<number | null>(null);
+  const coverUploadStartHeightRef = useRef<number | null>(null);
+  const changeEditorMode = useCallback(
+    (mode: MetadataEditorMode) => {
+      const actions = editorActionsRef.current;
+      if (actions) {
+        editorActionsStartTopRef.current = actions.getBoundingClientRect().top;
+        actions.getAnimations().forEach((animation) => animation.cancel());
+      }
+      const coverUpload = getCoverUpload(editorBodyRef.current);
+      if (coverUpload) {
+        coverUploadStartHeightRef.current = coverUpload.getBoundingClientRect().height;
+        coverUpload.getAnimations().forEach((animation) => animation.cancel());
+      }
+      onEditorModeChange(mode);
+    },
+    [onEditorModeChange],
+  );
+  useLayoutEffect(() => {
+    const actions = editorActionsRef.current;
+    const coverUpload = getCoverUpload(editorBodyRef.current);
+
+    const targetTop = actions?.getBoundingClientRect().top ?? null;
+    const startTop = editorActionsStartTopRef.current ?? editorActionsTopRef.current;
+    editorActionsStartTopRef.current = null;
+    editorActionsTopRef.current = targetTop;
+
+    const targetHeight = coverUpload?.getBoundingClientRect().height ?? null;
+    const startHeight = coverUploadStartHeightRef.current ?? coverUploadHeightRef.current;
+    coverUploadStartHeightRef.current = null;
+    coverUploadHeightRef.current = targetHeight;
+
+    if (viewActive === false || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    const timing = { duration: 220, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
+    if (
+      actions &&
+      startTop !== null &&
+      targetTop !== null &&
+      Math.abs(startTop - targetTop) >= 0.5
+    ) {
+      actions.animate(
+        [{ transform: `translateY(${startTop - targetTop}px)` }, { transform: "translateY(0)" }],
+        timing,
+      );
+    }
+    // The upload button stretches to meet the download button, so its height follows the
+    // same slide instead of snapping.
+    if (
+      coverUpload &&
+      startHeight !== null &&
+      targetHeight !== null &&
+      Math.abs(startHeight - targetHeight) >= 0.5
+    ) {
+      coverUpload.animate(
+        [{ flex: `0 0 ${startHeight}px` }, { flex: `0 0 ${targetHeight}px` }],
+        timing,
+      );
+    }
+  }, [advancedMetadata, editorMode, viewActive]);
   const focusPendingAdvancedField = useCallback(
     (node: HTMLDivElement | null) => {
       const pendingAdvancedFocus = pendingAdvancedFocusRef.current;
@@ -741,7 +807,7 @@ function LoadedTrackMetadataEditor({
           setFocus(invalidField, { shouldSelect: true });
         } else {
           pendingAdvancedFocusRef.current = invalidField;
-          onEditorModeChange("advanced");
+          changeEditorMode("advanced");
         }
         return;
       }
@@ -770,12 +836,15 @@ function LoadedTrackMetadataEditor({
           extension={getAudioFormat(selectedFile).extension}
           actions={
             advancedMetadata ? (
-              <MetadataEditorModeToggle mode={editorMode} onChange={onEditorModeChange} />
+              <MetadataEditorModeToggle mode={editorMode} onChange={changeEditorMode} />
             ) : undefined
           }
         />
         <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 max-lg:[@media(max-height:700px)]:p-2 lg:p-6 lg:pb-28">
-          <div className="flex min-h-full flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:min-h-0 lg:flex-row lg:gap-4">
+          <div
+            ref={editorBodyRef}
+            className="flex min-h-full flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:min-h-0 lg:flex-row lg:gap-4"
+          >
             <Controller
               name="picture"
               control={control}
@@ -791,18 +860,15 @@ function LoadedTrackMetadataEditor({
               )}
             />
             <div className="flex min-w-0 flex-1 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3">
-              <div
-                data-editor-form-area
-                className="grid min-w-0 [&>[data-editor-pane]]:col-start-1 [&>[data-editor-pane]]:row-start-1"
-              >
+              <div data-editor-form-area className="relative min-w-0">
                 <div
                   data-editor-pane="normal"
                   aria-hidden={editorMode !== "normal"}
                   inert={editorMode !== "normal"}
-                  className={`flex min-w-0 flex-col gap-2 bg-background transition-opacity duration-200 motion-reduce:transition-none max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3 ${
+                  className={`flex min-w-0 flex-col gap-2 bg-background transition-opacity duration-200 ease-out motion-reduce:transition-none max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3 ${
                     editorMode === "normal"
-                      ? "z-10 opacity-100"
-                      : "pointer-events-none z-0 opacity-0"
+                      ? "relative z-10 opacity-100"
+                      : "pointer-events-none absolute inset-x-0 top-0 z-0 opacity-0"
                   }`}
                 >
                   <TrackDetailsFields
@@ -832,10 +898,10 @@ function LoadedTrackMetadataEditor({
                     data-editor-pane="advanced"
                     aria-hidden={editorMode !== "advanced"}
                     inert={editorMode !== "advanced"}
-                    className={`flex min-w-0 flex-col gap-2 bg-background transition-opacity duration-200 motion-reduce:transition-none max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3 ${
+                    className={`flex min-w-0 flex-col gap-2 bg-background transition-opacity duration-200 ease-out motion-reduce:transition-none max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3 ${
                       editorMode === "advanced"
-                        ? "z-10 opacity-100"
-                        : "pointer-events-none z-0 opacity-0"
+                        ? "relative z-10 opacity-100"
+                        : "pointer-events-none absolute inset-x-0 top-0 z-0 opacity-0"
                     }`}
                   >
                     <AdvancedTrackDetailsFields
@@ -848,12 +914,26 @@ function LoadedTrackMetadataEditor({
                   </div>
                 )}
               </div>
-              <TrackFileSummary selectedFile={selectedFile} />
-              <DownloadTrackButton
-                onClick={submitDownload}
-                disabled={!canDownloadTrack}
-                disabledReason={downloadDisabledReason}
-              />
+              <div
+                ref={editorActionsRef}
+                data-editor-actions
+                className="flex min-w-0 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3"
+              >
+                <TrackWaveform
+                  key={selectedFile.id}
+                  active={viewActive ?? true}
+                  file={selectedFile.file}
+                  fallbackDuration={selectedFile.metadata.duration}
+                  clip={selectedFile.clip}
+                  onClipChange={(clip) => onTrackClipChange(selectedFile.id, clip)}
+                  trailing={<TrackFileSize selectedFile={selectedFile} />}
+                />
+                <DownloadTrackButton
+                  onClick={submitDownload}
+                  disabled={!canDownloadTrack}
+                  disabledReason={downloadDisabledReason}
+                />
+              </div>
             </div>
           </div>
         </div>
