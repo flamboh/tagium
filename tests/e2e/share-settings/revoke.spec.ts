@@ -1,4 +1,4 @@
-import { expect, test } from "../support/test";
+import { expect, test } from "./fixtures";
 import {
   albumManifest,
   createShare,
@@ -131,17 +131,23 @@ test("opening a share while tagium is open in another tab offers to copy the lin
 
   await page.goto("/");
   const shareTab = await context.newPage();
-  await shareTab.goto(share.url);
   const toast = notifications(shareTab).getByRole("listitem").filter({
     hasText:
       "tagium is already open in another tab. copy the link and add the album there instead.",
   });
+  const openShareBesideTagium = () =>
+    expect(async () => {
+      await shareTab.goto(share.url);
+      await expect(toast).toBeVisible({ timeout: 5_000 });
+    }).toPass();
+
+  await openShareBesideTagium();
   await toast.getByRole("button", { name: "copy link" }).click();
   await expect(notifications(shareTab).getByText("share link copied")).toBeVisible();
   expect(await clipboard.copied(shareTab)).toEqual([share.url]);
 
   await clipboard.deny(shareTab);
-  await shareTab.reload();
+  await openShareBesideTagium();
   await toast.getByRole("button", { name: "copy link" }).click();
   await expect(notifications(shareTab).getByText("copy failed")).toBeVisible();
   await expect(

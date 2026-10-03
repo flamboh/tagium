@@ -1,4 +1,4 @@
-import { expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { expect, IMPORT_TIMEOUT, test } from "./fixtures";
 import {
   albumManifest,
   albumMenu,

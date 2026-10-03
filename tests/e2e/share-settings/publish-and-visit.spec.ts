@@ -1,5 +1,5 @@
 import { captureDownload, inspectAudio, unzipDownload } from "../support/audio";
-import { expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { expect, IMPORT_TIMEOUT, test } from "./fixtures";
 import {
   albumMenu,
   createShare,

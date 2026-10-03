@@ -1,4 +1,4 @@
-import { expect, test } from "../support/test";
+import { expect, test } from "./fixtures";
 import { albumManifest, createShare, imageBytes } from "./helpers";
 
 const unavailableHeading = "this share is no longer available";

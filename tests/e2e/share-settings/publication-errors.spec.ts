@@ -1,4 +1,4 @@
-import { expect, test } from "../support/test";
+import { expect, test } from "./fixtures";
 import {
   importAlbum,
   openShareDialog,

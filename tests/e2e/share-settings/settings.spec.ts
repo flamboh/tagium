@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { APP_SETTINGS_STORAGE_KEY } from "../../../src/features/settings/settings";
 import { THEME_STORAGE_KEY } from "../../../src/features/theme/theme";
 import { audioFixture, captureDownload, expectLosslessAudio, inspectAudio } from "../support/audio";
-import { expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { expect, IMPORT_TIMEOUT, test } from "./fixtures";
 import { startImport, IMPORT_HEAVY, savedName } from "./helpers";
 
 test.describe.configure(IMPORT_HEAVY);

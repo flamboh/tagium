@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { audioFixture } from "../support/audio";
-import { expect, test } from "../support/test";
+import { expect, test } from "./fixtures";
 
 const TRACK = "Fixture Tone (mp3).mp3";
 

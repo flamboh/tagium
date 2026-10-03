@@ -2,7 +2,13 @@ import { Buffer } from "node:buffer";
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { APIRequestContext, BrowserContext, Locator, Page } from "@playwright/test";
+import type {
+  APIRequestContext,
+  APIResponse,
+  BrowserContext,
+  Locator,
+  Page,
+} from "@playwright/test";
 import {
   APP_SETTINGS_STORAGE_KEY,
   DEFAULT_APP_SETTINGS,
@@ -126,17 +132,33 @@ export const coverUpload = (name: ImageFixtureName) => ({
   buffer: Buffer.from(imageBytes(name)),
 });
 
+const postManifest = async (
+  request: APIRequestContext,
+  manifest: Manifest,
+  cover: ImageFixtureName | undefined,
+  attemptsLeft = 3,
+): Promise<APIResponse> => {
+  try {
+    return await request.post("/api/manifests", {
+      headers: { Accept: "application/json" },
+      multipart: cover
+        ? { manifest: JSON.stringify(manifest), cover: coverUpload(cover) }
+        : { manifest: JSON.stringify(manifest) },
+    });
+  } catch (error) {
+    if (attemptsLeft > 1 && /socket hang up|ECONNRESET/u.test(String(error))) {
+      return postManifest(request, manifest, cover, attemptsLeft - 1);
+    }
+    throw error;
+  }
+};
+
 export const createShare = async (
   request: APIRequestContext,
   manifest: Manifest,
   cover?: ImageFixtureName,
 ): Promise<CreatedShare> => {
-  const response = await request.post("/api/manifests", {
-    headers: { Accept: "application/json" },
-    multipart: cover
-      ? { manifest: JSON.stringify(manifest), cover: coverUpload(cover) }
-      : { manifest: JSON.stringify(manifest) },
-  });
+  const response = await postManifest(request, manifest, cover);
   expect(response.status(), await response.text()).toBe(201);
   return (await response.json()) as CreatedShare;
 };

@@ -1,5 +1,5 @@
 import { audioFixture } from "../support/audio";
-import { expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { expect, IMPORT_TIMEOUT, test } from "./fixtures";
 import { albumMenu, dragOnto, importAlbum, trackMenu, IMPORT_HEAVY } from "./helpers";
 
 test.describe.configure(IMPORT_HEAVY);

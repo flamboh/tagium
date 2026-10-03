@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { request as httpRequest } from "node:http";
 import type { APIRequestContext } from "@playwright/test";
 import { E2E_BASE_URL } from "../harness/protocol.ts";
-import { expect, test as base } from "../support/test";
+import { expect, test } from "./fixtures";
 import {
   albumManifest,
   coverUpload,
@@ -36,17 +36,6 @@ const uploadUntilAnswered = (headers: Record<string, string>, body: Uint8Array) 
     outgoing.on("error", reject);
     outgoing.write(body);
   });
-
-const test = base.extend<{ request: APIRequestContext }>({
-  request: async ({ playwright, baseURL }, provide) => {
-    const context = await playwright.request.newContext({
-      baseURL,
-      extraHTTPHeaders: { connection: "close" },
-    });
-    await provide(context);
-    await context.dispose();
-  },
-});
 
 const byText = (left: string | null, right: string | null) =>
   (left ?? "").localeCompare(right ?? "");
