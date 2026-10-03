@@ -60,6 +60,7 @@ import {
 } from "@/apps/tagium-save/tagiumSaveModel";
 import { useTheme } from "@/features/theme/useTheme";
 import { resolveTrackMetadata } from "@/features/import/trackMetadata";
+import { downloadBlob } from "@/lib/download";
 import { cn } from "@/lib/utils";
 import { mediaLinkKindFromUrl } from "@/lib/media-link";
 
@@ -602,18 +603,6 @@ function ErrorRow({
   );
 }
 
-const downloadFile = (file: File) => {
-  const url = URL.createObjectURL(file);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = file.name;
-  anchor.rel = "noopener";
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-};
-
 function SaveThemeToggle() {
   const { theme, toggleTheme } = useTheme();
 
@@ -932,7 +921,7 @@ function TagiumSaveView({
 export default function TagiumSaveApp({
   startDownload = startVideoDownload,
   capture = analytics.capture,
-  handoffDownload = downloadFile,
+  handoffDownload = (file: File) => downloadBlob(file, file.name),
   resolveMetadata = resolveTrackMetadata,
 }: {
   startDownload?: typeof startVideoDownload;
