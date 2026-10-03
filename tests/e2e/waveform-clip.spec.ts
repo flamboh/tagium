@@ -88,7 +88,7 @@ for (const { family, width } of cases) {
       expect(bulk.metadata.title).toBe("clipped title");
     }
 
-    await preview.getByRole("button", { name: "reset", exact: true }).click();
+    await preview.getByRole("button", { name: "reset clip", exact: true }).click();
     await expect(start).toHaveAttribute("aria-valuenow", "0");
     const resetDownloadPromise = page.waitForEvent("download");
     await page.getByRole("button", { name: "download track", exact: true }).click();

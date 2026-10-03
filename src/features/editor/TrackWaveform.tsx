@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent, ReactNode, RefObject } from "react";
-import { RotateLeft02Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import { IconSwap } from "@/components/ui/icon-swap";
@@ -367,17 +367,19 @@ export default function TrackWaveform(props: TrackWaveformProps) {
               clipped ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-1 opacity-0",
             )}
           >
-            <span className="tabular-nums">
-              clip {formatTimestamp(range.start)}–{formatTimestamp(range.end)}
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 py-px pr-0.5 pl-2 text-primary">
+              <span className="tabular-nums">
+                clip {formatTimestamp(range.start)}–{formatTimestamp(range.end)}
+              </span>
+              <button
+                type="button"
+                aria-label="reset clip"
+                className="inline-flex size-4 cursor-pointer items-center justify-center rounded-full transition-colors outline-none hover:bg-primary hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                onClick={() => onClipChange(undefined)}
+              >
+                <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2.5} className="size-2.5" />
+              </button>
             </span>
-            <button
-              type="button"
-              className="inline-flex cursor-pointer items-center gap-1 rounded-sm border border-border bg-background px-1.5 py-px text-foreground transition-colors outline-none hover:border-foreground/30 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50"
-              onClick={() => onClipChange(undefined)}
-            >
-              <HugeiconsIcon icon={RotateLeft02Icon} strokeWidth={2} className="size-3" />
-              reset
-            </button>
           </div>
           <div
             ref={surfaceRef}
