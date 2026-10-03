@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/cloudflare";
 import { parseMediaLink } from "../../src/lib/media-link";
+import { isMissingSoundCloudContent } from "./cobalt-error-code";
 
 export type DownloadFailure = {
   route: "download" | "audio" | "tunnel";
@@ -26,7 +27,7 @@ export const reportDownloadFailure = (failure: DownloadFailure) => {
   if (
     failure.stage === "cobalt.resolve_error" &&
     failure.errorCode &&
-    userInputErrorCodes.has(failure.errorCode)
+    (userInputErrorCodes.has(failure.errorCode) || isMissingSoundCloudContent(failure.errorCode))
   ) {
     return;
   }

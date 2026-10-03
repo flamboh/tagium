@@ -24,6 +24,7 @@ import {
   type CobaltRuntimeEnv as DevControlRuntimeEnv,
 } from "../../utils/dev-controls";
 import { decodeRequestBody, urlStringSchema } from "../../utils/schema";
+import { publicCobaltErrorCode } from "../../utils/cobalt-error-code";
 import { reportDownloadFailure } from "../../utils/download-failure-report";
 import { getYouTubeVideoId, resolveYouTubeUploadYear } from "../../utils/youtube";
 import { isSoundCloudHost } from "../../../src/lib/media-link";
@@ -358,16 +359,6 @@ const cobaltErrorResponse = (message: string) =>
       "Content-Type": "text/plain;charset=UTF-8",
     },
   });
-
-const publicCobaltErrorCode = (code: string) => {
-  if (
-    code.startsWith("error.api.fetch.soundcloud.stream_fetch") ||
-    code.startsWith("error.api.fetch.soundcloud.stream_parse")
-  ) {
-    return "error.api.fetch.empty";
-  }
-  return code.startsWith("error.api.fetch.soundcloud.") ? "error.api.fetch.fail" : code;
-};
 
 const cobaltCapacityErrorResponse = (response: CobaltResponse, retryAfter: string | undefined) => {
   const headers = new Headers({ "Content-Type": "application/json" });
