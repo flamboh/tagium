@@ -14,12 +14,13 @@ import {
   numberField,
   queueStatus,
   removeTrack,
+  useSettings,
 } from "./helpers";
 
 test.describe.configure({ timeout: 120_000 });
 
 const trackButtons = (page: import("@playwright/test").Page) =>
-  page.getByRole("button", { name: /^\d+ .+\.mp3$/u });
+  page.getByRole("button", { name: /^\d+ .+\.(mp3|opus)$/u });
 
 const fiveTrackSet = (upstreams: Upstreams, title: string) =>
   upstreams.soundcloud.set({
@@ -115,8 +116,10 @@ test("imports a youtube playlist as an ordered album, three downloads at a time"
 
 test("removing a downloading and a queued track shrinks the run and starts the next track", async ({
   page,
+  context,
   upstreams,
 }) => {
+  await useSettings(context, { audioFormat: "best" });
   const set = await fiveTrackSet(upstreams, "Removal Set");
   const [first, second, third, fourth, fifth] = set.tracks;
   const plans = await holdDownloadPlans(page);
@@ -136,9 +139,9 @@ test("removing a downloading and a queued track shrinks the run and starts the n
   await plans.releaseAll();
   await expect(queueStatus(page, "downloaded 3/3")).toBeVisible(IMPORT_TIMEOUT);
   await expect(trackButtons(page)).toHaveText([
-    /^1\s*Track 2\.mp3$/u,
-    /^2\s*Track 3\.mp3$/u,
-    /^3\s*Track 4\.mp3$/u,
+    /^1\s*Track 2\.opus$/u,
+    /^2\s*Track 3\.opus$/u,
+    /^3\s*Track 4\.opus$/u,
   ]);
   await expect(page.getByRole("button", { name: "download all" })).toBeEnabled();
   expect(plans.requested()).not.toContain(fifth!.url);
@@ -149,8 +152,10 @@ test("removing a downloading and a queued track shrinks the run and starts the n
 
 test("canceling a playlist keeps its tracks and retry downloads all of them", async ({
   page,
+  context,
   upstreams,
 }) => {
+  await useSettings(context, { audioFormat: "best" });
   const set = await fiveTrackSet(upstreams, "Cancel Set");
   const plans = await holdDownloadPlans(page);
 
@@ -178,8 +183,10 @@ test("canceling a playlist keeps its tracks and retry downloads all of them", as
 
 test("a failed playlist track keeps the successes and retry downloads only the failure", async ({
   page,
+  context,
   upstreams,
 }) => {
+  await useSettings(context, { audioFormat: "best" });
   const set = await upstreams.soundcloud.set({
     title: "Partial Set",
     author: "Queue Artist",
@@ -205,7 +212,7 @@ test("a failed playlist track keeps the successes and retry downloads only the f
 
   await page.getByRole("button", { name: "2 Track 2.mp3 track has an error" }).click();
   await expect(page.getByText("media is private, unavailable, or no longer exists.")).toBeVisible();
-  await page.getByRole("button", { name: "3 Track 3.mp3" }).click();
+  await page.getByRole("button", { name: "3 Track 3.opus" }).click();
   const survivor = await captureDownload(page, () => downloadTrackButton(page).click());
   expect((await inspectAudio(survivor)).metadata).toMatchObject({
     title: "Track 3",

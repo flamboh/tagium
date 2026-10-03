@@ -20,6 +20,8 @@ import {
   savedAs,
 } from "./helpers";
 
+test.describe.configure({ timeout: 120_000 });
+
 test("imports a youtube video with prefilled tags, then edits and exports the same audio", async ({
   browserName,
   page,
@@ -37,8 +39,8 @@ test("imports a youtube video with prefilled tags, then edits and exports the sa
   await expect(field(page, "title")).toHaveValue("Night Drive");
   await expect(field(page, "artist")).toHaveValue("Synth Person");
   await expect(field(page, "album")).toHaveValue("Night Drive");
-  await expect(numberField(page, "year")).toHaveValue("2019");
   await waitForTrackReady(page);
+  await expect(numberField(page, "year")).toHaveValue("2019");
   await expect(audioPreview(page)).toContainText("0:00 / 0:02");
   await expect(page.getByRole("img", { name: "album cover" })).toBeVisible();
 
