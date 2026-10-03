@@ -31,35 +31,6 @@ type LocalAudioProcessingRequest = {
   };
 };
 
-interface MP3TagPicture {
-  format: string;
-  type: number;
-  description: string;
-  data: number[];
-}
-
-interface MP3TagReader {
-  read: () => void;
-  save?: () => void;
-  error?: string;
-  buffer?: ArrayBuffer;
-  tags: {
-    title?: string;
-    artist?: string;
-    album?: string;
-    year?: string;
-    genre?: string;
-    track?: string;
-    v2?: {
-      APIC?: MP3TagPicture[];
-      TCOM?: string;
-      TCOP?: string;
-      TLAN?: string;
-      TPE2?: string;
-    };
-  };
-}
-
 export interface ProcessLocalAudioRequest {
   plan: LocalAudioPlan;
   lastModified: number;
@@ -210,49 +181,6 @@ export const validateLocalAudioPlan = (plan: LocalAudioPlan) => {
   }
   if (plan.audio.cover && plan.tunnel.length !== 2) {
     throw new Error("cobalt local processing response missing cover tunnel.");
-  }
-};
-
-export const applyCobaltAudioMetadata = (
-  mp3tag: Pick<MP3TagReader, "tags">,
-  metadata: Record<string, string | undefined> | undefined,
-) => {
-  if (!metadata) {
-    return;
-  }
-
-  if (metadata.title) {
-    mp3tag.tags.title = stripMetadataControlCharacters(metadata.title);
-  }
-  if (metadata.artist) {
-    mp3tag.tags.artist = stripMetadataControlCharacters(metadata.artist);
-  }
-  if (metadata.album) {
-    mp3tag.tags.album = stripMetadataControlCharacters(metadata.album);
-  }
-  if (metadata.date) {
-    mp3tag.tags.year = stripMetadataControlCharacters(metadata.date);
-  }
-  if (metadata.genre) {
-    mp3tag.tags.genre = stripMetadataControlCharacters(metadata.genre);
-  }
-  if (metadata.track) {
-    mp3tag.tags.track = stripMetadataControlCharacters(metadata.track);
-  }
-
-  const v2Frames = {
-    album_artist: "TPE2",
-    composer: "TCOM",
-    copyright: "TCOP",
-    sublanguage: "TLAN",
-  } as const;
-
-  for (const [metadataKey, frameName] of Object.entries(v2Frames)) {
-    const value = metadata[metadataKey];
-    if (value) {
-      mp3tag.tags.v2 ??= {};
-      mp3tag.tags.v2[frameName] = stripMetadataControlCharacters(value);
-    }
   }
 };
 
