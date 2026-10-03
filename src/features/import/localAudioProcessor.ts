@@ -13,6 +13,7 @@ import {
   patchAudioFileWithChanges,
 } from "@/features/audio/metadataEngine/engine";
 import type { MetadataChanges } from "@/features/audio/metadataEngine/types";
+import { cropCoverArtToSquare } from "@/features/editor/coverArtProcessing";
 
 type LocalAudioPlan = Extract<CobaltDownloadPlan, { status: "local-processing" }>;
 
@@ -282,12 +283,15 @@ const tagCobaltAudioFile = async (
     changes.language = stripMetadataControlCharacters(supplied.sublanguage);
   }
   if (coverFile) {
+    const cover = plan.audio?.cropCover
+      ? await cropCoverArtToSquare(coverFile).catch(() => coverFile)
+      : coverFile;
     changes.picture = [
       {
-        format: coverFile.type || "image/jpeg",
+        format: cover.type || "image/jpeg",
         type: 3,
         description: "cover",
-        data: new Uint8Array(await coverFile.arrayBuffer()),
+        data: new Uint8Array(await cover.arrayBuffer()),
       },
     ];
   }
