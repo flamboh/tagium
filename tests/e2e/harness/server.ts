@@ -25,6 +25,8 @@ import {
   E2E_PORT,
   FAKE_COBALT_API_KEY,
   FAKE_COBALT_ORIGIN,
+  FAKE_POSTHOG_KEY,
+  FAKE_POSTHOG_ORIGIN,
   type CobaltBehavior,
   type RateLimitRule,
   type Scenario,
@@ -48,6 +50,8 @@ if (process.env.E2E_SKIP_BUILD !== "1") {
       VITE_PUBLIC_DEPLOY_ENV: "production",
       VITE_PUBLIC_RELEASE_SHA: "e2e",
       VITE_PUBLIC_SHARE_LINKS_ENABLED: "true",
+      VITE_PUBLIC_POSTHOG_KEY: FAKE_POSTHOG_KEY,
+      VITE_PUBLIC_POSTHOG_HOST: FAKE_POSTHOG_ORIGIN,
     },
   });
   if (build.status !== 0) process.exit(build.status ?? 1);

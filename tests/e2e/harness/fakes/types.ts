@@ -6,12 +6,14 @@ export type FakeRequest = {
   url: URL;
   headers: Headers;
   body: string | undefined;
+  bodyBytes: Uint8Array | undefined;
 };
 
 export type FakeResult = {
   route: string;
   key: string | null;
   response: Response | Promise<Response>;
+  body?: string;
   unexpected?: boolean;
 };
 

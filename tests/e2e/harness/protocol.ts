@@ -15,6 +15,8 @@ export const FAKE_COBALT_ORIGIN = "http://cobalt.e2e.test";
 export const FAKE_COBALT_API_KEY = "e2e-cobalt-api-key";
 export const FAKE_COBALT_MACHINE_ID = "e2e-machine-1";
 export const FAKE_DIRECT_MEDIA_ORIGIN = "https://cdn.e2e.test";
+export const FAKE_POSTHOG_ORIGIN = "https://posthog.e2e.test";
+export const FAKE_POSTHOG_KEY = "phc_e2e_public_key";
 export const FAKE_SOUNDCLOUD_CLIENT_ID = "e2eSoundCloudClientId00000000000";
 
 export type Sequence<T> = T | readonly T[];

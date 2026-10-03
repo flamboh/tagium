@@ -317,6 +317,21 @@ export const createUpstreams = (owner: string) => {
               : filter.route.test(call.route))),
       );
     },
+    async analyticsEvents() {
+      const params = new URLSearchParams({ owner });
+      const response = await fetch(`${E2E_CONTROL_URL}/calls?${params}`);
+      const calls = (await response.json()) as UpstreamCall[];
+      return calls
+        .filter((call) => call.route === "posthog.capture")
+        .flatMap((call) => {
+          const payload = JSON.parse(call.requestBody ?? "[]") as
+            | AnalyticsEvent
+            | AnalyticsEvent[]
+            | { batch: AnalyticsEvent[] };
+          if (Array.isArray(payload)) return payload;
+          return "batch" in payload ? payload.batch : [payload];
+        });
+    },
     async unexpectedCallsSince(since: number) {
       const params = new URLSearchParams({
         owner,
@@ -329,6 +344,11 @@ export const createUpstreams = (owner: string) => {
     },
     release: () => post("/release", {}),
   };
+};
+
+export type AnalyticsEvent = {
+  event: string;
+  properties: Record<string, string | number | boolean | null>;
 };
 
 export type Upstreams = ReturnType<typeof createUpstreams>;

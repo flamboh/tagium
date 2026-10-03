@@ -1,4 +1,4 @@
-import { expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { expect, test } from "../support/test";
 import { SAVE_PATH, saveApp } from "./save";
 
 test.describe.configure({ timeout: 120_000 });
@@ -81,49 +81,4 @@ test("save.tagium.app opens tagium save, and other hosts open tagium", async ({
   } finally {
     await context.close();
   }
-});
-
-test("neither app sends analytics from a build without an analytics key", async ({
-  page,
-  context,
-  upstreams,
-}) => {
-  test.slow();
-  const analytics: string[] = [];
-  context.on("request", (request) => {
-    const url = new URL(request.url());
-    if (
-      url.hostname.endsWith("posthog.com") ||
-      url.hostname === "t.tagium.app" ||
-      url.pathname.includes("posthog")
-    ) {
-      analytics.push(request.url());
-    }
-  });
-  const track = await upstreams.soundcloud.track({
-    title: "Quiet",
-    author: "Private",
-    cover: null,
-  });
-  const failing = await upstreams.youtube.missingVideo();
-  const save = saveApp(page);
-
-  await page.goto("/");
-  await expect(page.getByRole("button", { name: "start media import" })).toBeVisible();
-
-  await save.open();
-  await save.save(track.url, "Quiet - Private (soundcloud).opus");
-  await save.download("Quiet - Private (soundcloud).opus");
-  await save.start(failing.url);
-  await expect(save.alert).toBeVisible(IMPORT_TIMEOUT);
-
-  await page.goto("/");
-  await expect(page.getByRole("button", { name: "start media import" })).toBeVisible();
-
-  expect(analytics).toEqual([]);
-  expect(
-    await page.evaluate(() =>
-      Object.keys(localStorage).filter((key) => key.startsWith("ph_") || key.includes("posthog")),
-    ),
-  ).toEqual([]);
 });

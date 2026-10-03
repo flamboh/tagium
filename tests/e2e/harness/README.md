@@ -1,6 +1,6 @@
 # e2e harness
 
-`bun run test:e2e` builds the app once (`vp build` with share links on), then runs the built
+`bun run test:e2e` builds the app once (`vp build` with share links on and a fake PostHog key), then runs the built
 Cloudflare Worker from `.output/` in Miniflare (real workerd) on `E2E_PORT` (default 4317).
 Only the outside world is fake.
 
@@ -45,6 +45,18 @@ await upstreams.rateLimits.limit("SHARE_CREATE_RATE_LIMITER", "203.0.113.7", 0);
 
 Cobalt session limits are keyed by the `tagium_client_id` cookie, so set that cookie on the
 context to target one test's session.
+
+## Analytics
+
+The build sets `VITE_PUBLIC_POSTHOG_KEY` and `VITE_PUBLIC_POSTHOG_HOST=https://posthog.e2e.test`,
+so the real posthog-js client runs in every test. `fakes/posthog.ts` answers its config, flags and
+static requests and decodes captured batches (gzip, base64 or plain JSON) into the call log, owned
+by the test whose page sent them. Read them with `upstreams.analyticsEvents()` and poll, since the
+client batches sends.
+
+PostHog drops events from browsers that look automated, so the sandbox hides
+`navigator.webdriver` and headless `navigator.userAgentData`. A test that needs analytics down can
+`page.route("https://posthog.e2e.test/**", (route) => route.abort())`.
 
 ## Iterating
 

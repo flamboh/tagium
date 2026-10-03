@@ -42,6 +42,8 @@ export const test = base.extend<HarnessFixtures>({
     await provide(async (context) => {
       await context.addInitScript(
         ({ key, value }) => {
+          Object.defineProperty(Navigator.prototype, "webdriver", { get: () => false });
+          Object.defineProperty(Navigator.prototype, "userAgentData", { get: () => undefined });
           if (localStorage.getItem(key) === null) localStorage.setItem(key, value);
         },
         {
