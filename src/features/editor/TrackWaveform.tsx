@@ -147,6 +147,13 @@ function useTrackWaveform({
     }
   };
 
+  const resetClip = () => {
+    const audio = audioRef.current;
+    if (audio) audio.currentTime = 0;
+    setCurrentTime(0);
+    onClipChange(undefined);
+  };
+
   const commitClip = (next: TrackClip) => {
     setDraftClip(null);
     onClipChange(normalizeClip(next, duration));
@@ -253,7 +260,7 @@ function useTrackWaveform({
     startRatio,
     endRatio,
     progressRatio,
-    onClipChange,
+    resetClip,
     waveform,
     bars,
     startDrag,
@@ -288,7 +295,7 @@ export default function TrackWaveform(props: TrackWaveformProps) {
     startRatio,
     endRatio,
     progressRatio,
-    onClipChange,
+    resetClip,
     waveform,
     bars,
     startDrag,
@@ -382,7 +389,7 @@ export default function TrackWaveform(props: TrackWaveformProps) {
                 type="button"
                 aria-label="reset clip"
                 className="inline-flex size-4 cursor-pointer items-center justify-center rounded-full transition-colors outline-none text-muted-foreground hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-                onClick={() => onClipChange(undefined)}
+                onClick={resetClip}
               >
                 <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2.5} className="size-2.5" />
               </button>

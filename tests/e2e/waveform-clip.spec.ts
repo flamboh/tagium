@@ -90,6 +90,10 @@ for (const { family, width } of cases) {
 
     await preview.getByRole("button", { name: "reset clip", exact: true }).click();
     await expect(start).toHaveAttribute("aria-valuenow", "0");
+    await expect(preview.getByRole("slider", { name: "playback position" })).toHaveAttribute(
+      "aria-valuenow",
+      "0",
+    );
     const resetDownloadPromise = page.waitForEvent("download");
     await page.getByRole("button", { name: "download track", exact: true }).click();
     const resetDownload = await resetDownloadPromise;
