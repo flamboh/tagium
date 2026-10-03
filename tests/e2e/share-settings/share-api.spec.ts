@@ -175,7 +175,6 @@ test("playlist shares reject bad sources, overrides, origins and fields", async 
     { source: video.url },
     { source: "https://example.com/playlist" },
     { source: missing.url },
-    { source: playlist.url, album: JSON.stringify({ year: 99_999 }) },
     { source: playlist.url, album: JSON.stringify({ title: "x", unexpected: true }) },
     { source: playlist.url, lifetime: "forever" },
     { source: playlist.url, extra: "field" },
@@ -205,7 +204,33 @@ test("playlist shares reject bad sources, overrides, origins and fields", async 
   expect(limited.headers()["retry-after"]).toBeUndefined();
   expect(
     (await upstreams.calls({ route: "youtube.playlist" })).map((call) => call.key).toSorted(byText),
-  ).toEqual([missing.key, playlist.key].toSorted(byText));
+  ).toEqual([missing.key]);
+});
+
+test("playlist shares reject an album override out of the manifest's range before resolving the playlist", async ({
+  request,
+  upstreams,
+}) => {
+  const playlist = await upstreams.youtube.playlist({ videos: [{}] });
+
+  for (const album of [
+    { year: 99_999 },
+    { year: 999 },
+    { year: 2020.5 },
+    { title: "x".repeat(1_025) },
+    { artist: "x".repeat(1_025) },
+    { genre: "x".repeat(1_025) },
+  ]) {
+    const response = await shareSource(request, {
+      source: playlist.url,
+      album: JSON.stringify(album),
+    });
+    expect(noStoreStatus(response), JSON.stringify(album).slice(0, 40)).toEqual({
+      status: 400,
+      cacheControl: "no-store",
+    });
+  }
+  expect(await upstreams.calls({ route: /^(youtube|cobalt)/u })).toHaveLength(0);
 });
 
 test("manifest updates keep the link and expiry, and only the permission holder can change or stop it", async ({

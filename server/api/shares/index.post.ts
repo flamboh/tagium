@@ -21,17 +21,12 @@ import { resolveSoundCloudSet } from "../../utils/soundcloud-set";
 import { resolveYouTubePlaylist } from "../../utils/youtube-playlist";
 import type { Playlist } from "../../../src/features/import/playlist";
 import { projectPlaylistAlbumManifest } from "../../../src/features/share/playlistAlbumManifest";
+import { albumOverrideSchema } from "../../../src/features/share/shareManifest";
 import { parseMediaLink } from "../../../src/lib/media-link";
 
 const MAX_SHARE_REQUEST_BYTES = SHARE_ARTWORK_MAX_BYTES + 64 * 1024;
 const FIELDS = new Set(["source", "album", "cover", "lifetime"]);
 
-const albumOverrideSchema = Schema.Struct({
-  title: Schema.optionalKey(Schema.String),
-  artist: Schema.optionalKey(Schema.String),
-  genre: Schema.optionalKey(Schema.String),
-  year: Schema.optionalKey(Schema.Number),
-});
 const decodeAlbumOverride = Schema.decodeUnknownSync(albumOverrideSchema, {
   onExcessProperty: "error",
 });

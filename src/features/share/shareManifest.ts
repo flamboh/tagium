@@ -21,6 +21,8 @@ const positiveInteger = (minimum: number, maximum: number) =>
     ),
   );
 
+const yearSchema = positiveInteger(1_000, 9_999);
+
 const isSupportedSourceUrl = (value: string) => {
   try {
     const url = new URL(value);
@@ -52,7 +54,7 @@ const metadataSchema = Schema.Struct({
   artist: boundedString(),
   album: boundedString(),
   genre: boundedString(),
-  year: Schema.optionalKey(positiveInteger(1_000, 9_999)),
+  year: Schema.optionalKey(yearSchema),
   trackNumber: Schema.optionalKey(positiveInteger(1, 9_999)),
 });
 
@@ -71,6 +73,13 @@ const tracksSchema = Schema.Array(trackSchema).pipe(
   ),
 );
 
+export const albumOverrideSchema = Schema.Struct({
+  title: Schema.optionalKey(boundedString()),
+  artist: Schema.optionalKey(boundedString()),
+  genre: Schema.optionalKey(boundedString()),
+  year: Schema.optionalKey(yearSchema),
+});
+
 const albumManifestSchema = Schema.Struct({
   version: Schema.Literal(MANIFEST_VERSION),
   kind: Schema.Literal("album"),
@@ -78,7 +87,7 @@ const albumManifestSchema = Schema.Struct({
     title: boundedString(),
     artist: boundedString(),
     genre: boundedString(),
-    year: Schema.optionalKey(positiveInteger(1_000, 9_999)),
+    year: Schema.optionalKey(yearSchema),
     sourceUrl: Schema.optionalKey(sourceUrlSchema),
     artwork: Schema.optionalKey(artworkSchema),
   }),
