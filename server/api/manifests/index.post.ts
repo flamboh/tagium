@@ -14,9 +14,9 @@ import {
   infrastructureFailure,
   isSameOriginBrowserRequest,
   noStore,
+  publicationCreated,
   readRequestBodyWithinLimit,
 } from "../../utils/share-manifest-request";
-import { toShareExpiryIso } from "../../../src/features/share/shareManifest";
 
 const MAX_SHARE_REQUEST_BYTES = SHARE_MANIFEST_MAX_BYTES + SHARE_ARTWORK_MAX_BYTES + 64 * 1024;
 
@@ -52,11 +52,7 @@ export default defineHandler(async (event) => {
     const cover = covers[0] instanceof File ? covers[0] : undefined;
     const manifest = decodePublishedManifest(JSON.parse(rawManifest));
     const published = await store.publish(manifest, await parseShareArtwork(cover));
-    const url = new URL(`/share/${published.slug}`, request.url).toString();
-    return Response.json(
-      { ...published, expiresAt: toShareExpiryIso(published.expiresAt), url },
-      { status: 201, headers: noStore },
-    );
+    return publicationCreated(request, published);
   } catch (error) {
     if (
       error instanceof Error &&

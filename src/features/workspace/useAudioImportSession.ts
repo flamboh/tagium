@@ -2,7 +2,10 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PlaylistDownloadControllerSnapshot } from "@/features/import/playlistDownloadController";
 import type { PlaylistDownloadQueuePanelState } from "@/features/import/PlaylistDownloadQueuePanel";
 import { createAudioUploadSession } from "@/features/import/audioUploadSession";
-import { createAudioUrlImportSession } from "@/features/import/audioUrlImportSession";
+import {
+  createAudioUrlImportSession,
+  type ImportDownloadTarget,
+} from "@/features/import/audioUrlImportSession";
 import { getImportQueuePresentation } from "@/features/import/importQueuePresentation";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
@@ -40,11 +43,13 @@ export const useAudioImportSession = ({
   editor,
   settings,
   activateEditor,
+  onImportReady,
 }: {
   library: LibraryStore;
   editor: AudioImportEditor;
   settings: AppSettings;
   activateEditor: () => void;
+  onImportReady: (target: ImportDownloadTarget) => void;
 }): AudioImportSession => {
   const [uploading, setUploading] = useState(false);
   const [urlImporting, setUrlImporting] = useState(false);
@@ -54,11 +59,13 @@ export const useAudioImportSession = ({
   const editorRef = useRef(editor);
   const settingsRef = useRef(settings);
   const activateEditorRef = useRef(activateEditor);
+  const onImportReadyRef = useRef(onImportReady);
   useLayoutEffect(() => {
     editorRef.current = editor;
     settingsRef.current = settings;
     activateEditorRef.current = activateEditor;
-  }, [activateEditor, editor, settings]);
+    onImportReadyRef.current = onImportReady;
+  }, [activateEditor, editor, onImportReady, settings]);
 
   const [uploadSession] = useState(() =>
     createAudioUploadSession({
@@ -79,6 +86,7 @@ export const useAudioImportSession = ({
       activateEditor: () => activateEditorRef.current(),
       setUrlImporting,
       emitQueueSnapshot: setQueueSnapshot,
+      onImportReady: (target) => onImportReadyRef.current(target),
     }),
   );
   const queue = useMemo(

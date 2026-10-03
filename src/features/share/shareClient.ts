@@ -55,7 +55,7 @@ const manifestVersionProbeSchema = Schema.Struct({
 });
 const sharedContentResponseSchema = Schema.Struct({
   manifest: manifestSchema,
-  expiresAt: Schema.String,
+  expiresAt: Schema.NullOr(Schema.String),
   analyticsId: shareAnalyticsIdSchema,
 });
 const createShareReceiptSchema = Schema.Struct({
@@ -74,7 +74,7 @@ const updateShareReceiptSchema = Schema.Struct({
 
 export interface FetchedSharedContent {
   manifest: Manifest;
-  expiresAt: string;
+  expiresAt: string | null;
   analyticsId: string;
 }
 

@@ -78,7 +78,8 @@ const result = await disableShareThenDeleteArtwork({
   },
   deleteArtwork: async (key) => {
     // Keys are server-derived; refuse a corrupt row rather than deleting arbitrary R2 content.
-    if (!key.startsWith(`shares/${slug}/`)) throw new Error("unexpected artwork key");
+    if (!key.startsWith(`shares/${slug}/`) && !key.startsWith(`permanent-shares/${slug}/`))
+      throw new Error("unexpected artwork key");
     const deleted = wrangler(["r2", "object", "delete", resources.bucketName, key]);
     if (deleted.status !== 0) throw new Error("R2 deletion failed");
   },
