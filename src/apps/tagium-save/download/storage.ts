@@ -158,19 +158,21 @@ const openSessionDirectory = async (sessionId: string) => {
   }
 };
 
-const holdSessionLock = (sessionId: string) =>
-  new Promise<boolean>((resolve) => {
+const claimSessionDirectory = (sessionId: string) =>
+  new Promise<{ directory: FileSystemDirectoryHandle | undefined; locked: boolean }>((resolve) => {
+    const resolveUnlocked = async () =>
+      resolve({ directory: await openSessionDirectory(sessionId), locked: false });
     const locks = getLockManager();
     if (!locks) {
-      resolve(false);
+      void resolveUnlocked();
       return;
     }
     locks
-      .request(sessionLockName(sessionId), () => {
-        resolve(true);
+      .request(sessionLockName(sessionId), async () => {
+        resolve({ directory: await openSessionDirectory(sessionId), locked: true });
         return new Promise<never>(() => undefined);
       })
-      .catch(() => resolve(false));
+      .catch(resolveUnlocked);
   });
 
 const removeAbandonedSessions = async (currentSessionId: string) => {
@@ -194,8 +196,7 @@ const removeAbandonedSessions = async (currentSessionId: string) => {
 
 const openOwnedSession = async (): Promise<TemporaryStorageSession> => {
   const id = randomIdentifier();
-  const locked = await holdSessionLock(id);
-  const directory = await openSessionDirectory(id);
+  const { directory, locked } = await claimSessionDirectory(id);
   if (locked) await removeAbandonedSessions(id).catch(() => undefined);
   return { id, directory };
 };
