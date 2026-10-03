@@ -227,6 +227,7 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
   }
   if (
     lower.includes("error.api.fetch.empty") ||
+    lower.includes("error.api.invalid_response") ||
     lower.includes("malformed") ||
     lower.includes("invalid response") ||
     lower.includes("invalid download plan") ||

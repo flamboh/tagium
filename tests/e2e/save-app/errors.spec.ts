@@ -172,10 +172,6 @@ for (const failure of failures) {
 }
 
 test("explains an invalid response from cobalt", async ({ page, upstreams }) => {
-  test.fail(
-    true,
-    "product bug: the server reports error.api.invalid_response, which the download failure classifier does not recognize, so users get the generic failure copy",
-  );
   const track = await upstreams.soundcloud.track({ cover: null });
   await upstreams.cobalt.respond(track.url, { kind: "non-json" });
   const save = saveApp(page);

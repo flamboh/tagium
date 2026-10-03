@@ -176,6 +176,18 @@ const failureCases: FailureCase[] = [
     retryable: true,
   },
   {
+    name: "an unreadable download plan",
+    arrange: async (upstreams) => {
+      const video = await upstreams.youtube.video({ title: "Failing Song" });
+      await upstreams.cobalt.respond(video.url, { kind: "non-json" });
+      return video;
+    },
+    title: "we could not read this media",
+    detail: "the media provider returned an unexpected response.",
+    toast: "the provider returned an unexpected response. try again or use another link.",
+    retryable: true,
+  },
+  {
     name: "too many download requests",
     arrange: async (upstreams, context) => {
       const ip = `203.0.113.${randomInt(1, 255)}`;
