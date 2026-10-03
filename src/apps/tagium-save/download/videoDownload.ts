@@ -19,12 +19,13 @@ export type VideoDownloadPlan = CobaltDownloadPlan;
 import {
   adoptTemporaryFileLease,
   createTemporaryFileStore,
+  startTemporaryStorageSession,
   type TemporaryFileLease,
 } from "./storage";
 import type {
   VideoWorkerMessage,
   VideoWorkerCancelRequest,
-  VideoWorkerProcessingRequest,
+  VideoWorkerJob,
   VideoWorkerProgress,
 } from "./cobaltVideoProcessingWorker";
 
@@ -458,6 +459,7 @@ const decodeWorkerMessage = (value: unknown): VideoWorkerMessage | undefined => 
 const runLocalProcessingWorker = (
   plan: CobaltLocalProcessingPlan,
   files: File[],
+  temporaryStorageSession: string,
   sourceUrl: string,
   callbacks: VideoDownloadCallbacks | undefined,
   signal: AbortSignal,
@@ -558,7 +560,7 @@ const runLocalProcessingWorker = (
       );
     };
 
-    const request: VideoWorkerProcessingRequest = { files, plan };
+    const request: VideoWorkerJob = { files, plan, temporaryStorageSession };
     try {
       worker.postMessage({ cobaltVideoProcessing: request });
     } catch (error) {
@@ -660,6 +662,7 @@ const executePlan = async (
     const outputLease = await runLocalProcessingWorker(
       plan,
       inputLeases.map((lease) => lease.value),
+      await startTemporaryStorageSession(),
       request.sourceUrl,
       callbacks,
       signal,

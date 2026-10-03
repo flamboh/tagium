@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { resetCobaltDownloadSchedulerForTests } from "@/shared/cobalt/cobaltDownloadScheduler";
+import { resetTemporaryStorageSessionForTests } from "@/apps/tagium-save/download/storage";
 import {
   downloadVideoPickerItem,
   executeVideoDownload,
@@ -26,7 +27,7 @@ const workerOutputEntryName = "tagium-video-output-worker";
 const installFakeOpfs = () => {
   const removedEntries: string[] = [];
   const entries = new Map<string, Uint8Array>();
-  const root = {
+  const sessionDirectory = {
     getFileHandle: async (name: string) => ({
       createWritable: async () => ({
         write: async (write: { position?: number; data?: BufferSource }) => {
@@ -56,8 +57,10 @@ const installFakeOpfs = () => {
       entries.delete(name);
     }),
   };
+  const temporaryDirectory = { getDirectoryHandle: async () => sessionDirectory };
+  const root = { getDirectoryHandle: async () => temporaryDirectory };
   vi.stubGlobal("navigator", { storage: { getDirectory: async () => root } });
-  return { entries, removedEntries, root };
+  return { entries, removedEntries, sessionDirectory };
 };
 
 const installControllableWorker = () => {
@@ -100,6 +103,7 @@ const installControllableWorker = () => {
 
 afterEach(() => {
   resetCobaltDownloadSchedulerForTests();
+  resetTemporaryStorageSessionForTests();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -373,6 +377,7 @@ describe("video download routing", () => {
     expect(WorkerFake.instance?.postMessage).toHaveBeenCalledWith({
       cobaltVideoProcessing: expect.objectContaining({
         plan: expect.objectContaining({ type: "proxy" }),
+        temporaryStorageSession: expect.any(String),
       }),
     });
     entries.set(workerOutputEntryName, new TextEncoder().encode("processed"));
