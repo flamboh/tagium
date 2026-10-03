@@ -30,7 +30,7 @@ const PLACEHOLDER_PEAKS = Array.from({ length: 256 }, (_, index) => {
 });
 
 const BAR_CLASS =
-  "transform-fill transition-transform duration-500 ease-out motion-reduce:transition-none";
+  "transform-fill transition-transform duration-300 ease-out motion-reduce:transition-none";
 
 type WaveformStatus = "waiting" | "loading" | "ready" | "unavailable";
 type ClipEdge = "start" | "end";
@@ -599,7 +599,7 @@ function WaveformBars({
     <svg
       aria-hidden
       className={cn(
-        "pointer-events-none absolute inset-x-0 top-1 h-[calc(100%-0.5rem)] w-full transition-[opacity,fill] duration-500 ease-out motion-reduce:transition-none",
+        "pointer-events-none absolute inset-x-0 top-1 h-[calc(100%-0.5rem)] w-full transition-[opacity,fill] duration-300 ease-out motion-reduce:transition-none",
         className,
       )}
       viewBox={`0 0 ${width} ${WAVEFORM_HEIGHT}`}
