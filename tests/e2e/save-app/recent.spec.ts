@@ -126,7 +126,7 @@ test("saves files when the browser refuses private storage", async ({ page, upst
 
   await save.start(photos.url);
   await page.getByRole("button", { name: "download photo 1" }).click();
-  await expect(save.downloadButton("tagium-photo.jpg")).toBeVisible(IMPORT_TIMEOUT);
-  const photo = await save.download("tagium-photo.jpg");
+  await expect(save.downloadButton(`twitter_${photos.id}_1.jpg`)).toBeVisible(IMPORT_TIMEOUT);
+  const photo = await save.download(`twitter_${photos.id}_1.jpg`);
   expect(photo.bytes).toEqual(imageFixture("cover").bytes);
 });

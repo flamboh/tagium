@@ -270,7 +270,7 @@ export const createUpstreams = (owner: string) => {
         tunnel: options.tunnel ?? { kind: "ok" },
       };
       await register([scenario]);
-      return { key: scenario.key, url: scenario.sourceUrl };
+      return { key: scenario.key, url: scenario.sourceUrl, id: url.pathname.split("/").at(-1)! };
     },
     picker({ items, audio, ...options }: PickerOptions) {
       return this.post({ ...options, media: { kind: "picker", items, audio } });

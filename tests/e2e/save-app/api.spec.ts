@@ -171,6 +171,7 @@ test("the download api signs direct post media for a limited time", async ({
 
   const photo = await request.get(`${resource.pathname}${resource.search}`, { maxRetries: 2 });
   expect(photo.status()).toBe(200);
+  expect(photo.headers()["content-disposition"]).toBe("attachment; filename*=UTF-8''photo.jpg");
 
   for (const [name, value] of [
     ["url", "https://cdn.e2e.test/other/photo.jpg"],
