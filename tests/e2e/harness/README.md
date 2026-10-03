@@ -81,6 +81,9 @@ The fake Cobalt follows Cobalt's forced local-processing rules for tagium save r
 - `upstreams.picker({ items, audio })` and `upstreams.gifPost({ asset, filename })` register an
   `https://x.com/…/status/…` post. Items are Cobalt tunnels, or direct
   `https://cdn.e2e.test/…` resources (`directFilename`) that exercise the signed direct path.
+- `upstreams.youtube.playlist({ missing: true })` serves YouTube's real answer for a missing
+  playlist: HTTP 200 with an `ERROR` alert and no playlist metadata. `status` fails the page with
+  that HTTP status instead.
 - Any other http(s) URL gets a `url:<href>` key, so `cobalt.fail`, `cobalt.respond` and
   `cobalt.plan(url, json)` work for unsupported links too.
 - `cobalt.stallTunnel(url, bytes?)` sends the first half (or `bytes`) of the media and then holds the

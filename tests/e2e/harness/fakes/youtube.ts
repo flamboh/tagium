@@ -106,6 +106,13 @@ const playlistHtml = (request: FakeRequest, playlist: YouTubePlaylistScenario) =
   return `<!doctype html><html><head>${ytcfgScript}</head><body><script>var ytInitialData = ${JSON.stringify(initialData)};</script></body></html>`;
 };
 
+const alertHtml = (text: string) => {
+  const initialData = {
+    alerts: [{ alertRenderer: { type: "ERROR", text: { runs: [{ text }] } } }],
+  };
+  return `<!doctype html><html><head>${ytcfgScript}</head><body><script>var ytInitialData = ${JSON.stringify(initialData)};</script></body></html>`;
+};
+
 type InnertubeRequestBody = { videoId?: unknown; continuation?: unknown };
 
 const parseJsonBody = (request: FakeRequest): InnertubeRequestBody => {
@@ -185,7 +192,7 @@ export const fakeYouTube = (request: FakeRequest): FakeResult => {
       key,
       response: playlist.status
         ? html("<html>unavailable</html>", playlist.status)
-        : html(playlistHtml(request, playlist)),
+        : html(playlist.alert ? alertHtml(playlist.alert) : playlistHtml(request, playlist)),
     };
   }
 
