@@ -335,6 +335,35 @@ export function applySingleAlbumTitlesToFiles(
   });
 }
 
+export function applyLinkedAlbumArtistsToFiles(
+  files: TagiumFile[],
+  trackIds: readonly string[] | undefined,
+  settings: MetadataPolicySettings = defaultMetadataPolicySettings,
+) {
+  if (!settings.metadataLinks.albumArtist) return files;
+
+  const trackIdSet = trackIds ? new Set(trackIds) : undefined;
+  return files.map((file) => {
+    if (
+      (trackIdSet && !trackIdSet.has(file.id)) ||
+      !file.metadata ||
+      file.metadata.albumArtist === file.metadata.artist
+    ) {
+      return file;
+    }
+
+    const patch: MetadataPatch = { albumArtist: file.metadata.artist };
+    return markPendingMetadataPatch(
+      {
+        ...file,
+        status: file.status === "saved" ? "pending" : file.status,
+        metadata: { ...file.metadata, ...patch },
+      },
+      patch,
+    );
+  });
+}
+
 export interface AlbumMetadataPolicyOptions {
   shared?: boolean;
   artwork?: boolean;

@@ -191,6 +191,43 @@ describe("export session", () => {
     hook.unmount();
   });
 
+  it("exports on the first confirmation when the write links a single's album artist", async () => {
+    const { hook, library, updateTags } = createHarness();
+    const source = library.getSnapshot().files[0]!;
+    act(() =>
+      library.dispatch({
+        type: "content-replaced",
+        files: [{ ...source, metadata: { ...source.metadata!, albumArtist: "Various Artists" } }],
+      }),
+    );
+    updateTags.mockImplementationOnce(async () => {
+      const current = library.getSnapshot().files[0]!;
+      library.dispatch({
+        type: "content-replaced",
+        files: [
+          {
+            ...current,
+            metadata: { ...current.metadata!, albumArtist: current.metadata!.artist },
+            file: new File(["rewritten"], current.filename),
+          },
+        ],
+      });
+      return undefined;
+    });
+
+    act(() => hook.result.downloadAll());
+    await act(async () => hook.result.confirmDownload());
+
+    expect(updateTags).toHaveBeenCalledWith(
+      expect.objectContaining({ id: source.id }),
+      expect.objectContaining({ albumArtist: "Artist" }),
+    );
+    expect(hook.result.confirmationStatus).toBe("ready");
+    expect(exportMocks.downloadBlob).toHaveBeenCalledTimes(1);
+    expect(hook.result.confirmation).toBeNull();
+    hook.unmount();
+  });
+
   it("confirms album ZIPs while leaving single-track downloads immediate", async () => {
     const { hook, library, flush, updateTags } = createHarness();
     act(() =>
