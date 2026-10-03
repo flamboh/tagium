@@ -154,6 +154,26 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
           </span>
         </span>
       </label>
+      <label className={checkboxRowClassName}>
+        <Checkbox
+          checked={settings.downloadAfterImport}
+          onCheckedChange={(checked) =>
+            onChange({
+              ...settings,
+              downloadAfterImport: checked === true,
+            })
+          }
+          className="mt-0.5"
+        />
+        <span className="space-y-0.5">
+          <span className="block text-sm font-medium leading-5">
+            start download immediately after import
+          </span>
+          <span className="block text-xs leading-5 text-muted-foreground">
+            useful if you don't need detailed tagging and want a faster download
+          </span>
+        </span>
+      </label>
     </section>
   );
 }

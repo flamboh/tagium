@@ -6,6 +6,7 @@ import {
   type ShareManifestPersistence,
   type StoredShareManifest,
 } from "../../../server/utils/share-manifest";
+import artworkLifecycle from "../../../migrations/share-artwork-lifecycle.json";
 
 const manifest = {
   version: 1 as const,
@@ -76,7 +77,7 @@ const createFakePersistence = () => {
       if (
         !current ||
         current.status !== "active" ||
-        current.expiresAt <= now ||
+        (current.expiresAt !== null && current.expiresAt <= now) ||
         current.expiresAt !== previous.expiresAt ||
         current.payloadJson !== previous.payloadJson ||
         current.artworkKey !== previous.artworkKey ||
@@ -88,7 +89,11 @@ const createFakePersistence = () => {
     },
     disable: async (slug, tokenHash, now) => {
       const record = records.get(slug);
-      if (!record || record.expiresAt <= now || record.revocationTokenHash !== tokenHash)
+      if (
+        !record ||
+        (record.expiresAt !== null && record.expiresAt <= now) ||
+        record.revocationTokenHash !== tokenHash
+      )
         return undefined;
       const disabled = { ...record, status: "disabled" as const };
       records.set(slug, disabled);
@@ -113,7 +118,50 @@ describe("share manifest store", () => {
       expiresAt: published.expiresAt,
       analyticsId: published.analyticsId,
     });
-    now = published.expiresAt;
+    now = published.expiresAt!;
+    expect(await store.load(published.slug)).toEqual({ kind: "unavailable" });
+  });
+
+  it("publishes indefinite records without an expiry and keeps their artwork out of the lifecycle prefix", async () => {
+    const fake = createFakePersistence();
+    let now = 1_000;
+    const store = createShareManifestStore(fake.persistence, { now: () => now });
+    const artwork = (await parseShareArtwork(new File([png], "cover.png")))!;
+    const published = await store.publish(manifest, artwork, { indefinite: true });
+    const record = fake.records.get(published.slug)!;
+
+    expect(published.expiresAt).toBeNull();
+    expect(record.expiresAt).toBeNull();
+    expect(record.artworkKey).toMatch(
+      new RegExp(`^permanent-shares/${published.slug}/[^/]+\\.png$`),
+    );
+    for (const rule of artworkLifecycle.rules)
+      expect(record.artworkKey!.startsWith(rule.conditions.prefix)).toBe(false);
+    now = 1_000 + 10 * SHARE_MANIFEST_LIFETIME_MS;
+    expect(await store.load(published.slug)).toMatchObject({ kind: "available", expiresAt: null });
+    await expect(store.loadArtwork(published.slug)).resolves.toMatchObject({ kind: "available" });
+
+    await expect(
+      store.update(
+        published.slug,
+        published.revocationToken,
+        { ...manifest, album: { ...manifest.album, title: "Edited" } },
+        { kind: "replace", artwork },
+      ),
+    ).resolves.toEqual({
+      kind: "updated",
+      slug: published.slug,
+      expiresAt: null,
+      analyticsId: published.analyticsId,
+    });
+    const updated = fake.records.get(published.slug)!;
+    expect(updated.expiresAt).toBeNull();
+    expect(updated.artworkKey).not.toBe(record.artworkKey);
+    expect(updated.artworkKey).toMatch(/^permanent-shares\//);
+    expect([...fake.artwork.keys()]).toEqual([updated.artworkKey]);
+
+    await expect(store.revoke(published.slug, published.revocationToken)).resolves.toBe("revoked");
+    expect(fake.artwork.size).toBe(0);
     expect(await store.load(published.slug)).toEqual({ kind: "unavailable" });
   });
 
@@ -124,6 +172,7 @@ describe("share manifest store", () => {
     const published = await store.publish(manifest, await parseShareArtwork(cover));
     const record = fake.records.get(published.slug)!;
 
+    expect(record.artworkKey).toMatch(new RegExp(`^shares/${published.slug}/`));
     expect(record.artworkType).toBe("image/png");
     expect(record.artworkBytes).toBe(png.byteLength);
     expect(record.artworkSha256).toMatch(/^[A-Za-z0-9_-]+$/);
@@ -365,7 +414,7 @@ describe("share manifest store", () => {
       store.update(published.slug, "wrong", manifest, { kind: "replace", artwork }),
     ).resolves.toEqual({ kind: "unavailable" });
     expect(fake.artwork.size).toBe(0);
-    now = published.expiresAt;
+    now = published.expiresAt!;
     await expect(
       store.update(published.slug, published.revocationToken, manifest, {
         kind: "replace",

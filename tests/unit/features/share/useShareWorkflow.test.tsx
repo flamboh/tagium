@@ -555,6 +555,42 @@ describe("share workflow publication lifecycle", () => {
     hook.unmount();
   });
 
+  it("rechecks eligibility at publish time instead of sharing an incomplete album", async () => {
+    const file: TagiumFile = structuredClone(creatorFile);
+    const album = creatorAlbum();
+    const { hook, library } = creatorWorkflow(album, file);
+
+    await act(async () => hook.result.openCreator({ kind: "album", id: album.id }));
+    expect(hook.result.dialog).toMatchObject({ status: "confirm", intent: "create" });
+
+    const queued: TagiumFile = {
+      ...structuredClone(creatorFile),
+      id: "track-2",
+      downloadStatus: "downloading",
+    };
+    library.state.files.push(queued);
+    album.trackIds.push(queued.id);
+    await act(async () => hook.result.publish());
+
+    expect(mocks.publishShare).not.toHaveBeenCalled();
+    expect(hook.result.dialog).toMatchObject({
+      status: "error",
+      message: "1 of 2 tracks is still downloading. no link was created.",
+    });
+    hook.unmount();
+  });
+
+  it("disables sharing a track until its download finishes", () => {
+    const file: TagiumFile = { ...structuredClone(creatorFile), downloadStatus: "downloading" };
+    const { hook } = trackCreatorWorkflow(file);
+
+    expect(hook.result.shareTrackActions[file.id]).toMatchObject({
+      enabled: false,
+      reason: "this track is still downloading",
+    });
+    hook.unmount();
+  });
+
   it("reopens the source link instead of republishing a received track", async () => {
     const file: TagiumFile = { ...structuredClone(creatorFile), sourceManifestSlug: slug };
     const { hook } = trackCreatorWorkflow(file);

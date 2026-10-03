@@ -119,6 +119,22 @@ describe("shared album page", () => {
     act(() => renderer.unmount());
   });
 
+  it("shows the link expiry only for expiring shares", () => {
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(<SharedAlbumPage {...makeProps()} />);
+    });
+    expect(textFromNode(renderer.root)).toContain("shared album · 1 track · link expires oct 20");
+
+    act(() => {
+      renderer.update(<SharedAlbumPage {...makeProps({ state: { ...state, expiresAt: null } })} />);
+    });
+    const text = textFromNode(renderer.root);
+    expect(text).toContain("shared album · 1 track");
+    expect(text).not.toContain("expires");
+    act(() => renderer.unmount());
+  });
+
   it("allows an owner to stop sharing and reports a recoverable failure", async () => {
     const onStopSharing = vi.fn(async () => Promise.reject(new Error("offline")));
     let renderer!: ReactTestRenderer;

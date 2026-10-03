@@ -21,6 +21,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   audioBitrate: "320",
   audioFormat: "mp3",
   applySoundCloudAlbumCoverToTracks: true,
+  downloadAfterImport: false,
   advancedMetadata: false,
   metadataLinks: {
     singleAlbum: true,
@@ -54,6 +55,7 @@ const storedAppSettingsSchema = Schema.Struct({
   applySoundCloudAlbumCoverToTracks: booleanWithDefault(
     DEFAULT_APP_SETTINGS.applySoundCloudAlbumCoverToTracks,
   ),
+  downloadAfterImport: booleanWithDefault(DEFAULT_APP_SETTINGS.downloadAfterImport),
   advancedMetadata: booleanWithDefault(DEFAULT_APP_SETTINGS.advancedMetadata),
   metadataLinks: Schema.Struct({
     singleAlbum: booleanWithDefault(DEFAULT_APP_SETTINGS.metadataLinks.singleAlbum),
