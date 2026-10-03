@@ -231,6 +231,73 @@ function TrackFilenameHeader({
   );
 }
 
+const useAutoFocusedTitleRef = ({
+  registrationRef,
+  selectedFileId,
+  focusedTitleFileIdRef,
+  autoFocus,
+}: {
+  registrationRef: UseFormRegisterReturn<"title">["ref"];
+  selectedFileId: string | null;
+  focusedTitleFileIdRef: RefObject<string | null>;
+  autoFocus: boolean;
+}) =>
+  useCallback(
+    (node: HTMLInputElement | null) => {
+      registrationRef(node);
+      if (!node || !selectedFileId || !autoFocus) return;
+      if (focusedTitleFileIdRef.current === selectedFileId) return;
+
+      focusedTitleFileIdRef.current = selectedFileId;
+      node.focus({ preventScroll: true });
+    },
+    [autoFocus, focusedTitleFileIdRef, selectedFileId, registrationRef],
+  );
+
+function TrackAlbumField({
+  registration,
+  inAlbum,
+  singleAlbumLinked,
+  linkedAlbumValue,
+  placeholder,
+}: {
+  registration: UseFormRegisterReturn<"album">;
+  inAlbum: boolean;
+  singleAlbumLinked: boolean;
+  linkedAlbumValue: string;
+  placeholder: string;
+}) {
+  const albumLinked = inAlbum || singleAlbumLinked;
+  const albumFieldReason = singleAlbumLinked
+    ? getMetadataLinkDescriptor("singleAlbum").disabledReason
+    : "album title is synced with the album.";
+  const albumFieldReasonId = "track-album-sync-reason";
+
+  return (
+    <div>
+      <DisabledReason disabled={albumLinked} reason={albumFieldReason}>
+        <FloatingLabelInput
+          key={singleAlbumLinked ? "linked" : "unlinked"}
+          {...(singleAlbumLinked ? { name: registration.name } : registration)}
+          id="track-album"
+          label="album"
+          aria-describedby={albumLinked ? albumFieldReasonId : undefined}
+          placeholder={placeholder}
+          disabled={albumLinked}
+          readOnly={albumLinked}
+          value={singleAlbumLinked ? linkedAlbumValue : undefined}
+          className={syncedInputClassName}
+        />
+      </DisabledReason>
+      {albumLinked && (
+        <p id={albumFieldReasonId} className="sr-only">
+          {albumFieldReason}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function TrackDetailsFields({
   selectedFileId,
   focusedTitleFileIdRef,
@@ -262,25 +329,13 @@ function TrackDetailsFields({
   const artistRegistration = register("artist", {
     onChange: (event) => onPreviewMetadataChange("artist", event),
   });
-  const albumRegistration = register("album");
   const { ref: titleRegistrationRef, ...titleInputRegistration } = titleRegistration;
-  const titleInputRef = useCallback(
-    (node: HTMLInputElement | null) => {
-      titleRegistrationRef(node);
-      if (!node || !selectedFileId || !autoFocus) return;
-      if (focusedTitleFileIdRef.current === selectedFileId) return;
-
-      focusedTitleFileIdRef.current = selectedFileId;
-      node.focus({ preventScroll: true });
-    },
-    [autoFocus, focusedTitleFileIdRef, selectedFileId, titleRegistrationRef],
-  );
-  const singleAlbumLinked = !inAlbum && metadataLinks.singleAlbum;
-  const albumLinked = inAlbum || singleAlbumLinked;
-  const albumFieldReason = singleAlbumLinked
-    ? getMetadataLinkDescriptor("singleAlbum").disabledReason
-    : "album title is synced with the album.";
-  const albumFieldReasonId = "track-album-sync-reason";
+  const titleInputRef = useAutoFocusedTitleRef({
+    registrationRef: titleRegistrationRef,
+    selectedFileId,
+    focusedTitleFileIdRef,
+    autoFocus,
+  });
 
   return (
     <>
@@ -306,27 +361,13 @@ function TrackDetailsFields({
           className={syncedInputClassName}
         />
       </DisabledReason>
-      <div>
-        <DisabledReason disabled={albumLinked} reason={albumFieldReason}>
-          <FloatingLabelInput
-            key={singleAlbumLinked ? "linked" : "unlinked"}
-            {...(singleAlbumLinked ? { name: albumRegistration.name } : albumRegistration)}
-            id="track-album"
-            label="album"
-            aria-describedby={albumLinked ? albumFieldReasonId : undefined}
-            placeholder={placeholder.album}
-            disabled={albumLinked}
-            readOnly={albumLinked}
-            value={singleAlbumLinked ? linkedAlbumValue : undefined}
-            className={syncedInputClassName}
-          />
-        </DisabledReason>
-        {albumLinked && (
-          <p id={albumFieldReasonId} className="sr-only">
-            {albumFieldReason}
-          </p>
-        )}
-      </div>
+      <TrackAlbumField
+        registration={register("album")}
+        inAlbum={inAlbum}
+        singleAlbumLinked={!inAlbum && metadataLinks.singleAlbum}
+        linkedAlbumValue={linkedAlbumValue}
+        placeholder={placeholder.album}
+      />
       <div className="grid grid-cols-[minmax(4.5rem,0.8fr)_minmax(0,1.4fr)_minmax(4.5rem,0.8fr)] gap-2">
         <DisabledReason
           disabled={inAlbum && metadataLinks.year}
@@ -655,49 +696,17 @@ function PendingTrackMetadataEditor({
   );
 }
 
-function LoadedTrackMetadataEditor({
+const useEditorModeLayoutAnimation = ({
   viewActive,
-  autoFocusTitle,
-  headerLeadingAction,
-  selectedFile,
-  selectedFileId,
-  focusedTitleFileIdRef,
-  register,
-  control,
-  getValues,
-  setError,
-  clearErrors,
-  setFocus,
-  onTrackCoverUpload,
-  onTrackCoverProcessingChange,
-  isTrackCoverProcessing,
-  onDownloadUpdatedFile,
-  selectedFileAlbum,
-  syncFilenames,
   advancedMetadata,
-  metadataLinks,
-  onPreviewMetadataChange,
   editorMode,
   onEditorModeChange,
-  onTrackClipChange,
-}: LoadedTrackMetadataEditorProps) {
-  const watchedTitle = useWatch({
-    control,
-    name: "title",
-    defaultValue: selectedFile.metadata.title,
-  });
-  const watchedFilename = useWatch({ control, name: "filename", defaultValue: "" });
-  const linkedAlbumArtistDisplay = useWatch({
-    control,
-    name: "artist",
-    defaultValue: selectedFile.metadata.artist,
-  });
-  const advancedFields = useAdvancedMetadataFormBoundary({
-    register,
-    control,
-    enabled: advancedMetadata,
-  });
-  const pendingAdvancedFocusRef = useRef<"discNumber" | "bpm" | null>(null);
+}: {
+  viewActive: boolean | undefined;
+  advancedMetadata: boolean;
+  editorMode: MetadataEditorMode;
+  onEditorModeChange: (mode: MetadataEditorMode) => void;
+}) => {
   const editorBodyRef = useRef<HTMLDivElement>(null);
   const editorActionsRef = useRef<HTMLDivElement>(null);
   const editorActionsTopRef = useRef<number | null>(null);
@@ -764,6 +773,69 @@ function LoadedTrackMetadataEditor({
       );
     }
   }, [advancedMetadata, editorMode, viewActive]);
+
+  return { editorBodyRef, editorActionsRef, changeEditorMode };
+};
+
+const getTrackFailure = (selectedFile: LoadedTrack): TrackFailure | null => {
+  if (selectedFile.downloadStatus !== "error" && selectedFile.status !== "error") return null;
+  return selectedFile.downloadError ? getTrackFailureDisplay(selectedFile.downloadError) : null;
+};
+
+const getDownloadDisabledReason = (isTrackCoverProcessing: boolean, filenameInvalid: boolean) => {
+  if (isTrackCoverProcessing) return "cover art is still processing";
+  return filenameInvalid ? "filename is required" : "track file is not ready";
+};
+
+function LoadedTrackMetadataEditor({
+  viewActive,
+  autoFocusTitle,
+  headerLeadingAction,
+  selectedFile,
+  selectedFileId,
+  focusedTitleFileIdRef,
+  register,
+  control,
+  getValues,
+  setError,
+  clearErrors,
+  setFocus,
+  onTrackCoverUpload,
+  onTrackCoverProcessingChange,
+  isTrackCoverProcessing,
+  onDownloadUpdatedFile,
+  selectedFileAlbum,
+  syncFilenames,
+  advancedMetadata,
+  metadataLinks,
+  onPreviewMetadataChange,
+  editorMode,
+  onEditorModeChange,
+  onTrackClipChange,
+}: LoadedTrackMetadataEditorProps) {
+  const watchedTitle = useWatch({
+    control,
+    name: "title",
+    defaultValue: selectedFile.metadata.title,
+  });
+  const watchedFilename = useWatch({ control, name: "filename", defaultValue: "" });
+  const linkedAlbumArtistDisplay = useWatch({
+    control,
+    name: "artist",
+    defaultValue: selectedFile.metadata.artist,
+  });
+  const advancedFields = useAdvancedMetadataFormBoundary({
+    register,
+    control,
+    enabled: advancedMetadata,
+  });
+  const pendingAdvancedFocusRef = useRef<"discNumber" | "bpm" | null>(null);
+  const { editorBodyRef, editorActionsRef, changeEditorMode } = useEditorModeLayoutAnimation({
+    viewActive,
+    advancedMetadata,
+    editorMode,
+    onEditorModeChange,
+  });
   const focusPendingAdvancedField = useCallback(
     (node: HTMLDivElement | null) => {
       const pendingAdvancedFocus = pendingAdvancedFocusRef.current;
@@ -778,22 +850,11 @@ function LoadedTrackMetadataEditor({
   const canDownloadTrack =
     Boolean(selectedFile.file) && !isTrackCoverProcessing && !filenameInvalid;
   const placeholder = getSampleTrack(selectedFile.id);
-  const downloadErrorDisplay = selectedFile.downloadError
-    ? getTrackFailureDisplay(selectedFile.downloadError)
-    : null;
-  const failure =
-    (selectedFile.downloadStatus === "error" || selectedFile.status === "error") &&
-    downloadErrorDisplay
-      ? downloadErrorDisplay
-      : null;
+  const failure = getTrackFailure(selectedFile);
   const filenameRegistration = register("filename", {
     onChange: (event) => onPreviewMetadataChange("filename", event),
   });
-  const downloadDisabledReason = isTrackCoverProcessing
-    ? "cover art is still processing"
-    : filenameInvalid
-      ? "filename is required"
-      : "track file is not ready";
+  const downloadDisabledReason = getDownloadDisabledReason(isTrackCoverProcessing, filenameInvalid);
   const submitDownload = () => {
     if (advancedMetadata) {
       const validationErrors = getAdvancedMetadataValidationErrors(getValues());

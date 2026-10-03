@@ -66,6 +66,84 @@ const sortableStyle = (
   transition,
 });
 
+const useSavedCheck = (status: TagiumFile["status"]) => {
+  const previousStatusRef = useRef(status);
+  const successTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+  const [showSavedCheck, setShowSavedCheck] = useState(false);
+
+  useEffect(() => {
+    const transitionedToSaved = previousStatusRef.current !== "saved" && status === "saved";
+    previousStatusRef.current = status;
+
+    if (successTimerRef.current !== null) {
+      globalThis.clearTimeout(successTimerRef.current);
+      successTimerRef.current = null;
+    }
+
+    if (transitionedToSaved) {
+      setShowSavedCheck(true);
+      successTimerRef.current = globalThis.setTimeout(() => {
+        setShowSavedCheck(false);
+        successTimerRef.current = null;
+      }, 3_000);
+    } else if (status !== "saved") {
+      setShowSavedCheck(false);
+    }
+
+    return () => {
+      if (successTimerRef.current !== null) {
+        globalThis.clearTimeout(successTimerRef.current);
+        successTimerRef.current = null;
+      }
+    };
+  }, [status]);
+
+  return showSavedCheck;
+};
+
+function TrackRowStatusIcons({
+  track,
+  showSavedCheck,
+}: {
+  track: TagiumFile;
+  showSavedCheck: boolean;
+}) {
+  return (
+    <>
+      {track.downloadStatus === "downloading" && (
+        <HugeiconsIcon
+          icon={loaderCircleIcon}
+          strokeWidth={2}
+          className="h-3 w-3 shrink-0 animate-spin text-muted-foreground"
+        />
+      )}
+      {track.downloadStatus !== "downloading" && showSavedCheck && (
+        <HugeiconsIcon
+          icon={Tick02Icon}
+          strokeWidth={2}
+          aria-hidden="true"
+          className="h-3 w-3 shrink-0 animate-in fade-in text-success motion-reduce:animate-none"
+        />
+      )}
+      {(track.downloadStatus === "error" || track.status === "error") && (
+        <HugeiconsIcon
+          icon={AlertCircleIcon}
+          strokeWidth={2}
+          aria-label="track has an error"
+          className="h-3 w-3 shrink-0 text-destructive"
+        />
+      )}
+      {track.downloadStatus === "canceled" && (
+        <HugeiconsIcon
+          icon={BanIcon}
+          strokeWidth={2}
+          className="h-3 w-3 text-muted-foreground flex-shrink-0"
+        />
+      )}
+    </>
+  );
+}
+
 export function SortableTrackRow({
   track,
   filenamePreviewStore,
@@ -80,9 +158,7 @@ export function SortableTrackRow({
 }: TrackRowProps) {
   const filename = useTrackFilenamePreview(filenamePreviewStore, track.id, track.filename);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
-  const previousStatusRef = useRef(track.status);
-  const successTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
-  const [showSavedCheck, setShowSavedCheck] = useState(false);
+  const showSavedCheck = useSavedCheck(track.status);
   const {
     attributes,
     listeners,
@@ -98,33 +174,6 @@ export function SortableTrackRow({
         ? ({ type: "track", trackId: track.id, container, albumId } satisfies SidebarDragData)
         : ({ type: "track", trackId: track.id, container } satisfies SidebarDragData),
   });
-
-  useEffect(() => {
-    const transitionedToSaved = previousStatusRef.current !== "saved" && track.status === "saved";
-    previousStatusRef.current = track.status;
-
-    if (successTimerRef.current !== null) {
-      globalThis.clearTimeout(successTimerRef.current);
-      successTimerRef.current = null;
-    }
-
-    if (transitionedToSaved) {
-      setShowSavedCheck(true);
-      successTimerRef.current = globalThis.setTimeout(() => {
-        setShowSavedCheck(false);
-        successTimerRef.current = null;
-      }, 3_000);
-    } else if (track.status !== "saved") {
-      setShowSavedCheck(false);
-    }
-
-    return () => {
-      if (successTimerRef.current !== null) {
-        globalThis.clearTimeout(successTimerRef.current);
-        successTimerRef.current = null;
-      }
-    };
-  }, [track.status]);
 
   return (
     <div
@@ -164,36 +213,7 @@ export function SortableTrackRow({
               <span className="min-w-3 text-[11px] text-muted-foreground">{index}</span>
             )}
             <span className="truncate text-sm flex-1">{filename}</span>
-            {track.downloadStatus === "downloading" && (
-              <HugeiconsIcon
-                icon={loaderCircleIcon}
-                strokeWidth={2}
-                className="h-3 w-3 shrink-0 animate-spin text-muted-foreground"
-              />
-            )}
-            {track.downloadStatus !== "downloading" && showSavedCheck && (
-              <HugeiconsIcon
-                icon={Tick02Icon}
-                strokeWidth={2}
-                aria-hidden="true"
-                className="h-3 w-3 shrink-0 animate-in fade-in text-success motion-reduce:animate-none"
-              />
-            )}
-            {(track.downloadStatus === "error" || track.status === "error") && (
-              <HugeiconsIcon
-                icon={AlertCircleIcon}
-                strokeWidth={2}
-                aria-label="track has an error"
-                className="h-3 w-3 shrink-0 text-destructive"
-              />
-            )}
-            {track.downloadStatus === "canceled" && (
-              <HugeiconsIcon
-                icon={BanIcon}
-                strokeWidth={2}
-                className="h-3 w-3 text-muted-foreground flex-shrink-0"
-              />
-            )}
+            <TrackRowStatusIcons track={track} showSavedCheck={showSavedCheck} />
           </div>
         </div>
       </Button>
