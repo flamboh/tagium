@@ -29,10 +29,9 @@ const PLACEHOLDER_PEAKS = Array.from({ length: 256 }, (_, index) => {
   return Math.min(1, Math.max(0.12, swell + Math.abs(jitter) * 0.35));
 });
 
+const BAR_GROWTH_MS = 300;
 const WAVEFORM_LAYER_CLASS =
   "pointer-events-none absolute inset-0 transition-[opacity,fill] duration-300 ease-out motion-reduce:transition-none";
-const BAR_CLASS =
-  "transform-fill transition-transform duration-300 ease-out motion-reduce:transition-none";
 
 type WaveformStatus = "waiting" | "loading" | "ready" | "unavailable";
 type ClipEdge = "start" | "end";
@@ -243,10 +242,25 @@ function useTrackWaveform({
       ? "waveform unavailable for this track"
       : null;
   const barCount = Math.floor((width + BAR_GAP) / (BAR_WIDTH + BAR_GAP));
+  const placeholderBars = useMemo(
+    () => (barCount > 0 ? resamplePeaks(PLACEHOLDER_PEAKS, barCount) : []),
+    [barCount],
+  );
   const peaks = waveform?.peaks ?? PLACEHOLDER_PEAKS;
-  const bars = useMemo(
+  const targetBars = useMemo(
     () => (barCount > 0 ? resamplePeaks(peaks, barCount) : []),
     [peaks, barCount],
+  );
+  const growth = useBarGrowth(Boolean(waveform));
+  const bars = useMemo(
+    () =>
+      growth < 1
+        ? targetBars.map((bar, index) => {
+            const from = placeholderBars[index] ?? bar;
+            return from + (bar - from) * growth;
+          })
+        : targetBars,
+    [growth, placeholderBars, targetBars],
   );
   const startRatio = ratio(range.start);
   const endRatio = ratio(range.end);
@@ -562,6 +576,28 @@ function useWaveformSource(
   };
 }
 
+function useBarGrowth(ready: boolean) {
+  const [readyOnMount] = useState(ready);
+  const [growth, setGrowth] = useState(ready ? 1 : 0);
+  useEffect(() => {
+    if (!ready || readyOnMount) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setGrowth(1);
+      return;
+    }
+    let frame = 0;
+    const startedAt = performance.now();
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / BAR_GROWTH_MS);
+      setGrowth(1 - (1 - progress) ** 4);
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [ready, readyOnMount]);
+  return growth;
+}
+
 function AnimatedWidth({ children, className }: { children: ReactNode; className: string }) {
   const contentRef = useRef<HTMLSpanElement>(null);
   const [width, setWidth] = useState<number>();
@@ -630,6 +666,14 @@ const WaveformBars = memo(function WaveformBars({ bars }: { bars: number[] }) {
   const width = Math.max(1, bars.length * (BAR_WIDTH + BAR_GAP) - BAR_GAP);
   // Bars mirror around a 1px divider through the vertical center; the lower half is fainter.
   const half = (WAVEFORM_HEIGHT - 1) / 2;
+  const upper: string[] = [];
+  const lower: string[] = [];
+  for (const [index, bar] of bars.entries()) {
+    const x = index * (BAR_WIDTH + BAR_GAP);
+    const height = Math.max(1, bar * half);
+    upper.push(`M${x} ${half - height}h${BAR_WIDTH}v${height}h${-BAR_WIDTH}Z`);
+    lower.push(`M${x} ${half + 1}h${BAR_WIDTH}v${height}h${-BAR_WIDTH}Z`);
+  }
   return (
     <svg
       aria-hidden
@@ -637,31 +681,8 @@ const WaveformBars = memo(function WaveformBars({ bars }: { bars: number[] }) {
       viewBox={`0 0 ${width} ${WAVEFORM_HEIGHT}`}
       preserveAspectRatio="none"
     >
-      {bars.map((bar, index) => {
-        const x = index * (BAR_WIDTH + BAR_GAP);
-        const transform = `scaleY(${Math.max(1, bar * half) / half})`;
-        return (
-          <g key={index}>
-            <rect
-              x={x}
-              y={0}
-              width={BAR_WIDTH}
-              height={half}
-              className={cn(BAR_CLASS, "origin-bottom")}
-              style={{ transform }}
-            />
-            <rect
-              x={x}
-              y={half + 1}
-              width={BAR_WIDTH}
-              height={half}
-              opacity={0.45}
-              className={cn(BAR_CLASS, "origin-top")}
-              style={{ transform }}
-            />
-          </g>
-        );
-      })}
+      <path d={upper.join("")} />
+      <path d={lower.join("")} opacity={0.45} />
     </svg>
   );
 });
