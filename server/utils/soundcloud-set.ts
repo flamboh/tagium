@@ -306,7 +306,7 @@ export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundClou
     tracks: tracks.map(({ track, trackIndex }) => ({
       title: track.title.trim(),
       url: track.permalink_url,
-      duration: track.duration,
+      duration: track.duration === undefined ? undefined : track.duration / 1000,
       trackNumber: trackIndex,
     })),
   };
