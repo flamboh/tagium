@@ -328,14 +328,17 @@ test("manifest publication validates its contract and origin before storing anyt
     (await post({ manifest: JSON.stringify(valid) }, { "Sec-Fetch-Site": "cross-site" })).status(),
   ).toBe(400);
   expect((await request.post("/api/manifests", { data: valid })).status()).toBe(400);
-  expect(
-    (
-      await post({
-        manifest: JSON.stringify(valid),
-        cover: { name: "cover.png", mimeType: "image/png", buffer: Buffer.from("not an image") },
-      })
-    ).status(),
-  ).toBe(400);
+  const artwork = coverUpload("artwork");
+  for (const buffer of [Buffer.from("not an image"), artwork.buffer.subarray(0, 64)]) {
+    expect(
+      (
+        await post({
+          manifest: JSON.stringify(valid),
+          cover: { name: "cover.png", mimeType: "image/png", buffer },
+        })
+      ).status(),
+    ).toBe(400);
+  }
 
   const contentType = "multipart/form-data; boundary=e2e-boundary";
   expect(

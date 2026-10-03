@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { fixtureTitle } from "../fixtures/catalog.ts";
 import { audioFixture, inspectAudio } from "../support/audio";
 import { expect, test } from "../support/test";
@@ -47,4 +48,72 @@ test("edits, navigates and exports from the library drawer on a phone", async ({
   await confirmation.getByRole("button", { name: "cancel" }).click();
   await expect(confirmation).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+const swipe = (
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  pointerType = "touch",
+) =>
+  page.evaluate(
+    ({ from, to, pointerType }) => {
+      const target = document.elementFromPoint(from.x, from.y) ?? document.body;
+      const pointer = (x: number, y: number): PointerEventInit => ({
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        pointerId: 7,
+        pointerType,
+        isPrimary: true,
+        clientX: x,
+        clientY: y,
+        width: 24,
+        height: 24,
+      });
+      target.dispatchEvent(new PointerEvent("pointerdown", pointer(from.x, from.y)));
+      for (let step = 1; step <= 8; step += 1) {
+        target.dispatchEvent(
+          new PointerEvent(
+            "pointermove",
+            pointer(from.x + ((to.x - from.x) * step) / 8, from.y + ((to.y - from.y) * step) / 8),
+          ),
+        );
+      }
+      target.dispatchEvent(new PointerEvent("pointerup", pointer(to.x, to.y)));
+    },
+    { from, to, pointerType },
+  );
+
+test("swipes the library drawer open from the left edge and closed again", async ({ page }) => {
+  await page.goto("/");
+  await pickFiles(
+    page,
+    (["mp3", "flac"] as const).map((format) => audioFixture(format).upload),
+  );
+  const title = field(page, "title");
+  await expect(title).toHaveValue(fixtureTitle("mp3"));
+  const drawer = page.getByRole("dialog", { name: "library" });
+
+  await swipe(page, { x: 300, y: 300 }, { x: 390, y: 300 });
+  await swipe(page, { x: 30, y: 300 }, { x: 60, y: 460 });
+  await swipe(page, { x: 30, y: 300 }, { x: 200, y: 300 }, "mouse");
+  const box = (await title.boundingBox())!;
+  await swipe(
+    page,
+    { x: box.x + 8, y: box.y + box.height / 2 },
+    { x: box.x + 200, y: box.y + box.height / 2 },
+  );
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  await expect(drawer).toBeHidden();
+
+  await swipe(page, { x: 30, y: 300 }, { x: 200, y: 310 });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByText("library (2)", { exact: true })).toBeVisible();
+
+  await swipe(page, { x: 300, y: 300 }, { x: 120, y: 300 });
+  await expect(drawer).toBeHidden();
+  await expect(title).toHaveValue(fixtureTitle("mp3"));
 });

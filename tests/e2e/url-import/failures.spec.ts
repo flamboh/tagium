@@ -36,6 +36,10 @@ test("rejects incomplete and unsupported links beside the url field", async ({
   for (const url of [
     "https://example.com/audio.mp3",
     "http://www.youtube.com/watch?v=abcdefghijk",
+    "https://youtube.com.example/watch?v=abcdefghijk",
+    "https://foo.youtube.com/watch?v=abcdefghijk",
+    "https://soundcloud.com.evil/artist/track",
+    "https://soundcloud.com/artist/track/extra",
   ]) {
     await importUrl(page, url);
     await expect(page.getByText("try a public soundcloud or youtube track url")).toBeVisible();
@@ -62,6 +66,32 @@ test("explains a soundcloud short link that does not lead to soundcloud", async 
   await expect(page.getByText("no tracks yet")).toBeVisible();
   await expect(urlField(page)).toHaveValue(link);
   expect(await upstreams.calls({ route: "cobalt.resolve" })).toHaveLength(0);
+});
+
+test("server link lookups refuse foreign hosts and endless short-link chains", async ({
+  request,
+  upstreams,
+}) => {
+  for (const url of [
+    "http://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg",
+    "https://example.com/cover.jpg",
+    "https://i.ytimg.com.evil.test/cover.jpg",
+  ]) {
+    const response = await request.get(`/api/youtube-cover?url=${encodeURIComponent(url)}`);
+    expect(response.status(), url).toBe(400);
+  }
+  for (const url of ["https://soundcloud.com.evil/x", "https://example.com/x"]) {
+    const response = await request.get(`/api/soundcloud-link?url=${encodeURIComponent(url)}`);
+    expect(response.ok(), url).toBe(false);
+  }
+
+  const track = await upstreams.soundcloud.track({ cover: null });
+  let link = track.url;
+  for (let hop = 0; hop < 6; hop += 1) link = await upstreams.soundcloud.shortLink(link);
+  const endless = await request.get(`/api/soundcloud-link?url=${encodeURIComponent(link)}`);
+  expect(endless.ok()).toBe(false);
+  expect(await upstreams.calls({ route: "soundcloud.short_link" })).toHaveLength(5);
+  expect(await upstreams.calls({ route: /^soundcloud\.(resolve|track)/u })).toHaveLength(0);
 });
 
 type FailureCase = {

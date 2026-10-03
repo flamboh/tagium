@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { fixtureTitle } from "../fixtures/catalog.ts";
-import { audioFixture } from "../support/audio";
+import { audioFixture, retaggedAudioFixture } from "../support/audio";
 import { expect, test } from "../support/test";
 import {
   dropFiles,
@@ -129,4 +129,29 @@ test("skips a file that is already in the library", async ({ page }) => {
   await libraryCount(page, 2);
   await expect(trackRow(page, `${fixtureTitle("flac")}.flac`)).toHaveCount(1);
   await expect(trackRow(page, `${fixtureTitle("mp3")}.mp3`)).toBeVisible();
+});
+
+test("orders a picked album by its track numbers with untracked files last", async ({ page }) => {
+  const picked = await Promise.all(
+    [
+      { file: "c.mp3", title: "Third", trackNumber: 3 },
+      { file: "x.mp3", title: "Untracked", trackNumber: null },
+      { file: "a.mp3", title: "First", trackNumber: 1 },
+      { file: "b.mp3", title: "Second", trackNumber: 2 },
+    ].map(({ file, title, trackNumber }) =>
+      retaggedAudioFixture("mp3", file, { title, trackNumber }),
+    ),
+  );
+
+  await page.goto("/");
+  await pickFiles(
+    page,
+    picked.map(({ upload }) => upload),
+  );
+  await libraryCount(page, 4);
+  const rows = page.getByRole("button", { name: /^\d+ \w+\.mp3$/u }).filter({ visible: true });
+  await expect(rows).toHaveText([/First/u, /Second/u, /Third/u, /Untracked/u]);
+  for (const [index, title] of ["First", "Second", "Third", "Untracked"].entries()) {
+    await expect(trackRow(page, `${index + 1} ${title}.mp3`)).toBeVisible();
+  }
 });

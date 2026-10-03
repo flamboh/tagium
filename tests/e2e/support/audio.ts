@@ -5,7 +5,11 @@ import { fileURLToPath } from "node:url";
 import { expect, type Page } from "@playwright/test";
 import { Effect } from "effect";
 import { unzipSync } from "fflate";
-import { inspectAudioFile } from "../../../src/features/audio/metadataEngine/engine";
+import {
+  inspectAudioFile,
+  patchAudioFile,
+} from "../../../src/features/audio/metadataEngine/engine";
+import type { AudioMetadata } from "../../../src/features/library/types";
 import {
   audioFixtures,
   imageFixtures,
@@ -24,6 +28,21 @@ export const audioFixture = (
   filename: string = audioFixtures[name].file,
 ) => {
   const bytes = fixtureBytes(audioFixtures[name].file);
+  return {
+    upload: { name: filename, mimeType: audioFixtures[name].mime, buffer: Buffer.from(bytes) },
+    file: { filename, bytes } satisfies DownloadedFile,
+  };
+};
+
+export const retaggedAudioFixture = async (
+  name: AudioFixtureName,
+  filename: string,
+  changes: Partial<AudioMetadata>,
+) => {
+  const source = new File([Buffer.from(fixtureBytes(audioFixtures[name].file))], filename);
+  const { metadata } = await Effect.runPromise(inspectAudioFile(source));
+  const patched = await Effect.runPromise(patchAudioFile(source, { ...metadata, ...changes }));
+  const bytes = new Uint8Array(await patched.arrayBuffer());
   return {
     upload: { name: filename, mimeType: audioFixtures[name].mime, buffer: Buffer.from(bytes) },
     file: { filename, bytes } satisfies DownloadedFile,

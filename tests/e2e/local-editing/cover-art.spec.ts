@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { crc32, deflateSync } from "node:zlib";
 import type { Page } from "@playwright/test";
 import { readCoverArtDimensions } from "../../../src/features/editor/coverArtProcessing";
 import { fixtureTitle } from "../fixtures/catalog.ts";
@@ -28,6 +29,33 @@ const exportedCover = async (page: Page) => {
 
 const sameBytes = (left: Uint8Array, right: Uint8Array) =>
   Buffer.from(left).equals(Buffer.from(right));
+
+const pngChunk = (type: string, data: Buffer) => {
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+  const checksum = Buffer.alloc(4);
+  checksum.writeUInt32BE(crc32(body));
+  return Buffer.concat([length, body, checksum]);
+};
+
+const png = (width: number, height: number, pixels = true): Upload => {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(width * 3, 0x5a)]);
+  return {
+    name: `cover-${width}x${height}.png`,
+    mimeType: "image/png",
+    buffer: Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      pngChunk("IHDR", header),
+      ...(pixels ? [pngChunk("IDAT", deflateSync(Buffer.concat(Array(height).fill(row))))] : []),
+      pngChunk("IEND", Buffer.alloc(0)),
+    ]),
+  };
+};
 
 for (const format of ["m4a", "opus"] as const) {
   test(`adds and crops cover art on a coverless ${format} track`, async ({ page }) => {
@@ -102,3 +130,32 @@ for (const format of ["m4a", "opus"] as const) {
     await expectLosslessAudio(kept.exported, source.file);
   });
 }
+
+test("shrinks a large cover to 1600 pixels and refuses one over 16 megapixels", async ({
+  page,
+}) => {
+  const source = audioFixture("mp3");
+  await page.goto("/");
+  await pickFiles(page, [source.upload]);
+  await expect(field(page, "title")).toHaveValue(fixtureTitle("mp3"));
+  const coverButton = page.getByRole("button", { name: "upload cover" });
+
+  await uploadCover(page, png(2400, 1200));
+  await expect(coverButton).toBeEnabled();
+  await expect(coverButton).not.toHaveAttribute("aria-invalid", "true");
+  const shrunk = await exportedCover(page);
+  expect(shrunk.picture.format).toBe("image/png");
+  expect(
+    await readCoverArtDimensions(
+      new File([Buffer.from(shrunk.picture.data)], "cover.png", { type: "image/png" }),
+    ),
+  ).toEqual({ width: 1600, height: 800 });
+
+  await uploadCover(page, png(5000, 4000, false));
+  await expect(coverButton).toHaveAccessibleDescription(
+    "cover art must be 16 megapixels or smaller.",
+  );
+  const kept = await exportedCover(page);
+  expect(sameBytes(kept.picture.data, shrunk.picture.data)).toBe(true);
+  await expectLosslessAudio(kept.exported, source.file);
+});
