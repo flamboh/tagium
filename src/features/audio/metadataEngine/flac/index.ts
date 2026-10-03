@@ -320,7 +320,7 @@ const inspect = (source: ByteSource) =>
       trackNumber: positiveInteger(trackText),
       trackTotal: trackTotalMatch ? Number.parseInt(trackTotalMatch[1]!, 10) : null,
       composer: firstValue(comments, "COMPOSER") ?? "",
-      comment: firstValue(comments, "COMMENT") ?? "",
+      comment: firstValue(comments, "COMMENT") ?? firstValue(comments, "DESCRIPTION") ?? "",
       discNumber: canonicalInteger(firstValue(comments, "DISCNUMBER")),
       bpm: canonicalInteger(firstValue(comments, "BPM")),
     };
@@ -359,6 +359,7 @@ const encodeVorbis = (
   }
   if (changes.comment !== undefined) {
     replaceText("COMMENT", changes.comment);
+    replacements.set("DESCRIPTION", []);
   }
   if (changes.year !== undefined) {
     replacements.set(

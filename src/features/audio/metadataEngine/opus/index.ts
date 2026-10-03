@@ -713,6 +713,7 @@ const encodeTags = (tags: OpusTags, changes: MetadataChanges) => {
   replaceText("ALBUM", changes.album);
   replaceText("COMPOSER", changes.composer);
   replaceText("COMMENT", changes.comment);
+  if (changes.comment !== undefined) replacements.set("DESCRIPTION", []);
   replaceText("COPYRIGHT", changes.copyright);
   replaceText("LANGUAGE", changes.language);
   if (changes.year !== undefined) {
@@ -919,7 +920,7 @@ const inspect = (source: ByteSource) =>
       trackNumber: positiveInteger(trackText),
       trackTotal: trackTotalMatch ? Number.parseInt(trackTotalMatch[1]!, 10) : null,
       composer: firstValue(comments, "COMPOSER") ?? "",
-      comment: firstValue(comments, "COMMENT") ?? "",
+      comment: firstValue(comments, "COMMENT") ?? firstValue(comments, "DESCRIPTION") ?? "",
       discNumber: canonicalInteger(firstValue(comments, "DISCNUMBER")),
       bpm: canonicalInteger(firstValue(comments, "BPM")),
     };
