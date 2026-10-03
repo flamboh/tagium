@@ -115,5 +115,33 @@ test("swipes the library drawer open from the left edge and closed again", async
 
   await swipe(page, { x: 300, y: 300 }, { x: 120, y: 300 });
   await expect(drawer).toBeHidden();
+});
+
+test("escape closes the library drawer and its menus one layer at a time", async ({ page }) => {
+  await page.goto("/");
+  await pickFiles(page, [audioFixture("mp3").upload]);
+  const title = field(page, "title");
+  await expect(title).toHaveValue(fixtureTitle("mp3"));
+
+  const openLibrary = page.getByRole("button", { name: "open library" });
+  const drawer = page.getByRole("dialog", { name: "library" });
+  await openLibrary.click();
+  await expect(drawer).toBeVisible();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Delete");
+  await expect(page.getByRole("dialog", { name: /^remove / })).toHaveCount(0);
+
+  await drawer
+    .getByRole("button", { name: `track actions for ${fixtureTitle("mp3")}.mp3` })
+    .click();
+  const menu = page.getByRole("menu");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await expect(drawer).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+  await expect(openLibrary).toBeFocused();
   await expect(title).toHaveValue(fixtureTitle("mp3"));
 });

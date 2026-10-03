@@ -51,18 +51,30 @@ test("selects ranges, toggles tracks, selects all and deletes the selection", as
   await expect(page.getByText("drag tracks here", { exact: true })).toBeVisible();
 });
 
-test("escape closes a dialog without clearing the selected track", async ({ page }) => {
-  test.fail(
-    true,
-    "product bug: workspace shortcuts stay active under modal dialogs, so escape also clears the selection",
-  );
+test("dialogs and menus keep workspace shortcuts from acting on the library", async ({ page }) => {
   await page.goto("/");
   await pickFiles(page, [audioFixture("mp3").upload]);
   await libraryCount(page, 1);
+  const title = field(page, "title");
+  await expect(title).toHaveValue(fixtureTitle("mp3"));
+
   await page.getByRole("button", { name: "download all", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "download 1 track" });
   await expect(dialog.getByRole("button", { name: "cancel" })).toBeFocused();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Delete");
+  await expect(page.getByRole("dialog", { name: /^remove / })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
-  await expect(field(page, "title")).toHaveValue(fixtureTitle("mp3"), { timeout: 3_000 });
+  await expect(title).toHaveValue(fixtureTitle("mp3"));
+
+  await page.getByRole("button", { name: `track actions for ${fixtureTitle("mp3")}.mp3` }).click();
+  const menu = page.getByRole("menu");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Delete");
+  await expect(page.getByRole("dialog", { name: /^remove / })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await expect(title).toHaveValue(fixtureTitle("mp3"));
+  await libraryCount(page, 1);
 });
