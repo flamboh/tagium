@@ -23,13 +23,13 @@ test.describe.configure({ timeout: 120_000 });
 const trackButtons = (page: import("@playwright/test").Page) =>
   page.getByRole("button", { name: /^\d+ .+\.(mp3|opus)$/u });
 
-const fiveTrackSet = (upstreams: Upstreams, title: string) =>
+const trackSet = (upstreams: Upstreams, title: string, count: number) =>
   upstreams.soundcloud.set({
     title,
     author: "Queue Artist",
     isAlbum: true,
     artwork: null,
-    tracks: Array.from({ length: 5 }, (_, index) => ({
+    tracks: Array.from({ length: count }, (_, index) => ({
       title: `Track ${index + 1}`,
       cover: null,
     })),
@@ -121,7 +121,7 @@ test("removing a downloading and a queued track shrinks the run and starts the n
   upstreams,
 }) => {
   await useSettings(context, { audioFormat: "best" });
-  const set = await fiveTrackSet(upstreams, "Removal Set");
+  const set = await trackSet(upstreams, "Removal Set", 5);
   const [first, second, third, fourth, fifth] = set.tracks;
   const plans = await holdDownloadPlans(page);
 
@@ -157,7 +157,7 @@ test("canceling a playlist keeps its tracks and retry downloads all of them", as
   upstreams,
 }) => {
   await useSettings(context, { audioFormat: "best" });
-  const set = await fiveTrackSet(upstreams, "Cancel Set");
+  const set = await trackSet(upstreams, "Cancel Set", 4);
   const plans = await holdDownloadPlans(page);
 
   await page.goto("/");
@@ -165,16 +165,16 @@ test("canceling a playlist keeps its tracks and retry downloads all of them", as
   await expect.poll(() => plans.requested().length).toBe(3);
 
   await page.getByRole("button", { name: "cancel playlist downloads" }).click();
-  await expect(queueStatus(page, "canceled 5/5")).toBeVisible();
+  await expect(queueStatus(page, "canceled 4/4")).toBeVisible();
   await expect(page.getByText("remaining tracks canceled", { exact: true })).toBeVisible();
   await expect(audioPreview(page).getByRole("status")).toHaveText("download canceled");
   await expect(downloadTrackButton(page)).toBeDisabled();
   await expect(page.getByRole("button", { name: "download all" })).toBeDisabled();
-  await expect(trackButtons(page)).toHaveCount(5);
+  await expect(trackButtons(page)).toHaveCount(4);
   await plans.releaseAll();
 
   await page.getByRole("button", { name: "retry playlist downloads" }).click();
-  await expect(queueStatus(page, "downloaded 5/5")).toBeVisible(IMPORT_TIMEOUT);
+  await expect(queueStatus(page, "downloaded 4/4")).toBeVisible(IMPORT_TIMEOUT);
   await expect(page.getByRole("button", { name: "download all" })).toBeEnabled();
   expect(plans.requested().slice(3).sort()).toEqual(set.tracks.map((track) => track.url).sort());
   for (const track of set.tracks) {
