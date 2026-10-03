@@ -35,6 +35,7 @@ function AudioTaggerViews({ controller, menuInTrackHeader, mobileMenuButton }: C
       >
         <TrackMetadataEditor
           viewActive={activeView === "editor"}
+          autoFocusTitle={library.state.selectedFileIds.size <= 1}
           headerLeadingAction={menuInTrackHeader ? mobileMenuButton : undefined}
           selectedFile={editor.selectedFile}
           selectedFileId={selectedFileId}

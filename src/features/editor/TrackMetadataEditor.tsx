@@ -45,6 +45,7 @@ type LoadedTrack = TagiumFile & { metadata: AudioMetadata };
 
 interface TrackMetadataEditorProps {
   viewActive?: boolean;
+  autoFocusTitle: boolean;
   headerLeadingAction?: ReactNode;
   selectedFile: TagiumFile | null;
   selectedFileId: string | null;
@@ -241,7 +242,7 @@ function TrackDetailsFields({
   metadataLinks,
   filenameInvalid,
   onPreviewMetadataChange,
-  active,
+  autoFocus,
 }: {
   selectedFileId: string | null;
   focusedTitleFileIdRef: RefObject<string | null>;
@@ -253,7 +254,7 @@ function TrackDetailsFields({
   metadataLinks: MetadataLinkState;
   filenameInvalid: boolean;
   onPreviewMetadataChange: TrackMetadataEditorProps["onPreviewMetadataChange"];
-  active: boolean;
+  autoFocus: boolean;
 }) {
   const titleRegistration = register("title", {
     onChange: (event) => onPreviewMetadataChange("title", event),
@@ -266,13 +267,13 @@ function TrackDetailsFields({
   const titleInputRef = useCallback(
     (node: HTMLInputElement | null) => {
       titleRegistrationRef(node);
-      if (!node || !selectedFileId || !active) return;
+      if (!node || !selectedFileId || !autoFocus) return;
       if (focusedTitleFileIdRef.current === selectedFileId) return;
 
       focusedTitleFileIdRef.current = selectedFileId;
       node.focus({ preventScroll: true });
     },
-    [active, focusedTitleFileIdRef, selectedFileId, titleRegistrationRef],
+    [autoFocus, focusedTitleFileIdRef, selectedFileId, titleRegistrationRef],
   );
   const singleAlbumLinked = !inAlbum && metadataLinks.singleAlbum;
   const albumLinked = inAlbum || singleAlbumLinked;
@@ -656,6 +657,7 @@ function PendingTrackMetadataEditor({
 
 function LoadedTrackMetadataEditor({
   viewActive,
+  autoFocusTitle,
   headerLeadingAction,
   selectedFile,
   selectedFileId,
@@ -891,7 +893,7 @@ function LoadedTrackMetadataEditor({
                     metadataLinks={metadataLinks}
                     filenameInvalid={filenameInvalid}
                     onPreviewMetadataChange={onPreviewMetadataChange}
-                    active={editorMode === "normal"}
+                    autoFocus={autoFocusTitle && editorMode === "normal"}
                   />
                 </div>
                 {advancedMetadata && (
