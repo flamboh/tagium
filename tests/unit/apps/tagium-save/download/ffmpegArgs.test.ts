@@ -116,6 +116,95 @@ describe("cobalt video ffmpeg args", () => {
     expect(args.slice(-3)).toEqual(["-f", "matroska", "output.mkv"]);
   });
 
+  it("remuxes proxied source audio into its named container with provider tags", () => {
+    expect(
+      makeLocalProcessingFfmpegArgs(
+        plan({
+          type: "proxy",
+          tunnel: ["audio", "cover"],
+          output: {
+            type: "audio/ogg",
+            filename: "clip.opus",
+            metadata: { title: "title", artist: "artist" },
+          },
+          audio: { copy: false, format: "opus", bitrate: "128", cover: true },
+        }),
+        ["input-0", "input-1"],
+        "output.opus",
+      ).slice(10),
+    ).toEqual([
+      "-vn",
+      "-c:a",
+      "copy",
+      "-metadata",
+      "title=title",
+      "-metadata",
+      "artist=artist",
+      "-f",
+      "opus",
+      "output.opus",
+    ]);
+  });
+
+  it("embeds the cover when proxied source audio is m4a", () => {
+    expect(
+      makeLocalProcessingFfmpegArgs(
+        plan({
+          type: "proxy",
+          tunnel: ["audio", "cover"],
+          output: { type: "audio/mp4", filename: "clip.m4a", metadata: { title: "title" } },
+          audio: { copy: false, format: "m4a", bitrate: "128", cover: true },
+        }),
+        ["input-0", "input-1"],
+        "output.m4a",
+      ).slice(10),
+    ).toEqual([
+      "-map",
+      "0",
+      "-map",
+      "1",
+      "-c:v",
+      "copy",
+      "-disposition:v",
+      "attached_pic",
+      "-c:a",
+      "copy",
+      "-metadata",
+      "title=title",
+      "-f",
+      "ipod",
+      "output.m4a",
+    ]);
+  });
+
+  it("tags proxied video without re-encoding it", () => {
+    expect(
+      makeLocalProcessingFfmpegArgs(
+        plan({
+          type: "proxy",
+          tunnel: ["video"],
+          output: { type: "video/mp4", filename: "clip.mp4", metadata: { title: "title" } },
+        }),
+        ["input-0"],
+        "output.mp4",
+      ).slice(8),
+    ).toEqual([
+      "-map",
+      "0:v?",
+      "-map",
+      "0:a?",
+      "-c",
+      "copy",
+      "-movflags",
+      "faststart+frag_keyframe+empty_moov",
+      "-metadata",
+      "title=title",
+      "-f",
+      "mp4",
+      "output.mp4",
+    ]);
+  });
+
   it("handles audio, gif, and metadata without allowing arbitrary ffmpeg flags", () => {
     expect(
       makeLocalProcessingFfmpegArgs(

@@ -9,7 +9,7 @@ import {
   type CobaltPickerItem,
   type CobaltVideoDownloadRequest,
 } from "./cobaltDownloadSchemas";
-import { outputFormatFromFilename } from "./ffmpegArgs";
+import { makeMetadataFfmpegArgs, outputFormatFromFilename } from "./ffmpegArgs";
 
 /** The browser-facing Cobalt request accepted by the downloader. */
 export type VideoDownloadRequest = CobaltVideoDownloadRequest;
@@ -362,6 +362,12 @@ const fetchTunnelFile = async (
 const localPlanMediaInputCount = (plan: CobaltLocalProcessingPlan) =>
   plan.output.subtitles ? plan.tunnel.length - 1 : plan.tunnel.length;
 
+const copiesTunnelDirectly = (plan: CobaltLocalProcessingPlan) =>
+  plan.type === "proxy" &&
+  !plan.audio &&
+  (plan.output.type.startsWith("image/") ||
+    makeMetadataFfmpegArgs(plan.output.metadata).length === 0);
+
 const pickerTypeDefaults: Record<
   CobaltPickerItem["type"],
   { extension: string; contentType: string }
@@ -611,7 +617,7 @@ const executePlan = async (
   }
 
   validateLocalPlan(plan);
-  if (plan.type === "proxy") {
+  if (copiesTunnelDirectly(plan)) {
     const tunnel = plan.tunnel[0];
     if (!tunnel) {
       throw new VideoDownloadError("processing", "cobalt proxy response is missing its tunnel.");
