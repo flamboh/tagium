@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent, ReactNode, RefObject } from "react";
+import { RotateLeft02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import { IconSwap } from "@/components/ui/icon-swap";
 import {
@@ -357,20 +359,26 @@ export default function TrackWaveform(props: TrackWaveformProps) {
         </Button>
         {/* The padding leaves room for clip handles, which sit just outside the clip. */}
         <div className="relative min-w-0 flex-1 px-2">
-          {clipped && (
-            <div className="absolute bottom-full left-1/2 mb-1 flex -translate-x-1/2 items-center gap-1.5 text-[0.6875rem] leading-tight tracking-widest whitespace-nowrap text-muted-foreground">
-              <span className="tabular-nums">
-                clip {formatTimestamp(range.start)}–{formatTimestamp(range.end)}
-              </span>
-              <button
-                type="button"
-                className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline"
-                onClick={() => onClipChange(undefined)}
-              >
-                reset
-              </button>
-            </div>
-          )}
+          <div
+            aria-hidden={!clipped}
+            inert={!clipped}
+            className={cn(
+              "absolute bottom-full left-1/2 mb-0.5 flex -translate-x-1/2 items-center gap-1.5 text-[0.6875rem] leading-tight tracking-widest whitespace-nowrap text-muted-foreground transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-none",
+              clipped ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-1 opacity-0",
+            )}
+          >
+            <span className="tabular-nums">
+              clip {formatTimestamp(range.start)}–{formatTimestamp(range.end)}
+            </span>
+            <button
+              type="button"
+              className="inline-flex cursor-pointer items-center gap-1 rounded-sm border border-border bg-background px-1.5 py-px text-foreground transition-colors outline-none hover:border-foreground/30 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50"
+              onClick={() => onClipChange(undefined)}
+            >
+              <HugeiconsIcon icon={RotateLeft02Icon} strokeWidth={2} className="size-3" />
+              reset
+            </button>
+          </div>
           <div
             ref={surfaceRef}
             role="slider"
