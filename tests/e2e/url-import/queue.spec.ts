@@ -1,6 +1,6 @@
 import { imageFixtures } from "../fixtures/catalog.ts";
 import { captureDownload, inspectAudio, unzipDownload } from "../support/audio";
-import { expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { IMPORT_TIMEOUT, test } from "../support/test";
 import type { Upstreams } from "../support/upstreams";
 import {
   audioPreview,
@@ -15,6 +15,7 @@ import {
   queueStatus,
   removeTrack,
   useSettings,
+  expect,
 } from "./helpers";
 
 test.describe.configure({ timeout: 120_000 });

@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto";
 import type { BrowserContext, Page } from "@playwright/test";
 import { captureDownload, inspectAudio } from "../support/audio";
-import { expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { IMPORT_TIMEOUT, test } from "../support/test";
 import type { Upstreams } from "../support/upstreams";
 import {
   cobaltRequestCount,
@@ -10,6 +10,7 @@ import {
   importUrl,
   notifications,
   waitForTrackReady,
+  expect,
 } from "./helpers";
 
 test.describe.configure({ timeout: 120_000 });

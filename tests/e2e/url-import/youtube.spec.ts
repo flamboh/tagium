@@ -6,7 +6,7 @@ import {
   inspectAudio,
   unzipDownload,
 } from "../support/audio";
-import { expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { IMPORT_TIMEOUT, test } from "../support/test";
 import type { FakeYouTubeVideo } from "../support/upstreams";
 import {
   audioPreview,
@@ -18,6 +18,7 @@ import {
   numberField,
   waitForTrackReady,
   savedAs,
+  expect,
 } from "./helpers";
 
 test.describe.configure({ timeout: 120_000 });

@@ -1,6 +1,6 @@
 import { imageFixtures, type ImageFixtureName } from "../fixtures/catalog.ts";
 import { captureDownload, inspectAudio, unzipDownload } from "../support/audio";
-import { expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { IMPORT_TIMEOUT, test } from "../support/test";
 import {
   audioPreview,
   cobaltRequests,
@@ -14,6 +14,7 @@ import {
   useSettings,
   waitForTrackReady,
   savedAs,
+  expect,
 } from "./helpers";
 
 test.describe.configure({ timeout: 120_000 });

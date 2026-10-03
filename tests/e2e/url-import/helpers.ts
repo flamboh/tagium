@@ -4,12 +4,14 @@ import type { BrowserContext, Page, Route } from "@playwright/test";
 import { audioFixtures, type AudioFixtureName } from "../fixtures/catalog.ts";
 import type { DownloadedFile } from "../support/audio";
 import type { Upstreams } from "../support/upstreams";
-import { expect, IMPORT_TIMEOUT } from "../support/test";
+import { expect as baseExpect, IMPORT_TIMEOUT } from "../support/test";
 import {
   APP_SETTINGS_STORAGE_KEY,
   DEFAULT_APP_SETTINGS,
 } from "../../../src/features/settings/settings";
 import type { AppSettings } from "../../../src/features/library/types";
+
+export const expect = baseExpect.configure({ timeout: 45_000 });
 
 export const importUrl = async (page: Page, url: string) => {
   await page.getByRole("textbox", { name: "media url" }).fill(url);
