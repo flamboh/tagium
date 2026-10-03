@@ -50,7 +50,7 @@ export const createCloudflareShareManifestPersistence = ({
   putArtwork: async ({ key, bytes, type, sha256, expiresAt }) => {
     await artwork.put(key, bytes, {
       httpMetadata: { contentType: type },
-      customMetadata: { sha256, expiresAt: String(expiresAt) },
+      customMetadata: expiresAt === null ? { sha256 } : { sha256, expiresAt: String(expiresAt) },
     });
   },
   deleteArtwork: (key) => artwork.delete(key),
@@ -113,8 +113,8 @@ export const createCloudflareShareManifestPersistence = ({
         `UPDATE share_manifests SET
           version = ?, payload_json = ?, artwork_key = ?, artwork_type = ?, artwork_bytes = ?,
           artwork_sha256 = ?, track_count = ?, payload_bytes = ?
-        WHERE slug = ? AND revocation_token_hash = ? AND status = 'active' AND expires_at = ?
-          AND expires_at > ? AND payload_json = ? AND artwork_key IS ?`,
+        WHERE slug = ? AND revocation_token_hash = ? AND status = 'active' AND expires_at IS ?
+          AND (expires_at IS NULL OR expires_at > ?) AND payload_json = ? AND artwork_key IS ?`,
       )
       .bind(
         replacement.version,
@@ -139,7 +139,7 @@ export const createCloudflareShareManifestPersistence = ({
     const row = await database
       .prepare(
         `UPDATE share_manifests SET status = 'disabled'
-       WHERE slug = ? AND revocation_token_hash = ? AND expires_at > ?
+       WHERE slug = ? AND revocation_token_hash = ? AND (expires_at IS NULL OR expires_at > ?)
        RETURNING slug, version, payload_json AS payloadJson, artwork_key AS artworkKey, artwork_type AS artworkType,
          artwork_bytes AS artworkBytes, artwork_sha256 AS artworkSha256, revocation_token_hash AS revocationTokenHash,
          track_count AS trackCount, payload_bytes AS payloadBytes, status, created_at AS createdAt, expires_at AS expiresAt`,

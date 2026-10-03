@@ -46,6 +46,15 @@ describe("shared content client", () => {
     expect(fetch).toHaveBeenCalledOnce();
   });
 
+  it("decodes indefinite shares without an expiry", async () => {
+    const fetch = vi.fn(async () => Response.json({ manifest, expiresAt: null, analyticsId }));
+    await expect(fetchSharedContent("k7m4q2", { fetch })).resolves.toEqual({
+      manifest,
+      expiresAt: null,
+      analyticsId,
+    });
+  });
+
   it("distinguishes a future contract from a generic unavailable response", async () => {
     const futureFetch = vi.fn(async () =>
       Response.json({

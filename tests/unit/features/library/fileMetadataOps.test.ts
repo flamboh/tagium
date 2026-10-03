@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   applyAlbumCoverToFiles,
   applyAlbumSharedTagsToFiles,
+  applyPlaylistImportedCover,
   applySingleAlbumTitlesToFiles,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
@@ -11,7 +12,7 @@ import {
   resolveDownloadedTrackHydrationWriteError,
   sanitizePendingMetadataPatch,
 } from "@/features/library/fileMetadataOps";
-import { AudioMetadata, TagiumFile } from "@/features/library/types";
+import { AlbumGroup, AudioMetadata, TagiumFile } from "@/features/library/types";
 import { DEFAULT_APP_SETTINGS } from "@/features/settings/settings";
 
 const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
@@ -629,5 +630,58 @@ describe("fileMetadataOps", () => {
     expect(hydratedFile.status).toBe("error");
     expect(hydratedFile.downloadStatus).toBe("ready");
     expect(hydratedFile.downloadError).toBe("Invalid ID3 tag");
+  });
+});
+
+describe("applyPlaylistImportedCover", () => {
+  const cover: AudioMetadata["picture"] = [
+    { format: "image/jpeg", type: 3, description: "album cover", data: new Uint8Array([1, 2, 3]) },
+  ];
+  const album: AlbumGroup = {
+    id: "album-1",
+    title: "Imported Set",
+    artist: "Artist",
+    genre: "",
+    coverPending: true,
+    trackIds: ["track-1", "track-2"],
+  };
+  const files = [readyFile(), readyFile({ id: "track-2", filename: "track-2.mp3" })];
+  const settings = { ...DEFAULT_APP_SETTINGS, applySoundCloudAlbumCoverToTracks: true };
+  const apply = (isAlbum: boolean, applySettings = settings) =>
+    applyPlaylistImportedCover(
+      files,
+      [album],
+      album.id,
+      album.trackIds,
+      { isAlbum },
+      applySettings,
+      cover,
+      null,
+    );
+
+  it("sets the album cover, ends the pending cover, and copies it to album tracks", () => {
+    const covered = apply(true);
+
+    expect(covered.albums[0]).toMatchObject({ cover, coverPending: false });
+    expect(covered.files.map((file) => file.metadata?.picture)).toEqual([cover, cover]);
+  });
+
+  it("keeps a playlist's cover off its tracks", () => {
+    const covered = apply(false);
+
+    expect(covered.albums[0]).toMatchObject({ cover, coverPending: false });
+    expect(covered.files).toBe(files);
+  });
+
+  it("keeps the cover off tracks when the setting or artwork link is off", () => {
+    expect(apply(true, { ...settings, applySoundCloudAlbumCoverToTracks: false }).files).toBe(
+      files,
+    );
+    expect(
+      apply(true, {
+        ...settings,
+        metadataLinks: { ...settings.metadataLinks, artwork: false },
+      }).files,
+    ).toBe(files);
   });
 });
