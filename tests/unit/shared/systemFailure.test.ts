@@ -57,15 +57,28 @@ describe("system failure reporting", () => {
   });
 
   it.each([
+    "error.api.link.invalid",
     "error.api.link.unsupported",
     "error.api.service.unsupported",
     "error.api.service.audio_not_supported",
   ])("maps typed Cobalt unsupported code %s to a non-retryable failure", (message) => {
     expect(getSystemFailurePresentation(new Error(message), "download")).toMatchObject({
       code: "unsupported_source",
+      trackDescription: "this link is not supported.",
       retryable: false,
     });
   });
+
+  it.each(["error.api.soundcloud.maybe_drm", "error.api.youtube.drm"])(
+    "explains typed Cobalt drm code %s without offering a retry",
+    (message) => {
+      expect(getSystemFailurePresentation(new Error(message), "download")).toMatchObject({
+        code: "unsupported_source",
+        trackDescription: "this media is drm-protected and can't be downloaded.",
+        retryable: false,
+      });
+    },
+  );
 
   it.each([
     "error.api.content.post.private",
