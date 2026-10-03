@@ -142,7 +142,7 @@ export function SortableTrackRow({
         ref={setActivatorNodeRef}
         variant="ghost"
         className={cn(
-          "justify-start h-auto py-2.5 px-4 pr-12 w-full text-left font-normal rounded-none hover:bg-accent/30 [@media(pointer:coarse)]:min-h-11",
+          "justify-start h-auto py-2.5 px-4 pr-12 w-full text-left font-normal rounded-none transition-[color,background-color,opacity] hover:bg-accent/30 [@media(pointer:coarse)]:min-h-11",
           container === "loose" ? "py-3" : "",
           muted ? "opacity-65" : "",
           selectedTone === "primary" ? "bg-accent text-accent-foreground" : "",
@@ -370,7 +370,7 @@ export function SortableAlbumCard({
       ref={setNodeRef}
       data-drawer-swipe-optout="true"
       className={cn(
-        "border-b transition-all shrink-0",
+        "border-b transition-[background-color,opacity] shrink-0",
         selected ? "bg-brand/5" : "",
         isDragging ? "z-10 opacity-60" : "",
       )}
