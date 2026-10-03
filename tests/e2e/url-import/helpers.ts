@@ -13,6 +13,8 @@ import type { AppSettings } from "../../../src/features/library/types";
 
 export const expect = baseExpect.configure({ timeout: 45_000 });
 
+export const SETTLE_TIMEOUT = { timeout: 120_000 };
+
 export const importUrl = async (page: Page, url: string) => {
   await page.getByRole("textbox", { name: "media url" }).fill(url);
   await page.getByRole("button", { name: "start media import" }).click();

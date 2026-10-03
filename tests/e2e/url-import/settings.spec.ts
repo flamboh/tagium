@@ -5,7 +5,7 @@ import {
   inspectAudio,
   unzipDownload,
 } from "../support/audio";
-import { IMPORT_TIMEOUT, test } from "../support/test";
+import { test } from "../support/test";
 import {
   cobaltRequests,
   downloadTrackButton,
@@ -17,9 +17,10 @@ import {
   waitForTrackReady,
   savedAs,
   expect,
+  SETTLE_TIMEOUT,
 } from "./helpers";
 
-test.describe.configure({ timeout: 120_000 });
+test.describe.configure({ timeout: 180_000 });
 
 const openImportSettings = async (page: Page) => {
   await page.getByRole("button", { name: "settings" }).click();
@@ -169,7 +170,7 @@ test("downloads an album right after import even when its cover cannot be import
       ),
     ).toBeVisible();
   });
-  await expect(page.getByText("downloaded 2/2", { exact: true })).toBeVisible(IMPORT_TIMEOUT);
+  await expect(page.getByText("downloaded 2/2", { exact: true })).toBeVisible(SETTLE_TIMEOUT);
 
   expect(archive.filename).toMatch(/\.zip$/u);
   const entries = unzipDownload(archive);

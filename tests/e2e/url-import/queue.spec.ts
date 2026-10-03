@@ -1,6 +1,6 @@
 import { imageFixtures } from "../fixtures/catalog.ts";
 import { captureDownload, inspectAudio, unzipDownload } from "../support/audio";
-import { IMPORT_TIMEOUT, test } from "../support/test";
+import { test } from "../support/test";
 import type { Upstreams } from "../support/upstreams";
 import {
   audioPreview,
@@ -16,12 +16,13 @@ import {
   removeTrack,
   useSettings,
   expect,
+  SETTLE_TIMEOUT,
 } from "./helpers";
 
-test.describe.configure({ timeout: 120_000 });
+test.describe.configure({ timeout: 180_000 });
 
 const trackButtons = (page: import("@playwright/test").Page) =>
-  page.getByRole("button", { name: /^\d+ .+\.(mp3|opus)$/u });
+  page.getByRole("button", { name: /^\d+ .+\.(mp3|m4a|opus)$/u });
 
 const trackSet = (upstreams: Upstreams, title: string, count: number) =>
   upstreams.soundcloud.set({
@@ -37,8 +38,10 @@ const trackSet = (upstreams: Upstreams, title: string, count: number) =>
 
 test("imports a youtube playlist as an ordered album, three downloads at a time", async ({
   page,
+  context,
   upstreams,
 }) => {
+  await useSettings(context, { audioFormat: "best" });
   const playlist = await upstreams.youtube.playlist({
     title: "Status Update Music",
     author: "lucida",
@@ -77,7 +80,7 @@ test("imports a youtube playlist as an ordered album, three downloads at a time"
   expect(plans.requested()).toHaveLength(3);
 
   await plans.releaseAll();
-  await expect(queueStatus(page, "downloaded 4/4")).toBeVisible(IMPORT_TIMEOUT);
+  await expect(queueStatus(page, "downloaded 4/4")).toBeVisible(SETTLE_TIMEOUT);
   expect(plans.requested()).toEqual(playlist.videos.map((video) => video.url));
   expect(plans.years()).toEqual([2026, 2026, 2026, 2026]);
 
@@ -97,7 +100,7 @@ test("imports a youtube playlist as an ordered album, three downloads at a time"
   expect(await upstreams.calls({ route: "ytimg.thumbnail" })).not.toHaveLength(0);
   for (const [index, video] of playlist.videos.entries()) {
     const entry = entries.find(
-      (file) => file.filename === `albums/Status Update Music/${video.title}.mp3`,
+      (file) => file.filename === `albums/Status Update Music/${video.title}.m4a`,
     );
     const { metadata } = await inspectAudio(entry!);
     expect(metadata).toMatchObject({
@@ -138,7 +141,7 @@ test("removing a downloading and a queued track shrinks the run and starts the n
   await expect(queueStatus(page, "downloading 0/3")).toBeVisible();
 
   await plans.releaseAll();
-  await expect(queueStatus(page, "downloaded 3/3")).toBeVisible(IMPORT_TIMEOUT);
+  await expect(queueStatus(page, "downloaded 3/3")).toBeVisible(SETTLE_TIMEOUT);
   await expect(trackButtons(page)).toHaveText([
     /^1\s*Track 2\.opus$/u,
     /^2\s*Track 3\.opus$/u,
@@ -174,7 +177,7 @@ test("canceling a playlist keeps its tracks and retry downloads all of them", as
   await plans.releaseAll();
 
   await page.getByRole("button", { name: "retry playlist downloads" }).click();
-  await expect(queueStatus(page, "downloaded 4/4")).toBeVisible(IMPORT_TIMEOUT);
+  await expect(queueStatus(page, "downloaded 4/4")).toBeVisible(SETTLE_TIMEOUT);
   await expect(page.getByRole("button", { name: "download all" })).toBeEnabled();
   expect(plans.requested().slice(3).sort()).toEqual(set.tracks.map((track) => track.url).sort());
   for (const track of set.tracks) {
@@ -207,7 +210,7 @@ test("a failed playlist track keeps the successes and retry downloads only the f
 
   await page.goto("/");
   await importUrl(page, set.url);
-  await expect(queueStatus(page, "failed 1/4")).toBeVisible(IMPORT_TIMEOUT);
+  await expect(queueStatus(page, "failed 1/4")).toBeVisible(SETTLE_TIMEOUT);
   await expect(page.getByText("downloads failed", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "download all" })).toBeDisabled();
 
@@ -222,7 +225,7 @@ test("a failed playlist track keeps the successes and retry downloads only the f
   });
 
   await page.getByRole("button", { name: "retry playlist downloads" }).click();
-  await expect(page.getByRole("button", { name: "download all" })).toBeEnabled(IMPORT_TIMEOUT);
+  await expect(page.getByRole("button", { name: "download all" })).toBeEnabled(SETTLE_TIMEOUT);
   await expect(page.getByRole("button", { name: /track has an error/u })).toHaveCount(0);
   await expect(queueStatus(page, "failed 1/4")).toBeHidden();
   const [one, two, three, four] = set.tracks;

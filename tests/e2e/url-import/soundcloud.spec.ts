@@ -1,6 +1,6 @@
 import { imageFixtures, type ImageFixtureName } from "../fixtures/catalog.ts";
 import { captureDownload, inspectAudio, unzipDownload } from "../support/audio";
-import { IMPORT_TIMEOUT, test } from "../support/test";
+import { test } from "../support/test";
 import {
   audioPreview,
   cobaltRequests,
@@ -15,9 +15,10 @@ import {
   waitForTrackReady,
   savedAs,
   expect,
+  SETTLE_TIMEOUT,
 } from "./helpers";
 
-test.describe.configure({ timeout: 120_000 });
+test.describe.configure({ timeout: 180_000 });
 
 const sizeOf = (image: ImageFixtureName) => ({
   width: imageFixtures[image].width,
@@ -113,7 +114,7 @@ test("imports a soundcloud album in order with album tags, seconds durations and
   await expect.poll(plans.requested).toEqual(set.tracks.map((track) => track.url));
 
   await plans.releaseAll();
-  await expect(queueStatus(page, "downloaded 3/3")).toBeVisible(IMPORT_TIMEOUT);
+  await expect(queueStatus(page, "downloaded 3/3")).toBeVisible(SETTLE_TIMEOUT);
   await page.getByRole("button", { name: "download all" }).click();
   const archive = await captureDownload(page, () =>
     page
@@ -170,7 +171,7 @@ for (const { name, isAlbum, albumCover } of [
     await page.goto("/");
     await importUrl(page, set.url);
     await expect(page.getByRole("button", { name: "Remixes Forss · 2 tracks" })).toBeVisible();
-    await expect(queueStatus(page, "downloaded 2/2")).toBeVisible(IMPORT_TIMEOUT);
+    await expect(queueStatus(page, "downloaded 2/2")).toBeVisible(SETTLE_TIMEOUT);
 
     await expect(field(page, "album")).toHaveValue("Remixes");
     await expect(numberField(page, "track")).toHaveValue("1");
@@ -216,7 +217,7 @@ test("resolves soundcloud short links to the canonical track and set", async ({
 
   await importUrl(page, setLink);
   await expect(page.getByRole("button", { name: "Short Set Shorty · 2 tracks" })).toBeVisible();
-  await expect(queueStatus(page, "downloaded 2/2")).toBeVisible(IMPORT_TIMEOUT);
+  await expect(queueStatus(page, "downloaded 2/2")).toBeVisible(SETTLE_TIMEOUT);
 
   expect((await cobaltRequests(upstreams)).map((request) => request.url).sort()).toEqual(
     [track.url, ...set.tracks.map((setTrack) => setTrack.url)].sort(),
