@@ -1,4 +1,4 @@
-import { expect, test } from "../support/test";
+import { expect, IMPORT_TIMEOUT, test } from "../support/test";
 import { saveApp } from "./save";
 
 test("explains links that are not complete web addresses without contacting cobalt", async ({
@@ -59,7 +59,7 @@ test("sends a pasted list of links as one link", async ({
   await expect(save.url).toHaveValue(pasted);
   await save.submit.click();
 
-  await expect(save.alert).toHaveText("this link is not supported.");
+  await expect(save.alert).toHaveText("this link is not supported.", IMPORT_TIMEOUT);
   await expect(save.retry).toHaveCount(0);
   const resolves = await upstreams.calls({ route: "cobalt.resolve" });
   expect(resolves.map((call) => JSON.parse(call.requestBody!).url)).toEqual([pasted]);

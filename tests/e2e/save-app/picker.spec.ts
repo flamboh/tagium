@@ -1,9 +1,10 @@
 import { imageFixture, inspectAudio } from "../support/audio";
 import { probeMedia } from "../support/media";
-import { expect, test } from "../support/test";
+import { expect, IMPORT_TIMEOUT, test } from "../support/test";
 import { saveApp } from "./save";
 
 test("saves each piece of media offered by a post, and its audio", async ({ page, upstreams }) => {
+  test.slow();
   const post = await upstreams.picker({
     items: [
       { type: "photo", asset: "cover" },
@@ -23,7 +24,7 @@ test("saves each piece of media offered by a post, and its audio", async ({ page
     await expect(save.settings).toBeDisabled();
     await expect(save.submit).toBeDisabled();
     await page.getByRole("button", { name: choice, exact: true }).click();
-    await expect(save.downloadButton(filename)).toBeVisible();
+    await expect(save.downloadButton(filename)).toBeVisible(IMPORT_TIMEOUT);
     await expect(page.getByRole("button", { name: "download photo 1" })).toBeHidden();
     return save.download(filename);
   };
@@ -51,7 +52,7 @@ test("saves each piece of media offered by a post, and its audio", async ({ page
     "tagium-photo.jpg",
   ]);
   expect(await upstreams.calls({ route: "media.direct" })).toHaveLength(1);
-  expect(await upstreams.calls({ route: "cobalt.tunnel.picker" })).toHaveLength(3);
+  expect(await upstreams.calls({ route: "cobalt.tunnel.post" })).toHaveLength(3);
 });
 
 test("resetting a post's choices leaves nothing saved", async ({ page, upstreams }) => {
@@ -73,5 +74,20 @@ test("resetting a post's choices leaves nothing saved", async ({ page, upstreams
   await expect(save.url).toHaveValue("");
   await expect(save.url).toBeEditable();
   await expect(save.recent).toHaveCount(0);
-  expect(await upstreams.calls({ route: "cobalt.tunnel.picker" })).toHaveLength(0);
+  expect(await upstreams.calls({ route: "cobalt.tunnel.post" })).toHaveLength(0);
+});
+
+test("saves a gif post as an animated gif", async ({ page, upstreams }) => {
+  const post = await upstreams.gifPost({ asset: "h264-480", filename: "dancing cat.gif" });
+  const save = saveApp(page);
+
+  await save.open();
+  await save.save(post.url, "dancing cat.gif");
+
+  const gif = await probeMedia(await save.download("dancing cat.gif"));
+  expect(gif.container).toBe("gif");
+  expect(gif.streams).toEqual([
+    expect.objectContaining({ type: "video", codec: "gif", width: 854, height: 480 }),
+  ]);
+  expect(gif.streams[0]!.frames).toBeGreaterThan(1);
 });

@@ -57,6 +57,7 @@ export const saveApp = (page: Page) => {
     },
     async save(url: string, filename: string) {
       await app.start(url);
+      await expect(app.url).toHaveValue("", IMPORT_TIMEOUT);
       await expect(app.downloadButton(filename).first()).toBeVisible(IMPORT_TIMEOUT);
     },
     async download(filename: string, index = 0) {
@@ -69,3 +70,25 @@ export const saveApp = (page: Page) => {
   };
   return app;
 };
+
+export const temporarySessions = (page: Page) =>
+  page.evaluate(async () => {
+    const root = await navigator.storage.getDirectory();
+    let directory: FileSystemDirectoryHandle;
+    try {
+      directory = await root.getDirectoryHandle("tagium-save-temporary");
+    } catch {
+      return {};
+    }
+    const sessions: Record<string, number> = {};
+    for await (const [name, handle] of directory.entries()) {
+      if (!(handle instanceof FileSystemDirectoryHandle)) continue;
+      let files = 0;
+      for await (const _ of handle.keys()) files += 1;
+      sessions[name] = files;
+    }
+    return sessions;
+  });
+
+export const storedFileCount = async (page: Page) =>
+  Object.values(await temporarySessions(page)).reduce((total, files) => total + files, 0);

@@ -1,12 +1,13 @@
-import type { Page } from "@playwright/test";
-import { inspectAudio } from "../support/audio";
-import { expect, test } from "../support/test";
-import { SAVE_PATH, saveApp } from "./save";
+import { imageFixture, inspectAudio } from "../support/audio";
+import { expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { SAVE_PATH, saveApp, storedFileCount, temporarySessions } from "./save";
 
 test("keeps the five newest saves downloadable until the page reloads", async ({
   page,
+  browserName,
   upstreams,
 }) => {
+  test.slow();
   const tracks = await Promise.all(
     ["One", "Two", "Three", "Four", "Five"].map((title) =>
       upstreams.soundcloud.track({ title, author: "Loop", cover: null }),
@@ -26,6 +27,7 @@ test("keeps the five newest saves downloadable until the page reloads", async ({
   await save.save(tracks[0]!.url, name("One"));
 
   await expect(save.rows).toHaveText(["One", "Five", "Four", "Three", "Two"].map(name));
+  if (browserName !== "webkit") await expect.poll(() => storedFileCount(page)).toBe(5);
   const resolvesBefore = (await upstreams.calls({ route: "cobalt.resolve" })).length;
   expect(resolvesBefore).toBe(6);
 
@@ -43,33 +45,13 @@ test("keeps the five newest saves downloadable until the page reloads", async ({
   await expect(page.getByLabel("quality", { exact: true })).toHaveValue("1080");
 });
 
-const temporarySessions = (page: Page) =>
-  page.evaluate(async () => {
-    const root = await navigator.storage.getDirectory();
-    let directory: FileSystemDirectoryHandle;
-    try {
-      directory = await root.getDirectoryHandle("tagium-save-temporary");
-    } catch {
-      return {};
-    }
-    const sessions: Record<string, number> = {};
-    for await (const [name, handle] of directory.entries()) {
-      if (handle.kind !== "directory") continue;
-      let files = 0;
-      if (handle instanceof FileSystemDirectoryHandle) {
-        for await (const _ of handle.keys()) files += 1;
-      }
-      sessions[name] = files;
-    }
-    return sessions;
-  });
-
 test("reclaims saved media from closed pages while open pages keep theirs", async ({
   browser,
   baseURL,
   sandbox,
   upstreams,
 }, testInfo) => {
+  test.slow();
   const first = await upstreams.soundcloud.track({
     title: "First Tab",
     author: "Loop",
@@ -122,4 +104,29 @@ test("reclaims saved media from closed pages while open pages keep theirs", asyn
   } finally {
     await context.close();
   }
+});
+
+test("saves files when the browser refuses private storage", async ({ page, upstreams }) => {
+  await page.addInitScript(() => {
+    navigator.storage.getDirectory = () =>
+      Promise.reject(new DOMException("denied", "SecurityError"));
+  });
+  const track = await upstreams.soundcloud.track({
+    title: "In Memory",
+    author: "Loop",
+    cover: null,
+  });
+  const photos = await upstreams.picker({ items: [{ type: "photo", asset: "cover" }] });
+  const save = saveApp(page);
+
+  await save.open();
+  await save.save(track.url, "In Memory - Loop (soundcloud).opus");
+  const audio = await save.download("In Memory - Loop (soundcloud).opus");
+  expect((await inspectAudio(audio)).metadata).toMatchObject({ title: "In Memory" });
+
+  await save.start(photos.url);
+  await page.getByRole("button", { name: "download photo 1" }).click();
+  await expect(save.downloadButton("tagium-photo.jpg")).toBeVisible(IMPORT_TIMEOUT);
+  const photo = await save.download("tagium-photo.jpg");
+  expect(photo.bytes).toEqual(imageFixture("cover").bytes);
 });

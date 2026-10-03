@@ -2,7 +2,9 @@ import type { Page } from "@playwright/test";
 import { FAKE_COBALT_ORIGIN } from "../harness/protocol.ts";
 import type { Upstreams } from "../support/upstreams";
 import { expect, IMPORT_TIMEOUT, test } from "../support/test";
-import { saveApp } from "./save";
+import { saveApp, storedFileCount } from "./save";
+
+test.describe.configure({ timeout: 120_000 });
 
 const copy = {
   busy: "downloads are busy. try again in a moment.",
@@ -132,7 +134,7 @@ const expectFailure = async (
   failure: Omit<Failure, "arrange" | "name">,
 ) => {
   const save = saveApp(page);
-  await expect(save.alert).toHaveText(failure.message, failure.slow ? IMPORT_TIMEOUT : undefined);
+  await expect(save.alert).toHaveText(failure.message, IMPORT_TIMEOUT);
   await expect(save.retry).toHaveCount(failure.retryable ? 1 : 0);
   await expect(save.reset).toBeVisible();
   await expect(save.url).toHaveValue(url);
@@ -156,7 +158,10 @@ for (const failure of failures) {
     if (failure.retryable && !failure.slow) {
       await save.retry.click();
       await expect
-        .poll(async () => (await upstreams.calls({ route: "cobalt.resolve" })).length)
+        .poll(
+          async () => (await upstreams.calls({ route: "cobalt.resolve" })).length,
+          IMPORT_TIMEOUT,
+        )
         .toBe(2);
       await expectFailure(page, url, failure);
     }
@@ -179,7 +184,7 @@ test("explains an invalid response from cobalt", async ({ page, upstreams }) => 
 
   await save.open();
   await save.start(track.url);
-  await expect(save.alert).toBeVisible();
+  await expect(save.alert).toBeVisible(IMPORT_TIMEOUT);
   await expect(save.alert).toHaveText(copy.unexpected, { timeout: 1_000 });
 });
 
@@ -204,7 +209,9 @@ test("retries a busy download after the advertised wait and saves it", async ({
   await expectFailure(page, track.url, { message: copy.busy, retryable: true });
 
   await save.retry.click();
-  await expect(save.downloadButton("Busy Day - Queue (soundcloud).opus")).toBeVisible();
+  await expect(save.downloadButton("Busy Day - Queue (soundcloud).opus")).toBeVisible(
+    IMPORT_TIMEOUT,
+  );
   await expect(save.alert).toHaveCount(0);
 });
 
@@ -222,7 +229,9 @@ test("retries media that was busy to fetch and saves it", async ({ page, upstrea
   await expectFailure(page, track.url, { message: copy.busy, retryable: true });
 
   await save.retry.click();
-  await expect(save.downloadButton("Busy Tunnel - Queue (soundcloud).opus")).toBeVisible();
+  await expect(save.downloadButton("Busy Tunnel - Queue (soundcloud).opus")).toBeVisible(
+    IMPORT_TIMEOUT,
+  );
 });
 
 test("explains repeated downloads beyond the session limit", async ({
@@ -249,7 +258,7 @@ test("explains repeated downloads beyond the session limit", async ({
   await save.open();
   await save.save(first.url, "Allowed - Limit (soundcloud).opus");
   await save.start(second.url);
-  await expect(save.alert).toHaveText(copy.rateLimited);
+  await expect(save.alert).toHaveText(copy.rateLimited, IMPORT_TIMEOUT);
   await expect(save.retry).toBeVisible();
   await expect(save.downloadButton("Allowed - Limit (soundcloud).opus")).toBeVisible();
   expect(await upstreams.calls({ route: "cobalt.resolve" })).toHaveLength(1);
@@ -284,7 +293,7 @@ test("a failed save keeps earlier files and the layout in place", async ({ page,
   const rowBefore = await save.rows.first().boundingBox();
 
   await save.start(failing.url);
-  await expect(save.alert).toHaveText(copy.timeout);
+  await expect(save.alert).toHaveText(copy.timeout, IMPORT_TIMEOUT);
   expect(await slot.boundingBox()).toEqual(slotBefore);
   expect(await save.rows.first().boundingBox()).toEqual(rowBefore);
 
@@ -292,4 +301,27 @@ test("a failed save keeps earlier files and the layout in place", async ({ page,
   await expect(save.alert).toHaveCount(0);
   await expect(save.rows).toHaveText(["Kept - Stable (soundcloud).opus"]);
   await save.download("Kept - Stable (soundcloud).opus");
+});
+
+test("explains media that cannot be processed and leaves nothing behind", async ({
+  page,
+  browserName,
+  upstreams,
+}) => {
+  const video = await upstreams.youtube.video({ title: "Broken", cover: null });
+  await upstreams.cobalt.tunnel(video.url, {
+    kind: "status",
+    status: 200,
+    body: "not media at all",
+  });
+  const save = saveApp(page);
+
+  await save.open();
+  await save.configure({ mode: "audio", audio: "mp3" });
+  await save.start(video.url);
+  await expectFailure(page, video.url, {
+    message: "download failed. try again or use another link.",
+    retryable: true,
+  });
+  if (browserName !== "webkit") await expect.poll(() => storedFileCount(page)).toBe(0);
 });

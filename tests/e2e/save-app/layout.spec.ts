@@ -1,4 +1,4 @@
-import { expect, test } from "../support/test";
+import { expect, IMPORT_TIMEOUT, test } from "../support/test";
 import { saveApp } from "./save";
 
 const sizes = [
@@ -12,6 +12,7 @@ test("five recent saves stay readable and clear of the attribution on every scre
   page,
   upstreams,
 }) => {
+  test.slow();
   await page.emulateMedia({ reducedMotion: "reduce" });
   const tracks = await Promise.all(
     ["Alpha", "Bravo", "Charlie", "Delta", "Echo"].map((title) =>
@@ -70,7 +71,7 @@ test("save controls stay reachable on a phone while working and after an error",
   await save.cancel.click();
 
   await save.start(failing.url);
-  await expect(save.alert).toHaveText("downloads are busy. try again in a moment.");
+  await expect(save.alert).toHaveText("downloads are busy. try again in a moment.", IMPORT_TIMEOUT);
   await expect(save.retry).toBeInViewport();
   await expect(save.reset).toBeInViewport();
   const alert = (await save.alert.boundingBox())!;

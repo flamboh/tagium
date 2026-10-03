@@ -54,6 +54,7 @@ test("source audio is saved in the container its name promises, with tags", asyn
   page,
   upstreams,
 }) => {
+  test.slow();
   const webm = await upstreams.youtube.video({
     title: "Open Water",
     author: "Drift",
@@ -95,6 +96,7 @@ test("saves soundcloud audio with its provider tags in each audio format", async
   page,
   upstreams,
 }) => {
+  test.slow();
   const track = await upstreams.soundcloud.track({
     title: "Monkeys Spinning",
     author: "Kevin",

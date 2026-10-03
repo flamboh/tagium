@@ -18,6 +18,12 @@ test("saves a youtube video with audio as a tagged mp4", async ({ page, upstream
   page.on("download", () => {
     downloads += 1;
   });
+  const tunnelStarts: number[] = [];
+  page.on("requestfinished", (request) => {
+    if (new URL(request.url()).pathname === "/api/cobalt/tunnel") {
+      tunnelStarts.push(request.timing().startTime);
+    }
+  });
 
   await save.open();
   await save.save(video.url, filename);
@@ -40,6 +46,8 @@ test("saves a youtube video with audio as a tagged mp4", async ({ page, upstream
   expect(media.duration).toBeCloseTo(2, 0);
   expect(media.tags).toMatchObject({ title: "Harbor Lights", artist: "Night Channel" });
 
+  await expect.poll(() => tunnelStarts.length).toBe(2);
+  expect(Math.abs(tunnelStarts[1]! - tunnelStarts[0]!)).toBeGreaterThanOrEqual(1_000);
   const [resolve] = await upstreams.calls({ route: "cobalt.resolve" });
   expect(JSON.parse(resolve!.requestBody!)).toMatchObject({
     url: video.url,
@@ -58,6 +66,7 @@ test("quality, codec, and container settings shape the saved video", async ({
   page,
   upstreams,
 }) => {
+  test.slow();
   const video = await upstreams.youtube.video({
     title: "Tide Pools",
     author: "Coastline",

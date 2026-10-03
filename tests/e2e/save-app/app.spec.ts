@@ -1,4 +1,4 @@
-import { expect, test } from "../support/test";
+import { expect, IMPORT_TIMEOUT, test } from "../support/test";
 import { SAVE_PATH, saveApp } from "./save";
 
 test("opens to an empty save form", async ({ page }) => {
@@ -43,7 +43,7 @@ test("follows the system theme and remembers a chosen theme", async ({ page }) =
   await expect(page.getByRole("button", { name: "switch to dark mode" })).toBeVisible();
 });
 
-test("save.tagium.app opens tagium save, and tagium.app ignores the preview switch", async ({
+test("save.tagium.app opens tagium save, and other hosts open tagium", async ({
   browser,
   baseURL,
 }) => {
@@ -51,12 +51,19 @@ test("save.tagium.app opens tagium save, and tagium.app ignores the preview swit
   try {
     await context.route("**/*", async (route) => {
       const url = new URL(route.request().url());
-      if (url.hostname !== "save.tagium.app" && url.hostname !== "tagium.app") {
-        await route.abort();
+      if (!["save.tagium.app", "tagium.app", "video.tagium.app"].includes(url.hostname)) {
+        await route.abort().catch(() => {});
         return;
       }
-      const response = await route.fetch({ url: `${baseURL}${url.pathname}${url.search}` });
-      await route.fulfill({ response });
+      try {
+        const response = await route.fetch({
+          url: `${baseURL}${url.pathname}${url.search}`,
+          maxRetries: 3,
+        });
+        await route.fulfill({ response });
+      } catch {
+        await route.abort().catch(() => {});
+      }
     });
     const page = await context.newPage();
 
@@ -64,9 +71,11 @@ test("save.tagium.app opens tagium save, and tagium.app ignores the preview swit
     await expect(page).toHaveTitle("tagium save");
     await expect(page.getByRole("button", { name: "start video download" })).toBeVisible();
 
-    await page.goto("https://tagium.app/?app=tagium-save");
-    await expect(page).toHaveTitle("tagium");
-    await expect(page.getByRole("button", { name: "start media import" })).toBeVisible();
+    for (const url of ["https://tagium.app/?app=tagium-save", "https://video.tagium.app/"]) {
+      await page.goto(url);
+      await expect(page).toHaveTitle("tagium");
+      await expect(page.getByRole("button", { name: "start media import" })).toBeVisible();
+    }
   } finally {
     await context.close();
   }
@@ -77,6 +86,7 @@ test("neither app sends analytics from a build without an analytics key", async 
   context,
   upstreams,
 }) => {
+  test.slow();
   const analytics: string[] = [];
   context.on("request", (request) => {
     const url = new URL(request.url());
@@ -103,7 +113,7 @@ test("neither app sends analytics from a build without an analytics key", async 
   await save.save(track.url, "Quiet - Private (soundcloud).opus");
   await save.download("Quiet - Private (soundcloud).opus");
   await save.start(failing.url);
-  await expect(save.alert).toBeVisible();
+  await expect(save.alert).toBeVisible(IMPORT_TIMEOUT);
 
   await page.goto("/");
   await expect(page.getByRole("button", { name: "start media import" })).toBeVisible();

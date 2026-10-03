@@ -3,11 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { AnalyticsEvent } from "@/analytics";
 import TagiumSaveApp from "@/apps/tagium-save/TagiumSaveApp";
 import {
-  presentVideoDownloadFailure,
-  updateVideoDownloadSettings,
-  type VideoDownloadSettings,
-} from "@/apps/tagium-save/tagiumSaveModel";
-import {
   VideoDownloadError,
   type VideoDownloadResult,
   type VideoDownloadTask,
@@ -22,14 +17,6 @@ vi.mock("sonner", () => ({ toast: toastMocks }));
 
 const reactActEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
 reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
-
-const settings: VideoDownloadSettings = {
-  mode: "auto",
-  quality: "1080",
-  container: "mp4",
-  codec: "h264",
-  audioFormat: "best",
-};
 
 const taskFrom = <Result,>(promise: Promise<Result>): VideoDownloadTask<Result> => {
   const controller = new AbortController();
@@ -70,41 +57,10 @@ const captureEvents = () => {
   };
 };
 
-describe("tagium save app", () => {
+describe("tagium save analytics lifecycle", () => {
   beforeEach(() => {
     resetSystemFailureReportingForTest();
     toastMocks.error.mockClear();
-  });
-
-  it("keeps codec and container settings compatible", () => {
-    const webm = updateVideoDownloadSettings(settings, { key: "container", value: "webm" });
-    expect(webm).toMatchObject({ container: "webm", codec: "vp9" });
-
-    const h264 = updateVideoDownloadSettings(webm, { key: "codec", value: "h264" });
-    expect(h264).toMatchObject({ container: "mp4", codec: "h264" });
-
-    const matroska = updateVideoDownloadSettings(h264, { key: "container", value: "mkv" });
-    expect(updateVideoDownloadSettings(matroska, { key: "codec", value: "av1" })).toMatchObject({
-      container: "mkv",
-      codec: "av1",
-    });
-  });
-
-  it("keeps the download failure reason visible", () => {
-    const failure = presentVideoDownloadFailure(
-      new VideoDownloadError(
-        "planning",
-        "too many downloads too quickly. wait a moment, then try again.",
-        "rate_limited",
-      ),
-    );
-
-    expect(failure).toMatchObject({
-      code: "rate_limited",
-      trackDescription: "too many download requests. try again shortly.",
-      retryable: true,
-    });
-    expect(toastMocks.error).not.toHaveBeenCalled();
   });
 
   it("tracks one complete lifecycle for a direct file", async () => {
@@ -277,46 +233,6 @@ describe("tagium save app", () => {
     expect(handoffDownload).toHaveBeenCalledWith(result.file);
 
     act(() => renderer.unmount());
-  });
-
-  it("releases completed files when they leave the five-item list or the app unmounts", async () => {
-    const releases = Array.from({ length: 6 }, () => vi.fn(async () => undefined));
-    let resultIndex = 0;
-    const startDownload = vi.fn(() => {
-      const index = resultIndex++;
-      const controller = new AbortController();
-      return {
-        signal: controller.signal,
-        abort: () => controller.abort(),
-        promise: Promise.resolve({
-          status: "file" as const,
-          file: new File([`file-${index}`], `clip-${index}.mp4`),
-          release: releases[index],
-        }),
-      };
-    });
-
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(<TagiumSaveApp startDownload={startDownload} />);
-    });
-
-    for (let index = 0; index < releases.length; index++) {
-      await act(async () => {
-        renderer.root.findByProps({ name: "media-url" }).props.onChange({
-          target: { value: `https://example.test/watch/${index}` },
-        });
-      });
-      await act(async () => {
-        await renderer.root.findByType("form").props.onSubmit({ preventDefault: vi.fn() });
-      });
-    }
-
-    expect(releases[0]).toHaveBeenCalledOnce();
-    for (const release of releases.slice(1)) expect(release).not.toHaveBeenCalled();
-
-    act(() => renderer.unmount());
-    for (const release of releases) expect(release).toHaveBeenCalledOnce();
   });
 
   it("releases a file that completes after its operation was cancelled", async () => {

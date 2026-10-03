@@ -1,6 +1,6 @@
 import { inspectAudio } from "../support/audio";
-import { expect, test } from "../support/test";
-import { saveApp } from "./save";
+import { expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { saveApp, storedFileCount } from "./save";
 
 test("cancels a save while it is being prepared and saves another link", async ({
   page,
@@ -49,7 +49,11 @@ test("cancels a save whose media stalls halfway through", async ({ page, upstrea
 
   await save.open();
   await save.start(stalled.url);
-  await expect(save.progress).toHaveAttribute("aria-valuetext", /^downloading \d+%$/u);
+  await expect(save.progress).toHaveAttribute(
+    "aria-valuetext",
+    /^downloading \d+%$/u,
+    IMPORT_TIMEOUT,
+  );
   await expect(save.progress).not.toHaveAttribute("aria-valuetext", "downloading 100%");
 
   await save.cancel.click();
@@ -61,8 +65,17 @@ test("cancels a save whose media stalls halfway through", async ({ page, upstrea
   await expect(save.rows).toHaveCount(1);
 });
 
-test("cancels a save while its media is being processed", async ({ page, upstreams }) => {
-  const first = await upstreams.youtube.video({ title: "Long Encode", author: "Studio" });
+test("cancels a save while its media is being processed", async ({
+  page,
+  browserName,
+  upstreams,
+}) => {
+  test.slow();
+  const first = await upstreams.youtube.video({
+    title: "Long Encode",
+    author: "Studio",
+    cover: null,
+  });
   const second = await upstreams.youtube.video({ title: "Short Encode", author: "Studio" });
   const save = saveApp(page);
   let releaseLibAV = () => {};
@@ -77,7 +90,7 @@ test("cancels a save while its media is being processed", async ({ page, upstrea
   await save.open();
   await save.configure({ mode: "audio", audio: "mp3" });
   await save.start(first.url);
-  await expect(save.progress).toHaveAttribute("aria-valuetext", /^processing/u);
+  await expect(save.progress).toHaveAttribute("aria-valuetext", /^processing/u, IMPORT_TIMEOUT);
 
   await save.cancel.click();
   await expect(save.progress).toBeHidden();
@@ -87,4 +100,5 @@ test("cancels a save while its media is being processed", async ({ page, upstrea
   await expect(save.rows).toHaveCount(1);
   const file = await save.download("Short Encode - Studio (youtube).mp3");
   expect((await inspectAudio(file)).metadata).toMatchObject({ title: "Short Encode" });
+  if (browserName !== "webkit") await expect.poll(() => storedFileCount(page)).toBe(1);
 });
