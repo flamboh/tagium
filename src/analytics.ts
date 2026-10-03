@@ -161,6 +161,7 @@ export type AnalyticsEvent =
       audioBitrate: "320" | "256" | "128" | "96" | "64";
       audioFormat: "best" | "mp3";
       applySoundCloudCover: boolean;
+      downloadAfterImport: boolean;
       advancedMetadata: boolean;
       metadataLinks: MetadataLinkState;
     }
@@ -434,6 +435,7 @@ const CUSTOM_EVENT_PROPERTIES = {
     "audio_bitrate",
     "audio_format",
     "apply_soundcloud_cover",
+    "download_after_import",
     "advanced_metadata",
     ...METADATA_LINK_DESCRIPTORS.map((descriptor) => descriptor.analyticsProperty),
   ]),
@@ -1101,6 +1103,7 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
           audio_bitrate: event.audioBitrate,
           audio_format: event.audioFormat,
           apply_soundcloud_cover: event.applySoundCloudCover,
+          download_after_import: event.downloadAfterImport,
           advanced_metadata: event.advancedMetadata,
           ...serializeMetadataLinkAnalytics(event.metadataLinks),
         },
