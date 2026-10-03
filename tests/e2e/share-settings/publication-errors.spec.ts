@@ -1,5 +1,14 @@
-import { expect, JOURNEY_TIMEOUT, test } from "./fixtures";
-import { importAlbum, openShareDialog, randomIp, SHARE_URL, stubClipboard } from "./helpers";
+import { expect, IMPORT_TIMEOUT, JOURNEY_TIMEOUT, test } from "./fixtures";
+import {
+  importAlbum,
+  notifications,
+  openShareDialog,
+  randomIp,
+  SHARE_URL,
+  startImport,
+  stubClipboard,
+  trackMenu,
+} from "./helpers";
 
 test.describe.configure({ timeout: JOURNEY_TIMEOUT });
 
@@ -86,4 +95,32 @@ test("failed publications keep the preview, explain the failure and can be retri
 
   await dialog.getByRole("button", { name: "done" }).click();
   await expect(dialog).not.toBeAttached();
+});
+
+test("a title edited while the rejected share's menu is still closing keeps focus and every keystroke", async ({
+  page,
+  upstreams,
+}) => {
+  const video = await upstreams.youtube.video({ title: "Single", author: "Soloist" });
+  await page.goto("/");
+  await startImport(page, video.url);
+  await expect(page.getByRole("button", { name: "download track" })).toBeEnabled(IMPORT_TIMEOUT);
+  await page.addStyleTag({
+    content:
+      "[data-slot='dropdown-menu-content'][data-state='closed'] { animation-duration: 2s !important; }",
+  });
+
+  const title = page.getByLabel("title", { exact: true });
+  await title.fill("x".repeat(1_025));
+  const menu = await trackMenu(page, /^track actions for x+/u);
+  await menu.getByRole("menuitem", { name: "share track", exact: true }).click();
+  await expect(notifications(page).getByText("this track cannot be shared")).toBeVisible();
+  await title.fill("Single");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(title).toBeFocused();
+  await page.keyboard.type(" (shared)");
+  await expect(title).toHaveValue("Single (shared)");
+  await expect(
+    page.getByRole("button", { name: "track actions for Single (shared).mp3" }),
+  ).toBeVisible();
 });
