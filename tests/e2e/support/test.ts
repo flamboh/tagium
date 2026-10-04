@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
-import { test as base, expect, type BrowserContext } from "@playwright/test";
+import { test as base, expect, type BrowserContext, type Page } from "@playwright/test";
 import {
   FEATURE_DISCOVERY_STORAGE_KEY,
   type DiscoverableFeature,
@@ -13,6 +13,7 @@ const describeCall = (call: UpstreamCall) =>
 
 type HarnessFixtures = {
   upstreams: Upstreams;
+  pageCrashes: string[];
   seenFeatures: DiscoverableFeature[];
   sandbox: (context: BrowserContext) => Promise<void>;
   newContext: () => Promise<BrowserContext>;
@@ -37,9 +38,26 @@ export const test = base.extend<HarnessFixtures>({
     }
   },
 
-  sandbox: async ({ baseURL, upstreams, seenFeatures }, provide) => {
+  pageCrashes: async ({ browserName }, provide) => {
+    const crashes: string[] = [];
+    await provide(crashes);
+    if (crashes.length > 0) {
+      throw new Error(
+        `the ${browserName} page crashed (renderer or web content process died) at ${crashes.join(", ")}. this is a browser crash, not a slow step`,
+      );
+    }
+  },
+
+  sandbox: async ({ baseURL, upstreams, seenFeatures, pageCrashes }, provide) => {
     const appOrigin = new URL(baseURL!).origin;
     await provide(async (context) => {
+      const watch = (page: Page) =>
+        page.on("crash", () => {
+          pageCrashes.push(page.url());
+          void page.close().catch(() => {});
+        });
+      context.pages().forEach(watch);
+      context.on("page", watch);
       await context.addInitScript(
         ({ key, value }) => {
           Object.defineProperty(Navigator.prototype, "webdriver", { get: () => false });
