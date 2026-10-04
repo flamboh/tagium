@@ -1,14 +1,7 @@
-import { expect, IMPORT_TIMEOUT, test } from "./fixtures";
-import {
-  albumManifest,
-  albumMenu,
-  createShare,
-  notifications,
-  startImport,
-  IMPORT_HEAVY,
-} from "./helpers";
+import { expect, IMPORT_TIMEOUT, JOURNEY_TIMEOUT, test } from "./fixtures";
+import { albumManifest, albumMenu, createShare, notifications, startImport } from "./helpers";
 
-test.describe.configure(IMPORT_HEAVY);
+test.describe.configure({ timeout: JOURNEY_TIMEOUT });
 
 test("pasted share links add the album in place, then select it instead of adding a duplicate", async ({
   page,

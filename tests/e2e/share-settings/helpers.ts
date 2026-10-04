@@ -46,8 +46,10 @@ export const seedSettings = (context: BrowserContext, settings: Partial<AppSetti
   );
 
 export const startImport = async (page: Page, url: string) => {
+  const submit = page.getByRole("button", { name: "start media import" });
+  await expect(submit).not.toHaveAttribute("aria-busy", "true", IMPORT_TIMEOUT);
   await page.getByRole("textbox", { name: "media url" }).fill(url);
-  await page.getByRole("button", { name: "start media import" }).click();
+  await submit.click();
 };
 
 export const albumMenu = async (page: Page, title: string) => {
@@ -220,5 +222,3 @@ export const stubClipboard = async (context: BrowserContext) => {
 
 export const savedName = (name: string) =>
   test.info().project.name === "webkit" ? name.replaceAll(" ", "_") : name;
-
-export const IMPORT_HEAVY = { timeout: 150_000 };

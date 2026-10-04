@@ -134,6 +134,12 @@ export const test = base.extend<HarnessFixtures>({
   },
 });
 
-export const IMPORT_TIMEOUT = { timeout: 60_000 };
+export const TEST_TIMEOUT = 60_000;
+export const JOURNEY_TIMEOUT = 110_000;
+export const EXPECT_TIMEOUT = 10_000;
+export const IMPORT_TIMEOUT = { timeout: 20_000 };
+export const SETTLE_TIMEOUT = { timeout: 45_000 };
+
+export const journey = () => test.setTimeout(JOURNEY_TIMEOUT);
 
 export { expect };

@@ -1,7 +1,5 @@
-import { expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { expect, IMPORT_TIMEOUT, journey, test } from "../support/test";
 import { saveApp } from "./save";
-
-test.describe.configure({ timeout: 120_000 });
 
 const sizes = [
   { width: 390, height: 844 },
@@ -14,7 +12,7 @@ test("five recent saves stay readable and clear of the attribution on every scre
   page,
   upstreams,
 }) => {
-  test.slow();
+  journey();
   await page.emulateMedia({ reducedMotion: "reduce" });
   const tracks = await Promise.all(
     ["Alpha", "Bravo", "Charlie", "Delta", "Echo"].map((title) =>

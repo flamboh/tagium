@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import process from "node:process";
 import { E2E_BASE_URL, E2E_CONTROL_URL } from "./tests/e2e/harness/protocol.ts";
+import { EXPECT_TIMEOUT, TEST_TIMEOUT } from "./tests/e2e/support/test.ts";
 
 const browsers = [
   { name: "chromium", use: { ...devices["Desktop Chrome"] } },
@@ -14,8 +15,8 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
-  timeout: 60_000,
-  expect: { timeout: 15_000 },
+  timeout: TEST_TIMEOUT,
+  expect: { timeout: EXPECT_TIMEOUT },
   use: {
     baseURL: E2E_BASE_URL,
     trace: "retain-on-failure",

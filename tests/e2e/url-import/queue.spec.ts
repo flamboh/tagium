@@ -1,6 +1,6 @@
 import { imageFixtures } from "../fixtures/catalog.ts";
 import { captureDownload, inspectAudio, unzipDownload } from "../support/audio";
-import { test } from "../support/test";
+import { JOURNEY_TIMEOUT, test } from "../support/test";
 import type { Upstreams } from "../support/upstreams";
 import {
   audioPreview,
@@ -19,7 +19,7 @@ import {
   SETTLE_TIMEOUT,
 } from "./helpers";
 
-test.describe.configure({ timeout: 180_000 });
+test.describe.configure({ timeout: JOURNEY_TIMEOUT });
 
 const trackButtons = (page: import("@playwright/test").Page) =>
   page.getByRole("button", { name: /^\d+ .+\.(mp3|m4a|opus)$/u });

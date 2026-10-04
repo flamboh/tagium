@@ -1,9 +1,7 @@
 import { audioFixture, expectLosslessAudio, inspectAudio } from "../support/audio";
 import { probeMedia } from "../support/media";
-import { expect, test } from "../support/test";
+import { expect, journey, test } from "../support/test";
 import { saveApp } from "./save";
-
-test.describe.configure({ timeout: 120_000 });
 
 test("saves youtube audio as a tagged mp3 with its cover", async ({ page, upstreams }) => {
   const video = await upstreams.youtube.video({ title: "Café 東京 🎧", author: "Ártist / Duo" });
@@ -56,7 +54,6 @@ test("source audio is saved in the container its name promises, with tags", asyn
   page,
   upstreams,
 }) => {
-  test.slow();
   const webm = await upstreams.youtube.video({
     title: "Open Water",
     author: "Drift",
@@ -98,7 +95,7 @@ test("saves soundcloud audio with its provider tags in each audio format", async
   page,
   upstreams,
 }) => {
-  test.slow();
+  journey();
   const track = await upstreams.soundcloud.track({
     title: "Monkeys Spinning",
     author: "Kevin",

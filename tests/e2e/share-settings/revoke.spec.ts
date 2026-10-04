@@ -40,7 +40,7 @@ test("the creator's browser stops a share from its page after a failed attempt, 
   ).toBeVisible();
   await dialog.getByRole("button", { name: "keep sharing" }).click();
   await expect(dialog).not.toBeAttached();
-  expect((await request.get(`/api/manifests/${share.slug}`)).status()).toBe(200);
+  expect((await request.get(`/api/manifests/${share.slug}`, { maxRetries: 2 })).status()).toBe(200);
 
   await page.route(`**/api/manifests/${share.slug}`, (route) =>
     route.request().method() === "DELETE" ? route.abort("internetdisconnected") : route.fallback(),
@@ -53,7 +53,7 @@ test("the creator's browser stops a share from its page after a failed attempt, 
   expect(await storedReceipts(page)).toEqual([
     { slug: share.slug, expiresAt: share.expiresAt, token: share.revocationToken },
   ]);
-  expect((await request.get(`/api/manifests/${share.slug}`)).status()).toBe(200);
+  expect((await request.get(`/api/manifests/${share.slug}`, { maxRetries: 2 })).status()).toBe(200);
 
   await page.unrouteAll();
   const revocation = page.waitForRequest((candidate) => candidate.method() === "DELETE");
@@ -65,7 +65,7 @@ test("the creator's browser stops a share from its page after a failed attempt, 
   await expect(notifications(page).getByText("sharing stopped")).toBeVisible();
   await expect(notifications(page).getByText("the link no longer works.")).toBeVisible();
   expect(await storedReceipts(page)).toEqual([]);
-  expect((await request.get(`/api/manifests/${share.slug}`)).status()).toBe(404);
+  expect((await request.get(`/api/manifests/${share.slug}`, { maxRetries: 2 })).status()).toBe(404);
 
   await visitor.getByRole("button", { name: "add to library" }).click();
   await expect(
@@ -112,8 +112,10 @@ test("expired or foreign stored permissions don't offer stop sharing, and malfor
   await expect(
     page.getByRole("heading", { level: 1, name: "this share is no longer available" }),
   ).toBeVisible();
-  expect((await request.get(`/api/manifests/${owned.slug}`)).status()).toBe(404);
-  expect((await request.get(`/api/manifests/${expired.slug}`)).status()).toBe(200);
+  expect((await request.get(`/api/manifests/${owned.slug}`, { maxRetries: 2 })).status()).toBe(404);
+  expect((await request.get(`/api/manifests/${expired.slug}`, { maxRetries: 2 })).status()).toBe(
+    200,
+  );
 });
 
 test("opening a share while tagium is open in another tab offers to copy the link there", async ({

@@ -2,10 +2,8 @@ import type { Page } from "@playwright/test";
 import { APP_SETTINGS_STORAGE_KEY } from "../../../src/features/settings/settings";
 import { THEME_STORAGE_KEY } from "../../../src/features/theme/theme";
 import { audioFixture, captureDownload, expectLosslessAudio, inspectAudio } from "../support/audio";
-import { expect, IMPORT_TIMEOUT, test } from "./fixtures";
-import { startImport, IMPORT_HEAVY, savedName } from "./helpers";
-
-test.describe.configure(IMPORT_HEAVY);
+import { expect, IMPORT_TIMEOUT, journey, test } from "./fixtures";
+import { startImport, savedName } from "./helpers";
 
 const LINK_SWITCHES = [
   "sync artist with the album artist",
@@ -109,6 +107,7 @@ const mp3Bitrate = (bytes: Uint8Array) => {
 test("every setting persists across reloads, and unreadable stored settings fall back to defaults", async ({
   page,
 }) => {
+  journey();
   await page.goto("/");
   await page.evaluate(
     (key) =>
@@ -166,6 +165,7 @@ test("the download format and bitrate choices describe and change the audio tagi
   page,
   upstreams,
 }) => {
+  journey();
   const video = await upstreams.youtube.video({ title: "Format Test", audio: "m4a" });
   const converted = await upstreams.youtube.video({ title: "Bitrate Test" });
   await page.goto("/");
@@ -253,6 +253,7 @@ test("the soundcloud album cover setting replaces track covers once, at import",
   page,
   upstreams,
 }) => {
+  journey();
   const coverSize = async (filename: string) => {
     await page.getByRole("button", { name: filename }).click();
     const download = page.getByRole("button", { name: "download track" });

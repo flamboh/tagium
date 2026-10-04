@@ -4,20 +4,20 @@ import type { BrowserContext, Page, Route } from "@playwright/test";
 import { audioFixtures, type AudioFixtureName } from "../fixtures/catalog.ts";
 import type { DownloadedFile } from "../support/audio";
 import type { Upstreams } from "../support/upstreams";
-import { expect as baseExpect } from "../support/test";
+import { expect, IMPORT_TIMEOUT } from "../support/test";
 import {
   APP_SETTINGS_STORAGE_KEY,
   DEFAULT_APP_SETTINGS,
 } from "../../../src/features/settings/settings";
 import type { AppSettings } from "../../../src/features/library/types";
 
-export const expect = baseExpect.configure({ timeout: 45_000 });
-
-export const SETTLE_TIMEOUT = { timeout: 120_000 };
+export { expect, SETTLE_TIMEOUT } from "../support/test";
 
 export const importUrl = async (page: Page, url: string) => {
+  const submit = page.getByRole("button", { name: "start media import" });
+  await expect(submit).not.toHaveAttribute("aria-busy", "true", IMPORT_TIMEOUT);
   await page.getByRole("textbox", { name: "media url" }).fill(url);
-  await page.getByRole("button", { name: "start media import" }).click();
+  await submit.click();
 };
 
 export const field = (page: Page, name: "title" | "artist" | "album" | "genre") =>
@@ -30,7 +30,7 @@ export const downloadTrackButton = (page: Page) =>
   page.getByRole("button", { name: "download track", exact: true });
 
 export const waitForTrackReady = (page: Page) =>
-  expect(downloadTrackButton(page)).toBeEnabled(SETTLE_TIMEOUT);
+  expect(downloadTrackButton(page)).toBeEnabled(IMPORT_TIMEOUT);
 
 export const audioPreview = (page: Page) => page.getByRole("region", { name: "audio preview" });
 

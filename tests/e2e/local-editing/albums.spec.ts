@@ -39,7 +39,6 @@ const drag = async (page: Page, source: Locator, target: Locator, offsetY = 0) =
 };
 
 test("applies album edits and a new cover to every format it exports", async ({ page }) => {
-  test.slow();
   const sources = formats.map((format) => audioFixture(format));
   const artwork = imageFixture("artwork");
   await page.goto("/");

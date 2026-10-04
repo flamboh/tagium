@@ -1,5 +1,5 @@
 import type { APIRequestContext } from "@playwright/test";
-import { expect, IMPORT_TIMEOUT, test as base } from "../support/test";
+import { expect, IMPORT_TIMEOUT, journey, JOURNEY_TIMEOUT, test as base } from "../support/test";
 
 export const test = base.extend<{ request: APIRequestContext }>({
   request: async ({ playwright, baseURL }, provide) => {
@@ -12,4 +12,4 @@ export const test = base.extend<{ request: APIRequestContext }>({
   },
 });
 
-export { expect, IMPORT_TIMEOUT };
+export { expect, IMPORT_TIMEOUT, journey, JOURNEY_TIMEOUT };

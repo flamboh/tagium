@@ -25,7 +25,6 @@ import {
 test("reads every tag from all four formats picked together when links are off", async ({
   page,
 }) => {
-  test.slow();
   await seedSettings(page, unlinkedSettings);
   await page.goto("/");
   await pickFiles(

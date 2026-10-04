@@ -22,8 +22,6 @@ import {
   SETTLE_TIMEOUT,
 } from "./helpers";
 
-test.describe.configure({ timeout: 180_000 });
-
 test("imports a youtube video with prefilled tags, then edits and exports the same audio", async ({
   browserName,
   page,

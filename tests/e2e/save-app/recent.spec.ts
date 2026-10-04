@@ -1,15 +1,13 @@
 import { imageFixture, inspectAudio } from "../support/audio";
-import { expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { expect, IMPORT_TIMEOUT, journey, test } from "../support/test";
 import { SAVE_PATH, saveApp, storedFileCount, temporarySessions } from "./save";
-
-test.describe.configure({ timeout: 120_000 });
 
 test("keeps the five newest saves downloadable until the page reloads", async ({
   page,
   browserName,
   upstreams,
 }) => {
-  test.slow();
+  journey();
   const tracks = await Promise.all(
     ["One", "Two", "Three", "Four", "Five"].map((title) =>
       upstreams.soundcloud.track({ title, author: "Loop", cover: null }),
@@ -53,7 +51,7 @@ test("reclaims saved media from closed pages while open pages keep theirs", asyn
   sandbox,
   upstreams,
 }, testInfo) => {
-  test.slow();
+  journey();
   const first = await upstreams.soundcloud.track({
     title: "First Tab",
     author: "Loop",

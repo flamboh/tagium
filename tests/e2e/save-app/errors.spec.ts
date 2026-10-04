@@ -4,8 +4,6 @@ import type { Upstreams } from "../support/upstreams";
 import { expect, IMPORT_TIMEOUT, test } from "../support/test";
 import { saveApp, storedFileCount } from "./save";
 
-test.describe.configure({ timeout: 120_000 });
-
 const copy = {
   busy: "downloads are busy. try again in a moment.",
   rateLimited: "too many download requests. try again shortly.",

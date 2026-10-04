@@ -1,6 +1,6 @@
 import { imageFixtures, type ImageFixtureName } from "../fixtures/catalog.ts";
 import { captureDownload, inspectAudio, unzipDownload } from "../support/audio";
-import { test } from "../support/test";
+import { journey, test } from "../support/test";
 import {
   audioPreview,
   cobaltRequests,
@@ -17,8 +17,6 @@ import {
   expect,
   SETTLE_TIMEOUT,
 } from "./helpers";
-
-test.describe.configure({ timeout: 180_000 });
 
 const sizeOf = (image: ImageFixtureName) => ({
   width: imageFixtures[image].width,
@@ -76,6 +74,7 @@ test("imports a soundcloud album in order with album tags, seconds durations and
   page,
   upstreams,
 }) => {
+  journey();
   const set = await upstreams.soundcloud.set({
     title: "Ecclesia",
     author: "Forss",
@@ -193,6 +192,7 @@ test("resolves soundcloud short links to the canonical track and set", async ({
   page,
   upstreams,
 }) => {
+  journey();
   const track = await upstreams.soundcloud.track({
     title: "Short Track",
     author: "Shorty",

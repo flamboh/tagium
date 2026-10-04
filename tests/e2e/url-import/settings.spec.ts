@@ -20,8 +20,6 @@ import {
   SETTLE_TIMEOUT,
 } from "./helpers";
 
-test.describe.configure({ timeout: 180_000 });
-
 const openImportSettings = async (page: Page) => {
   await page.getByRole("button", { name: "settings" }).click();
   await expect(page.getByRole("heading", { name: "importing" })).toBeVisible();

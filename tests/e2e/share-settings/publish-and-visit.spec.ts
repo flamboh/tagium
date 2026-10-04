@@ -1,5 +1,5 @@
 import { captureDownload, inspectAudio, unzipDownload } from "../support/audio";
-import { expect, IMPORT_TIMEOUT, test } from "./fixtures";
+import { expect, IMPORT_TIMEOUT, JOURNEY_TIMEOUT, test } from "./fixtures";
 import {
   albumMenu,
   createShare,
@@ -13,11 +13,10 @@ import {
   startImport,
   storedReceipts,
   trackMenu,
-  IMPORT_HEAVY,
   savedName,
 } from "./helpers";
 
-test.describe.configure(IMPORT_HEAVY);
+test.describe.configure({ timeout: JOURNEY_TIMEOUT });
 
 const dialogExpiry = (expiresAt: string) =>
   new Date(expiresAt).toLocaleDateString(undefined, {

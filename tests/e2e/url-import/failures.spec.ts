@@ -14,8 +14,6 @@ import {
   SETTLE_TIMEOUT,
 } from "./helpers";
 
-test.describe.configure({ timeout: 180_000 });
-
 const urlField = (page: Page) => page.getByRole("textbox", { name: "media url" });
 
 test("rejects incomplete and unsupported links beside the url field", async ({

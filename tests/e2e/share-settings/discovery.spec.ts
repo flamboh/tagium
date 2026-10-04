@@ -1,9 +1,9 @@
 import { FEATURE_DISCOVERY_STORAGE_KEY } from "../../../src/features/discovery/featureDiscovery";
 import { audioFixture } from "../support/audio";
-import { expect, IMPORT_TIMEOUT, test } from "./fixtures";
-import { startImport, IMPORT_HEAVY } from "./helpers";
+import { expect, IMPORT_TIMEOUT, JOURNEY_TIMEOUT, test } from "./fixtures";
+import { startImport } from "./helpers";
 
-test.describe.configure(IMPORT_HEAVY);
+test.describe.configure({ timeout: JOURNEY_TIMEOUT });
 
 test.use({ seenFeatures: [] });
 

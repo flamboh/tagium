@@ -1,10 +1,8 @@
 import type { Request } from "@playwright/test";
 import type { MediaProbe } from "../support/media";
 import { probeMedia } from "../support/media";
-import { expect, test } from "../support/test";
+import { expect, journey, test } from "../support/test";
 import { saveApp } from "./save";
-
-test.describe.configure({ timeout: 120_000 });
 
 const expectDecoded = (media: MediaProbe) => {
   for (const stream of media.streams) {
@@ -69,7 +67,7 @@ test("quality, codec, and container settings shape the saved video", async ({
   page,
   upstreams,
 }) => {
-  test.slow();
+  journey();
   const video = await upstreams.youtube.video({
     title: "Tide Pools",
     author: "Coastline",

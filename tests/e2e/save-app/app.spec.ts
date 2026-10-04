@@ -1,8 +1,6 @@
 import { expect, test } from "../support/test";
 import { SAVE_PATH, saveApp } from "./save";
 
-test.describe.configure({ timeout: 120_000 });
-
 test("opens to an empty save form", async ({ page }) => {
   const save = saveApp(page);
 

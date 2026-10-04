@@ -3,10 +3,7 @@ import { probeMedia } from "../support/media";
 import { expect, IMPORT_TIMEOUT, test } from "../support/test";
 import { saveApp } from "./save";
 
-test.describe.configure({ timeout: 120_000 });
-
 test("saves each piece of media offered by a post, and its audio", async ({ page, upstreams }) => {
-  test.slow();
   const post = await upstreams.picker({
     items: [
       { type: "photo", asset: "cover" },

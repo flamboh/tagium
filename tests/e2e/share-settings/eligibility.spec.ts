@@ -1,8 +1,6 @@
 import { audioFixture } from "../support/audio";
 import { expect, IMPORT_TIMEOUT, test } from "./fixtures";
-import { albumMenu, dragOnto, importAlbum, trackMenu, IMPORT_HEAVY } from "./helpers";
-
-test.describe.configure(IMPORT_HEAVY);
+import { albumMenu, dragOnto, importAlbum, trackMenu } from "./helpers";
 
 test("local tracks and albums made from them explain why they can't be shared", async ({
   page,

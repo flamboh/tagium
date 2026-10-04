@@ -1,14 +1,7 @@
-import { expect, test } from "./fixtures";
-import {
-  importAlbum,
-  openShareDialog,
-  randomIp,
-  SHARE_URL,
-  stubClipboard,
-  IMPORT_HEAVY,
-} from "./helpers";
+import { expect, JOURNEY_TIMEOUT, test } from "./fixtures";
+import { importAlbum, openShareDialog, randomIp, SHARE_URL, stubClipboard } from "./helpers";
 
-test.describe.configure(IMPORT_HEAVY);
+test.describe.configure({ timeout: JOURNEY_TIMEOUT });
 
 test("failed publications keep the preview, explain the failure and can be retried", async ({
   page,
