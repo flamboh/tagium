@@ -43,6 +43,7 @@ export const createRegistry = () => {
   const tunnels = new Map<string, Tunnel>();
   const hangs = new Map<string, Set<() => void>>();
   const rateLimits = new Map<string, Owned<{ rule: RateLimitRule; used: number }>>();
+  const releasedOwners = new Map<string, string>();
   const calls: UpstreamCall[] = [];
 
   const cursor = (key: string) => {
@@ -88,6 +89,7 @@ export const createRegistry = () => {
       for (const map of [scenarios, cobaltOverrides, tunnelOverrides, rateLimits] as const) {
         for (const [key, entry] of map) {
           if (entry.owner !== owner) continue;
+          releasedOwners.set(key, owner);
           map.delete(key);
           cursors.delete(key);
           for (const resolve of hangs.get(key) ?? []) resolve();
@@ -117,6 +119,7 @@ export const createRegistry = () => {
         scenarios.get(key)?.owner ??
         cobaltOverrides.get(key)?.owner ??
         tunnelOverrides.get(key)?.owner ??
+        releasedOwners.get(key) ??
         null
       );
     },
