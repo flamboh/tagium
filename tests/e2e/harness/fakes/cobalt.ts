@@ -361,8 +361,9 @@ const serveTunnel = (request: FakeRequest, entry: Tunnel, route: string): FakeRe
 };
 
 const tunnel = (request: FakeRequest): FakeResult => {
-  const entry = request.registry.tunnel(request.url.searchParams.get("id"));
-  if (!entry) return unexpected("cobalt.tunnel.unknown");
+  const id = request.url.searchParams.get("id");
+  const entry = request.registry.tunnel(id);
+  if (!entry) return unexpected("cobalt.tunnel.unknown", request.registry.releasedTunnelKey(id));
   if (request.headers.get("fly-force-instance-id") !== entry.machineId) {
     return unexpected("cobalt.tunnel.machine_mismatch", entry.key);
   }
@@ -370,8 +371,11 @@ const tunnel = (request: FakeRequest): FakeResult => {
 };
 
 export const fakeDirectMedia = (request: FakeRequest): FakeResult => {
-  const entry = request.registry.tunnel(request.url.pathname.split("/")[1] ?? null);
-  if (request.method !== "GET" || !entry) return unexpected("media.direct.unknown");
+  const id = request.url.pathname.split("/")[1] ?? null;
+  const entry = request.registry.tunnel(id);
+  if (request.method !== "GET" || !entry) {
+    return unexpected("media.direct.unknown", request.registry.releasedTunnelKey(id));
+  }
   return serveTunnel(request, entry, "media.direct");
 };
 

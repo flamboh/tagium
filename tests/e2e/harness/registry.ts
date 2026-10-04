@@ -44,6 +44,7 @@ export const createRegistry = () => {
   const hangs = new Map<string, Set<() => void>>();
   const rateLimits = new Map<string, Owned<{ rule: RateLimitRule; used: number }>>();
   const releasedOwners = new Map<string, string>();
+  const releasedTunnels = new Map<string, string>();
   const calls: UpstreamCall[] = [];
 
   const cursor = (key: string) => {
@@ -97,7 +98,11 @@ export const createRegistry = () => {
         }
       }
       for (const [id, key] of soundcloudIds) if (!scenarios.has(key)) soundcloudIds.delete(id);
-      for (const [id, tunnel] of tunnels) if (!scenarios.has(tunnel.key)) tunnels.delete(id);
+      for (const [id, tunnel] of tunnels) {
+        if (scenarios.has(tunnel.key)) continue;
+        releasedTunnels.set(id, tunnel.key);
+        tunnels.delete(id);
+      }
     },
     get(key: string | null) {
       return key ? scenarios.get(key)?.value : undefined;
@@ -142,6 +147,9 @@ export const createRegistry = () => {
     },
     tunnel(id: string | null) {
       return id ? tunnels.get(id) : undefined;
+    },
+    releasedTunnelKey(id: string | null) {
+      return id ? (releasedTunnels.get(id) ?? null) : null;
     },
     hang(key: string) {
       return new Promise<void>((resolve) => {
