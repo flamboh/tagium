@@ -39,7 +39,6 @@ import {
   startVideoDownload,
   VideoDownloadError,
   type CobaltPickerItem,
-  type CobaltVideoDownloadRequest,
   type VideoDownloadCallbacks,
   type VideoDownloadPhase,
   type VideoDownloadProgress,
@@ -939,11 +938,7 @@ export default function TagiumSaveApp({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [settings, setSettings] = useState(initialSettings);
   const [state, setState] = useState<DownloadState>({ kind: "idle" });
-  const lastRequestRef = useRef<{
-    request: CobaltVideoDownloadRequest;
-    sourceUrl: string;
-    settings: VideoDownloadSettings;
-  } | null>(null);
+  const lastSourceUrlRef = useRef<string | null>(null);
   const {
     activeLifecycleRef,
     activeTaskRef,
@@ -957,7 +952,6 @@ export default function TagiumSaveApp({
   } = useDownloadLifecycle({ capture, setState, setSourceUrl });
 
   const runRequest = async (
-    request: CobaltVideoDownloadRequest,
     source: string,
     requestedSettings: VideoDownloadSettings,
     isRetry: boolean,
@@ -965,7 +959,7 @@ export default function TagiumSaveApp({
     const operation = operationRef.current + 1;
     operationRef.current = operation;
     activeTaskRef.current?.abort();
-    lastRequestRef.current = { request, sourceUrl: source, settings: requestedSettings };
+    lastSourceUrlRef.current = source;
     const lifecycle: DownloadLifecycle = {
       sourceUrl: source,
       startedAt: Date.now(),
@@ -990,7 +984,10 @@ export default function TagiumSaveApp({
         requestedAudioFormat: requestedSettings.audioFormat,
         isRetry,
       });
-      const task = startDownload(request, callbacksFor(operation));
+      const task = startDownload(
+        buildVideoDownloadRequest(source, requestedSettings),
+        callbacksFor(operation),
+      );
       activeTaskRef.current = task;
       const result = await task.promise;
       if (operationRef.current !== operation || activeLifecycleRef.current !== lifecycle) {
@@ -1094,7 +1091,7 @@ export default function TagiumSaveApp({
       redirected: false,
       outcome: "accepted",
     });
-    await runRequest(buildVideoDownloadRequest(trimmedUrl, settings), trimmedUrl, settings, false);
+    await runRequest(trimmedUrl, settings, false);
     return true;
   };
 
@@ -1133,11 +1130,11 @@ export default function TagiumSaveApp({
   };
 
   const retry = () => {
-    const lastRequest = lastRequestRef.current;
-    if (!lastRequest || activeTaskRef.current) return;
-    setSourceUrl(lastRequest.sourceUrl);
+    const lastSourceUrl = lastSourceUrlRef.current;
+    if (!lastSourceUrl || activeTaskRef.current) return;
+    setSourceUrl(lastSourceUrl);
     setValidationError(null);
-    void runRequest(lastRequest.request, lastRequest.sourceUrl, lastRequest.settings, true);
+    void runRequest(lastSourceUrl, settings, true);
   };
 
   const prepareRecentDownload = (download: RecentDownload) => {
