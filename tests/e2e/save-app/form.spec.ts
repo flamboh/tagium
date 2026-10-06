@@ -1,6 +1,27 @@
 import { expect, IMPORT_TIMEOUT, test } from "../support/test";
 import { saveApp } from "./save";
 
+for (const mode of ["audio", "mute"] as const) {
+  test(`only shows settings that apply to ${mode} mode`, async ({ page }) => {
+    const save = saveApp(page);
+    await save.open();
+    await save.settings.click();
+    await page.getByLabel("mode", { exact: true }).selectOption(mode);
+
+    for (const label of ["quality", "container", "codec"]) {
+      await expect
+        .soft(page.getByLabel(label, { exact: true }))
+        .toHaveCount(mode === "audio" ? 0 : 1);
+    }
+    await expect(page.getByLabel("audio", { exact: true })).toHaveCount(mode === "mute" ? 0 : 1);
+
+    await page.getByLabel("mode", { exact: true }).selectOption("auto");
+    for (const label of ["quality", "container", "codec", "audio"]) {
+      await expect(page.getByLabel(label, { exact: true })).toBeVisible();
+    }
+  });
+}
+
 test("explains links that are not complete web addresses without contacting cobalt", async ({
   page,
   upstreams,

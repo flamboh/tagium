@@ -180,4 +180,7 @@ test("saves a youtube video without its audio track and keeps its tags", async (
   expect(await upstreams.calls({ route: "cobalt.tunnel.audio" })).toHaveLength(0);
   const [resolve] = await upstreams.calls({ route: "cobalt.resolve" });
   expect(JSON.parse(resolve!.requestBody!)).toMatchObject({ downloadMode: "mute" });
+  for (const option of ["audioFormat", "audioBitrate"]) {
+    expect.soft(JSON.parse(resolve!.requestBody!)).not.toHaveProperty(option);
+  }
 });

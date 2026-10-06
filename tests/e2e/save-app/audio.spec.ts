@@ -29,6 +29,9 @@ test("saves youtube audio as a tagged mp3 with its cover", async ({ page, upstre
     audioFormat: "mp3",
     audioBitrate: "128",
   });
+  for (const option of ["videoQuality", "youtubeVideoContainer", "youtubeVideoCodec"]) {
+    expect.soft(JSON.parse(resolve!.requestBody!)).not.toHaveProperty(option);
+  }
 });
 
 test("saves youtube audio as tagged ogg opus", async ({ page, upstreams }) => {

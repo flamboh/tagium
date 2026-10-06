@@ -269,34 +269,40 @@ function DownloadSettings({
             options={modeOptions}
             onChange={(value) => onChange({ key: "mode", value })}
           />
-          <SelectField
-            id="video-quality"
-            label="quality"
-            value={settings.quality}
-            options={qualityOptions}
-            onChange={(value) => onChange({ key: "quality", value })}
-          />
-          <SelectField
-            id="video-container"
-            label="container"
-            value={settings.container}
-            options={containerOptions}
-            onChange={(value) => onChange({ key: "container", value })}
-          />
-          <SelectField
-            id="video-codec"
-            label="codec"
-            value={settings.codec}
-            options={codecOptions}
-            onChange={(value) => onChange({ key: "codec", value })}
-          />
-          <SelectField
-            id="video-audio"
-            label="audio"
-            value={settings.audioFormat}
-            options={audioFormatOptions}
-            onChange={(value) => onChange({ key: "audioFormat", value })}
-          />
+          {settings.mode !== "audio" && (
+            <>
+              <SelectField
+                id="video-quality"
+                label="quality"
+                value={settings.quality}
+                options={qualityOptions}
+                onChange={(value) => onChange({ key: "quality", value })}
+              />
+              <SelectField
+                id="video-container"
+                label="container"
+                value={settings.container}
+                options={containerOptions}
+                onChange={(value) => onChange({ key: "container", value })}
+              />
+              <SelectField
+                id="video-codec"
+                label="codec"
+                value={settings.codec}
+                options={codecOptions}
+                onChange={(value) => onChange({ key: "codec", value })}
+              />
+            </>
+          )}
+          {settings.mode !== "mute" && (
+            <SelectField
+              id="video-audio"
+              label="audio"
+              value={settings.audioFormat}
+              options={audioFormatOptions}
+              onChange={(value) => onChange({ key: "audioFormat", value })}
+            />
+          )}
         </div>
       </PopoverContent>
     </Popover>
