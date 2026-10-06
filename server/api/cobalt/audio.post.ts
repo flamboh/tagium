@@ -270,7 +270,6 @@ const requestCobaltAudio = async (
         alwaysProxy: true,
         localProcessing: "forced",
         filenameStyle: "pretty",
-        youtubeVideoCodec: "h264",
         youtubeHLS: false,
       }),
     });

@@ -24,7 +24,6 @@ type RateLimitBinding = {
 const machineAffinitySecret = "test-machine-affinity-secret";
 const cobaltRequestSchema = Schema.Struct({
   audioFormat: Schema.String,
-  youtubeVideoCodec: Schema.String,
   youtubeHLS: Schema.Boolean,
 });
 
@@ -123,7 +122,6 @@ describe("cobalt audio endpoint", () => {
     expect(response.status).toBe(200);
     expect(cobaltBody).toEqual({
       audioFormat: testCase.expectedFormat,
-      youtubeVideoCodec: "h264",
       youtubeHLS: false,
     });
   });
