@@ -106,6 +106,80 @@ test("reclaims saved media from closed pages while open pages keep theirs", asyn
   }
 });
 
+test("sweeps old root entries at startup while an open tab keeps its session", async ({
+  browser,
+  baseURL,
+  sandbox,
+  upstreams,
+}, testInfo) => {
+  const track = await upstreams.soundcloud.track({
+    title: "Open Tab",
+    author: "Loop",
+    cover: null,
+  });
+  const context = await browser
+    .browserType()
+    .launchPersistentContext(testInfo.outputPath("profile"), { baseURL });
+  try {
+    await sandbox(context);
+    const tabA = context.pages()[0] ?? (await context.newPage());
+    const saveA = saveApp(tabA);
+    const filename = "Open Tab - Loop (soundcloud).opus";
+    await saveA.open();
+    await saveA.save(track.url, filename);
+    await expect.poll(async () => Object.values(await temporarySessions(tabA))).toEqual([1]);
+    const [sessionA] = Object.keys(await temporarySessions(tabA));
+
+    const tabB = await context.newPage();
+    await tabB.route(`**${SAVE_PATH}`, (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: "<!doctype html><title>seed storage</title>",
+      }),
+    );
+    await tabB.goto(SAVE_PATH);
+    await tabB.evaluate(async () => {
+      const root = await navigator.storage.getDirectory();
+      const file = await root.getFileHandle("tagium-video-old-build", { create: true });
+      const writer = await file.createWritable();
+      await writer.write("old temporary media");
+      await writer.close();
+      const directory = await root.getDirectoryHandle("old-temporary-directory", { create: true });
+      await directory.getFileHandle("leftover", { create: true });
+    });
+    const rootEntries = () =>
+      tabB.evaluate(async () => {
+        const root = await navigator.storage.getDirectory();
+        const names = [];
+        for await (const name of root.keys()) names.push(name);
+        return names.sort();
+      });
+    expect(await rootEntries()).toEqual([
+      "old-temporary-directory",
+      "tagium-save-temporary",
+      "tagium-video-old-build",
+    ]);
+
+    await tabB.unroute(`**${SAVE_PATH}`);
+    await tabB.reload();
+    await expect(saveApp(tabB).url).toBeEditable();
+    await expect.poll(rootEntries).toEqual(["tagium-save-temporary"]);
+    expect(await temporarySessions(tabB)).toMatchObject({ [sessionA!]: 1 });
+    expect((await inspectAudio(await saveA.download(filename))).metadata).toMatchObject({
+      title: "Open Tab",
+    });
+
+    await tabB.evaluate(async () => {
+      const root = await navigator.storage.getDirectory();
+      await root.getFileHandle("created-after-startup", { create: true });
+    });
+    await saveApp(tabB).save(track.url, filename);
+    expect(await rootEntries()).toEqual(["created-after-startup", "tagium-save-temporary"]);
+  } finally {
+    await context.close();
+  }
+});
+
 test("saves files when the browser refuses private storage", async ({ page, upstreams }) => {
   await page.addInitScript(() => {
     navigator.storage.getDirectory = () =>
