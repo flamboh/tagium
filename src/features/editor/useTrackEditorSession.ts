@@ -254,8 +254,9 @@ export const useTrackEditorSession = ({
         settingsRef.current.syncFilenames,
         settingsRef.current.metadataLinks.albumArtist,
         isSingleAlbumLinkedForFile(fileId),
+        library.getSnapshot().albums.some((album) => album.trackIds.includes(fileId ?? "")),
       ),
-    [isSingleAlbumLinkedForFile],
+    [isSingleAlbumLinkedForFile, library],
   );
 
   const createCurrentMetadataPatch = useCallback(
