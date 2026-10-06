@@ -233,6 +233,7 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
     lower.includes("error.api.invalid_response") ||
     lower.includes("malformed") ||
     lower.includes("invalid response") ||
+    lower.includes("invalid machine id") ||
     lower.includes("invalid download plan") ||
     lower.includes("non-json") ||
     lower.includes("response was empty") ||

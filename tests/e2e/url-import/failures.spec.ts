@@ -252,9 +252,9 @@ const failureCases: FailureCase[] = [
       await upstreams.cobalt.respond(video.url, { kind: "invalid-machine-id" });
       return video;
     },
-    title: "download failed",
-    detail: "download failed. try again or use another link.",
-    toast: "tagium could not download this track. try again or use another link.",
+    title: "we could not read this media",
+    detail: "the media provider returned an unexpected response.",
+    toast: "the provider returned an unexpected response. try again or use another link.",
     retryable: true,
   },
 ];
