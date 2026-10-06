@@ -355,14 +355,14 @@ export const libraryReducer = (state: LibraryState, action: LibraryAction): Libr
     case "selection-cleared":
       return withClearedSelection(state, true);
     case "all-tracks-selected": {
-      const firstFileId = state.files[0]?.id ?? null;
-      if (!firstFileId) return withClearedSelection(state, false);
+      const activeFileId = state.selectedFileId ?? state.files[0]?.id ?? null;
+      if (!activeFileId) return withClearedSelection(state, false);
       return {
         ...state,
-        selectedAlbumId: getTrackAlbumId(state.albums, firstFileId),
-        selectedFileId: firstFileId,
+        selectedAlbumId: getTrackAlbumId(state.albums, activeFileId),
+        selectedFileId: activeFileId,
         selectedFileIds: new Set(state.files.map((file) => file.id)),
-        rangeAnchorFileId: firstFileId,
+        rangeAnchorFileId: activeFileId,
         selectionWasManuallyCleared: false,
       };
     }

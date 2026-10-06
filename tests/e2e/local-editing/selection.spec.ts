@@ -44,6 +44,7 @@ test("selects ranges, toggles tracks, selects all and deletes the selection", as
   await page.getByText("library (4)", { exact: true }).click();
   await expect(title).not.toBeFocused();
   await page.keyboard.press("ControlOrMeta+a");
+  await expect(title).toHaveValue(fixtureTitle("flac"));
   await expect(title).not.toBeFocused();
   await page.keyboard.press("Delete");
   await removeTracks(4).getByRole("button", { name: "remove tracks" }).click();
