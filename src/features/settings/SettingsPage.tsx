@@ -40,7 +40,7 @@ export default function SettingsPage({
 
   return (
     <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
-      <div className="p-6 h-[104px] border-b flex-shrink-0 flex flex-col justify-center gap-1">
+      <div className="h-16 border-b flex-shrink-0 flex flex-col justify-center gap-1 px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6">
         <div className="flex min-w-0 items-center gap-2">
           {headerLeadingAction}
           <button
