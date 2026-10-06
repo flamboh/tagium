@@ -201,7 +201,7 @@ test("a failed playlist track keeps the successes and retry downloads only the f
       {
         title: "Track 2",
         cover: null,
-        cobalt: [{ kind: "error", code: "error.api.content.video.unavailable" }, { kind: "ok" }],
+        cobalt: [{ kind: "error", code: "error.api.timed_out" }, { kind: "ok" }],
       },
       { title: "Track 3", cover: null },
       { title: "Track 4", cover: null },
@@ -215,7 +215,7 @@ test("a failed playlist track keeps the successes and retry downloads only the f
   await expect(page.getByRole("button", { name: "download all" })).toBeDisabled();
 
   await page.getByRole("button", { name: "2 Track 2.mp3 track has an error" }).click();
-  await expect(page.getByText("media is private, unavailable, or no longer exists.")).toBeVisible();
+  await expect(page.getByText("download timed out. try again.")).toBeVisible();
   await page.getByRole("button", { name: "3 Track 3.opus" }).click();
   const survivor = await captureDownload(page, () => downloadTrackButton(page).click());
   expect((await inspectAudio(survivor)).metadata).toMatchObject({
@@ -233,4 +233,61 @@ test("a failed playlist track keeps the successes and retry downloads only the f
   for (const track of [one!, three!, four!]) {
     expect(await cobaltRequestCount(upstreams, track.url)).toBe(1);
   }
+});
+
+test("playlist retry skips private, drm and unsupported failures", async ({ page, upstreams }) => {
+  const failures = [
+    {
+      title: "Private",
+      code: "error.api.content.video.private",
+      detail: "media is private, unavailable, or no longer exists.",
+    },
+    {
+      title: "Protected",
+      code: "error.api.youtube.drm",
+      detail: "this media is drm-protected and can't be downloaded.",
+    },
+    {
+      title: "Unsupported",
+      code: "error.api.service.unsupported",
+      detail: "this link is not supported.",
+    },
+  ];
+  const set = await upstreams.soundcloud.set({
+    title: "Mixed Failures",
+    artwork: null,
+    tracks: [
+      { title: "Success", cover: null },
+      {
+        title: "Transient",
+        cover: null,
+        cobalt: [{ kind: "error", code: "error.api.timed_out" }, { kind: "ok" }],
+      },
+      ...failures.map(({ title, code }) => ({
+        title,
+        cover: null,
+        cobalt: [{ kind: "error" as const, code }, { kind: "ok" as const }],
+      })),
+    ],
+  });
+  await page.goto("/");
+  await importUrl(page, set.url);
+  await expect(queueStatus(page, "failed 4/5")).toBeVisible(SETTLE_TIMEOUT);
+  await page.getByRole("button", { name: "retry playlist downloads" }).click();
+  await expect(page.getByRole("button", { name: "2 Transient.mp3", exact: true })).toBeVisible(
+    SETTLE_TIMEOUT,
+  );
+  await page.getByRole("button", { name: "2 Transient.mp3", exact: true }).click();
+  await expect(downloadTrackButton(page)).toBeEnabled(SETTLE_TIMEOUT);
+  await expect(page.getByRole("button", { name: /track has an error$/u })).toHaveCount(3);
+  expect(await cobaltRequestCount(upstreams, set.tracks[1]!.url)).toBe(2);
+  expect(await cobaltRequestCount(upstreams, set.tracks[0]!.url)).toBe(1);
+  for (const [index, failure] of failures.entries()) {
+    expect(await cobaltRequestCount(upstreams, set.tracks[index + 2]!.url)).toBe(1);
+    await page
+      .getByRole("button", { name: `${index + 3} ${failure.title}.mp3 track has an error` })
+      .click();
+    await expect(page.getByText(failure.detail, { exact: true })).toBeVisible();
+  }
+  await expect(page.getByRole("button", { name: "download all" })).toBeDisabled();
 });
