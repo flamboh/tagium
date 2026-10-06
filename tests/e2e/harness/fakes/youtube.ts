@@ -17,20 +17,56 @@ const ytcfgScript = `<script>ytcfg.set(${JSON.stringify(ytcfg)});</script>`;
 
 const thumbnailUrl = (videoId: string) => `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 
-const videoRenderer = (scenario: MediaScenario) => ({
-  playlistVideoRenderer: {
-    videoId: scenario.key.slice("yt:".length),
-    title: { runs: [{ text: scenario.title }] },
-    lengthSeconds: String(scenario.durationSec),
-  },
-});
+const videoRenderer = (scenario: MediaScenario, renderer: YouTubePlaylistScenario["renderer"]) =>
+  renderer === "lockup"
+    ? {
+        lockupViewModel: {
+          contentId: scenario.key.slice("yt:".length),
+          contentType: "LOCKUP_CONTENT_TYPE_VIDEO",
+          metadata: {
+            lockupMetadataViewModel: {
+              title: { content: scenario.title },
+              metadata: {
+                contentMetadataViewModel: {
+                  metadataRows: [{ metadataParts: [{ text: { content: scenario.author } }] }],
+                },
+              },
+            },
+          },
+          contentImage: {
+            thumbnailViewModel: {
+              overlays: [
+                {
+                  thumbnailOverlayBadgeViewModel: {
+                    thumbnailBadges: [
+                      {
+                        thumbnailBadgeViewModel: {
+                          text: `${Math.floor(scenario.durationSec / 60)}:${String(scenario.durationSec % 60).padStart(2, "0")}`,
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        },
+      }
+    : {
+        playlistVideoRenderer: {
+          videoId: scenario.key.slice("yt:".length),
+          title: { runs: [{ text: scenario.title }] },
+          shortBylineText: { runs: [{ text: scenario.author }] },
+          lengthSeconds: String(scenario.durationSec),
+        },
+      };
 
 const playlistPage = (request: FakeRequest, playlist: YouTubePlaylistScenario, offset: number) => {
   const videos = playlist.videoKeys
     .slice(offset, offset + playlist.pageSize)
     .map((key) => request.registry.media(key))
     .filter((video) => video !== undefined)
-    .map(videoRenderer);
+    .map((scenario) => videoRenderer(scenario, playlist.renderer));
   const nextOffset = offset + playlist.pageSize;
   return nextOffset < playlist.videoKeys.length
     ? [
@@ -163,6 +199,13 @@ export const fakeYouTube = (request: FakeRequest): FakeResult => {
     const key = typeof videoId === "string" ? youtubeVideoKey(videoId) : null;
     const scenario = registry.media(key);
     if (!scenario) return unexpected("youtube.next", key);
+    if (scenario.uploadYearStatus !== undefined) {
+      return {
+        route: "youtube.next",
+        key,
+        response: new Response("unavailable", { status: scenario.uploadYearStatus }),
+      };
+    }
     const primaryInfo =
       scenario.year === undefined
         ? { title: { runs: [{ text: scenario.title }] } }
