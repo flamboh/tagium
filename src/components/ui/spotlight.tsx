@@ -51,6 +51,7 @@ function SpotlightContent({
   sideOffset = 10,
   children,
   onInteractOutside,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
   const { anchorRef } = React.useContext(SpotlightContext);
@@ -61,6 +62,11 @@ function SpotlightContent({
         side={side}
         align={align}
         sideOffset={sideOffset}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event);
+          const focused = document.activeElement;
+          if (focused && focused !== document.body) event.preventDefault();
+        }}
         collisionPadding={12}
         hideWhenDetached
         onOpenAutoFocus={(event) => event.preventDefault()}
