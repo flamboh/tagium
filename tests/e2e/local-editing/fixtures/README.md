@@ -13,3 +13,5 @@ for f in mp3 flac m4a opus; do
     -metadata composer="Zoë" -metadata comment=$'first line\nsecond line' "tagged.$f"
 done
 ```
+
+`separate-description.{flac,opus}` reuse the audio from the tagged fixtures. Their Vorbis comments contain title `Comment preservation`, artist `Fixture artist`, `COMMENT=Primary comment`, and `DESCRIPTION=Separate description`. The tests edit and clear COMMENT while checking that DESCRIPTION survives and the audio payload stays identical.

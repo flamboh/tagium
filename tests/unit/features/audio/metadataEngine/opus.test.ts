@@ -332,13 +332,46 @@ describe("Opus metadata driver", () => {
     expect(inspected.metadata.comment).toBe(expected);
   });
 
-  it("replaces every comment alias with one COMMENT field", async () => {
+  it.each(["Updated", ""])(
+    "preserves a separate DESCRIPTION when writing comment %j",
+    async (comment) => {
+      const original = validOpusBytes({
+        comments: ["dEsCrIpTiOn=Separate description", "comment=Primary comment"],
+      });
+      const inspected = await Effect.runPromise(
+        opusDriver.inspect(makeBlobByteSource(new Blob([original]))),
+      );
+      expect(inspected.metadata.comment).toBe("Primary comment");
+      const plan = await Effect.runPromise(
+        opusDriver.patch(makeBlobByteSource(new Blob([original])), { comment }),
+      );
+      const patched = await outputBytes(plan.parts);
+      expect(new TextDecoder().decode(patched)).toContain("dEsCrIpTiOn=Separate description");
+      expect(new TextDecoder().decode(patched)).not.toContain("Primary comment");
+      const updated = await Effect.runPromise(
+        opusDriver.inspect(makeBlobByteSource(new Blob([patched]))),
+      );
+      expect(updated.metadata.comment).toBe(comment || "Separate description");
+    },
+  );
+
+  it("preserves DESCRIPTION when an empty COMMENT was displayed", async () => {
+    const original = validOpusBytes({ comments: ["DESCRIPTION=Separate description", "COMMENT="] });
+    const inspected = await Effect.runPromise(
+      opusDriver.inspect(makeBlobByteSource(new Blob([original]))),
+    );
+    expect(inspected.metadata.comment).toBe("");
+    const plan = await Effect.runPromise(
+      opusDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "Updated" }),
+    );
+    expect(new TextDecoder().decode(await outputBytes(plan.parts))).toContain(
+      "DESCRIPTION=Separate description",
+    );
+  });
+
+  it("replaces a displayed DESCRIPTION alias with one COMMENT field", async () => {
     const original = validOpusBytes({
-      comments: [
-        "DESCRIPTION=FFmpeg comment",
-        "comment=lowercase comment",
-        "X-private=opaque value",
-      ],
+      comments: ["DESCRIPTION=FFmpeg comment", "X-private=opaque value"],
     });
     const patchedPlan = await Effect.runPromise(
       opusDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "Updated" }),
@@ -347,7 +380,6 @@ describe("Opus metadata driver", () => {
     const patchedText = new TextDecoder().decode(patched);
     expect(patchedText).toContain("COMMENT=Updated");
     expect(patchedText).not.toContain("FFmpeg comment");
-    expect(patchedText).not.toContain("lowercase comment");
     expect(patchedText).toContain("X-private=opaque value");
     const inspected = await Effect.runPromise(
       opusDriver.inspect(makeBlobByteSource(new Blob([patched]))),
