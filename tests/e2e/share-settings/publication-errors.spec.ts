@@ -48,12 +48,10 @@ test("failed publications keep the preview, explain the failure and can be retri
   await expect(dialog.getByRole("list", { name: "track preview" })).toHaveText(/Only Song/u);
   await expect(dialog.getByRole("button", { name: "cancel" })).toBeEnabled();
 
-  for (const status of [503, 400]) {
-    await page.route("**/api/manifests", (route) => route.fulfill({ status }), { times: 1 });
-    await create.click();
-    await expect(alert, `status ${status}`).toHaveText("the share link could not be created.");
-    await expect(create).toBeEnabled();
-  }
+  await page.route("**/api/manifests", (route) => route.fulfill({ status: 503 }), { times: 1 });
+  await create.click();
+  await expect(alert).toHaveText("the share link could not be created.");
+  await expect(create).toBeEnabled();
 
   await context.setExtraHTTPHeaders({ "cf-connecting-ip": randomIp() });
   let release!: () => void;
@@ -78,7 +76,7 @@ test("failed publications keep the preview, explain the failure and can be retri
   const link = dialog.getByRole("textbox", { name: "share link" });
   await expect(link).toHaveValue(SHARE_URL);
   const shareUrl = await link.inputValue();
-  expect(publications).toHaveLength(4);
+  expect(publications).toHaveLength(3);
 
   await dialog.getByRole("button", { name: "copy link" }).click();
   await expect(dialog.getByRole("button", { name: "copied" })).toBeVisible();
@@ -124,3 +122,24 @@ test("a title edited while the rejected share's menu is still closing keeps focu
     page.getByRole("button", { name: "track actions for Single (shared).mp3" }),
   ).toBeVisible();
 });
+
+for (const status of [400, 413]) {
+  test(`explains that the share is too large after status ${status}`, async ({
+    page,
+    upstreams,
+  }) => {
+    await importAlbum(page, upstreams, {
+      title: "Large Share",
+      videos: [{ title: "Song" }],
+    });
+    const dialog = await openShareDialog(page, "Large Share");
+    await page.route("**/api/manifests", (route) => route.fulfill({ status }), { times: 1 });
+    const create = dialog.getByRole("button", { name: "create share link" });
+    await create.click();
+    await expect(dialog.getByRole("alert")).toHaveText(
+      "this share contains too much metadata to publish. no link was created.",
+    );
+    await expect(create).toBeEnabled();
+    await expect(dialog.getByRole("list", { name: "track preview" })).toHaveText(/Song/u);
+  });
+}
