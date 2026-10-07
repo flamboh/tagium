@@ -255,6 +255,7 @@ export const useTrackEditorSession = ({
         settingsRef.current.metadataLinks.albumArtist,
         isSingleAlbumLinkedForFile(fileId),
         library.getSnapshot().albums.some((album) => album.trackIds.includes(fileId ?? "")),
+        library.getSnapshot().files.find((file) => file.id === fileId)?.metadata?.artist ?? null,
       ),
     [isSingleAlbumLinkedForFile, library],
   );

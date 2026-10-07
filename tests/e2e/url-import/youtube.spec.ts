@@ -72,7 +72,7 @@ test("imports a youtube video with prefilled tags, then edits and exports the sa
     title: "zoo café 日本語",
     album: "zoo café 日本語",
     artist: "qa artist",
-    albumArtist: "Synth Person",
+    albumArtist: "qa artist",
     year: 2024,
     genre: "test genre",
     trackNumber: 3,
