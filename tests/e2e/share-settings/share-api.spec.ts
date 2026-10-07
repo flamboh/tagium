@@ -51,7 +51,11 @@ test("a playlist url becomes an album share without downloading any audio", asyn
   const playlist = await upstreams.youtube.playlist({
     title: "Source Playlist",
     author: "Curator",
-    videos: [{ title: "Alpha: Part 1", year: 2011 }, { title: "Beta" }, { title: "Gamma" }],
+    videos: [
+      { title: "Alpha: Part 1", author: "Alpha Artist - Topic", year: 2011 },
+      { title: "Beta", author: "Beta Artist", year: 2018 },
+      { title: "Gamma", author: "Gamma Artist" },
+    ],
   });
 
   const response = await shareSource(request, {
@@ -76,29 +80,27 @@ test("a playlist url becomes an album share without downloading any audio", asyn
   expect(stored.manifest).toMatchObject({
     version: 1,
     kind: "album",
-    album: { title: "Renamed Album", artist: "Renamed Artist", sourceUrl: playlist.url },
+    album: {
+      title: "Renamed Album",
+      artist: "Renamed Artist",
+      sourceUrl: playlist.url,
+      year: 2011,
+    },
   });
-  expect(
-    stored.manifest.tracks.map(
-      (track: { sourceUrl: string; audioBitrate: string; metadata: object }) => ({
-        sourceUrl: track.sourceUrl,
-        audioBitrate: track.audioBitrate,
-        metadata: track.metadata,
-      }),
-    ),
-  ).toEqual(
-    playlist.videos.map((video, index) => ({
-      sourceUrl: video.url,
+  expect(stored.manifest.tracks).toEqual(
+    [
+      { filename: "Alpha- Part 1", title: "Alpha: Part 1", artist: "Alpha Artist", trackNumber: 1 },
+      { filename: "Beta", title: "Beta", artist: "Beta Artist", trackNumber: 2 },
+      { filename: "Gamma", title: "Gamma", artist: "Gamma Artist", trackNumber: 3 },
+    ].map((metadata, index) => ({
+      sourceUrl: playlist.videos[index]!.url,
       audioBitrate: "320",
-      metadata: expect.objectContaining({
-        title: video.title,
-        artist: "Renamed Artist",
-        album: "Renamed Album",
-        trackNumber: index + 1,
-      }),
+      metadata: { ...metadata, album: "Renamed Album", genre: "" },
     })),
   );
-  expect(stored.manifest.tracks[0].metadata.filename).not.toContain(":");
+  expect((await upstreams.calls({ route: "youtube.next" })).map((call) => call.key)).toEqual([
+    playlist.videos[0]!.key,
+  ]);
   expect(await upstreams.calls({ route: /^cobalt\./u })).toEqual([]);
 
   await page.goto(share.url);
