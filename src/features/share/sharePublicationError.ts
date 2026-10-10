@@ -3,6 +3,7 @@ const metadataContractError = (message: string) =>
 
 const userFacingMessages = new Set([
   "the share link could not be created",
+  "this share contains too much metadata to publish",
   "too many share requests; try again shortly",
   "too many update requests; try again shortly",
   "your browser did not allow tagium to save the sharing permission",

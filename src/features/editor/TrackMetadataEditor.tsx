@@ -829,9 +829,10 @@ function LoadedTrackMetadataEditor({
     name: "albumArtist",
     defaultValue: selectedFile.metadata.albumArtist,
   });
-  const linkedAlbumArtistDisplay = selectedFileAlbum
-    ? watchedArtist
-    : watchedAlbumArtist || watchedArtist;
+  const linkedAlbumArtistDisplay =
+    selectedFileAlbum || !watchedAlbumArtist || watchedAlbumArtist === selectedFile.metadata.artist
+      ? watchedArtist
+      : watchedAlbumArtist;
   const advancedFields = useAdvancedMetadataFormBoundary({
     register,
     control,

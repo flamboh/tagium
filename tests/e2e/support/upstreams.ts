@@ -39,7 +39,11 @@ export type MediaOptions = {
   tunnel?: Sequence<TunnelBehavior>;
 };
 
-export type YouTubeVideoOptions = MediaOptions & { id?: string; video?: VideoStreamFixtureName[] };
+export type YouTubeVideoOptions = MediaOptions & {
+  id?: string;
+  video?: VideoStreamFixtureName[];
+  uploadYearStatus?: number;
+};
 type PostOptions = {
   url?: string;
   cobalt?: Sequence<CobaltBehavior>;
@@ -109,6 +113,7 @@ export const createUpstreams = (owner: string) => {
       audio: options.audio ?? "m4a",
       cover: options.cover === undefined ? "thumbnail" : options.cover,
       year: options.year,
+      uploadYearStatus: options.uploadYearStatus,
       video: options.video ?? defaultYouTubeVideoStreams,
       metadata: options.metadata ?? { kind: "ok" },
       cobalt: options.cobalt ?? { kind: "ok" },
@@ -176,6 +181,7 @@ export const createUpstreams = (owner: string) => {
         author?: string;
         videos: YouTubeVideoOptions[];
         pageSize?: number;
+        renderer?: "legacy" | "lockup";
         status?: number;
         missing?: boolean;
       }) {
@@ -189,6 +195,7 @@ export const createUpstreams = (owner: string) => {
           author: options.author ?? "Fixture Channel",
           videoKeys: videos.map(({ scenario }) => scenario.key),
           pageSize: options.pageSize ?? 100,
+          renderer: options.renderer ?? "lockup",
           status: options.status,
           alert: options.missing ? "The playlist does not exist." : undefined,
         };

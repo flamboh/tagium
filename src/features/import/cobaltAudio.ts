@@ -17,6 +17,7 @@ interface CobaltAudioRequestBody {
   audioBitrate: AudioDownloadBitrate;
   audioFormat: AudioDownloadFormat;
   year?: number;
+  fallbackYear?: number;
 }
 
 export type CobaltAudioDownloadLifecycleEvent =
@@ -44,6 +45,7 @@ export interface CobaltAudioDownloadRequest {
   importId?: string;
   trackIndex?: number;
   year?: number;
+  fallbackYear?: number;
   onLifecycle?: CobaltAudioDownloadLifecycleCallback;
   signal?: AbortSignal;
 }
@@ -126,6 +128,7 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
           audioFormat: request.audioFormat,
         };
         if (request.year !== undefined) body.year = request.year;
+        if (request.fallbackYear !== undefined) body.fallbackYear = request.fallbackYear;
         const response = await fetch("/api/cobalt/audio", {
           method: "POST",
           headers,

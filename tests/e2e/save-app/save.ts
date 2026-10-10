@@ -84,7 +84,12 @@ export const temporarySessions = (page: Page) =>
     for await (const [name, handle] of directory.entries()) {
       if (!(handle instanceof FileSystemDirectoryHandle)) continue;
       let files = 0;
-      for await (const _ of handle.keys()) files += 1;
+      try {
+        for await (const _ of handle.keys()) files += 1;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "NotFoundError") continue;
+        throw error;
+      }
       sessions[name] = files;
     }
     return sessions;

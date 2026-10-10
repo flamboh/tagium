@@ -15,6 +15,7 @@ const urlStringSchema = Schema.String.pipe(
 
 const playlistTrackSchema = Schema.Struct({
   title: Schema.String,
+  artist: Schema.optionalKey(Schema.String),
   url: urlStringSchema,
   duration: Schema.optionalKey(Schema.Number),
   trackNumber: Schema.Number,

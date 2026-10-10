@@ -37,13 +37,17 @@ enum CobaltResponseType {
   LocalProcessing = "local-processing",
 }
 
+const yearSchema = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isBetween({ minimum: 1_000, maximum: 9_999 }),
+);
+
 const audioRequestSchema = Schema.Struct({
   url: urlStringSchema,
   audioBitrate: Schema.Literals(["320", "256", "128", "96", "64"]),
   audioFormat: Schema.Literals(["best", "mp3"]),
-  year: Schema.optionalKey(
-    Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1_000, maximum: 9_999 })),
-  ),
+  year: Schema.optionalKey(yearSchema),
+  fallbackYear: Schema.optionalKey(yearSchema),
 });
 
 const cobaltResponseSchema = Schema.Union([
@@ -270,7 +274,6 @@ const requestCobaltAudio = async (
         alwaysProxy: true,
         localProcessing: "forced",
         filenameStyle: "pretty",
-        youtubeVideoCodec: "h264",
         youtubeHLS: false,
       }),
     });
@@ -603,7 +606,10 @@ export default defineHandler(async (event) => {
     }
 
     if (cobaltResponse.status === CobaltResponseType.LocalProcessing) {
-      const responseWithYear = withYearMetadata(cobaltResponse, await yearPromise);
+      const responseWithYear = withYearMetadata(
+        cobaltResponse,
+        (await yearPromise) ?? body.fallbackYear,
+      );
       return respond(
         localProcessingResponse(
           event.req,

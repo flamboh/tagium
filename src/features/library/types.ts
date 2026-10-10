@@ -34,6 +34,7 @@ export interface TagiumFile {
     importId?: string;
     trackIndex?: number;
     year?: number;
+    fallbackYear?: number;
   };
   pendingMetadataPatch?: MetadataPatch;
   // Compatibility for UI/status consumers that still render a buffered flag.
@@ -51,6 +52,7 @@ export interface TagiumFile {
 
 export interface AlbumGroup {
   id: string;
+  metadataLinks?: Pick<MetadataLinks, "artist" | "year">;
   title: string;
   artist: string;
   genre: string;

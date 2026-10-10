@@ -59,6 +59,7 @@ export type MediaScenario = {
   audio: AudioFixtureName;
   cover: ImageFixtureName | null;
   year?: number;
+  uploadYearStatus?: number;
   genre?: string;
   album?: string;
   soundcloudId?: number;
@@ -95,6 +96,7 @@ export type YouTubePlaylistScenario = {
   author: string;
   videoKeys: string[];
   pageSize: number;
+  renderer: "legacy" | "lockup";
   status?: number;
   alert?: string;
 };

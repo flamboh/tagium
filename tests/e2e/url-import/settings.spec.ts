@@ -58,7 +58,9 @@ test("converts imports to mp3 at the bitrate chosen in settings", async ({
     title: "Low Bitrate",
     artist: "Squeezer",
   });
-  expect(await cobaltRequests(upstreams)).toEqual([
+  const requests = await cobaltRequests(upstreams);
+  expect(requests[0]).not.toHaveProperty("youtubeVideoCodec");
+  expect(requests).toEqual([
     expect.objectContaining({ url: video.url, audioFormat: "mp3", audioBitrate: "128" }),
   ]);
 });

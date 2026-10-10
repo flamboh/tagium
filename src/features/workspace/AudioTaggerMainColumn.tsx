@@ -55,7 +55,7 @@ function AudioTaggerViews({ controller, menuInViewHeader, mobileMenuButton }: Co
           selectedFileAlbum={editor.selectedFileAlbum}
           syncFilenames={settings.syncFilenames}
           advancedMetadata={settings.advancedMetadata}
-          metadataLinks={getMetadataLinkState(settings)}
+          metadataLinks={getMetadataLinkState(settings, editor.selectedFileAlbum)}
           onPreviewMetadataChange={(field, event) =>
             editor.commands.preview(field, event.target.value)
           }

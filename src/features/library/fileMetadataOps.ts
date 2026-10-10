@@ -1,3 +1,4 @@
+import { getAlbumMetadataLinks } from "@/features/library/metadataLinks";
 import { sanitizeFilenameBase } from "@/features/library/filename";
 import { audioFilename, getAudioFormat } from "@/features/audio/audioFormat";
 import {
@@ -385,6 +386,7 @@ export function applyAlbumMetadataPolicyToFiles(
     ? new Map(album.trackIds.map((trackId, index) => [trackId, index + 1]))
     : undefined;
   const shared = options.shared ?? true;
+  const metadataLinks = getAlbumMetadataLinks(settings, album);
 
   return files.map((file) => {
     if (!trackSet.has(file.id) || !file.metadata) return file;
@@ -392,9 +394,9 @@ export function applyAlbumMetadataPolicyToFiles(
     const patch: MetadataPatch = {};
     if (shared) {
       patch.album = album.title;
-      if (settings.metadataLinks.artist) patch.artist = album.artist;
+      if (metadataLinks.artist) patch.artist = album.artist;
       if (settings.metadataLinks.genre) patch.genre = album.genre;
-      if (settings.metadataLinks.year && album.year !== undefined) patch.year = album.year;
+      if (metadataLinks.year && album.year !== undefined) patch.year = album.year;
     }
     if (options.artwork && settings.metadataLinks.artwork && album.cover?.length) {
       patch.picture = album.cover;

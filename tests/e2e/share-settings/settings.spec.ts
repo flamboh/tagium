@@ -295,10 +295,12 @@ test("the soundcloud album cover setting replaces track covers once, at import",
 });
 
 test("link switches decide which track fields follow their source", async ({ page, upstreams }) => {
-  const playlist = await upstreams.youtube.playlist({
+  const playlist = await upstreams.soundcloud.set({
     title: "Linked Album",
     author: "Linker",
-    videos: [{ title: "Linked Song", year: 2015 }],
+    isAlbum: true,
+    displayDate: "2015-01-02T00:00:00Z",
+    tracks: [{ title: "Linked Song" }],
   });
   const loose = await upstreams.youtube.video({ title: "Loose Song" });
   await page.goto("/");
@@ -314,6 +316,7 @@ test("link switches decide which track fields follow their source", async ({ pag
   await expect(field("filename")).not.toBeAttached();
 
   await page.getByRole("button", { name: "1 Linked Song.mp3" }).click();
+  await expect(page.getByRole("button", { name: "download track" })).toBeEnabled(IMPORT_TIMEOUT);
   await expect(field("title")).toHaveValue("Linked Song");
   for (const name of ["artist", "year", "genre", "track", "album"]) {
     await expect(field(name), name).toBeDisabled();

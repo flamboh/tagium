@@ -40,7 +40,10 @@ test("a fresh visitor adds a published album and exports it with the shared tags
   const playlist = await importAlbum(page, upstreams, {
     title: "Road Trip",
     author: "Mixer",
-    videos: [{ title: "First Song", year: 2020 }, { title: "Second Song" }],
+    videos: [
+      { title: "First Song", author: "Mixer", year: 2020 },
+      { title: "Second Song", author: "Mixer" },
+    ],
   });
   await page.getByLabel("title", { exact: true }).fill("First Song (shared edit)");
 

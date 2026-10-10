@@ -8,6 +8,7 @@ import {
   createDownloadMetadata,
   createPlaylistPendingMetadataPatch,
   createPlaylistTrackMetadata,
+  getPlaylistTrackPendingYear,
 } from "@/features/import/downloadMetadata";
 import type { Playlist } from "@/features/import/playlist";
 import type { TrackMetadata } from "@/features/import/trackMetadata";
@@ -227,7 +228,9 @@ export const createPlaylistDownloadPlan = ({
       trackIndex: track.trackNumber,
     };
     if (importId) downloadRequest.importId = importId;
-    if (playlist.year !== undefined) downloadRequest.year = playlist.year;
+    const year = getPlaylistTrackPendingYear(playlist, track);
+    if (year !== undefined) downloadRequest.year = year;
+    else if (playlist.year !== undefined) downloadRequest.fallbackYear = playlist.year;
     return createPendingDownloadTrack(
       createId(),
       createPlaylistTrackMetadata(playlist, track),
@@ -244,6 +247,9 @@ export const createPlaylistDownloadPlan = ({
     trackIds: pendingFiles.map((file) => file.id),
     year: playlist.year,
   };
+  if (playlist.tracks.some((track) => track.artist !== undefined)) {
+    album.metadataLinks = { artist: false, year: false };
+  }
   if (playlist.sourceUrl !== undefined) album.sourceUrl = playlist.sourceUrl;
   if (playlist.coverUrl) album.coverPending = true;
   const firstPendingFileId = pendingFiles[0]?.id ?? null;
