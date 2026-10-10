@@ -10,6 +10,9 @@ export const MAX_DECODED_PCM_BYTES = 256 * 1024 * 1024;
 /** Minimum clip length, in seconds, so the two handles can never cross. */
 export const MIN_CLIP_SECONDS = 1;
 
+/** Minimum clip length while the track's duration is still unknown. */
+const MIN_CLIP_FRACTION = 0.01;
+
 // Decoding at a low sample rate keeps long mixes inside the memory budget; the peak
 // envelope only needs to be accurate to a few milliseconds.
 const WAVEFORM_SAMPLE_RATE = 8_000;
@@ -48,47 +51,46 @@ export const formatTimestamp = (seconds: number) => {
     : `${minutes}:${remainingSeconds}`;
 };
 
-export const getPointerTime = (clientX: number, left: number, width: number, duration: number) => {
+export const getPointerFraction = (clientX: number, left: number, width: number) =>
+  width > 0 ? Math.min(1, Math.max(0, (clientX - left) / width)) : 0;
+
+export const FULL_CLIP: TrackClip = { start: 0, end: 1 };
+
+const minClipFraction = (duration: number) => {
   const safeDuration = normalizeSeconds(duration);
 
-  if (width <= 0 || safeDuration === 0) return 0;
-
-  return Math.min(1, Math.max(0, (clientX - left) / width)) * safeDuration;
+  return safeDuration > 0 ? Math.min(1, MIN_CLIP_SECONDS / safeDuration) : MIN_CLIP_FRACTION;
 };
-
-export const fullClip = (duration: number): TrackClip => ({
-  start: 0,
-  end: normalizeSeconds(duration),
-});
 
 /** Clamps a clip into the track and returns undefined when it covers the whole track. */
 export const normalizeClip = (
   clip: TrackClip | undefined,
   duration: number,
 ): TrackClip | undefined => {
+  if (!clip) return undefined;
+  const gap = minClipFraction(duration);
+  const start = Math.min(Math.max(0, clip.start), 1 - gap);
+  const end = Math.min(1, Math.max(clip.end, start + gap));
   const safeDuration = normalizeSeconds(duration);
+  const slack = safeDuration > 0 ? 0.05 / safeDuration : 0.001;
+  const coversTrack = start < slack && end > 1 - slack;
 
-  if (!clip || safeDuration === 0) return undefined;
-  const start = Math.min(Math.max(0, clip.start), Math.max(0, safeDuration - MIN_CLIP_SECONDS));
-  const end = Math.max(Math.min(safeDuration, clip.end), start + MIN_CLIP_SECONDS);
-  const coversTrack = start < 0.05 && end > safeDuration - 0.05;
-
-  return coversTrack ? undefined : { start, end: Math.min(end, safeDuration) };
+  return coversTrack ? undefined : { start, end };
 };
 
 export const moveClipEdge = (
   clip: TrackClip,
   edge: "start" | "end",
-  time: number,
+  fraction: number,
   duration: number,
 ): TrackClip => {
-  const safeDuration = normalizeSeconds(duration);
+  const gap = minClipFraction(duration);
 
   if (edge === "start") {
-    return { ...clip, start: Math.min(Math.max(0, time), clip.end - MIN_CLIP_SECONDS) };
+    return { ...clip, start: Math.min(Math.max(0, fraction), clip.end - gap) };
   }
 
-  return { ...clip, end: Math.max(Math.min(safeDuration, time), clip.start + MIN_CLIP_SECONDS) };
+  return { ...clip, end: Math.max(Math.min(1, fraction), clip.start + gap) };
 };
 
 export const extractPeaks = (audio: DecodedAudio, peakCount = WAVEFORM_PEAK_COUNT) => {
