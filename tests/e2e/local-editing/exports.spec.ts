@@ -6,7 +6,7 @@ import {
   unzipDownload,
   retaggedAudioFixture,
 } from "../support/audio";
-import { expect, test } from "../support/test";
+import { expect, expectDownloadName, test } from "../support/test";
 import {
   confirmDownload,
   downloadTrack,
@@ -17,7 +17,6 @@ import {
   libraryCount,
   pickFiles,
   trackRow,
-  expectDownloadName,
 } from "./workspace";
 
 test("exports a loose track and an album on the first confirmation with unique names", async ({

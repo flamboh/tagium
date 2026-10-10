@@ -65,6 +65,10 @@ and firefox before the production deploy, with webkit alongside as a non-blockin
 runs as its own job via `E2E_BROWSERS=all` and `--project <browser>`. CI retries flaky tests twice
 and uploads `test-results/` when a job fails.
 
+WebKit runs headed under `xvfb-run`. Headless WebKit on Linux is Playwright's WPE build, which
+segfaults in its compositor mid-test; headed uses the GTK build, which doesn't. Locally:
+`E2E_BROWSERS=all xvfb-run -a bun run test:e2e --project webkit --headed`.
+
 ## Iterating
 
 - `bun run test:e2e:serve` keeps the harness running, and Playwright reuses it outside CI.

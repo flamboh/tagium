@@ -1,5 +1,6 @@
 import { captureDownload, inspectAudio, unzipDownload } from "../support/audio";
 import { expect, IMPORT_TIMEOUT, JOURNEY_TIMEOUT, test } from "./fixtures";
+import { expectDownloadName } from "../support/test";
 import {
   albumMenu,
   createShare,
@@ -13,7 +14,6 @@ import {
   startImport,
   storedReceipts,
   trackMenu,
-  savedName,
 } from "./helpers";
 
 test.describe.configure({ timeout: JOURNEY_TIMEOUT });
@@ -281,7 +281,7 @@ test("a single imported track is shared on its own, and a share without artwork 
   const download = bareVisitor.getByRole("button", { name: "download track" });
   await expect(download).toBeEnabled(IMPORT_TIMEOUT);
   const saved = await captureDownload(bareVisitor, () => download.click());
-  expect(saved.filename).toBe(savedName("Bare.mp3"));
+  expectDownloadName(saved, "Bare.mp3");
   const { metadata } = await inspectAudio(saved);
   expect(metadata).toMatchObject({ title: "Bare", artist: "Soloist" });
   expect(metadata.picture ?? []).toEqual([]);

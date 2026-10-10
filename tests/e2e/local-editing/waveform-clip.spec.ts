@@ -1,13 +1,6 @@
 import { inspectAudio, unzipDownload } from "../support/audio";
-import { expect, test } from "../support/test";
-import {
-  downloadAll,
-  downloadTrack,
-  field,
-  pickFiles,
-  waveformFixture,
-  expectDownloadName,
-} from "./workspace";
+import { expect, expectDownloadName, test } from "../support/test";
+import { downloadAll, downloadTrack, field, pickFiles, waveformFixture } from "./workspace";
 
 const cases = [
   { format: "mp3", width: 1280 },

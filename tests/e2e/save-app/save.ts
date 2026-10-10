@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { captureDownload } from "../support/audio";
-import { expect, IMPORT_TIMEOUT } from "../support/test";
+import { expect, expectDownloadName, IMPORT_TIMEOUT } from "../support/test";
 
 export const SAVE_PATH = "/?app=tagium-save";
 
@@ -11,11 +11,6 @@ export type SaveSettings = {
   codec?: "h264" | "vp9" | "av1";
   audio?: "best" | "opus" | "mp3";
 };
-
-export const suggestedFilename = (page: Page, filename: string) =>
-  page.context().browser()?.browserType().name() === "webkit"
-    ? filename.replaceAll(" ", "_")
-    : filename;
 
 export const saveApp = (page: Page) => {
   const recent = page.getByRole("list", { name: "recent downloads" });
@@ -64,7 +59,7 @@ export const saveApp = (page: Page) => {
       const file = await captureDownload(page, () =>
         app.downloadButton(filename).nth(index).click(),
       );
-      expect(file.filename).toBe(suggestedFilename(page, filename));
+      expectDownloadName(file, filename);
       return { ...file, filename };
     },
   };

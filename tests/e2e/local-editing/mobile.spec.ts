@@ -1,8 +1,8 @@
 import type { Page } from "@playwright/test";
 import { fixtureTitle } from "../fixtures/catalog.ts";
 import { audioFixture, inspectAudio } from "../support/audio";
-import { expect, test } from "../support/test";
-import { downloadTrack, field, pickFiles, trackRow, expectDownloadName } from "./workspace";
+import { expect, expectDownloadName, test } from "../support/test";
+import { downloadTrack, field, pickFiles, trackRow } from "./workspace";
 
 test.use({ viewport: { width: 390, height: 844 } });
 
