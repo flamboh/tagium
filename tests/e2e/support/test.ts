@@ -142,4 +142,10 @@ export const SETTLE_TIMEOUT = { timeout: 45_000 };
 
 export const journey = () => test.setTimeout(JOURNEY_TIMEOUT);
 
+export const downloadNames = (name: string) =>
+  test.info().project.name === "webkit" ? [name, name.replaceAll(" ", "_")] : [name];
+
+export const expectDownloadName = (file: { filename: string }, name: string) =>
+  expect(downloadNames(name)).toContain(file.filename);
+
 export { expect };

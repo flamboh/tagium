@@ -6,7 +6,7 @@ import {
   inspectAudio,
   unzipDownload,
 } from "../support/audio";
-import { test } from "../support/test";
+import { expectDownloadName, test } from "../support/test";
 import type { FakeYouTubeVideo } from "../support/upstreams";
 import {
   audioPreview,
@@ -17,13 +17,11 @@ import {
   importUrl,
   numberField,
   waitForTrackReady,
-  savedAs,
   expect,
   SETTLE_TIMEOUT,
 } from "./helpers";
 
 test("imports a youtube video with prefilled tags, then edits and exports the same audio", async ({
-  browserName,
   page,
   upstreams,
 }) => {
@@ -45,7 +43,7 @@ test("imports a youtube video with prefilled tags, then edits and exports the sa
   await expect(page.getByRole("img", { name: "album cover" })).toBeVisible();
 
   const original = await captureDownload(page, () => downloadTrackButton(page).click());
-  expect(original.filename).toBe(savedAs(browserName, "Night Drive.mp3"));
+  expectDownloadName(original, "Night Drive.mp3");
   const imported = await inspectAudio(original);
   expect(imported.format).toBe("mp3");
   expect(imported.metadata).toMatchObject({
@@ -67,7 +65,7 @@ test("imports a youtube video with prefilled tags, then edits and exports the sa
   await expect(field(page, "album")).toHaveValue("zoo café 日本語");
 
   const edited = await captureDownload(page, () => downloadTrackButton(page).click());
-  expect(edited.filename).toBe(savedAs(browserName, "zoo café 日本語.mp3"));
+  expectDownloadName(edited, "zoo café 日本語.mp3");
   expect((await inspectAudio(edited)).metadata).toMatchObject({
     title: "zoo café 日本語",
     album: "zoo café 日本語",

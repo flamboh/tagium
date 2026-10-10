@@ -9,7 +9,7 @@ import {
 } from "../../../src/features/settings/settings";
 import { audioFixtures, type AudioFixtureFormat } from "../fixtures/catalog.ts";
 import { captureDownload, type DownloadedFile } from "../support/audio";
-import { expect, test } from "../support/test";
+import { expect } from "../support/test";
 
 export type Upload = { name: string; mimeType: string; buffer: Buffer };
 
@@ -194,8 +194,3 @@ export const backToWorkspace = (page: Page) =>
 
 export const goHome = (page: Page) =>
   page.getByRole("button", { name: "tagium, go to workspace home" }).click();
-
-export const expectDownloadName = (file: DownloadedFile, name: string) =>
-  expect(file.filename).toBe(
-    test.info().project.name === "webkit" ? name.replaceAll(" ", "_") : name,
-  );

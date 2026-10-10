@@ -16,7 +16,7 @@ import {
 import type { AppSettings } from "../../../src/features/library/types";
 import type { AlbumManifest, Manifest } from "../../../src/features/share/shareManifest";
 import { imageFixtures, type ImageFixtureName } from "../fixtures/catalog.ts";
-import { expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { expect, IMPORT_TIMEOUT } from "../support/test";
 import type { FakeYouTubeVideo, Upstreams, YouTubeVideoOptions } from "../support/upstreams";
 
 export const SHARE_URL = /^http:\/\/127\.0\.0\.1:\d+\/share\/[23456789abcdefghjkmnpqrstvwxyz]{6}$/u;
@@ -219,6 +219,3 @@ export const stubClipboard = async (context: BrowserContext) => {
     deny: (page: Page) => page.evaluate(() => localStorage.setItem("e2e-clipboard", "deny")),
   };
 };
-
-export const savedName = (name: string) =>
-  test.info().project.name === "webkit" ? name.replaceAll(" ", "_") : name;

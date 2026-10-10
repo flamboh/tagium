@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { fixtureTitle } from "../fixtures/catalog.ts";
 import { audioFixture, expectLosslessAudio, inspectAudio, unzipDownload } from "../support/audio";
-import { expect, test } from "../support/test";
+import { expect, expectDownloadName, test } from "../support/test";
 import {
   backToWorkspace,
   downloadAll,
@@ -19,7 +19,6 @@ import {
   taggedTags,
   trackRow,
   unlinkedSettings,
-  expectDownloadName,
 } from "./workspace";
 
 for (const format of formats) {

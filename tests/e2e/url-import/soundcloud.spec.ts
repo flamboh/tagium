@@ -1,6 +1,6 @@
 import { imageFixtures, type ImageFixtureName } from "../fixtures/catalog.ts";
 import { captureDownload, inspectAudio, unzipDownload } from "../support/audio";
-import { journey, test } from "../support/test";
+import { expectDownloadName, journey, test } from "../support/test";
 import {
   audioPreview,
   cobaltRequests,
@@ -13,7 +13,6 @@ import {
   queueStatus,
   useSettings,
   waitForTrackReady,
-  savedAs,
   expect,
   SETTLE_TIMEOUT,
 } from "./helpers";
@@ -148,12 +147,7 @@ for (const { name, isAlbum, albumCover } of [
   { name: "a non-album soundcloud set", isAlbum: false, albumCover: true },
   { name: "an album with the album cover setting off", isAlbum: true, albumCover: false },
 ]) {
-  test(`keeps each track's own cover for ${name}`, async ({
-    browserName,
-    page,
-    context,
-    upstreams,
-  }) => {
+  test(`keeps each track's own cover for ${name}`, async ({ page, context, upstreams }) => {
     await useSettings(context, { applySoundCloudAlbumCoverToTracks: albumCover });
     const set = await upstreams.soundcloud.set({
       title: "Remixes",
@@ -175,7 +169,7 @@ for (const { name, isAlbum, albumCover } of [
     await expect(field(page, "album")).toHaveValue("Remixes");
     await expect(numberField(page, "track")).toHaveValue("1");
     const exported = await captureDownload(page, () => downloadTrackButton(page).click());
-    expect(exported.filename).toBe(savedAs(browserName, "Speech Craft.mp3"));
+    expectDownloadName(exported, "Speech Craft.mp3");
     const { metadata } = await inspectAudio(exported);
     expect(metadata).toMatchObject({
       title: "Speech Craft",

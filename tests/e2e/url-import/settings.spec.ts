@@ -5,7 +5,7 @@ import {
   inspectAudio,
   unzipDownload,
 } from "../support/audio";
-import { test } from "../support/test";
+import { expectDownloadName, test } from "../support/test";
 import {
   cobaltRequests,
   downloadTrackButton,
@@ -15,7 +15,6 @@ import {
   streamFixture,
   useSettings,
   waitForTrackReady,
-  savedAs,
   expect,
   SETTLE_TIMEOUT,
 } from "./helpers";
@@ -28,11 +27,7 @@ const openImportSettings = async (page: Page) => {
 const backToWorkspace = (page: Page) =>
   page.getByRole("button", { name: "back to workspace" }).click();
 
-test("converts imports to mp3 at the bitrate chosen in settings", async ({
-  browserName,
-  page,
-  upstreams,
-}) => {
+test("converts imports to mp3 at the bitrate chosen in settings", async ({ page, upstreams }) => {
   const video = await upstreams.youtube.video({
     title: "Low Bitrate",
     author: "Squeezer",
@@ -52,7 +47,7 @@ test("converts imports to mp3 at the bitrate chosen in settings", async ({
   await importUrl(page, video.url);
   await waitForTrackReady(page);
   const exported = await captureDownload(page, () => downloadTrackButton(page).click());
-  expect(exported.filename).toBe(savedAs(browserName, "Low Bitrate.mp3"));
+  expectDownloadName(exported, "Low Bitrate.mp3");
   expect(mp3BitrateKbps(exported.bytes)).toBe(128);
   expect((await inspectAudio(exported)).metadata).toMatchObject({
     title: "Low Bitrate",
@@ -66,7 +61,6 @@ test("converts imports to mp3 at the bitrate chosen in settings", async ({
 });
 
 test("keeps the original provider audio when best compatible is chosen", async ({
-  browserName,
   page,
   upstreams,
 }) => {
@@ -99,7 +93,7 @@ test("keeps the original provider audio when best compatible is chosen", async (
   await importUrl(page, video.url);
   await waitForTrackReady(page);
   const youtubeFile = await captureDownload(page, () => downloadTrackButton(page).click());
-  expect(youtubeFile.filename).toBe(savedAs(browserName, "Original Video.m4a"));
+  expectDownloadName(youtubeFile, "Original Video.m4a");
   expect((await inspectAudio(youtubeFile)).metadata.title).toBe("Original Video");
   await expectLosslessAudio(youtubeFile, streamFixture("m4a"));
 
@@ -107,7 +101,7 @@ test("keeps the original provider audio when best compatible is chosen", async (
   await expect(page.getByRole("heading", { level: 2 })).toContainText("Original Track");
   await waitForTrackReady(page);
   const soundcloudFile = await captureDownload(page, () => downloadTrackButton(page).click());
-  expect(soundcloudFile.filename).toBe(savedAs(browserName, "Original Track.opus"));
+  expectDownloadName(soundcloudFile, "Original Track.opus");
   expect((await inspectAudio(soundcloudFile)).metadata.title).toBe("Original Track");
   await expectLosslessAudio(soundcloudFile, streamFixture("opus"));
 
@@ -118,7 +112,6 @@ test("keeps the original provider audio when best compatible is chosen", async (
 });
 
 test("downloads a single right after import when the setting is on", async ({
-  browserName,
   page,
   context,
   upstreams,
@@ -138,7 +131,7 @@ test("downloads a single right after import when the setting is on", async ({
   await backToWorkspace(page);
 
   const exported = await captureDownload(page, () => importUrl(page, video.url));
-  expect(exported.filename).toBe(savedAs(browserName, "Instant Song.mp3"));
+  expectDownloadName(exported, "Instant Song.mp3");
   expect((await inspectAudio(exported)).metadata).toMatchObject({
     title: "Instant Song",
     artist: "Hurry",

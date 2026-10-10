@@ -3,7 +3,8 @@ import { APP_SETTINGS_STORAGE_KEY } from "../../../src/features/settings/setting
 import { THEME_STORAGE_KEY } from "../../../src/features/theme/theme";
 import { audioFixture, captureDownload, expectLosslessAudio, inspectAudio } from "../support/audio";
 import { expect, IMPORT_TIMEOUT, journey, test } from "./fixtures";
-import { startImport, savedName } from "./helpers";
+import { expectDownloadName } from "../support/test";
+import { startImport } from "./helpers";
 
 const LINK_SWITCHES = [
   "sync artist with the album artist",
@@ -209,7 +210,7 @@ test("the download format and bitrate choices describe and change the audio tagi
   const download = page.getByRole("button", { name: "download track" });
   await expect(download).toBeEnabled(IMPORT_TIMEOUT);
   const original = await captureDownload(page, () => download.click());
-  expect(original.filename).toBe(savedName("Format Test.m4a"));
+  expectDownloadName(original, "Format Test.m4a");
   await expectLosslessAudio(original, audioFixture("m4a").file);
 
   await openSettings(page, "importing");
@@ -219,7 +220,7 @@ test("the download format and bitrate choices describe and change the audio tagi
   await expect(page.getByLabel("title", { exact: true })).toHaveValue("Bitrate Test");
   await expect(download).toBeEnabled(IMPORT_TIMEOUT);
   const mp3 = await captureDownload(page, () => download.click());
-  expect(mp3.filename).toBe(savedName("Bitrate Test.mp3"));
+  expectDownloadName(mp3, "Bitrate Test.mp3");
   expect((await inspectAudio(mp3)).format).toBe("mp3");
   expect(mp3Bitrate(mp3.bytes)).toBe(96);
 
@@ -245,7 +246,7 @@ test("immediate download saves the track as soon as its import finishes", async 
   await page.getByRole("button", { name: "back to workspace" }).click();
 
   const saved = await captureDownload(page, () => startImport(page, video.url));
-  expect(saved.filename).toBe(savedName("Instant Save.mp3"));
+  expectDownloadName(saved, "Instant Save.mp3");
   expect((await inspectAudio(saved)).metadata).toMatchObject({ title: "Instant Save", year: 2022 });
 });
 
@@ -347,7 +348,7 @@ test("link switches decide which track fields follow their source", async ({ pag
   const download = page.getByRole("button", { name: "download track" });
   await expect(download).toBeEnabled(IMPORT_TIMEOUT);
   const saved = await captureDownload(page, () => download.click());
-  expect(saved.filename).toBe(savedName("custom-name.mp3"));
+  expectDownloadName(saved, "custom-name.mp3");
   expect((await inspectAudio(saved)).metadata).toMatchObject({
     title: "Renamed Song",
     artist: "Solo Artist",

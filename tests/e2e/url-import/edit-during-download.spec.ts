@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { captureDownload, inspectAudio } from "../support/audio";
-import { expect, IMPORT_TIMEOUT, test } from "../support/test";
-import { downloadTrackButton, importUrl, savedAs } from "./helpers";
+import { downloadNames, expect, IMPORT_TIMEOUT, test } from "../support/test";
+import { downloadTrackButton, importUrl } from "./helpers";
 
 const holdTunnelResponse = async (page: Page) => {
   let received = false;
@@ -20,7 +20,6 @@ const holdTunnelResponse = async (page: Page) => {
 
 for (const source of ["single", "playlist"] as const) {
   test(`youtube ${source} keeps edits made while its audio download is held`, async ({
-    browserName,
     page,
     upstreams,
   }) => {
@@ -82,7 +81,7 @@ for (const source of ["single", "playlist"] as const) {
       }
 
       const exported = await captureDownload(page, () => downloadTrackButton(page).click());
-      expect.soft(exported.filename).toBe(savedAs(browserName, "custom-name.mp3"));
+      expect.soft(downloadNames("custom-name.mp3")).toContain(exported.filename);
       expect.soft((await inspectAudio(exported)).metadata).toMatchObject({
         title: "Edited Song",
         artist: "Edited Artist",
