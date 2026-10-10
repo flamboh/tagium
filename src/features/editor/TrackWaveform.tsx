@@ -61,11 +61,12 @@ function useTrackWaveform({
     playbackFile,
     waveform,
     status,
+    loading,
     duration,
     playbackFailed,
     setPlaybackFailed,
     setMediaDuration,
-  } = useWaveformSource(audioRef, file, fallbackDuration);
+  } = useWaveformSource(audioRef, file, downloadStatus, fallbackDuration);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(clip?.start ?? 0);
@@ -274,10 +275,6 @@ function useTrackWaveform({
       : null;
 
   const barCount = barCountForWidth(width);
-
-  const loading =
-    !playbackFailed &&
-    (status === "loading" || (status === "waiting" && downloadStatus === "downloading"));
 
   const barsRef = useWaveformBars(surfaceRef, {
     peaks: waveform?.peaks ?? null,
@@ -542,6 +539,7 @@ export default function TrackWaveform(props: TrackWaveformProps) {
 function useWaveformSource(
   audioRef: RefObject<HTMLAudioElement | null>,
   file: File | undefined,
+  downloadStatus: TagiumFile["downloadStatus"],
   fallbackDuration: number,
 ) {
   // Metadata writes replace the track's File without touching its audio; keep the first one
@@ -603,10 +601,15 @@ function useWaveformSource(
     normalizeSeconds(waveform?.duration) ||
     normalizeSeconds(fallbackDuration);
 
+  const loading =
+    !playbackFailed &&
+    (status === "loading" || (status === "waiting" && downloadStatus === "downloading"));
+
   return {
     playbackFile,
     waveform,
     status,
+    loading,
     duration,
     playbackFailed,
     setPlaybackFailed,
