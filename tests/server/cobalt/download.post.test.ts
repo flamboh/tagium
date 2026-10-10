@@ -18,7 +18,9 @@ type RuntimeRequest = Request & {
 };
 
 const machineAffinitySecret = "test-machine-affinity-secret";
+
 const sourceUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+
 const makeRequest = (
   body: Record<string, RequestBodyValue> = { url: sourceUrl },
   options: {
@@ -33,7 +35,9 @@ const makeRequest = (
     Origin: options.origin ?? "https://tagium.test",
     "X-Tagium-Request-Id": "request-test",
   });
+
   if (options.cookie) headers.set("Cookie", options.cookie);
+
   if (options.clientIp) headers.set("CF-Connecting-IP", options.clientIp);
 
   const request = new Request("https://tagium.test/api/cobalt/download", {
@@ -52,6 +56,7 @@ const makeRequest = (
       },
     },
   };
+
   return request;
 };
 
@@ -76,6 +81,7 @@ describe("cobalt video download endpoint", () => {
     );
 
     let response: Response | undefined;
+
     const events = await captureSentryEvents(async () => {
       response = await handler(makeEvent(makeRequest()));
     });
@@ -99,6 +105,7 @@ describe("cobalt video download endpoint", () => {
   it("fails closed outside local development when shared bindings are missing", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
+
     const response = await handler(
       makeEvent(makeRequest({ url: sourceUrl }, { runtime: { TAGIUM_DEPLOY_ENV: "production" } })),
     );

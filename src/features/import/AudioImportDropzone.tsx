@@ -29,6 +29,7 @@ export default function AudioImportDropzone({
 
   const importFiles = (files: FileList | File[] | null) => {
     const audioFiles = Array.from(files ?? []);
+
     if (audioFiles.length > 0) void onAudioUpload(audioFiles);
   };
 
@@ -43,6 +44,7 @@ export default function AudioImportDropzone({
     const handleDocumentDragLeave = (event: DragEvent) => {
       if (!event.relatedTarget) resetDragState();
     };
+
     const handleVisibilityChange = () => {
       if (document.hidden) resetDragState();
     };
@@ -51,6 +53,7 @@ export default function AudioImportDropzone({
     document.addEventListener("dragend", resetDragState);
     document.addEventListener("dragleave", handleDocumentDragLeave);
     document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       window.removeEventListener("blur", resetDragState);
       document.removeEventListener("dragend", resetDragState);
@@ -89,6 +92,7 @@ export default function AudioImportDropzone({
         onDragLeave={(event) => {
           event.preventDefault();
           dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+
           if (dragCounterRef.current === 0) setIsDragging(false);
         }}
         onDragOver={handleDragOver}

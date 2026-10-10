@@ -8,6 +8,7 @@ import {
 import { Option, Schema } from "effect";
 
 const UNAVAILABLE_MESSAGE = "this share is no longer available";
+
 const SHARE_METADATA_TOO_LARGE_MESSAGE = "this share contains too much metadata to publish.";
 
 export class SharedContentUnavailableError extends Error {
@@ -53,11 +54,13 @@ const readJson = async (response: Response) => {
 const manifestVersionProbeSchema = Schema.Struct({
   manifest: Schema.Struct({ version: Schema.Number }),
 });
+
 const sharedContentResponseSchema = Schema.Struct({
   manifest: manifestSchema,
   expiresAt: Schema.NullOr(Schema.String),
   analyticsId: shareAnalyticsIdSchema,
 });
+
 const createShareReceiptSchema = Schema.Struct({
   slug: Schema.String,
   url: Schema.String,
@@ -65,6 +68,7 @@ const createShareReceiptSchema = Schema.Struct({
   revocationToken: Schema.String,
   analyticsId: shareAnalyticsIdSchema,
 });
+
 const updateShareReceiptSchema = Schema.Struct({
   slug: Schema.String,
   url: Schema.String,
@@ -86,15 +90,19 @@ export const fetchSharedContent = async (
     headers: { Accept: "application/json" },
     cache: "no-store",
   });
+
   if (!response.ok) throw new SharedContentUnavailableError();
 
   try {
     const payload = await readJson(response);
     const versionProbe = Schema.decodeUnknownOption(manifestVersionProbeSchema)(payload);
+
     if (Option.isSome(versionProbe) && versionProbe.value.manifest.version !== MANIFEST_VERSION) {
       throw new SharedContentVersionError();
     }
+
     const decoded = Schema.decodeUnknownSync(sharedContentResponseSchema)(payload);
+
     return {
       manifest: decodeManifest(decoded.manifest),
       expiresAt: decoded.expiresAt,
@@ -114,10 +122,14 @@ export const fetchSharedArtwork = async (
     headers: { Accept: "image/jpeg,image/png" },
     cache: "no-store",
   });
+
   if (response.status === 404) return null;
+
   if (!response.ok) return null;
   const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim();
+
   if (contentType !== "image/jpeg" && contentType !== "image/png") return null;
+
   return new File(
     [await response.blob()],
     contentType === "image/png" ? "cover.png" : "cover.jpg",
@@ -134,18 +146,23 @@ export const publishShare = async (
 ): Promise<CreatedSharePublicationReceipt> => {
   const body = new FormData();
   body.set("manifest", JSON.stringify(manifest));
+
   if (cover) body.set("cover", cover);
+
   const response = await (dependencies.fetch ?? globalThis.fetch)("/api/manifests", {
     method: "POST",
     body,
     headers: { Accept: "application/json" },
   });
+
   if (!response.ok) {
     if (response.status === 400 || response.status === 413)
       throw new Error(SHARE_METADATA_TOO_LARGE_MESSAGE);
+
     if (response.status === 429) throw new Error("too many share requests; try again shortly");
     throw new Error("the share link could not be created");
   }
+
   try {
     return Schema.decodeUnknownSync(createShareReceiptSchema)(await readJson(response));
   } catch {
@@ -162,8 +179,10 @@ export const updateShare = async (
 ): Promise<ShareUpdateReceipt> => {
   const body = new FormData();
   body.set("manifest", JSON.stringify(manifest));
+
   if (cover) body.set("cover", cover);
   else body.set("removeArtwork", "true");
+
   const response = await (dependencies.fetch ?? globalThis.fetch)(apiPath(slug), {
     method: "PATCH",
     body,
@@ -172,12 +191,15 @@ export const updateShare = async (
       Accept: "application/json",
     },
   });
+
   if (!response.ok) {
     if (response.status === 400 || response.status === 413)
       throw new Error(SHARE_METADATA_TOO_LARGE_MESSAGE);
+
     if (response.status === 429) throw new Error("too many update requests; try again shortly");
     throw new Error(`the shared ${manifest.kind} could not be updated`);
   }
+
   try {
     return Schema.decodeUnknownSync(updateShareReceiptSchema)(await readJson(response));
   } catch {
@@ -197,6 +219,7 @@ export const revokeShare = async (
       Accept: "application/json",
     },
   });
+
   // Only a confirmed revocation permits deleting the local capability.
   if (response.status !== 204) {
     throw new Error("sharing could not be stopped");

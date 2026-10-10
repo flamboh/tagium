@@ -59,19 +59,23 @@ export type LibraryAction =
 const uniqueExistingTrackIds = (trackIds: Iterable<string>, fileIdSet: ReadonlySet<string>) => {
   const result: string[] = [];
   const seen = new Set<string>();
+
   for (const trackId of trackIds) {
     if (!fileIdSet.has(trackId) || seen.has(trackId)) continue;
     seen.add(trackId);
     result.push(trackId);
   }
+
   return result;
 };
 
 const uniqueById = <Value extends { id: string }>(values: Value[]) => {
   const result: Value[] = [];
   const indexById = new Map<string, number>();
+
   for (const value of values) {
     const existingIndex = indexById.get(value.id);
+
     if (existingIndex === undefined) {
       indexById.set(value.id, result.length);
       result.push(value);
@@ -79,6 +83,7 @@ const uniqueById = <Value extends { id: string }>(values: Value[]) => {
       result[existingIndex] = value;
     }
   }
+
   return result;
 };
 
@@ -87,6 +92,7 @@ const getTrackAlbumId = (albums: AlbumGroup[], trackId: string) =>
 
 const getOrderedFileIds = (state: LibraryState) => {
   const fileIdSet = new Set(state.files.map((file) => file.id));
+
   const orderedIds = uniqueExistingTrackIds(
     [
       ...state.looseTrackIds,
@@ -95,6 +101,7 @@ const getOrderedFileIds = (state: LibraryState) => {
     ],
     fileIdSet,
   );
+
   return orderedIds;
 };
 
@@ -111,6 +118,7 @@ const normalizeSelection = (state: LibraryState): LibraryState => {
   const fileIdSet = new Set(state.files.map((file) => file.id));
   const albumIdSet = new Set(state.albums.map((album) => album.id));
   const selectedFileIds = new Set(uniqueExistingTrackIds(state.selectedFileIds, fileIdSet));
+
   const rangeAnchorFileId =
     state.rangeAnchorFileId && fileIdSet.has(state.rangeAnchorFileId)
       ? state.rangeAnchorFileId
@@ -122,6 +130,7 @@ const normalizeSelection = (state: LibraryState): LibraryState => {
 
   const selectedAlbumId =
     state.selectedAlbumId && albumIdSet.has(state.selectedAlbumId) ? state.selectedAlbumId : null;
+
   if (state.selectedFileId && fileIdSet.has(state.selectedFileId)) {
     return {
       ...state,
@@ -134,6 +143,7 @@ const normalizeSelection = (state: LibraryState): LibraryState => {
   const firstRemainingSelectedId = getOrderedFileIds(state).find((trackId) =>
     selectedFileIds.has(trackId),
   );
+
   if (firstRemainingSelectedId) {
     return {
       ...state,
@@ -147,6 +157,7 @@ const normalizeSelection = (state: LibraryState): LibraryState => {
   if (selectedAlbumId) {
     const selectedAlbum = state.albums.find((album) => album.id === selectedAlbumId);
     const firstAlbumTrackId = selectedAlbum?.trackIds.find((trackId) => fileIdSet.has(trackId));
+
     if (!firstAlbumTrackId) {
       return {
         ...state,
@@ -156,6 +167,7 @@ const normalizeSelection = (state: LibraryState): LibraryState => {
         rangeAnchorFileId: null,
       };
     }
+
     return {
       ...state,
       selectedAlbumId,
@@ -166,6 +178,7 @@ const normalizeSelection = (state: LibraryState): LibraryState => {
   }
 
   const firstLooseTrackId = state.looseTrackIds.find((trackId) => fileIdSet.has(trackId));
+
   if (firstLooseTrackId) {
     return {
       ...state,
@@ -178,7 +191,9 @@ const normalizeSelection = (state: LibraryState): LibraryState => {
 
   for (const album of state.albums) {
     const firstAlbumTrackId = album.trackIds.find((trackId) => fileIdSet.has(trackId));
+
     if (!firstAlbumTrackId) continue;
+
     return {
       ...state,
       selectedAlbumId: album.id,
@@ -189,6 +204,7 @@ const normalizeSelection = (state: LibraryState): LibraryState => {
   }
 
   const firstFileId = state.files[0]?.id;
+
   if (firstFileId) {
     return {
       ...state,
@@ -206,14 +222,18 @@ const normalizeContents = (state: LibraryState) => {
   const files = uniqueById(state.files);
   const fileIdSet = new Set(files.map((file) => file.id));
   const assignedTrackIds = new Set<string>();
+
   const albums = uniqueById(state.albums).map((album) => {
     const trackIds = uniqueExistingTrackIds(album.trackIds, fileIdSet).filter((trackId) => {
       if (assignedTrackIds.has(trackId)) return false;
       assignedTrackIds.add(trackId);
+
       return true;
     });
+
     return { ...album, trackIds };
   });
+
   const nextState = {
     ...state,
     files,
@@ -222,6 +242,7 @@ const normalizeContents = (state: LibraryState) => {
       (trackId) => !assignedTrackIds.has(trackId),
     ),
   };
+
   return normalizeSelection(nextState);
 };
 
@@ -263,6 +284,7 @@ const selectTrack = (
   mode: TrackSelectionMode,
 ) => {
   if (!state.files.some((file) => file.id === fileId)) return state;
+
   if (mode === "replace") {
     return applySelection(state, {
       selectedAlbumId: albumId,
@@ -273,6 +295,7 @@ const selectTrack = (
   }
 
   const selectedFileIds = new Set(state.selectedFileIds);
+
   if (mode === "toggle") {
     if (selectedFileIds.has(fileId)) selectedFileIds.delete(fileId);
     else selectedFileIds.add(fileId);
@@ -280,10 +303,12 @@ const selectTrack = (
     const scope = getSelectionScope(state, albumId);
     const startIndex = state.rangeAnchorFileId ? scope.indexOf(state.rangeAnchorFileId) : -1;
     const endIndex = scope.indexOf(fileId);
+
     if (startIndex < 0 || endIndex < 0) {
       return state;
     } else {
       const [start, end] = startIndex < endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
+
       for (const trackId of scope.slice(start, end + 1)) selectedFileIds.add(trackId);
     }
   }
@@ -305,17 +330,21 @@ export const libraryReducer = (state: LibraryState, action: LibraryAction): Libr
         albums: action.albums ?? state.albums,
         looseTrackIds: action.looseTrackIds ?? state.looseTrackIds,
       });
+
       return action.selection ? applySelection(content, action.selection) : content;
     }
+
     case "tracks-removed": {
       const trackIdSet = new Set(action.trackIds);
       const files = action.files ?? state.files.filter((file) => !trackIdSet.has(file.id));
+
       const albums =
         action.albums ??
         state.albums.map((album) => ({
           ...album,
           trackIds: album.trackIds.filter((trackId) => !trackIdSet.has(trackId)),
         }));
+
       return normalizeContents({
         ...state,
         files,
@@ -323,10 +352,13 @@ export const libraryReducer = (state: LibraryState, action: LibraryAction): Libr
         looseTrackIds: state.looseTrackIds.filter((trackId) => !trackIdSet.has(trackId)),
       });
     }
+
     case "album-removed": {
       const removedAlbum = state.albums.find((album) => album.id === action.albumId);
+
       if (!removedAlbum) return state;
       const trackIdSet = new Set(removedAlbum.trackIds);
+
       return normalizeContents({
         ...state,
         files: state.files.filter((file) => !trackIdSet.has(file.id)),
@@ -334,12 +366,16 @@ export const libraryReducer = (state: LibraryState, action: LibraryAction): Libr
         looseTrackIds: state.looseTrackIds.filter((trackId) => !trackIdSet.has(trackId)),
       });
     }
+
     case "album-selected": {
       const album = state.albums.find((entry) => entry.id === action.albumId);
+
       if (!album) return state;
+
       const firstTrackId = album.trackIds.find((trackId) =>
         state.files.some((file) => file.id === trackId),
       );
+
       if (!firstTrackId) {
         return applySelection(state, {
           selectedAlbumId: album.id,
@@ -348,15 +384,19 @@ export const libraryReducer = (state: LibraryState, action: LibraryAction): Libr
           rangeAnchorFileId: null,
         });
       }
+
       return selectTrack(state, album.id, firstTrackId, action.mode);
     }
+
     case "track-selected":
       return selectTrack(state, action.albumId, action.fileId, action.mode);
     case "selection-cleared":
       return withClearedSelection(state, true);
     case "all-tracks-selected": {
       const activeFileId = state.selectedFileId ?? state.files[0]?.id ?? null;
+
       if (!activeFileId) return withClearedSelection(state, false);
+
       return {
         ...state,
         selectedAlbumId: getTrackAlbumId(state.albums, activeFileId),
@@ -366,6 +406,7 @@ export const libraryReducer = (state: LibraryState, action: LibraryAction): Libr
         selectionWasManuallyCleared: false,
       };
     }
+
     case "album-share-publication-set":
       return {
         ...state,

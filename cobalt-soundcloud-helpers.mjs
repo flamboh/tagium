@@ -8,6 +8,7 @@ const errorNames = new Set([
 
 const normalizedDetails = (details) => {
   const output = {};
+
   if (
     Number.isInteger(details.upstreamStatus) &&
     details.upstreamStatus >= 100 &&
@@ -15,12 +16,14 @@ const normalizedDetails = (details) => {
   ) {
     output.upstreamStatus = details.upstreamStatus;
   }
+
   if (
     typeof details.contentType === "string" &&
     /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i.test(details.contentType)
   ) {
     output.contentType = details.contentType.toLowerCase();
   }
+
   if (typeof details.retryAfter === "string") {
     if (/^\d{1,6}$/.test(details.retryAfter)) output.retryAfter = details.retryAfter;
     else if (
@@ -29,9 +32,11 @@ const normalizedDetails = (details) => {
       output.retryAfter = "http-date";
     }
   }
+
   if (typeof details.errorType === "string") {
     output.errorType = errorNames.has(details.errorType) ? details.errorType : "OtherError";
   }
+
   return output;
 };
 
@@ -39,9 +44,11 @@ export const buildSoundCloudFailureCode = (stage, details = {}) => {
   const safe = normalizedDetails(details);
   const status = safe.upstreamStatus ? `.${safe.upstreamStatus}` : "";
   let suffix = "";
+
   for (const [key, value] of Object.entries(safe)) {
     if (key !== "upstreamStatus") suffix += `.${key}-${value}`;
   }
+
   return `fetch.soundcloud.${stage}${status}${suffix}`;
 };
 

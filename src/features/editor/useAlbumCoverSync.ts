@@ -15,10 +15,12 @@ export function useAlbumCoverSync({ disabled, onSync }: AlbumCoverSyncOptions) {
 
   const cancel = (resetVisualState: boolean) => {
     runRef.current += 1;
+
     if (timerRef.current !== null) {
       globalThis.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+
     if (resetVisualState) {
       setIsSyncing(false);
       setRotation(0);

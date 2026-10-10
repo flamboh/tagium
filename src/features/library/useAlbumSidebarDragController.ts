@@ -53,9 +53,13 @@ const dragStartY = (event: Event) => {
     clientY?: number;
     touches?: TouchList;
   };
+
   if (sourceEvent.clientY !== undefined) return sourceEvent.clientY;
+
   if (sourceEvent.touches?.[0]) return sourceEvent.touches[0].clientY;
+
   if (sourceEvent.changedTouches?.[0]) return sourceEvent.changedTouches[0].clientY;
+
   return null;
 };
 
@@ -64,12 +68,14 @@ const isFileDrag = (event: ReactDragEvent) => event.dataTransfer.types.includes(
 const acceptFileDrag = (event: ReactDragEvent, nested: boolean) => {
   if (!isFileDrag(event)) return;
   event.preventDefault();
+
   if (nested) event.stopPropagation();
   event.dataTransfer.dropEffect = "copy";
 };
 
 const acceptFileDrop = (event: ReactDragEvent, onUpload: (files: File[]) => void) => {
   const files = Array.from(event.dataTransfer.files);
+
   if (files.length === 0) return;
   event.preventDefault();
   event.stopPropagation();
@@ -78,6 +84,7 @@ const acceptFileDrop = (event: ReactDragEvent, onUpload: (files: File[]) => void
 
 const runCommand = (command: SidebarDragCommand | null, actions: AlbumSidebarDragActions) => {
   if (!command) return;
+
   switch (command.type) {
     case "reorder-album":
       actions.onReorderAlbums(command.albumId, command.targetIndex);
@@ -103,6 +110,7 @@ export function useAlbumSidebarDragController(options: UseAlbumSidebarDragContro
   const [activeDrag, setActiveDrag] = useState<SidebarDragData | null>(null);
   const dragStartYRef = useRef<number | null>(null);
   const recentLooseTargetRef = useRef<RecentLooseTarget | null>(null);
+
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
@@ -127,8 +135,11 @@ export function useAlbumSidebarDragController(options: UseAlbumSidebarDragContro
     const active = event.active.data.current as SidebarDragData | undefined;
     // SAFETY: sidebar droppables exclusively register SidebarDropData with dnd-kit.
     const over = event.over?.data.current as SidebarDropData | undefined;
+
     if (active?.type !== "track" || active.container !== "loose") return;
+
     if (over?.type !== "track" || over.container !== "loose") return;
+
     if (over.trackId === active.trackId) return;
     recentLooseTargetRef.current = { trackId: over.trackId, expiresAt: Date.now() + 700 };
   };
@@ -138,6 +149,7 @@ export function useAlbumSidebarDragController(options: UseAlbumSidebarDragContro
     const active = event.active.data.current as SidebarDragData | undefined;
     // SAFETY: sidebar droppables exclusively register SidebarDropData with dnd-kit.
     const over = event.over?.data.current as SidebarDropData | undefined;
+
     if (active && over && event.over) {
       runCommand(
         resolveSidebarDragCommand({
@@ -157,6 +169,7 @@ export function useAlbumSidebarDragController(options: UseAlbumSidebarDragContro
         options,
       );
     }
+
     resetDrag();
   };
 

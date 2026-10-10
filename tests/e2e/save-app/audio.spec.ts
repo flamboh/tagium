@@ -29,6 +29,7 @@ test("saves youtube audio as a tagged mp3 with its cover", async ({ page, upstre
     audioFormat: "mp3",
     audioBitrate: "128",
   });
+
   for (const option of ["videoQuality", "youtubeVideoContainer", "youtubeVideoCodec"]) {
     expect.soft(JSON.parse(resolve!.requestBody!)).not.toHaveProperty(option);
   }
@@ -62,6 +63,7 @@ test("source audio is saved in the container its name promises, with tags", asyn
     author: "Drift",
     video: ["h264-1080", "vp9-720"],
   });
+
   const m4a = await upstreams.youtube.video({ title: "Closed Room", author: "Drift" });
   const save = saveApp(page);
 
@@ -88,6 +90,7 @@ test("source audio is saved in the container its name promises, with tags", asyn
   const requests = (await upstreams.calls({ route: "cobalt.resolve" })).map((call) =>
     JSON.parse(call.requestBody!),
   );
+
   expect(requests.map((body) => [body.downloadMode, body.audioFormat])).toEqual([
     ["audio", "best"],
     ["audio", "best"],
@@ -99,6 +102,7 @@ test("saves soundcloud audio with its provider tags in each audio format", async
   upstreams,
 }) => {
   journey();
+
   const track = await upstreams.soundcloud.track({
     title: "Monkeys Spinning",
     author: "Kevin",
@@ -106,7 +110,9 @@ test("saves soundcloud audio with its provider tags in each audio format", async
     genre: "pizzicato",
     year: 2014,
   });
+
   const save = saveApp(page);
+
   const tags = {
     title: "Monkeys Spinning",
     artist: "Kevin",
@@ -143,6 +149,7 @@ test("saves soundcloud audio with its provider tags in each audio format", async
   const requests = (await upstreams.calls({ route: "cobalt.resolve" })).map((call) =>
     JSON.parse(call.requestBody!),
   );
+
   expect(requests.map((body) => [body.downloadMode, body.audioFormat])).toEqual([
     ["auto", "best"],
     ["audio", "mp3"],

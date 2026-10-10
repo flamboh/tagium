@@ -8,11 +8,13 @@ test("keeps the five newest saves downloadable until the page reloads", async ({
   upstreams,
 }) => {
   journey();
+
   const tracks = await Promise.all(
     ["One", "Two", "Three", "Four", "Five"].map((title) =>
       upstreams.soundcloud.track({ title, author: "Loop", cover: null }),
     ),
   );
+
   const save = saveApp(page);
   const name = (title: string) => `${title} - Loop (soundcloud).opus`;
   const theme = page.locator("html");
@@ -27,6 +29,7 @@ test("keeps the five newest saves downloadable until the page reloads", async ({
   await save.save(tracks[0]!.url, name("One"));
 
   await expect(save.rows).toHaveText(["One", "Five", "Four", "Three", "Two"].map(name));
+
   if (browserName !== "webkit") await expect.poll(() => storedFileCount(page)).toBe(5);
   const resolvesBefore = (await upstreams.calls({ route: "cobalt.resolve" })).length;
   expect(resolvesBefore).toBe(6);
@@ -52,21 +55,25 @@ test("reclaims saved media from closed pages while open pages keep theirs", asyn
   upstreams,
 }, testInfo) => {
   journey();
+
   const first = await upstreams.soundcloud.track({
     title: "First Tab",
     author: "Loop",
     cover: null,
   });
+
   const second = await upstreams.soundcloud.track({
     title: "Second Tab",
     author: "Loop",
     cover: null,
   });
+
   const context = await browser
     .browserType()
     .launchPersistentContext(testInfo.outputPath("profile"), {
       baseURL,
     });
+
   try {
     await sandbox(context);
     const tabA = context.pages()[0] ?? (await context.newPage());
@@ -117,9 +124,11 @@ test("sweeps old root entries at startup while an open tab keeps its session", a
     author: "Loop",
     cover: null,
   });
+
   const context = await browser
     .browserType()
     .launchPersistentContext(testInfo.outputPath("profile"), { baseURL });
+
   try {
     await sandbox(context);
     const tabA = context.pages()[0] ?? (await context.newPage());
@@ -147,13 +156,17 @@ test("sweeps old root entries at startup while an open tab keeps its session", a
       const directory = await root.getDirectoryHandle("old-temporary-directory", { create: true });
       await directory.getFileHandle("leftover", { create: true });
     });
+
     const rootEntries = () =>
       tabB.evaluate(async () => {
         const root = await navigator.storage.getDirectory();
         const names = [];
+
         for await (const name of root.keys()) names.push(name);
+
         return names.sort();
       });
+
     expect(await rootEntries()).toEqual([
       "old-temporary-directory",
       "tagium-save-temporary",
@@ -185,11 +198,13 @@ test("saves files when the browser refuses private storage", async ({ page, upst
     navigator.storage.getDirectory = () =>
       Promise.reject(new DOMException("denied", "SecurityError"));
   });
+
   const track = await upstreams.soundcloud.track({
     title: "In Memory",
     author: "Loop",
     cover: null,
   });
+
   const photos = await upstreams.picker({ items: [{ type: "photo", asset: "cover" }] });
   const save = saveApp(page);
 

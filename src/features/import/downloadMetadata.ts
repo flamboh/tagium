@@ -5,7 +5,9 @@ import type { AudioMetadata, MetadataPatch } from "@/features/library/types";
 
 const filenameFromTitle = (title: string) => {
   const filename = filenamify(title.trim(), { replacement: "-" });
+
   if (filename) return `${filename}.mp3`;
+
   return "downloading-track.mp3";
 };
 
@@ -77,8 +79,12 @@ export const createPlaylistPendingMetadataPatch = (
     album: playlist.title,
     genre: playlist.genre,
   };
+
   const year = getPlaylistTrackPendingYear(playlist, track);
+
   if (year !== undefined) patch.year = year;
+
   if (track.trackNumber !== undefined) patch.trackNumber = track.trackNumber;
+
   return patch;
 };

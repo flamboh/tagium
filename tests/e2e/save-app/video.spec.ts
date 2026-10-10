@@ -7,6 +7,7 @@ import { saveApp } from "./save";
 const expectDecoded = (media: MediaProbe) => {
   for (const stream of media.streams) {
     expect(stream.packets, `${stream.codec} packets`).toBeGreaterThan(0);
+
     if (stream.codec !== "vp9") expect(stream.frames, `${stream.codec} frames`).toBeGreaterThan(0);
   }
 };
@@ -70,11 +71,13 @@ test("quality, codec, and container settings shape the saved video", async ({
   upstreams,
 }) => {
   journey();
+
   const video = await upstreams.youtube.video({
     title: "Tide Pools",
     author: "Coastline",
     video: ["h264-1080", "h264-720", "h264-480", "vp9-720", "av1-720"],
   });
+
   const save = saveApp(page);
   const mode = page.getByLabel("mode", { exact: true });
   const quality = page.getByLabel("quality", { exact: true });
@@ -103,9 +106,11 @@ test("quality, codec, and container settings shape the saved video", async ({
 
   await save.configure({ quality: "720", container: "webm" });
   await save.save(video.url, "Tide Pools - Coastline (720p, vp9, youtube).webm");
+
   const vp9 = await probeMedia(
     await save.download("Tide Pools - Coastline (720p, vp9, youtube).webm"),
   );
+
   expect(vp9.container).toContain("webm");
   expect(vp9.streams).toEqual([
     expect.objectContaining({ type: "video", codec: "vp9", width: 1280, height: 720 }),
@@ -116,9 +121,11 @@ test("quality, codec, and container settings shape the saved video", async ({
 
   await save.configure({ codec: "av1" });
   await save.save(video.url, "Tide Pools - Coastline (720p, av1, youtube).webm");
+
   const av1 = await probeMedia(
     await save.download("Tide Pools - Coastline (720p, av1, youtube).webm"),
   );
+
   expect(av1.streams).toEqual([
     expect.objectContaining({ type: "video", codec: "av1", width: 1280, height: 720 }),
     expect.objectContaining({ type: "audio", codec: "opus" }),
@@ -127,9 +134,11 @@ test("quality, codec, and container settings shape the saved video", async ({
 
   await save.configure({ container: "mkv", codec: "h264", quality: "480" });
   await save.save(video.url, "Tide Pools - Coastline (480p, h264, youtube).mkv");
+
   const mkv = await probeMedia(
     await save.download("Tide Pools - Coastline (480p, h264, youtube).mkv"),
   );
+
   expect(mkv.container).toContain("matroska");
   expect(mkv.streams).toEqual([
     expect.objectContaining({ type: "video", codec: "h264", width: 854, height: 480 }),
@@ -141,6 +150,7 @@ test("quality, codec, and container settings shape the saved video", async ({
   const requests = (await upstreams.calls({ route: "cobalt.resolve" })).map((call) =>
     JSON.parse(call.requestBody!),
   );
+
   expect(requests).toEqual([
     expect.objectContaining({
       videoQuality: "720",
@@ -182,6 +192,7 @@ test("saves a youtube video without its audio track and keeps its tags", async (
   expect(await upstreams.calls({ route: "cobalt.tunnel.audio" })).toHaveLength(0);
   const [resolve] = await upstreams.calls({ route: "cobalt.resolve" });
   expect(JSON.parse(resolve!.requestBody!)).toMatchObject({ downloadMode: "mute" });
+
   for (const option of ["audioFormat", "audioBitrate"]) {
     expect.soft(JSON.parse(resolve!.requestBody!)).not.toHaveProperty(option);
   }

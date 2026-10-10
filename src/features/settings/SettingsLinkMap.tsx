@@ -37,6 +37,7 @@ function LinkRow({
 }: SettingsLinkMapProps & { descriptor: MetadataLinkDescriptor }) {
   const linked = isMetadataLinkEnabled(settings, descriptor);
   const nodeClassName = "hidden min-h-11 items-center text-sm sm:flex";
+
   // The two stubs grow out of the chain when a link is on and retract into it when it is cut, so
   // breaking a link reads as the wire pulling apart rather than as a change of line style.
   const wireClassName = cn(

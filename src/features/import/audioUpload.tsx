@@ -17,9 +17,11 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
 
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+
     if (files.length > 0) {
       onAudioUpload(files);
     }
+
     // Reset input value so the same file can be selected again if needed
     if (fileInputRef.current) {
       fileInputRef.current.value = "";

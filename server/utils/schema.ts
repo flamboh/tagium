@@ -5,6 +5,7 @@ export const urlStringSchema = Schema.Trim.check(
   Schema.makeFilter((value) => {
     try {
       new URL(value);
+
       return true;
     } catch {
       return "Expected a valid URL";

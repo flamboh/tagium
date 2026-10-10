@@ -14,6 +14,7 @@ const isWorkspaceNavigation = (navigation: unknown): navigation is WorkspaceNavi
   if (navigation === null || (typeof navigation !== "object" && typeof navigation !== "function")) {
     return false;
   }
+
   return (
     "kind" in navigation &&
     "value" in navigation &&
@@ -34,6 +35,7 @@ export const workspaceHistoryState = (
 ): WorkspaceNavigationState => {
   const nextState: WorkspaceNavigationState = isObjectState(state) ? { ...state } : {};
   nextState.workspaceNav = { kind, value };
+
   return nextState;
 };
 
@@ -57,15 +59,18 @@ export const useMobileWorkspaceNavigation = ({
     const update = () => setIsMobile(query.matches);
     update();
     query.addEventListener?.("change", update);
+
     return () => query.removeEventListener?.("change", update);
   }, []);
 
   useEffect(() => {
     mobileRef.current = isMobile;
+
     if (!isMobile && drawerOpen) {
       const state: WorkspaceNavigationState = isObjectState(history.state)
         ? { ...history.state }
         : {};
+
       delete state.workspaceNav;
       history.replaceState(state, "", location.href);
       currentWorkspaceNavRef.current = undefined;
@@ -83,6 +88,7 @@ export const useMobileWorkspaceNavigation = ({
       currentWorkspaceNavRef.current = nav;
       const drawerIsOpen = mobileRef.current && nav?.kind === "drawer" && nav.value === "open";
       setDrawerOpen(drawerIsOpen);
+
       if (nav?.kind === "view") setActiveView(nav.value === "settings" ? "settings" : "editor");
       else if (
         !nav &&
@@ -91,13 +97,16 @@ export const useMobileWorkspaceNavigation = ({
       ) {
         setActiveView("editor");
       }
+
       if (!drawerIsOpen) {
         const action = pendingActionRef.current;
         pendingActionRef.current = null;
         action?.();
       }
     };
+
     window.addEventListener("popstate", onPopState);
+
     return () => window.removeEventListener("popstate", onPopState);
   }, [setActiveView]);
 
@@ -119,6 +128,7 @@ export const useMobileWorkspaceNavigation = ({
         (typeof document !== "undefined" && document.activeElement instanceof HTMLElement
           ? document.activeElement
           : null);
+
       if (drawerOpen) return;
       history.pushState(workspaceHistoryState(history.state, "drawer", "open"), "", location.href);
       currentWorkspaceNavRef.current = { kind: "drawer", value: "open" };
@@ -129,6 +139,7 @@ export const useMobileWorkspaceNavigation = ({
 
   const closeDrawer = useCallback(() => {
     if (!drawerOpen || popPendingRef.current) return;
+
     if (
       isWorkspaceNavigationState(history.state) &&
       history.state.workspaceNav?.kind === "drawer"
@@ -148,8 +159,10 @@ export const useMobileWorkspaceNavigation = ({
     (action: () => void) => {
       if (!drawerOpen) {
         action();
+
         return;
       }
+
       if (popPendingRef.current) return;
       openerRef.current = null;
       pendingActionRef.current = action;
@@ -171,6 +184,7 @@ export const useMobileWorkspaceNavigation = ({
   const backWorkspace = useCallback(
     (afterBack?: () => void) => {
       if (popPendingRef.current) return;
+
       if (
         isWorkspaceNavigationState(history.state) &&
         history.state.workspaceNav?.kind === "view"

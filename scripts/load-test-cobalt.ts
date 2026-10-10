@@ -47,7 +47,9 @@ import { assertTunnelMatchesLoadTestTarget, parseLoadTestTarget } from "./load-t
 
 // Last-resort fallback if scripts/load-test-urls.txt is missing or unreadable.
 const FALLBACK_URLS = ["https://www.youtube.com/watch?v=YE7VzlLtp-4"];
+
 const DEFAULT_URLS_FILE = fileURLToPath(new URL("./load-test-urls.txt", import.meta.url));
+
 const REQUEST_TIMEOUT_MS = 120_000;
 
 const cobaltPlanSchema = Schema.Union([
@@ -68,6 +70,7 @@ const cobaltPlanSchema = Schema.Union([
     tunnel: Schema.Array(Schema.String),
   }),
 ]);
+
 type CobaltPlan = Schema.Schema.Type<typeof cobaltPlanSchema>;
 
 interface DownloadResult {
@@ -111,13 +114,16 @@ const readUrlsFile = (path: string): string[] =>
 
 const resolveUrls = (flags: Map<string, string>): string[] => {
   const inlineUrls = flags.get("url");
+
   if (inlineUrls) {
     return inlineUrls.split(",").map((url) => url.trim());
   }
 
   const urlsFilePath = flags.get("urls-file") ?? DEFAULT_URLS_FILE;
+
   try {
     const urlsFromFile = readUrlsFile(urlsFilePath);
+
     if (urlsFromFile.length > 0) {
       return urlsFromFile;
     }
@@ -134,25 +140,31 @@ const parseArgs = (argv: string[]): CliOptions => {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+
     if (arg === "--force") {
       force = true;
       continue;
     }
+
     if (arg?.startsWith("--")) {
       const key = arg.slice(2);
       const value = argv[index + 1];
+
       if (value === undefined) {
         throw new Error(`Missing value for --${key}.`);
       }
+
       flags.set(key, value);
       index += 1;
     }
   }
 
   const targetValue = flags.get("target");
+
   if (!targetValue) {
     throw new Error("Missing required --target <cobalt-origin-url>.");
   }
+
   const target = parseLoadTestTarget(targetValue);
 
   return {
@@ -190,17 +202,21 @@ const fetchTunnel = async (url: string) => {
     const response = await fetch(url, {
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
+
     if (!response.ok || !response.body) {
       return { ok: false as const, status: response.status, bytes: 0 };
     }
 
     let bytes = 0;
     const reader = response.body.getReader();
+
     while (true) {
       const { done, value } = await reader.read();
+
       if (done) {
         break;
       }
+
       bytes += value.byteLength;
     }
 
@@ -232,6 +248,7 @@ const performOneDownload = async (
       Accept: "application/json",
       "Content-Type": "application/json",
     });
+
     if (apiKey) headers.set("Authorization", `Api-Key ${apiKey}`);
     response = await fetch(new URL("/", target), {
       method: "POST",
@@ -265,6 +282,7 @@ const performOneDownload = async (
   }
 
   let plan: CobaltPlan;
+
   try {
     plan = Schema.decodeUnknownSync(cobaltPlanSchema)(await response.json());
   } catch {
@@ -278,6 +296,7 @@ const performOneDownload = async (
   const tunnelUrls = pickTunnelUrls(plan).map((url) =>
     assertTunnelMatchesLoadTestTarget(target, url),
   );
+
   if (tunnelUrls.length === 0) {
     return {
       ok: false,
@@ -290,6 +309,7 @@ const performOneDownload = async (
   const tunnelResults = await Promise.all(tunnelUrls.map((url) => fetchTunnel(url)));
   const streamMs = performance.now() - streamStart;
   const failedTunnel = tunnelResults.find((result) => !result.ok);
+
   if (failedTunnel && !failedTunnel.ok) {
     return {
       ok: false,
@@ -328,6 +348,7 @@ const runWave = async (options: CliOptions, concurrency: number): Promise<WaveSu
     while (dispatched < options.requestsPerWave) {
       dispatched += 1;
       const sourceUrl = options.urls[(dispatched - 1) % options.urls.length]!;
+
       const result = await performOneDownload(
         options.target,
         sourceUrl,
@@ -337,6 +358,7 @@ const runWave = async (options: CliOptions, concurrency: number): Promise<WaveSu
 
       summary.total += 1;
       summary.resolveLatenciesMs.push(result.resolveMs);
+
       if (result.streamMs !== undefined) {
         summary.streamLatenciesMs.push(result.streamMs);
       }
@@ -354,6 +376,7 @@ const runWave = async (options: CliOptions, concurrency: number): Promise<WaveSu
 
   await Promise.all(Array.from({ length: concurrency }, worker));
   summary.wallMs = performance.now() - startedAt;
+
   return summary;
 };
 
@@ -361,12 +384,15 @@ const percentile = (values: number[], fraction: number) => {
   if (values.length === 0) {
     return 0;
   }
+
   const sorted = [...values].sort((a, b) => a - b);
   const index = Math.min(sorted.length - 1, Math.floor(sorted.length * fraction));
+
   return sorted[index]!;
 };
 
 const formatMs = (value: number) => `${value.toFixed(0)}ms`;
+
 const formatMB = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 
 const printWaveSummary = (summary: WaveSummary) => {
@@ -396,12 +422,15 @@ const printWaveSummary = (summary: WaveSummary) => {
       `max=${formatMs(percentile(summary.streamLatenciesMs, 1))}`,
     ].join("  "),
   );
+
   if (summary.errorCodes.size > 0) {
     const breakdown = Array.from(summary.errorCodes.entries())
       .map(([code, count]) => `${code}=${count}`)
       .join(", ");
+
     console.log(`  errors: ${breakdown}`);
   }
+
   console.log("");
 };
 
@@ -427,6 +456,7 @@ const main = async () => {
     printWaveSummary(summary);
 
     const errorRate = summary.total === 0 ? 0 : summary.failed / summary.total;
+
     if (errorRate > options.abortErrorRate) {
       console.log(
         `Error rate ${(errorRate * 100).toFixed(0)}% exceeded --abort-error-rate ` +

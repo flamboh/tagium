@@ -19,19 +19,23 @@ type CanonicalJson =
   | null
   | readonly CanonicalJson[]
   | { readonly [key: string]: CanonicalJson };
+
 const isCanonicalPrimitive = Schema.is(
   Schema.Union([Schema.String, Schema.Number, Schema.Boolean, Schema.Null]),
 );
+
 const isSupportedArtworkFormat = Schema.is(Schema.Literals(["image/jpeg", "image/png"]));
 
 const canonicalJson = (value: CanonicalJson): string => {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+
   if (!isCanonicalPrimitive(value)) {
     return `{${Object.entries(value)
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`)
       .join(",")}}`;
   }
+
   return JSON.stringify(value);
 };
 
@@ -47,7 +51,9 @@ export const fingerprintSharedContent = async (
   const payload = new Uint8Array(metadata.byteLength + 1 + (artworkBytes?.byteLength ?? 0));
   payload.set(metadata);
   payload.set(separator, metadata.byteLength);
+
   if (artworkBytes) payload.set(artworkBytes, metadata.byteLength + 1);
+
   return hex(await crypto.subtle.digest("SHA-256", payload));
 };
 
@@ -60,8 +66,10 @@ export interface ShareSnapshot {
 const projectArtwork = (firstPicture: AudioMetadata["picture"][number] | undefined) => {
   const supportedFormat =
     firstPicture && isSupportedArtworkFormat(firstPicture.format) ? firstPicture.format : undefined;
+
   const supportedPicture =
     firstPicture && supportedFormat ? { ...firstPicture, format: supportedFormat } : undefined;
+
   const artwork: ManifestArtwork | undefined = supportedPicture
     ? {
         kind: "stored",
@@ -70,6 +78,7 @@ const projectArtwork = (firstPicture: AudioMetadata["picture"][number] | undefin
         description: supportedPicture.description,
       }
     : undefined;
+
   const cover = supportedPicture
     ? new File(
         [new Uint8Array(supportedPicture.data)],
@@ -77,6 +86,7 @@ const projectArtwork = (firstPicture: AudioMetadata["picture"][number] | undefin
         { type: supportedPicture.format },
       )
     : null;
+
   return { artwork, cover, bytes: supportedPicture?.data };
 };
 
@@ -86,6 +96,7 @@ export const projectAlbumShareSnapshot = async (
 ): Promise<ShareSnapshot> => {
   const { artwork, cover, bytes } = projectArtwork(album.cover?.[0]);
   const manifest = projectAlbumManifest(album, files, artwork);
+
   return {
     manifest,
     cover,
@@ -97,6 +108,7 @@ export const projectTrackShareSnapshot = async (file: TagiumFile): Promise<Share
   const picture = file.pendingMetadataPatch?.picture ?? file.metadata?.picture;
   const { artwork, cover, bytes } = projectArtwork(picture?.[0]);
   const manifest = projectTrackManifest(file, artwork);
+
   return {
     manifest,
     cover,
@@ -134,6 +146,7 @@ const shareActionState = (
 ): ShareActionState => {
   const createLabel = kind === "album" ? "share album" : "share track";
   const updateLabel = kind === "album" ? "update shared album" : "update shared track";
+
   if (sourceManifestSlug) {
     return {
       enabled: true,
@@ -142,8 +155,10 @@ const shareActionState = (
       variant: "view",
     };
   }
+
   if (!publication)
     return { enabled: true, label: createLabel, reason: createLabel, variant: "create" };
+
   if (!isActiveSharePublication(publication, now)) {
     return {
       enabled: true,
@@ -152,6 +167,7 @@ const shareActionState = (
       variant: "create",
     };
   }
+
   if (!hasCapability) {
     return {
       enabled: false,
@@ -160,6 +176,7 @@ const shareActionState = (
       variant: "update",
     };
   }
+
   if (!currentFingerprint || currentFingerprint === publication.publishedFingerprint) {
     return {
       enabled: true,
@@ -168,6 +185,7 @@ const shareActionState = (
       variant: "view",
     };
   }
+
   return { enabled: true, label: updateLabel, reason: updateLabel, variant: "update" };
 };
 

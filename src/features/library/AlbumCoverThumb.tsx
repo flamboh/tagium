@@ -18,6 +18,7 @@ const toBase64 = (data: Uint8Array) => {
 
 export function AlbumCoverThumb({ picture }: AlbumCoverThumbProps) {
   const pic = picture?.[0];
+
   const src = useMemo(() => {
     if (!pic) {
       return null;

@@ -35,6 +35,7 @@ const createLibraryStore = (initialState = createLibraryState()) => {
     },
     subscribe: (listener: Listener) => {
       listeners.add(listener);
+
       return () => listeners.delete(listener);
     },
   };

@@ -7,6 +7,7 @@ const wranglerBindingSchema = Schema.Struct({
   namespace_id: Schema.optionalKey(Schema.String),
   simple: Schema.optionalKey(Schema.Struct({ limit: Schema.Number, period: Schema.Number })),
 });
+
 const optionalMutableKey = <S extends Schema.Constraint>(schema: S) =>
   Schema.optionalKey(Schema.mutableKey(schema));
 
@@ -48,7 +49,9 @@ export const wranglerConfigSchema = Schema.StructWithRest(
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
+
 export type WranglerConfig = Schema.Schema.Type<typeof wranglerConfigSchema>;
+
 export const decodeWranglerConfig = Schema.decodeUnknownSync(wranglerConfigSchema);
 
 /** Materialize one target into the top-level config used by both Wrangler commands. */
@@ -60,6 +63,7 @@ export const configureShareDeploymentBindings = (
     throw new Error(
       `refusing deploy: Worker name must be tagium, got ${JSON.stringify(config.name)}`,
     );
+
   if (config.env != null)
     throw new Error("refusing deploy: generated config must not contain Wrangler env arrays");
   const resources = getShareDeploymentResources(environment);
@@ -72,6 +76,7 @@ export const configureShareDeploymentBindings = (
     },
   ];
   config.r2_buckets = [{ binding: "SHARE_ARTWORK", bucket_name: resources.bucketName }];
+
   const shareRateLimits = [
     {
       name: "SHARE_CREATE_RATE_LIMITER",
@@ -94,9 +99,12 @@ export const configureShareDeploymentBindings = (
       simple: { limit: 20, period: 60 },
     },
   ];
+
   const downloadRateLimits = (config.ratelimits ?? []).filter((binding) =>
     ["COBALT_SESSION_RATE_LIMITER", "COBALT_CLIENT_RATE_LIMITER"].includes(binding.name ?? ""),
   );
+
   config.ratelimits = [...downloadRateLimits, ...shareRateLimits];
+
   return config;
 };

@@ -5,10 +5,13 @@ import type { TagiumFile } from "@/features/library/types";
 const formatEta = (etaMs?: number) => {
   if (etaMs === undefined) return null;
   const minutes = Math.ceil(etaMs / 60_000);
+
   if (minutes <= 1) return "<1 min";
+
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   const leftoverMinutes = minutes % 60;
+
   return leftoverMinutes === 0 ? `${hours} hr` : `${hours} hr ${leftoverMinutes} min`;
 };
 
@@ -18,16 +21,23 @@ export const getImportQueuePresentation = (
 ): PlaylistDownloadQueuePanelState | null => {
   if (!snapshot || snapshot.total <= 1) return null;
   const trackIds = new Set(snapshot.trackIds);
+
   const retryCount = files.filter(
     (file) => trackIds.has(file.id) && !file.file && file.downloadRequest,
   ).length;
+
   let status: PlaylistDownloadQueuePanelState["status"] = "downloading";
+
   if (snapshot.waitingForTunnelBudget) status = "waiting";
+
   if (snapshot.done && snapshot.failed === 0 && !snapshot.canceled) status = "complete";
+
   if (snapshot.done && snapshot.failed > 0) status = "error";
+
   if (snapshot.canceled && snapshot.failed === 0) status = "canceled";
   const settled = snapshot.completed + snapshot.failed + snapshot.canceledCount;
   const eta = formatEta(snapshot.etaMs);
+
   const presentation: PlaylistDownloadQueuePanelState = {
     id: snapshot.id,
     status,
@@ -42,6 +52,8 @@ export const getImportQueuePresentation = (
       snapshot.active.length === 0 && retryCount > 0 && (snapshot.canceled || snapshot.failed > 0),
     ),
   };
+
   if (eta) presentation.eta = `eta ${eta}`;
+
   return presentation;
 };

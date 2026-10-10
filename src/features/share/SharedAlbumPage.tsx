@@ -46,6 +46,7 @@ export type SharedContentPageState =
 type ReadySharedContentPageState = Extract<SharedContentPageState, { status: "ready" }>;
 
 const skeletonRows = ["one", "two", "three", "four", "five", "six"] as const;
+
 const shortExpiryFormatter = new Intl.DateTimeFormat("en", {
   month: "short",
   day: "numeric",
@@ -139,6 +140,7 @@ function SharedContentSkeleton({ onOpenTagium }: { onOpenTagium: () => void }) {
 
 function Artwork({ slug, title }: { slug: string; title: string }) {
   const [status, setStatus] = useState<"loading" | "loaded" | "failed">("loading");
+
   return (
     <div
       aria-busy={status === "loading"}
@@ -195,9 +197,11 @@ function ContentHero({ manifest, slug }: { manifest: Manifest; slug: string }) {
           artist: manifest.track.metadata.artist,
           sourceUrl: manifest.track.sourceUrl,
         };
+
   const sourceLabel = content.sourceUrl
     ? new URL(content.sourceUrl).hostname.replace(/^www\./, "")
     : null;
+
   return (
     <section className="flex items-start gap-6 max-sm:gap-4">
       {manifestArtwork(manifest) ? (
@@ -250,12 +254,15 @@ function TrackList({
   albumArtist: string;
 }) {
   const occurrences = new Map<string, number>();
+
   const rows = tracks.map((track, index) => {
     const identity = JSON.stringify(track);
     const occurrence = occurrences.get(identity) ?? 0;
     occurrences.set(identity, occurrence + 1);
+
     return { track, index, key: `${identity}:${occurrence}` };
   });
+
   return (
     <section className="mt-8" aria-labelledby="shared-track-list-title">
       <h2 id="shared-track-list-title" className="mb-3 text-sm font-semibold">
@@ -265,6 +272,7 @@ function TrackList({
         {rows.map(({ track, index, key }) => {
           const trackArtist = track.metadata.artist.trim();
           const showArtist = trackArtist.length > 0 && trackArtist !== albumArtist.trim();
+
           return (
             <li
               key={key}
@@ -303,6 +311,7 @@ function AnotherTabToast({
   useEffect(() => {
     if (!anotherTabOpen) return;
     const link = shareLinkForSlug(slug);
+
     const copyShareLink = async () => {
       try {
         await navigator.clipboard.writeText(link);
@@ -313,6 +322,7 @@ function AnotherTabToast({
         });
       }
     };
+
     const timeout = globalThis.setTimeout(() => {
       toast(
         `tagium is already open in another tab. copy the link and add the ${kind} there instead.`,
@@ -325,6 +335,7 @@ function AnotherTabToast({
         },
       );
     }, 1_500);
+
     return () => globalThis.clearTimeout(timeout);
   }, [anotherTabOpen, kind, slug]);
 
@@ -345,6 +356,7 @@ function RecipientContext({
   expiresAt: string | null;
 }) {
   const noun = trackCount === 1 ? "track" : "tracks";
+
   return (
     <p className="mb-5 text-sm text-muted-foreground">
       shared {kind} · {trackCount} {noun}
@@ -501,9 +513,11 @@ function SharedContentReadyPage({
   const { manifest, slug } = state;
   const tracks = manifestTracks(manifest);
   const primaryLabel = alreadyAddedTargetId ? "open in tagium" : "add to library";
+
   const stopSharing = async () => {
     setStopping(true);
     setStopError(null);
+
     try {
       await onStopSharing();
       setShowStopConfirmation(false);
@@ -513,13 +527,16 @@ function SharedContentReadyPage({
       setStopping(false);
     }
   };
+
   const setStopDialogOpen = (open: boolean) => {
     setShowStopConfirmation(open);
+
     if (!open) {
       setStopError(null);
       setStopping(false);
     }
   };
+
   return (
     <div className="min-h-svh bg-background">
       <Header
@@ -575,8 +592,10 @@ export default function SharedAlbumPage(props: {
 }) {
   if (props.state.status === "loading")
     return <SharedContentSkeleton onOpenTagium={props.onOpenTagium} />;
+
   if (props.state.status === "unavailable") {
     const newerVersion = props.state.reason === "newer-version";
+
     return (
       <div className="min-h-svh bg-background">
         <Header onOpenTagium={props.onOpenTagium} />
@@ -614,5 +633,6 @@ export default function SharedAlbumPage(props: {
       </div>
     );
   }
+
   return <SharedContentReadyPage key={props.state.slug} {...props} state={props.state} />;
 }

@@ -6,8 +6,11 @@
 import EncodeLibAV from "@imput/libav.js-encode-cli";
 
 const inputName = "tagium-audio-input";
+
 const outputName = (format) => `tagium-output.${format}`;
+
 const progressName = "tagium-progress.txt";
+
 const cobaltFileMetadataKeys = new Set([
   "album",
   "composer",
@@ -38,17 +41,20 @@ export const createProgressSink = (postProgress) => {
 
     for (const line of lines) {
       const separator = line.indexOf("=");
+
       if (separator === -1) {
         continue;
       }
 
       const key = line.slice(0, separator);
+
       if (key !== "total_size") {
         continue;
       }
 
       const value = line.slice(separator + 1);
       const progress = Number(value);
+
       if (value && Number.isFinite(progress)) {
         postProgress(progress);
         continue;
@@ -67,6 +73,7 @@ export const createOutputSink = () => {
     write(position, data) {
       const patch = Uint8Array.from(new Uint8Array(data));
       const end = position + patch.length;
+
       if (end > size) {
         size = end;
       }
@@ -75,6 +82,7 @@ export const createOutputSink = () => {
     },
     toBlob(type) {
       const bytes = new Uint8Array(size);
+
       for (const patch of patches) {
         bytes.set(patch.data, patch.position);
       }
@@ -88,6 +96,7 @@ const stripMetadataControlCharacters = (value) =>
   Array.from(value)
     .filter((character) => {
       const code = character.charCodeAt(0);
+
       return code > 31 && code !== 127;
     })
     .join("");
@@ -166,6 +175,7 @@ export const encodeWithLibAV = async (libav, request, postProgress) => {
   libav.onwrite = (name, _position, data) => {
     if (name === progressName) {
       progressSink(data);
+
       return;
     }
 
@@ -183,6 +193,7 @@ export const encodeWithLibAV = async (libav, request, postProgress) => {
     await libav.ffmpeg(makeAudioFfmpegArgs(request));
 
     const blob = outputSink.toBlob(request.output.type);
+
     if (blob.size === 0) {
       throw new Error("local audio processing produced an empty file.");
     }
@@ -212,9 +223,11 @@ export const processLocalAudio = async (request) => {
 
   try {
     libav = await createLibAV();
+
     const blob = await encodeWithLibAV(libav, request, (progress) => {
       postLocalProcessingMessage({ progress });
     });
+
     postLocalProcessingMessage({ blob });
   } catch (error) {
     postLocalProcessingMessage({ error: errorMessage(error) });
@@ -226,6 +239,7 @@ export const processLocalAudio = async (request) => {
 if (globalThis.self) {
   globalThis.self.onmessage = async (event) => {
     const request = event.data.cobaltLocalProcessing;
+
     if (!request) {
       return;
     }

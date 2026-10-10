@@ -2,30 +2,41 @@ import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
 import { AudioMetadataReadError } from "@/features/audio/audioErrors";
 import type { ByteSource } from "@/features/audio/metadataEngine/byteSource";
-import { makeBlobByteSource } from "@/features/audio/metadataEngine/byteSource";
+import { blobByteSource } from "@/features/audio/metadataEngine/byteSource";
 import { mp4Driver } from "@/features/audio/metadataEngine/mp4";
 
 const u32 = (value: number) =>
   Uint8Array.of((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
+
 const u16 = (value: number) => Uint8Array.of((value >>> 8) & 0xff, value & 0xff);
+
 const concat = (...chunks: Uint8Array[]) => {
   const bytes = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
   let offset = 0;
+
   for (const chunk of chunks) {
     bytes.set(chunk, offset);
     offset += chunk.length;
   }
+
   return bytes;
 };
+
 const ascii = (value: string) => Uint8Array.from(value, (character) => character.charCodeAt(0));
+
 const atom = (type: string, ...payload: Uint8Array[]) => {
   const body = concat(...payload);
+
   return concat(u32(body.length + 8), ascii(type), body);
 };
+
 const data = (value: Uint8Array, type = 1) => atom("data", u32(type), u32(0), value);
+
 const textItem = (type: string, value: string) => atom(type, data(new TextEncoder().encode(value)));
+
 const indexItem = (type: "trkn" | "disk", value: number, total: number) =>
   atom(type, data(concat(u16(0), u16(value), u16(total), ...(type === "trkn" ? [u16(0)] : [])), 0));
+
 const pictureItem = (...pictures: { bytes: number[]; type: number }[]) =>
   atom("covr", ...pictures.map((picture) => data(Uint8Array.from(picture.bytes), picture.type)));
 
@@ -69,7 +80,9 @@ const makeFixture = ({
       u32(44_100 * 65_536),
       atom("zzzz"),
     );
+
     const stsd = atom("stsd", u32(0), u32(1), sampleEntry);
+
     const chunkOffsets = atom(
       offsetKind,
       u32(0),
@@ -78,27 +91,33 @@ const makeFixture = ({
         offsetKind === "co64" ? concat(u32(0), u32(offset)) : u32(offset),
       ),
     );
+
     const stbl = atom("stbl", stsd, atom("zzzz", ascii("opaque-stbl")), chunkOffsets);
+
     const dataInformation = externalReference
       ? atom("dinf", atom("dref", u32(0), u32(1), atom("url ", u32(0), ascii("external"))))
       : new Uint8Array();
+
     const minf = atom("minf", dataInformation, stbl);
     const mdhd = atom("mdhd", u32(0), u32(0), u32(0), u32(44_100), u32(88_200), u16(0), u16(0));
     const hdlr = atom("hdlr", u32(0), u32(0), ascii("soun"), new Uint8Array(12), Uint8Array.of(0));
     const trak = atom("trak", atom("mdia", mdhd, hdlr, minf));
     const unknownItem = atom("Xtra", data(ascii("opaque-ilst"), 0));
+
     const freeform = atom(
       "----",
       atom("mean", u32(0), ascii("com.apple.iTunes")),
       atom("name", u32(0), ascii("TITLE")),
       data(ascii("Fallback title")),
     );
+
     const opaqueFreeform = atom(
       "----",
       atom("mean", u32(0), ascii("vendor.example")),
       atom("name", u32(0), ascii("BINARY_PRIVATE")),
       data(Uint8Array.of(0xff, 0xfe, 0x00), 0),
     );
+
     const ilst = atom(
       "ilst",
       textItem("©nam", title),
@@ -126,12 +145,14 @@ const makeFixture = ({
       freeform,
       ...(binaryFreeform ? [opaqueFreeform] : []),
     );
+
     const meta = atom(
       "meta",
       u32(0),
       atom("hdlr", u32(0), u32(0), ascii("mdir"), new Uint8Array(12)),
       ilst,
     );
+
     return atom("moov", trak, atom("udta", meta), atom("uuid", ascii("unknown-moov-atom")));
   };
 
@@ -140,6 +161,7 @@ const makeFixture = ({
   const secondOffset = ftyp.length + moov.length + mdat1.length + free.length + 8;
   moov = makeMoov(secondMdat ? [firstOffset, secondOffset] : [firstOffset]);
   const bytes = concat(ftyp, moov, mdat1, ...(secondMdat ? [free, mdat2] : []));
+
   return {
     bytes,
     media: secondMdat ? [media1, media2] : [media1],
@@ -148,14 +170,14 @@ const makeFixture = ({
 };
 
 const runInspect = (bytes: Uint8Array<ArrayBuffer>) =>
-  Effect.runPromise(mp4Driver.inspect(makeBlobByteSource(new Blob([bytes]))));
+  Effect.runPromise(mp4Driver.inspect(blobByteSource(new Blob([bytes]))));
+
 const runPatch = async (
   bytes: Uint8Array<ArrayBuffer>,
   changes: Parameters<typeof mp4Driver.patch>[1],
 ) => {
-  const plan = await Effect.runPromise(
-    mp4Driver.patch(makeBlobByteSource(new Blob([bytes])), changes),
-  );
+  const plan = await Effect.runPromise(mp4Driver.patch(blobByteSource(new Blob([bytes])), changes));
+
   return new Uint8Array(await new Blob(plan.parts, { type: plan.type }).arrayBuffer());
 };
 
@@ -163,23 +185,28 @@ const includes = (haystack: Uint8Array, needle: Uint8Array) => {
   outer: for (let index = 0; index <= haystack.length - needle.length; index++) {
     for (let inner = 0; inner < needle.length; inner++)
       if (haystack[index + inner] !== needle[inner]) continue outer;
+
     return true;
   }
+
   return false;
 };
 
 const topAtoms = (bytes: Uint8Array) => {
   const result: { type: string; start: number; size: number }[] = [];
+
   for (let offset = 0; offset < bytes.length;) {
     const size =
       bytes[offset]! * 0x1000000 +
       bytes[offset + 1]! * 0x10000 +
       bytes[offset + 2]! * 0x100 +
       bytes[offset + 3]!;
+
     const type = String.fromCharCode(...bytes.subarray(offset + 4, offset + 8));
     result.push({ type, start: offset, size });
     offset += size;
   }
+
   return result;
 };
 
@@ -188,20 +215,24 @@ describe("mp4Driver", () => {
     const fixture = makeFixture();
     const blob = new Blob([fixture.bytes]);
     let largestRead = 0;
+
     const source: ByteSource = {
       size: blob.size,
       slice: (start, end) => blob.slice(start, end),
       read: (offset, length) => {
         largestRead = Math.max(largestRead, length);
+
         if (length > 256)
           return Effect.fail(
             new AudioMetadataReadError({ message: "oversized", cause: undefined }),
           );
+
         return Effect.promise(
           async () => new Uint8Array(await blob.slice(offset, offset + length).arrayBuffer()),
         );
       },
     };
+
     const result = await Effect.runPromise(mp4Driver.inspect(source));
     expect(result.metadata).toMatchObject({
       title: "Old",
@@ -242,21 +273,25 @@ describe("mp4Driver", () => {
     const fixture = makeFixture({ artworkSize: 1024 * 1024 + 17 });
     const blob = new Blob([fixture.bytes]);
     let largestRead = 0;
+
     const source: ByteSource = {
       size: blob.size,
       slice: (start, end) => blob.slice(start, end),
       read: (offset, length) => {
         largestRead = Math.max(largestRead, length);
+
         if (length > 1024 * 1024) {
           return Effect.fail(
             new AudioMetadataReadError({ message: "oversized", cause: undefined }),
           );
         }
+
         return Effect.promise(
           async () => new Uint8Array(await blob.slice(offset, offset + length).arrayBuffer()),
         );
       },
     };
+
     const result = await Effect.runPromise(mp4Driver.inspect(source));
     expect(result.metadata.picture[0]?.data).toHaveLength(1024 * 1024 + 17);
     expect(largestRead).toBeLessThanOrEqual(1024 * 1024);
@@ -268,6 +303,7 @@ describe("mp4Driver", () => {
     const inspected = await runInspect(output);
     expect(inspected.metadata.title).toBe("A much longer replacement title");
     expect(inspected.metadata.picture).toHaveLength(2);
+
     for (const opaque of fixture.opaque) expect(includes(output, opaque)).toBe(true);
     const outputMdats = topAtoms(output).filter((entry) => entry.type === "mdat");
     expect(outputMdats).toHaveLength(2);
@@ -278,6 +314,7 @@ describe("mp4Driver", () => {
 
   it("patches and clears every advanced field while preserving disk totals and media", async () => {
     const fixture = makeFixture();
+
     const output = await runPatch(fixture.bytes, {
       albumArtist: "New Album Artist",
       composer: "New Composer",
@@ -285,6 +322,7 @@ describe("mp4Driver", () => {
       discNumber: 1,
       bpm: 140,
     });
+
     const inspected = await runInspect(output);
     expect(inspected.metadata).toMatchObject({
       albumArtist: "New Album Artist",
@@ -294,6 +332,7 @@ describe("mp4Driver", () => {
       bpm: 140,
     });
     expect(includes(output, concat(u16(0), u16(1), u16(3)))).toBe(true);
+
     for (const opaque of fixture.opaque) expect(includes(output, opaque)).toBe(true);
     const outputMdats = topAtoms(output).filter((entry) => entry.type === "mdat");
     expect(
@@ -307,6 +346,7 @@ describe("mp4Driver", () => {
       discNumber: null,
       bpm: null,
     });
+
     const clearedInspection = await runInspect(cleared);
     expect(clearedInspection.metadata).toMatchObject({
       albumArtist: "",
@@ -323,10 +363,13 @@ describe("mp4Driver", () => {
 
   it("updates every moved stco offset across multiple mdat regions", async () => {
     const fixture = makeFixture();
+
     const output = await runPatch(fixture.bytes, {
       album: "An album name long enough to move both media atoms",
     });
+
     const mdats = topAtoms(output).filter((entry) => entry.type === "mdat");
+
     for (const mdat of mdats) {
       const encoded = u32(mdat.start + 8);
       expect(includes(output, encoded)).toBe(true);
@@ -343,11 +386,13 @@ describe("mp4Driver", () => {
 
   it("replaces artwork only when explicitly edited", async () => {
     const fixture = makeFixture();
+
     const output = await runPatch(fixture.bytes, {
       picture: [
         { format: "image/png", type: 3, description: "front", data: Uint8Array.of(7, 8, 9) },
       ],
     });
+
     const inspected = await runInspect(output);
     expect(inspected.metadata.picture).toHaveLength(1);
     expect(inspected.metadata.picture[0]?.data).toEqual(Uint8Array.of(7, 8, 9));
@@ -357,15 +402,14 @@ describe("mp4Driver", () => {
     await expect(runInspect(makeFixture({ codec: "alac" }).bytes)).resolves.toMatchObject({
       format: { kind: "m4a" },
     });
-    await expect(runInspect(makeFixture({ codec: "enca" }).bytes)).rejects.toMatchObject({
-      _tag: "AudioMetadataReadError",
-      message: expect.stringContaining("encrypted"),
-    });
-    await expect(runInspect(ascii("not an mp4 file"))).rejects.toMatchObject({
-      _tag: "AudioMetadataReadError",
-    });
+    const encrypted = runInspect(makeFixture({ codec: "enca" }).bytes);
+    await expect(encrypted).rejects.toBeInstanceOf(AudioMetadataReadError);
+    await expect(encrypted).rejects.toThrow("encrypted");
+    await expect(runInspect(ascii("not an mp4 file"))).rejects.toBeInstanceOf(
+      AudioMetadataReadError,
+    );
     const truncated = makeFixture().bytes.slice(0, -3);
-    await expect(runInspect(truncated)).rejects.toMatchObject({ _tag: "AudioMetadataReadError" });
+    await expect(runInspect(truncated)).rejects.toBeInstanceOf(AudioMetadataReadError);
   });
 
   it("rejects fragmented and external-reference layouts before patch planning", async () => {

@@ -6,14 +6,17 @@ type Frame = { status: string; heights: number[] };
 
 const holdTunnel = async (page: Page) => {
   let release = () => {};
+
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
+
   await page.route("**/api/cobalt/tunnel?**", async (route) => {
     const response = await route.fetch();
     await gate;
     await route.fulfill({ response });
   });
+
   return release;
 };
 
@@ -29,9 +32,11 @@ const holdDecoding = (page: Page) =>
     const gate = new Promise<void>((resolve) => {
       window.e2eReleaseDecoding = resolve;
     });
+
     window.OfflineAudioContext = class extends window.OfflineAudioContext {
       override async decodeAudioData(data: ArrayBuffer) {
         await gate;
+
         return super.decodeAudioData(data);
       }
     };
@@ -45,9 +50,11 @@ const recordFrames = (page: Page) =>
     window.e2eWaveformFrames = frames;
     new MutationObserver(() => {
       const section = document.querySelector<HTMLElement>("[data-track-waveform]");
+
       const d = section
         ?.querySelector('[aria-label="playback position"] svg path')
         ?.getAttribute("d");
+
       if (section && d && d !== frames.at(-1)?.d) {
         frames.push({ status: section.dataset.waveformStatus!, d });
       }
@@ -77,18 +84,22 @@ const settledPathData = async (page: Page) => {
       await page.waitForTimeout(400);
       const after = await pathData(page);
       settled = after ?? "";
+
       return before === after;
     })
     .toBe(true);
+
   return settled;
 };
 
 const distinctPaths = async (page: Page, samples: number) => {
   const seen = new Set<string | null>();
+
   for (let index = 0; index < samples; index += 1) {
     seen.add(await pathData(page));
     await page.waitForTimeout(150);
   }
+
   return seen.size;
 };
 
@@ -103,6 +114,7 @@ const expectTween = (frames: Frame[]) => {
   expect(start.status).toBe("loading");
   expect(sameHeights(start.heights, end.heights)).toBe(false);
   const tween = frames.slice(handoff);
+
   for (const frame of tween) {
     expect(frame.heights).toHaveLength(end.heights.length);
     frame.heights.forEach((height, index) => {
@@ -111,6 +123,7 @@ const expectTween = (frames: Frame[]) => {
       expect(height).toBeLessThanOrEqual(high! + 0.01);
     });
   }
+
   expect(tween.some((frame) => !sameHeights(frame.heights, end.heights))).toBe(true);
 };
 
@@ -155,9 +168,11 @@ test("the waveform oscillates while a track downloads and decodes, then tweens i
   expect(await settledPathData(page)).toBe(final);
   const revisit = await takeFrames(page);
   expect(revisit.length).toBeGreaterThan(0);
+
   for (const frame of revisit) expect(frame.status).toBe("ready");
   const settled = revisit.at(-1)!;
   const sameWidth = revisit.filter((frame) => frame.heights.length === settled.heights.length);
+
   for (const frame of sameWidth) expect(frame.heights).toEqual(settled.heights);
 });
 
@@ -187,6 +202,7 @@ test("the waveform stays still while loading when reduced motion is requested", 
   const final = await settledPathData(page);
   const ready = (await takeFrames(page)).filter((frame) => frame.status === "ready");
   expect(ready.length).toBeGreaterThan(0);
+
   for (const frame of ready) expect(frame.heights).toEqual(ready.at(-1)!.heights);
   expect(await pathData(page)).toBe(final);
 });

@@ -9,6 +9,7 @@ export const resolveInitialTheme = (): Theme => {
 
   try {
     const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+
     if (isTheme(storedTheme)) return storedTheme;
   } catch {
     // Storage may be unavailable in private browsing mode.
@@ -24,9 +25,11 @@ export const applyTheme = (mode: Theme) => {
   // Disable transitions (see index.css) while the swap lands so themed colors snap
   // together; the forced style read commits the change before they come back.
   const themeChanged = root.dataset.theme !== undefined && root.dataset.theme !== mode;
+
   if (themeChanged) root.classList.add("theme-switching");
   root.classList.toggle("dark", mode === "dark");
   root.dataset.theme = mode;
+
   if (themeChanged) {
     void window.getComputedStyle(root).transitionProperty;
     window.requestAnimationFrame(() => root.classList.remove("theme-switching"));

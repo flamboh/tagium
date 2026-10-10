@@ -26,10 +26,13 @@ export const shareLinkSpotlightTarget = ({
   const importing =
     files.some((file) => file.downloadStatus === "downloading") ||
     albums.some((album) => album.coverPending);
+
   if (importing) return null;
   const album = albums.find((candidate) => canCreateShare(shareAlbumActions[candidate.id]));
+
   if (album) return { kind: "album", id: album.id };
   const file = files.find((candidate) => canCreateShare(shareTrackActions[candidate.id]));
+
   return file ? { kind: "track", id: file.id } : null;
 };
 
@@ -54,24 +57,30 @@ export const useShareLinkSpotlight = ({
   storage?: Pick<Storage, "getItem" | "setItem">;
 }) => {
   const discovery = useFeatureDiscovery("share-links", storage);
+
   const readyTarget =
     visible && !discovery.seen && shareAlbumActions && shareTrackActions
       ? shareLinkSpotlightTarget({ albums, files, shareAlbumActions, shareTrackActions })
       : null;
+
   const readyKey = readyTarget ? `${readyTarget.kind}:${readyTarget.id}` : null;
   const [delay, setDelay] = useState({ key: readyKey, elapsed: false });
+
   if (delay.key !== readyKey) setDelay({ key: readyKey, elapsed: false });
 
   useEffect(() => {
     if (!readyKey) return;
+
     const timer = globalThis.setTimeout(
       () =>
         setDelay((current) => (current.key === readyKey ? { ...current, elapsed: true } : current)),
       SHARE_LINK_SPOTLIGHT_DELAY_MS,
     );
+
     return () => globalThis.clearTimeout(timer);
   }, [readyKey]);
 
   const target = delay.key === readyKey && delay.elapsed ? readyTarget : null;
+
   return { target, dismiss: discovery.markSeen };
 };

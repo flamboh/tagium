@@ -13,9 +13,11 @@ for (const mode of ["audio", "mute"] as const) {
         .soft(page.getByLabel(label, { exact: true }))
         .toHaveCount(mode === "audio" ? 0 : 1);
     }
+
     await expect(page.getByLabel("audio", { exact: true })).toHaveCount(mode === "mute" ? 0 : 1);
 
     await page.getByLabel("mode", { exact: true }).selectOption("auto");
+
     for (const label of ["quality", "container", "codec", "audio"]) {
       await expect(page.getByLabel(label, { exact: true })).toBeVisible();
     }
@@ -69,6 +71,7 @@ test("sends a pasted list of links as one link", async ({
   const pasted = `${first.url} ${second.url}`;
   await upstreams.cobalt.fail(pasted, "error.api.link.invalid");
   const save = saveApp(page);
+
   if (browserName === "chromium") {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   }

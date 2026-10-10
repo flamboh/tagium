@@ -25,9 +25,11 @@ export const test = base.extend<HarnessFixtures>({
   upstreams: async ({}, provide, testInfo) => {
     const upstreams = createUpstreams(`${testInfo.testId}-${testInfo.retry}-${randomUUID()}`);
     const startedAt = Date.now();
+
     try {
       await provide(upstreams);
       const unexpected = await upstreams.unexpectedCallsSince(startedAt);
+
       if (unexpected.length > 0) {
         throw new Error(
           `unexpected upstream calls (register a scenario for them):\n${unexpected.map(describeCall).join("\n")}`,
@@ -41,6 +43,7 @@ export const test = base.extend<HarnessFixtures>({
   pageCrashes: async ({ browserName }, provide) => {
     const crashes: string[] = [];
     await provide(crashes);
+
     if (crashes.length > 0) {
       throw new Error(
         `the ${browserName} page crashed (renderer or web content process died) at ${crashes.join(", ")}. this is a browser crash, not a slow step`,
@@ -56,12 +59,14 @@ export const test = base.extend<HarnessFixtures>({
           pageCrashes.push(page.url());
           void page.close().catch(() => {});
         });
+
       context.pages().forEach(watch);
       context.on("page", watch);
       await context.addInitScript(
         ({ key, value }) => {
           Object.defineProperty(Navigator.prototype, "webdriver", { get: () => false });
           Object.defineProperty(Navigator.prototype, "userAgentData", { get: () => undefined });
+
           if (localStorage.getItem(key) === null) localStorage.setItem(key, value);
         },
         {
@@ -74,6 +79,7 @@ export const test = base.extend<HarnessFixtures>({
         async (route) => {
           const request = route.request();
           const postData = request.postDataBuffer();
+
           const response = await fetch(`${E2E_CONTROL_URL}/browser-upstream`, {
             method: "POST",
             headers: {
@@ -83,6 +89,7 @@ export const test = base.extend<HarnessFixtures>({
             },
             body: postData ? new Uint8Array(postData) : undefined,
           });
+
           await route.fulfill({
             status: response.status,
             headers: {
@@ -126,8 +133,10 @@ export const test = base.extend<HarnessFixtures>({
         isMobile,
         hasTouch,
       });
+
       contexts.push(context);
       await sandbox(context);
+
       return context;
     });
     await Promise.all(contexts.map((context) => context.close()));
@@ -135,9 +144,13 @@ export const test = base.extend<HarnessFixtures>({
 });
 
 export const TEST_TIMEOUT = 60_000;
+
 export const JOURNEY_TIMEOUT = 110_000;
+
 export const EXPECT_TIMEOUT = 10_000;
+
 export const IMPORT_TIMEOUT = { timeout: 20_000 };
+
 export const SETTLE_TIMEOUT = { timeout: 45_000 };
 
 export const journey = () => test.setTimeout(JOURNEY_TIMEOUT);

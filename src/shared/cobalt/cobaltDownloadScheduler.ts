@@ -19,6 +19,7 @@ const delay = async (milliseconds: number, signal?: AbortSignal) => {
 
   await new Promise<void>((resolve, reject) => {
     let timeout: ReturnType<typeof setTimeout>;
+
     const onAbort = () => {
       clearTimeout(timeout);
       reject(signal?.reason);
@@ -52,8 +53,10 @@ export const createCobaltDownloadScheduler = ({
 
   const releaseDownloadSlot = () => {
     const next = pendingDownloads.shift();
+
     if (next) {
       next();
+
       return;
     }
 
@@ -65,24 +68,31 @@ export const createCobaltDownloadScheduler = ({
 
     if (activeDownloads < maxConcurrentDownloads) {
       activeDownloads += 1;
+
       return;
     }
 
     await new Promise<void>((resolve, reject) => {
       const resolveSlot = () => {
         signal?.removeEventListener("abort", onAbort);
+
         if (signal?.aborted) {
           releaseDownloadSlot();
           reject(signal.reason);
+
           return;
         }
+
         resolve();
       };
+
       const onAbort = () => {
         const pendingIndex = pendingDownloads.indexOf(resolveSlot);
+
         if (pendingIndex >= 0) {
           pendingDownloads.splice(pendingIndex, 1);
         }
+
         reject(signal?.reason);
       };
 
@@ -93,6 +103,7 @@ export const createCobaltDownloadScheduler = ({
 
   const schedule = async <Value>(work: () => Promise<Value>, signal?: AbortSignal) => {
     await reserveDownloadSlot(signal);
+
     try {
       return await work();
     } finally {
@@ -107,6 +118,7 @@ export const createCobaltDownloadScheduler = ({
     while (true) {
       signal?.throwIfAborted();
       const reservation = admission.reserve(cost, Date.now());
+
       if (reservation.status === "admitted") return;
       await delay(reservation.waitMs, signal);
     }
@@ -119,6 +131,7 @@ export const createCobaltDownloadScheduler = ({
     signal?.throwIfAborted();
 
     let releaseQueue = () => {};
+
     const previousQueue = tunnelStartQueue;
     tunnelStartQueue = new Promise<void>((resolve) => {
       releaseQueue = resolve;
@@ -153,11 +166,13 @@ export const createCobaltDownloadScheduler = ({
 
       signal?.throwIfAborted();
       const waitMs = nextTunnelStartAt - Date.now();
+
       if (waitMs > 0) {
         if (!isWaiting) {
           isWaiting = true;
           onWaitChange?.(true);
         }
+
         await delay(waitMs, signal);
       }
 
@@ -166,6 +181,7 @@ export const createCobaltDownloadScheduler = ({
     } finally {
       waitingTunnelStarts -= 1;
       releaseQueue();
+
       if (isWaiting) onWaitChange?.(false);
     }
   };

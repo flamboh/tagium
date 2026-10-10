@@ -10,9 +10,11 @@ import react from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
 
 const isTest = process.env.VITEST === "true" || process.env.VITEST === "1";
+
 const libavDist = fileURLToPath(
   new URL("./node_modules/@imput/libav.js-encode-cli/dist/", import.meta.url),
 );
+
 const libavAssetFiles = ["libav-6.8.7.1-encode-cli.wasm.mjs", "libav-6.8.7.1-encode-cli.wasm.wasm"];
 
 const contentTypes = new Map([
@@ -42,20 +44,25 @@ const libavAssets = (): Plugin => ({
 
         if (libavRelativePath.startsWith("..") || libavRelativePath.includes(`..${sep}`)) {
           next();
+
           return;
         }
 
         try {
           const fileStat = await stat(filePath);
+
           if (!fileStat.isFile()) {
             next();
+
             return;
           }
 
           const contentType = contentTypes.get(extname(filePath));
+
           if (contentType) {
             response.setHeader("Content-Type", contentType);
           }
+
           response.setHeader("Content-Length", fileStat.size);
           createReadStream(filePath).pipe(response);
         } catch {
@@ -80,6 +87,10 @@ export default defineConfig({
         name: "anti-slop",
         specifier: "./tools/oxlint/anti-slop/index.ts",
       },
+      {
+        name: "anti-slop-effect",
+        specifier: "./tools/oxlint/anti-slop/effect/index.ts",
+      },
     ],
     categories: {
       correctness: "warn",
@@ -100,13 +111,22 @@ export default defineConfig({
       "tools/oxlint/anti-slop/**",
     ],
     rules: {
+      "oxc/no-accumulating-spread": "error",
+      "anti-slop/no-array-filter-map": "error",
+      "anti-slop/no-reduce-accumulator-copy": "error",
       "anti-slop/no-chained-type-assertions": "error",
       "anti-slop/no-reflect-apply": "error",
       "anti-slop/no-reflect-get": "error",
       "anti-slop/no-unknown-returns": "error",
       "anti-slop/no-unknown-type-aliases": "error",
       "anti-slop/no-widen-then-assert": "error",
+      "anti-slop/require-readable-spacing": "error",
       "anti-slop/require-safety-comment-for-type-assertion": "error",
+      "anti-slop-effect/no-manual-effect-error-tag": "error",
+      "anti-slop-effect/no-manual-tag-comparison": "error",
+      "anti-slop-effect/no-manual-tagged-construction": "error",
+      "anti-slop-effect/no-service-constructor-imports": "error",
+      "anti-slop-effect/prefer-effect-match": "error",
 
       // `typeof` is valid for capability checks, SSR guards, and narrowing known unions.
       "anti-slop/no-runtime-typeof": "off",

@@ -27,6 +27,7 @@ function DropdownMenuContent({
         onCloseAutoFocus={(event) => {
           onCloseAutoFocus?.(event);
           const focused = document.activeElement;
+
           if (focused && focused !== document.body) event.preventDefault();
         }}
         className={cn(

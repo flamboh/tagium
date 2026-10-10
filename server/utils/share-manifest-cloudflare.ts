@@ -5,7 +5,9 @@ type D1Statement = {
   first: <T>() => Promise<T | null>;
   run: () => Promise<{ meta: { changes?: number } }>;
 };
+
 export type D1DatabaseBinding = { prepare: (query: string) => D1Statement };
+
 export type R2BucketBinding = {
   put: (
     key: string,
@@ -56,7 +58,9 @@ export const createCloudflareShareManifestPersistence = ({
   deleteArtwork: (key) => artwork.delete(key),
   getArtwork: async (key) => {
     const object = await artwork.get(key);
+
     if (!object) return undefined;
+
     return {
       body: object.body,
       type: object.httpMetadata?.contentType ?? "application/octet-stream",
@@ -89,6 +93,7 @@ export const createCloudflareShareManifestPersistence = ({
           record.expiresAt,
         )
         .run();
+
       return "created";
     } catch (error) {
       if (error instanceof Error && /unique|constraint/i.test(error.message)) return "conflict";
@@ -105,6 +110,7 @@ export const createCloudflareShareManifestPersistence = ({
       )
       .bind(slug)
       .first<D1Row>();
+
     return row ? fromRow(row) : undefined;
   },
   update: async ({ previous, replacement, revocationTokenHash, now }) => {
@@ -133,6 +139,7 @@ export const createCloudflareShareManifestPersistence = ({
         previous.artworkKey ?? null,
       )
       .run();
+
     return result.meta.changes === 1 ? "updated" : "conflict";
   },
   disable: async (slug, tokenHash, now) => {
@@ -146,6 +153,7 @@ export const createCloudflareShareManifestPersistence = ({
       )
       .bind(slug, tokenHash, now)
       .first<D1Row>();
+
     return row ? fromRow(row) : undefined;
   },
 });
