@@ -46,14 +46,18 @@ const topLevelBoxes = (bytes: Uint8Array) => {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const boxes: string[] = [];
   let offset = 0;
+
   while (offset + 8 <= bytes.byteLength) {
     let size = view.getUint32(offset);
+
     if (size === 1) size = Number(view.getBigUint64(offset + 8));
     else if (size === 0) size = bytes.byteLength - offset;
     boxes.push(new TextDecoder().decode(bytes.subarray(offset + 4, offset + 8)));
+
     if (size < 8) break;
     offset += size;
   }
+
   return boxes;
 };
 
