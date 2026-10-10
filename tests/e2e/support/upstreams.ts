@@ -177,6 +177,7 @@ export const createUpstreams = (owner: string) => {
         videos: YouTubeVideoOptions[];
         pageSize?: number;
         status?: number;
+        missing?: boolean;
       }) {
         const id = options.id ?? `PLe2e${randomBytes(12).toString("base64url")}`;
         const videos = options.videos.map((video) => youtubeVideoScenario(video));
@@ -189,6 +190,7 @@ export const createUpstreams = (owner: string) => {
           videoKeys: videos.map(({ scenario }) => scenario.key),
           pageSize: options.pageSize ?? 100,
           status: options.status,
+          alert: options.missing ? "The playlist does not exist." : undefined,
         };
         await register([...videos.map(({ scenario }) => scenario), playlist]);
         return {
@@ -268,7 +270,7 @@ export const createUpstreams = (owner: string) => {
         tunnel: options.tunnel ?? { kind: "ok" },
       };
       await register([scenario]);
-      return { key: scenario.key, url: scenario.sourceUrl };
+      return { key: scenario.key, url: scenario.sourceUrl, id: url.pathname.split("/").at(-1)! };
     },
     picker({ items, audio, ...options }: PickerOptions) {
       return this.post({ ...options, media: { kind: "picker", items, audio } });

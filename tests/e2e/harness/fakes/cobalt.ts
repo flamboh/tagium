@@ -221,12 +221,16 @@ type PickerPlan = {
   audioFilename?: string;
 };
 
+const pickerExtensions = { photo: "jpg", video: "mp4", gif: "gif" } as const;
+
 const postPlan = (request: FakeRequest, scenario: PostScenario) => {
-  const resource = (asset: PostAsset, directFilename?: string) => {
-    const id = createTunnel(request, { key: scenario.key, part: "post", asset });
-    return directFilename
-      ? `${FAKE_DIRECT_MEDIA_ORIGIN}/${id}/${encodeURIComponent(directFilename)}`
-      : tunnelUrl(id);
+  const postId = new URL(scenario.sourceUrl).pathname.split("/").at(-1);
+  const resource = (asset: PostAsset, directFilename?: string, filename?: string) => {
+    if (directFilename) {
+      const id = createTunnel(request, { key: scenario.key, part: "post", asset });
+      return `${FAKE_DIRECT_MEDIA_ORIGIN}/${id}/${encodeURIComponent(directFilename)}`;
+    }
+    return tunnelUrl(createTunnel(request, { key: scenario.key, part: "post", asset, filename }));
   };
   const { media } = scenario;
   if (media.kind === "gif") {
@@ -241,13 +245,17 @@ const postPlan = (request: FakeRequest, scenario: PostScenario) => {
   }
   const plan: PickerPlan = {
     status: "picker",
-    picker: media.items.map((item) => ({
+    picker: media.items.map((item, index) => ({
       type: item.type,
-      url: resource(item.asset, item.directFilename),
+      url: resource(
+        item.asset,
+        item.directFilename,
+        `twitter_${postId}_${index + 1}.${pickerExtensions[item.type]}`,
+      ),
     })),
   };
   if (media.audio) {
-    plan.audio = resource(media.audio.asset);
+    plan.audio = resource(media.audio.asset, undefined, media.audio.filename);
     plan.audioFilename = media.audio.filename;
   }
   return plan;
@@ -336,7 +344,13 @@ const serveTunnel = (request: FakeRequest, entry: Tunnel, route: string): FakeRe
 
   const asset = entry.asset ?? media?.audio;
   if (!asset) return unexpected(`${route}.no_asset`, entry.key);
-  const body = () => (entry.asset ? assetResponse(entry.asset) : audioResponse(media!.audio));
+  const body = () => {
+    const response = entry.asset ? assetResponse(entry.asset) : audioResponse(media!.audio);
+    if (entry.filename) {
+      response.headers.set("content-disposition", `attachment; filename="${entry.filename}"`);
+    }
+    return response;
+  };
   const behavior = request.registry.nextTunnel(entry.key) ?? { kind: "ok" };
   switch (behavior.kind) {
     case "ok":

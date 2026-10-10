@@ -6,6 +6,7 @@ import type {
   ImportOutcome,
 } from "@/analytics";
 import type { AppSettings } from "@/features/library/types";
+import { getSystemFailurePresentation } from "@/shared/systemFailure";
 
 export type ImportTrackOutcome = "completed" | "failed" | "canceled";
 
@@ -100,6 +101,14 @@ export const importFailureCodeFrom = (error: Error): ImportFailureCode => {
   if (message.includes("error.api.fetch.fail")) return "fetch_failed";
   if (/metadata.*(?:write|appl)|write.*metadata/.test(message)) return "metadata_write_failed";
   if (/could not be parsed|decode|malformed|metadata read/.test(message)) return "parse_failed";
+  const classified = getSystemFailurePresentation(error, "import").code;
+  if (
+    classified === "unsupported_source" ||
+    classified === "private_or_missing" ||
+    classified === "invalid_response"
+  ) {
+    return classified;
+  }
   return "unknown";
 };
 

@@ -29,16 +29,16 @@ test("saves each piece of media offered by a post, and its audio", async ({ page
   };
 
   await save.open();
-  const photo = await choose("download photo 1", "tagium-photo.jpg");
+  const photo = await choose("download photo 1", `twitter_${post.id}_1.jpg`);
   expect(photo.bytes).toEqual(imageFixture("cover").bytes);
 
-  const video = await probeMedia(await choose("download video 2", "tagium-video.mp4"));
+  const video = await probeMedia(await choose("download video 2", "clip.mp4"));
   expect(video.streams).toEqual([
     expect.objectContaining({ type: "video", codec: "h264", width: 854, height: 480 }),
     expect.objectContaining({ type: "audio", codec: "aac" }),
   ]);
 
-  const gif = await probeMedia(await choose("download gif 3", "tagium-gif.gif"));
+  const gif = await probeMedia(await choose("download gif 3", `twitter_${post.id}_3.gif`));
   expect(gif.streams).toEqual([expect.objectContaining({ type: "video", codec: "gif" })]);
 
   const audio = await choose("download post-audio.m4a", "post-audio.m4a");
@@ -46,9 +46,9 @@ test("saves each piece of media offered by a post, and its audio", async ({ page
 
   await expect(save.rows).toHaveText([
     "post-audio.m4a",
-    "tagium-gif.gif",
-    "tagium-video.mp4",
-    "tagium-photo.jpg",
+    `twitter_${post.id}_3.gif`,
+    "clip.mp4",
+    `twitter_${post.id}_1.jpg`,
   ]);
   expect(await upstreams.calls({ route: "media.direct" })).toHaveLength(1);
   expect(await upstreams.calls({ route: "cobalt.tunnel.post" })).toHaveLength(3);

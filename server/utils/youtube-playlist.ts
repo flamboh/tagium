@@ -1,4 +1,5 @@
 import { Option, Schema } from "effect";
+import { HTTPError } from "nitro";
 import {
   extractYouTubeJsonObject,
   fetchYouTubeWithRetry,
@@ -212,6 +213,14 @@ const getPlaylistTitle = (initialData: JsonValue) => {
     : "";
 };
 
+const hasErrorAlert = (initialData: JsonValue) => {
+  const alert = findFirstValue(initialData, "alertRenderer");
+  return alert !== undefined && isRecord(alert) && alert.type === "ERROR";
+};
+
+const playlistNotFound = () =>
+  new HTTPError({ status: 404, message: "youtube.playlist_not_found" });
+
 const getPlaylistArtist = (initialData: JsonValue) => {
   const owner = findFirstValue(initialData, "videoOwnerRenderer");
   return owner !== undefined && isRecord(owner) ? (getText(owner.title)?.trim() ?? "") : "";
@@ -300,6 +309,7 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
     },
     { stage: "playlist" },
   );
+  if (response.status === 404) throw playlistNotFound();
   if (!response.ok) throw new Error(`youtube.playlist_failed (${response.status})`);
   const html = await response.text();
   const initialData = extractYouTubeJsonObject(html, "var ytInitialData =")?.value;
@@ -307,6 +317,7 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
   const config = getYouTubeConfig(html);
 
   const title = getPlaylistTitle(initialData);
+  if (!title && hasErrorAlert(initialData)) throw playlistNotFound();
   if (!title) throw new Error("youtube.playlist_title");
 
   const tracks: YouTubeTrack[] = [];

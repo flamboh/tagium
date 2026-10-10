@@ -256,6 +256,19 @@ const cobaltDevTunnelFaultResponse = (fault: ReturnType<typeof consumeTunnelDevF
   return undefined;
 };
 
+const directResourceDisposition = (resourceUrl: URL) => {
+  let filename: string;
+  try {
+    filename = decodeURIComponent(
+      resourceUrl.pathname.slice(resourceUrl.pathname.lastIndexOf("/") + 1),
+    );
+  } catch {
+    return undefined;
+  }
+  if (!/\.[a-z0-9]{1,12}$/i.test(filename)) return undefined;
+  return `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`;
+};
+
 const parseTunnelRequest = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
   const requestUrl = new URL(request.url);
   const kind = requestUrl.searchParams.get("kind");
@@ -498,6 +511,14 @@ export default defineHandler(async (event) => {
       response.headers.get("estimated-content-length") ?? response.headers.get("content-length");
     if (estimatedLength && /^\d+$/.test(estimatedLength) && estimatedLength !== "0") {
       responseHeaders.set("Estimated-Content-Length", estimatedLength);
+    }
+    const contentDisposition =
+      response.headers.get("content-disposition") ??
+      (tunnelRequest.resource === "direct"
+        ? directResourceDisposition(tunnelRequest.tunnelUrl)
+        : undefined);
+    if (contentDisposition) {
+      responseHeaders.set("Content-Disposition", contentDisposition);
     }
     responseHeaders.set("Cache-Control", "private, no-store");
 

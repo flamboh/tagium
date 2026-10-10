@@ -33,6 +33,7 @@ import {
   type TrackFilenamePreviewStore,
   useLiveTrackFilenameValidity,
 } from "@/features/library/trackFilenamePreview";
+import { getTrackFailureDisplay } from "@/shared/systemFailure";
 
 interface AlbumSidebarProps {
   albums: AlbumGroup[];
@@ -79,9 +80,9 @@ interface AlbumSidebarProps {
 
 const isRetryableError = (track: TagiumFile) =>
   Boolean(track.downloadRequest) &&
-  (track.downloadStatus === "error" ||
-    track.downloadStatus === "canceled" ||
-    track.status === "error");
+  (track.downloadStatus === "canceled" ||
+    ((track.downloadStatus === "error" || track.status === "error") &&
+      (!track.downloadError || getTrackFailureDisplay(track.downloadError).retryable)));
 
 export default function AlbumSidebar({
   albums,

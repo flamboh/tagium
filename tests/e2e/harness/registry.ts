@@ -25,6 +25,7 @@ export type Tunnel = {
   part: "audio" | "cover" | "video" | "post";
   machineId: string;
   asset?: PostAsset;
+  filename?: string;
 };
 
 const pick = <T>(sequence: Sequence<T>, index: number): T => {

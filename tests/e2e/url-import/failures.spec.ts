@@ -92,6 +92,50 @@ test("server link lookups refuse foreign hosts and endless short-link chains", a
   expect(await upstreams.calls({ route: /^soundcloud\.(resolve|track)/u })).toHaveLength(0);
 });
 
+test("explains a missing soundcloud set or youtube playlist beside the url field", async ({
+  page,
+  upstreams,
+}) => {
+  const set = await upstreams.soundcloud.set({ tracks: [{}], status: 404 });
+  const playlist = await upstreams.youtube.playlist({ videos: [{}], missing: true });
+
+  await page.goto("/");
+  for (const url of [set.url, playlist.url]) {
+    await importUrl(page, url);
+    await expect(
+      page.getByText("check that the link is public and still available, then try again"),
+    ).toBeVisible();
+    await expect(urlField(page)).toHaveValue(url);
+  }
+  await expect(notifications(page).getByText("import failed")).toHaveCount(0);
+  await expect(page.getByText("no tracks yet")).toBeVisible();
+  expect(await upstreams.calls({ route: "soundcloud.resolve.set" })).toHaveLength(1);
+  expect(await upstreams.calls({ route: "youtube.playlist" })).toHaveLength(1);
+  expect(await upstreams.calls({ route: "cobalt.resolve" })).toHaveLength(0);
+});
+
+test("reports a soundcloud set or youtube playlist outage as an import failure", async ({
+  page,
+  upstreams,
+}) => {
+  const set = await upstreams.soundcloud.set({ tracks: [{}], status: 503 });
+  const playlist = await upstreams.youtube.playlist({ videos: [{}], status: 500 });
+
+  for (const url of [set.url, playlist.url]) {
+    await page.goto("/");
+    await importUrl(page, url);
+    await expect(
+      notifications(page).getByText("tagium could not import this media. try again in a moment."),
+    ).toBeVisible();
+    await expect(urlField(page)).toHaveValue(url);
+    await expect(
+      page.getByText("check that the link is public and still available, then try again"),
+    ).toHaveCount(0);
+  }
+  await expect(page.getByText("no tracks yet")).toBeVisible();
+  expect(await upstreams.calls({ route: "cobalt.resolve" })).toHaveLength(0);
+});
+
 type FailureCase = {
   name: string;
   arrange: (upstreams: Upstreams, context: BrowserContext) => Promise<{ url: string }>;
@@ -176,6 +220,18 @@ const failureCases: FailureCase[] = [
     retryable: true,
   },
   {
+    name: "an unreadable download plan",
+    arrange: async (upstreams) => {
+      const video = await upstreams.youtube.video({ title: "Failing Song" });
+      await upstreams.cobalt.respond(video.url, { kind: "non-json" });
+      return video;
+    },
+    title: "we could not read this media",
+    detail: "the media provider returned an unexpected response.",
+    toast: "the provider returned an unexpected response. try again or use another link.",
+    retryable: true,
+  },
+  {
     name: "too many download requests",
     arrange: async (upstreams, context) => {
       const ip = `203.0.113.${randomInt(1, 255)}`;
@@ -223,10 +279,11 @@ for (const failure of failureCases) {
       failure.cobaltCalls ?? 1,
     );
 
-    if (failure.retryable) {
-      await page.getByRole("button", { name: /^track actions for / }).click();
-      await expect(page.getByRole("menuitem", { name: "retry download" })).toBeVisible();
-    }
+    await page.getByRole("button", { name: /^track actions for / }).click();
+    await expect(page.getByRole("menuitem", { name: "remove track" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "retry download" })).toHaveCount(
+      failure.retryable ? 1 : 0,
+    );
   });
 }
 

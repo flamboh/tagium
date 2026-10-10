@@ -96,6 +96,7 @@ export type YouTubePlaylistScenario = {
   videoKeys: string[];
   pageSize: number;
   status?: number;
+  alert?: string;
 };
 
 export type SoundCloudSetScenario = {

@@ -265,7 +265,7 @@ const fetchPlan = async (
 
 const fetchTunnelFile = async (
   url: string,
-  filename: string,
+  filename: string | ((response: Response) => string),
   sourceUrl: string,
   callbacks: VideoDownloadCallbacks | undefined,
   signal: AbortSignal,
@@ -349,7 +349,7 @@ const fetchTunnelFile = async (
     }
 
     const fileLease = await inputStore.toFile(
-      safeFilename(filename),
+      safeFilename(typeof filename === "string" ? filename : filename(response)),
       contentType,
       stableLastModified(sourceUrl),
     );
@@ -378,19 +378,29 @@ const pickerTypeDefaults: Record<
   gif: { extension: "gif", contentType: "image/gif" },
 };
 
-const pickerFilename = (item: CobaltPickerItem) => {
-  const fallback = pickerTypeDefaults[item.type];
-  let pathSegment = "";
+const decodeExtendedFilename = (value: string) => {
   try {
-    const base = typeof location === "undefined" ? "https://tagium.invalid" : location.href;
-    const pathname = new URL(item.url, base).pathname;
-    pathSegment = decodeURIComponent(pathname.slice(pathname.lastIndexOf("/") + 1));
+    return decodeURIComponent(value);
   } catch {
-    pathSegment = "";
+    return undefined;
   }
+};
 
-  const hasExtension = /\.[a-z0-9]{1,12}$/i.test(pathSegment);
-  return hasExtension ? safeFilename(pathSegment) : `tagium-${item.type}.${fallback.extension}`;
+const contentDispositionFilename = (response: Response) => {
+  const header = response.headers.get("Content-Disposition");
+  if (!header) return undefined;
+  const extended = /(?:^|;)\s*filename\*\s*=\s*utf-8''([^;]+)/i.exec(header)?.[1];
+  const decoded = extended ? decodeExtendedFilename(extended.trim()) : undefined;
+  if (decoded) return decoded;
+  const plain = /(?:^|;)\s*filename\s*=\s*(?:"([^"]*)"|([^;]*))/i.exec(header);
+  return (plain?.[1] ?? plain?.[2])?.trim();
+};
+
+const pickerFilename = (item: CobaltPickerItem, response: Response) => {
+  const filename = contentDispositionFilename(response);
+  return filename && /\.[a-z0-9]{1,12}$/i.test(filename)
+    ? filename
+    : `tagium-${item.type}.${pickerTypeDefaults[item.type].extension}`;
 };
 
 const pickerContentType = (item: CobaltPickerItem) => pickerTypeDefaults[item.type].contentType;
@@ -682,7 +692,7 @@ const executePickerItem = async (
 ): Promise<VideoFileDownloadResult> => {
   const fileLease = await fetchTunnelFile(
     item.url,
-    pickerFilename(item),
+    (response) => pickerFilename(item, response),
     request.sourceUrl || item.url,
     callbacks,
     signal,

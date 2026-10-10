@@ -57,10 +57,7 @@ test("imports a youtube video with prefilled tags, then edits and exports the sa
   });
   expect(imported.metadata.duration).toBeCloseTo(video.durationSec, 0);
   expect(imported.metadata.picture).toHaveLength(1);
-  expect(imageSize(imported.metadata.picture[0]!.data)).toEqual({
-    width: imageFixtures.thumbnail.width,
-    height: imageFixtures.thumbnail.height,
-  });
+  expect(imageSize(imported.metadata.picture[0]!.data)).toEqual({ width: 720, height: 720 });
 
   await field(page, "title").fill("zoo café 日本語");
   await field(page, "artist").fill("qa artist");
@@ -96,6 +93,34 @@ test("imports a youtube video with prefilled tags, then edits and exports the sa
   ]);
   const [tunnel] = await upstreams.calls({ route: "cobalt.tunnel.audio" });
   expect(tunnel!.requestHeaders["fly-force-instance-id"]).toBe(FAKE_COBALT_MACHINE_ID);
+});
+
+test("crops youtube topic covers square like tagium save and keeps other covers whole", async ({
+  page,
+  upstreams,
+}) => {
+  const topic = await upstreams.youtube.video({ title: "Square", author: "Label Act - Topic" });
+  const upload = await upstreams.youtube.video({ title: "Wide", author: "Vlogger" });
+
+  const exportedCover = async (url: string) => {
+    await page.goto("/");
+    await importUrl(page, url);
+    await waitForTrackReady(page);
+    const exported = await captureDownload(page, () => downloadTrackButton(page).click());
+    const { picture } = (await inspectAudio(exported)).metadata;
+    expect(picture).toHaveLength(1);
+    return picture[0]!;
+  };
+
+  const square = await exportedCover(topic.url);
+  expect(square.format).toBe("image/jpeg");
+  expect(imageSize(square.data)).toEqual({ width: 720, height: 720 });
+
+  const wide = await exportedCover(upload.url);
+  expect(imageSize(wide.data)).toEqual({
+    width: imageFixtures.thumbnail.width,
+    height: imageFixtures.thumbnail.height,
+  });
 });
 
 test("downloads a freshly imported youtube single as a zip on the first confirmation", async ({

@@ -153,6 +153,39 @@ test("the editor reports a failed import by category without its link", async ({
   expectPrivate(events, [stuck.id, "Stuck Upload"]);
 });
 
+test("the editor reports missing and drm-protected imports by their category", async ({
+  page,
+  upstreams,
+}) => {
+  const missing = await upstreams.youtube.missingVideo();
+  const protectedTrack = await upstreams.soundcloud.track({ title: "Locked Song", cover: null });
+  await upstreams.cobalt.fail(protectedTrack.url, "error.api.soundcloud.maybe_drm");
+  const categories = async () =>
+    (await upstreams.analyticsEvents()).filter(
+      (event) => event.event === "import_failure_category",
+    );
+
+  await page.goto("/");
+  await importUrl(page, missing.url);
+  await expect.poll(async () => (await categories()).length, IMPORT_TIMEOUT).toBe(1);
+  await importUrl(page, protectedTrack.url);
+
+  await expect
+    .poll(
+      async () =>
+        (await categories()).map(({ properties }) => ({
+          provider: properties.provider,
+          code: properties.code,
+        })),
+      IMPORT_TIMEOUT,
+    )
+    .toEqual([
+      { provider: "youtube", code: "private_or_missing" },
+      { provider: "soundcloud", code: "unsupported_source" },
+    ]);
+  expectPrivate(await categories(), [missing.id, "Locked Song"]);
+});
+
 test("tagium save reports each download outcome with its provider and failure code", async ({
   page,
   upstreams,
