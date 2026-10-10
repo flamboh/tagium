@@ -14,15 +14,18 @@ test("five recent saves stay readable and clear of the attribution on every scre
 }) => {
   journey();
   await page.emulateMedia({ reducedMotion: "reduce" });
+
   const tracks = await Promise.all(
     ["Alpha", "Bravo", "Charlie", "Delta", "Echo"].map((title) =>
       upstreams.soundcloud.track({ title, author: "Stack", cover: null }),
     ),
   );
+
   const save = saveApp(page);
   const attribution = page.locator("footer");
 
   await save.open();
+
   for (const track of tracks)
     await save.save(track.url, `${track.title} - Stack (soundcloud).opus`);
 
@@ -31,6 +34,7 @@ test("five recent saves stay readable and clear of the attribution on every scre
     await attribution.scrollIntoViewIfNeeded();
     await expect(attribution).toBeInViewport();
     const footer = (await attribution.boundingBox())!;
+
     for (const row of await save.rows.all()) {
       const box = (await row.boundingBox())!;
       expect(
@@ -38,11 +42,13 @@ test("five recent saves stay readable and clear of the attribution on every scre
         `row above attribution at ${size.width}x${size.height}`,
       ).toBeLessThanOrEqual(footer.y);
     }
+
     const overflow = await page.evaluate(() => ({
       document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       main:
         document.querySelector("main")!.scrollWidth - document.querySelector("main")!.clientWidth,
     }));
+
     expect(overflow, `horizontal overflow at ${size.width}x${size.height}`).toEqual({
       document: 0,
       main: 0,

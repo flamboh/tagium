@@ -7,6 +7,7 @@ export const test = base.extend<{ request: APIRequestContext }>({
       baseURL,
       extraHTTPHeaders: { connection: "close" },
     });
+
     await provide(context);
     await context.dispose();
   },

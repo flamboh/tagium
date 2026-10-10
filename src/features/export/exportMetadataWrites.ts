@@ -26,14 +26,17 @@ export async function writeExportMetadata(
     const index = nextIndex;
     const file = writableFiles[index];
     nextIndex += 1;
+
     if (!file) return;
 
     try {
       await writeFile(file, file.metadata);
     } catch (error) {
       failures.push({ index, error });
+
       return;
     }
+
     return writeNext();
   };
 
@@ -49,5 +52,6 @@ export async function writeExportMetadata(
       !firstFailure || nextFailure.index < firstFailure.index ? nextFailure : firstFailure,
     undefined,
   );
+
   if (failure) throw failure.error;
 }

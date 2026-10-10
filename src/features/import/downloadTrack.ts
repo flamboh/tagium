@@ -85,7 +85,9 @@ export const titleFromSourceUrl = (sourceUrl: string) => {
   try {
     const url = new URL(sourceUrl);
     const [lastPathPart] = url.pathname.split("/").filter(Boolean).slice(-1);
+
     if (lastPathPart) return decodeURIComponent(lastPathPart).replaceAll("-", " ");
+
     return url.hostname;
   } catch {
     return "downloading audio";
@@ -116,9 +118,11 @@ interface FetchImportedCoverDependencies {
 
 const readCoverResponseFile = async (response: Response, contentType: string) => {
   const declaredLength = Number(response.headers.get("content-length"));
+
   if (Number.isFinite(declaredLength) && declaredLength > MAX_COVER_ART_UPLOAD_BYTES) {
     throw new Error("cover art must be 25 mb or smaller.");
   }
+
   if (!response.body) throw new Error("album cover response body is unavailable.");
 
   const chunks: Uint8Array<ArrayBuffer>[] = [];
@@ -128,12 +132,15 @@ const readCoverResponseFile = async (response: Response, contentType: string) =>
   try {
     while (true) {
       const { done, value } = await reader.read();
+
       if (done) break;
       receivedBytes += value.byteLength;
+
       if (receivedBytes > MAX_COVER_ART_UPLOAD_BYTES) {
         await reader.cancel();
         throw new Error("cover art must be 25 mb or smaller.");
       }
+
       chunks.push(Uint8Array.from(value));
     }
   } finally {
@@ -141,6 +148,7 @@ const readCoverResponseFile = async (response: Response, contentType: string) =>
   }
 
   const extension = contentType === "image/png" ? "png" : "jpg";
+
   return new File(chunks, `imported-cover.${extension}`, { type: contentType });
 };
 
@@ -155,12 +163,15 @@ export const fetchImportedCover = async (
   }
 
   const contentTypeHeader = response.headers.get("content-type");
+
   if (!contentTypeHeader) {
     throw new Error("album cover response missing content type.");
   }
+
   const contentType = normalizeCoverArtType(contentTypeHeader);
   const coverFile = await readCoverResponseFile(response, contentType);
   const optimizedCover = await (dependencies.optimize ?? optimizeCoverArt)(coverFile);
+
   return coverArtFileToPicture(optimizedCover, "album cover");
 };
 
@@ -185,7 +196,9 @@ export const createSingleUrlDownloadPlan = ({
   const id = createId();
   const title = metadata?.title || titleFromSourceUrl(sourceUrl);
   const downloadRequest: DownloadRequest = { sourceUrl, audioBitrate, audioFormat };
+
   if (importId) downloadRequest.importId = importId;
+
   const pendingFile = createPendingDownloadTrack(
     id,
     createDownloadMetadata({
@@ -220,6 +233,7 @@ export const createPlaylistDownloadPlan = ({
   importId,
 }: CreatePlaylistDownloadPlanInput): PlaylistDownloadPlan => {
   const albumId = createId();
+
   const pendingFiles = playlist.tracks.map((track) => {
     const downloadRequest: DownloadRequest = {
       sourceUrl: track.url,
@@ -227,10 +241,13 @@ export const createPlaylistDownloadPlan = ({
       audioFormat,
       trackIndex: track.trackNumber,
     };
+
     if (importId) downloadRequest.importId = importId;
     const year = getPlaylistTrackPendingYear(playlist, track);
+
     if (year !== undefined) downloadRequest.year = year;
     else if (playlist.year !== undefined) downloadRequest.fallbackYear = playlist.year;
+
     return createPendingDownloadTrack(
       createId(),
       createPlaylistTrackMetadata(playlist, track),
@@ -239,6 +256,7 @@ export const createPlaylistDownloadPlan = ({
       createPlaylistPendingMetadataPatch(playlist, track),
     );
   });
+
   const album: AlbumGroup = {
     id: albumId,
     title: playlist.title,
@@ -247,10 +265,13 @@ export const createPlaylistDownloadPlan = ({
     trackIds: pendingFiles.map((file) => file.id),
     year: playlist.year,
   };
+
   if (playlist.tracks.some((track) => track.artist !== undefined)) {
     album.metadataLinks = { artist: false, year: false };
   }
+
   if (playlist.sourceUrl !== undefined) album.sourceUrl = playlist.sourceUrl;
+
   if (playlist.coverUrl) album.coverPending = true;
   const firstPendingFileId = pendingFiles[0]?.id ?? null;
 

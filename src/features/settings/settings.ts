@@ -76,6 +76,7 @@ export const loadAppSettings = (storage?: Pick<Storage, "getItem">): AppSettings
   try {
     const targetStorage = storage ?? localStorage;
     const storedSettings = targetStorage.getItem(APP_SETTINGS_STORAGE_KEY);
+
     if (storedSettings === null) return DEFAULT_APP_SETTINGS;
 
     return {
@@ -91,6 +92,7 @@ export const saveAppSettings = (settings: AppSettings, storage?: Pick<Storage, "
   try {
     const targetStorage = storage ?? localStorage;
     targetStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+
     return true;
   } catch {
     return false;

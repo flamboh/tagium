@@ -37,6 +37,7 @@ test("a fresh visitor adds a published album and exports it with the shared tags
   newContext,
 }) => {
   await seedSettings(context, { audioBitrate: "64" });
+
   const playlist = await importAlbum(page, upstreams, {
     title: "Road Trip",
     author: "Mixer",
@@ -45,6 +46,7 @@ test("a fresh visitor adds a published album and exports it with the shared tags
       { title: "Second Song", author: "Mixer" },
     ],
   });
+
   await page.getByLabel("title", { exact: true }).fill("First Song (shared edit)");
 
   const dialog = await openShareDialog(page, "Road Trip");
@@ -63,6 +65,7 @@ test("a fresh visitor adds a published album and exports it with the shared tags
     (response) =>
       response.url().endsWith("/api/manifests") && response.request().method() === "POST",
   );
+
   await dialog.getByRole("button", { name: "create share link" }).click();
   const receipt = (await (await publication).json()) as { slug: string; expiresAt: string };
   const link = dialog.getByRole("textbox", { name: "share link" });
@@ -115,24 +118,29 @@ test("a fresh visitor adds a published album and exports it with the shared tags
   await expect(visitor.getByText("downloaded 2/2")).toBeVisible(IMPORT_TIMEOUT);
 
   await visitor.getByRole("button", { name: "download all", exact: true }).click();
+
   const archive = await captureDownload(visitor, () =>
     visitor
       .getByRole("dialog", { name: "download 2 tracks" })
       .getByRole("button", { name: /^download ~/u })
       .click(),
   );
+
   const tracks = unzipDownload(archive).filter((entry) => entry.filename.endsWith(".mp3"));
   expect(tracks.map((entry) => entry.filename).sort()).toEqual([
     "albums/Road Trip/First Song (shared edit).mp3",
     "albums/Road Trip/Second Song.mp3",
   ]);
+
   const artwork = new Uint8Array(
     await (await visitor.request.get(`/api/manifests/${receipt.slug}/artwork`)).body(),
   );
+
   for (const [index, title] of ["First Song (shared edit)", "Second Song"].entries()) {
     const { format, metadata } = await inspectAudio(
       tracks.find((entry) => entry.filename.endsWith(`${title}.mp3`))!,
     );
+
     expect(format).toBe("mp3");
     expect(metadata).toMatchObject({
       title,
@@ -147,6 +155,7 @@ test("a fresh visitor adds a published album and exports it with the shared tags
 
   const resolves = await upstreams.calls({ route: "cobalt.resolve" });
   expect(resolves).toHaveLength(4);
+
   for (const call of resolves) {
     expect(JSON.parse(call.requestBody!)).toMatchObject({ audioBitrate: "64", audioFormat: "mp3" });
   }
@@ -274,6 +283,7 @@ test("a single imported track is shared on its own, and a share without artwork 
       metadata: { filename: "Bare", title: "Bare", artist: "Soloist", album: "", genre: "" },
     },
   });
+
   const bareVisitor = await (await newContext()).newPage();
   await bareVisitor.goto(bare.url);
   await expect(bareVisitor.getByRole("main").getByText("no cover art")).toBeAttached();

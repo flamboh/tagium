@@ -38,6 +38,7 @@ function MetadataCleanupDialogSession({
     if (open) visibleSuggestionsRef.current = suggestions;
   }, [open, suggestions]);
   const visibleSuggestions = open ? suggestions : visibleSuggestionsRef.current;
+
   const [selectedIds, setSelectedIds] = useState(
     () => new Set(suggestions.map((suggestion) => suggestion.trackId)),
   );
@@ -84,8 +85,10 @@ function MetadataCleanupDialogSession({
                     onCheckedChange={() =>
                       setSelectedIds((current) => {
                         const next = new Set(current);
+
                         if (next.has(suggestion.trackId)) next.delete(suggestion.trackId);
                         else next.add(suggestion.trackId);
+
                         return next;
                       })
                     }

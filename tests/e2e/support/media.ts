@@ -33,6 +33,7 @@ type FfprobeJson = {
 };
 
 let libav: ReturnType<typeof LibAVWrapper.LibAV> | undefined;
+
 let queue: Promise<unknown> = Promise.resolve();
 
 const lowerKeys = (tags: Record<string, string> | undefined) =>
@@ -45,14 +46,18 @@ const topLevelBoxes = (bytes: Uint8Array) => {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const boxes: string[] = [];
   let offset = 0;
+
   while (offset + 8 <= bytes.byteLength) {
     let size = view.getUint32(offset);
+
     if (size === 1) size = Number(view.getBigUint64(offset + 8));
     else if (size === 0) size = bytes.byteLength - offset;
     boxes.push(new TextDecoder().decode(bytes.subarray(offset + 4, offset + 8)));
+
     if (size < 8) break;
     offset += size;
   }
+
   return boxes;
 };
 
@@ -62,6 +67,7 @@ const probe = async (file: DownloadedFile): Promise<MediaProbe> => {
   const input = `probe-input${file.filename.slice(file.filename.lastIndexOf("."))}`;
   const output = "probe-output.json";
   await instance.writeFile(input, file.bytes);
+
   try {
     const status = await instance.ffprobe(
       "-v",
@@ -76,10 +82,13 @@ const probe = async (file: DownloadedFile): Promise<MediaProbe> => {
       output,
       input,
     );
+
     if (status !== 0) throw new Error(`ffprobe could not read ${file.filename} (${status})`);
+
     const result = JSON.parse(
       new TextDecoder().decode(await instance.readFile(output)),
     ) as FfprobeJson;
+
     const streams = (result.streams ?? []).map((stream) => {
       const probed: ProbedStream = {
         type: stream.codec_type ?? "unknown",
@@ -87,17 +96,21 @@ const probe = async (file: DownloadedFile): Promise<MediaProbe> => {
         frames: count(stream.nb_read_frames),
         packets: count(stream.nb_read_packets) ?? 0,
       };
+
       if (stream.width !== undefined) {
         probed.width = stream.width;
         probed.height = stream.height;
       }
+
       return probed;
     });
+
     const tags = Object.assign(
       {},
       ...(result.streams ?? []).map((stream) => lowerKeys(stream.tags)),
       lowerKeys(result.format?.tags),
     ) as Record<string, string>;
+
     return {
       container: result.format?.format_name ?? "unknown",
       duration: Number(result.format?.duration ?? Number.NaN),
@@ -114,5 +127,6 @@ const probe = async (file: DownloadedFile): Promise<MediaProbe> => {
 export const probeMedia = (file: DownloadedFile): Promise<MediaProbe> => {
   const run = queue.then(() => probe(file));
   queue = run.catch(() => {});
+
   return run;
 };

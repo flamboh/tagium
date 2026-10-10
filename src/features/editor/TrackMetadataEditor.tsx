@@ -245,7 +245,9 @@ const useAutoFocusedTitleRef = ({
   useCallback(
     (node: HTMLInputElement | null) => {
       registrationRef(node);
+
       if (!node || !selectedFileId || !autoFocus) return;
+
       if (focusedTitleFileIdRef.current === selectedFileId) return;
 
       focusedTitleFileIdRef.current = selectedFileId;
@@ -268,9 +270,11 @@ function TrackAlbumField({
   placeholder: string;
 }) {
   const albumLinked = inAlbum || singleAlbumLinked;
+
   const albumFieldReason = singleAlbumLinked
     ? getMetadataLinkDescriptor("singleAlbum").disabledReason
     : "album title is synced with the album.";
+
   const albumFieldReasonId = "track-album-sync-reason";
 
   return (
@@ -326,10 +330,13 @@ function TrackDetailsFields({
   const titleRegistration = register("title", {
     onChange: (event) => onPreviewMetadataChange("title", event),
   });
+
   const artistRegistration = register("artist", {
     onChange: (event) => onPreviewMetadataChange("artist", event),
   });
+
   const { ref: titleRegistrationRef, ...titleInputRegistration } = titleRegistration;
+
   const titleInputRef = useAutoFocusedTitleRef({
     registrationRef: titleRegistrationRef,
     selectedFileId,
@@ -566,6 +573,7 @@ const useAdvancedMetadataFormBoundary = ({
     }),
     comment: register("comment"),
   };
+
   const { errors } = useFormState({ control, name: ["discNumber", "bpm"] });
 
   return { registrations, errors };
@@ -713,22 +721,28 @@ const useEditorModeLayoutAnimation = ({
   const editorActionsStartTopRef = useRef<number | null>(null);
   const coverUploadHeightRef = useRef<number | null>(null);
   const coverUploadStartHeightRef = useRef<number | null>(null);
+
   const changeEditorMode = useCallback(
     (mode: MetadataEditorMode) => {
       const actions = editorActionsRef.current;
+
       if (actions) {
         editorActionsStartTopRef.current = actions.getBoundingClientRect().top;
         actions.getAnimations().forEach((animation) => animation.cancel());
       }
+
       const coverUpload = getCoverUpload(editorBodyRef.current);
+
       if (coverUpload) {
         coverUploadStartHeightRef.current = coverUpload.getBoundingClientRect().height;
         coverUpload.getAnimations().forEach((animation) => animation.cancel());
       }
+
       onEditorModeChange(mode);
     },
     [onEditorModeChange],
   );
+
   useLayoutEffect(() => {
     const actions = editorActionsRef.current;
     const coverUpload = getCoverUpload(editorBodyRef.current);
@@ -748,6 +762,7 @@ const useEditorModeLayoutAnimation = ({
     }
 
     const timing = { duration: 220, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
+
     if (
       actions &&
       startTop !== null &&
@@ -759,6 +774,7 @@ const useEditorModeLayoutAnimation = ({
         timing,
       );
     }
+
     // The upload button stretches to meet the download button, so its height follows the
     // same slide instead of snapping.
     if (
@@ -779,11 +795,13 @@ const useEditorModeLayoutAnimation = ({
 
 const getTrackFailure = (selectedFile: LoadedTrack): TrackFailure | null => {
   if (selectedFile.downloadStatus !== "error" && selectedFile.status !== "error") return null;
+
   return selectedFile.downloadError ? getTrackFailureDisplay(selectedFile.downloadError) : null;
 };
 
 const getDownloadDisabledReason = (isTrackCoverProcessing: boolean, filenameInvalid: boolean) => {
   if (isTrackCoverProcessing) return "cover art is still processing";
+
   return filenameInvalid ? "filename is required" : "track file is not ready";
 };
 
@@ -818,70 +836,90 @@ function LoadedTrackMetadataEditor({
     name: "title",
     defaultValue: selectedFile.metadata.title,
   });
+
   const watchedFilename = useWatch({ control, name: "filename", defaultValue: "" });
+
   const watchedArtist = useWatch({
     control,
     name: "artist",
     defaultValue: selectedFile.metadata.artist,
   });
+
   const watchedAlbumArtist = useWatch({
     control,
     name: "albumArtist",
     defaultValue: selectedFile.metadata.albumArtist,
   });
+
   const linkedAlbumArtistDisplay =
     selectedFileAlbum || !watchedAlbumArtist || watchedAlbumArtist === selectedFile.metadata.artist
       ? watchedArtist
       : watchedAlbumArtist;
+
   const advancedFields = useAdvancedMetadataFormBoundary({
     register,
     control,
     enabled: advancedMetadata,
   });
+
   const pendingAdvancedFocusRef = useRef<"discNumber" | "bpm" | null>(null);
+
   const { editorBodyRef, editorActionsRef, changeEditorMode } = useEditorModeLayoutAnimation({
     viewActive,
     advancedMetadata,
     editorMode,
     onEditorModeChange,
   });
+
   const focusPendingAdvancedField = useCallback(
     (node: HTMLDivElement | null) => {
       const pendingAdvancedFocus = pendingAdvancedFocusRef.current;
+
       if (!node || editorMode !== "advanced" || !pendingAdvancedFocus) return;
       setFocus(pendingAdvancedFocus, { shouldSelect: true });
       pendingAdvancedFocusRef.current = null;
     },
     [editorMode, setFocus],
   );
+
   const filenameValue = syncFilenames ? watchedTitle : watchedFilename;
   const filenameInvalid = !isValidFilenameBase(filenameValue);
+
   const canDownloadTrack =
     Boolean(selectedFile.file) && !isTrackCoverProcessing && !filenameInvalid;
+
   const placeholder = getSampleTrack(selectedFile.id);
   const failure = getTrackFailure(selectedFile);
+
   const filenameRegistration = register("filename", {
     onChange: (event) => onPreviewMetadataChange("filename", event),
   });
+
   const downloadDisabledReason = getDownloadDisabledReason(isTrackCoverProcessing, filenameInvalid);
+
   const submitDownload = () => {
     if (advancedMetadata) {
       const validationErrors = getAdvancedMetadataValidationErrors(getValues());
       clearErrors(["discNumber", "bpm"]);
+
       if (validationErrors.discNumber || validationErrors.bpm) {
         if (validationErrors.discNumber) {
           setError("discNumber", { type: "validate", message: validationErrors.discNumber });
         }
+
         if (validationErrors.bpm) {
           setError("bpm", { type: "validate", message: validationErrors.bpm });
         }
+
         const invalidField = validationErrors.discNumber ? "discNumber" : "bpm";
+
         if (editorMode === "advanced") {
           setFocus(invalidField, { shouldSelect: true });
         } else {
           pendingAdvancedFocusRef.current = invalidField;
           changeEditorMode("advanced");
         }
+
         return;
       }
     }
@@ -1023,13 +1061,17 @@ export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
   useLayoutEffect(() => {
     wasViewActiveRef.current = viewActive;
   }, [viewActive]);
+
   const { mode: editorMode, setMode: setEditorMode } = useMetadataEditorMode(
     props.advancedMetadata,
   );
+
   const currentSelection = props.selectedFile
     ? { selectedFile: props.selectedFile, selectedFileAlbum: props.selectedFileAlbum }
     : null;
+
   const [retainedSelection, setRetainedSelection] = useState(currentSelection);
+
   if (
     currentSelection &&
     (retainedSelection?.selectedFile !== currentSelection.selectedFile ||
@@ -1037,6 +1079,7 @@ export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
   ) {
     setRetainedSelection(currentSelection);
   }
+
   const displayedSelection = currentSelection ?? retainedSelection;
   const trackIsSelected = currentSelection !== null;
   useEffect(() => {
@@ -1044,10 +1087,12 @@ export default function TrackMetadataEditor(props: TrackMetadataEditorProps) {
 
     const reduceMotion =
       "window" in globalThis && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
     const timeoutId = globalThis.setTimeout(
       () => setRetainedSelection(null),
       reduceMotion ? 0 : 250,
     );
+
     return () => globalThis.clearTimeout(timeoutId);
   }, [retainedSelection, trackIsSelected]);
 

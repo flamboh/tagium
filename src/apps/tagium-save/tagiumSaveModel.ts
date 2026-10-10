@@ -82,11 +82,14 @@ export const buildVideoDownloadRequest = (
     downloadMode: settings.mode,
     filenameStyle: "pretty",
   };
+
   if (settings.mode !== "audio") {
     request.videoQuality = settings.quality;
     request.youtubeVideoContainer = settings.container;
     request.youtubeVideoCodec = settings.codec;
   }
+
   if (settings.mode !== "mute") request.audioFormat = settings.audioFormat;
+
   return request;
 };

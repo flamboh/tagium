@@ -15,31 +15,37 @@ const eventsNamed = async (upstreams: Upstreams, names: string[]) => {
     .poll(
       async () => {
         events = await upstreams.analyticsEvents();
+
         return names.filter((name) => !events.some((event) => event.event === name));
       },
       { message: "analytics events still missing", ...IMPORT_TIMEOUT },
     )
     .toEqual([]);
+
   return events;
 };
 
 const only = (events: AnalyticsEvent[], name: string) => {
   const matching = events.filter((event) => event.event === name);
   expect(matching, `${name} events`).toHaveLength(1);
+
   return matching[0]!.properties;
 };
 
 const expectPrivate = (events: AnalyticsEvent[], secrets: string[]) => {
   const serialized = JSON.stringify(events);
+
   for (const secret of secrets) {
     expect(serialized, `analytics payload contains "${secret}"`).not.toContain(secret);
   }
+
   for (const { event, properties } of events) {
     for (const [key, value] of Object.entries(properties)) {
       if (key === "$lib_custom_api_host") {
         expect(value, `${event}.${key}`).toBe(FAKE_POSTHOG_ORIGIN);
         continue;
       }
+
       expect(key, `${event} sends a content property`).not.toMatch(SENSITIVE_KEY);
       expect(JSON.stringify(value), `${event}.${key}`).not.toMatch(/https?:\/\//iu);
     }
@@ -81,12 +87,15 @@ test("the editor reports import and export milestones without links or track con
     "import_finished",
     "export_prepared",
   ]);
+
   for (const { event, properties } of events) {
     expect(properties, event).toMatchObject({ app_id: "tagium" });
+
     if (!event.startsWith("$")) {
       expect(properties, event).toMatchObject({ deploy_env: "production", release_sha: "e2e" });
     }
   }
+
   expect(only(events, "audio_upload_completed")).toMatchObject({
     requested_count: 1,
     accepted_count: 1,
@@ -160,6 +169,7 @@ test("the editor reports missing and drm-protected imports by their category", a
   const missing = await upstreams.youtube.missingVideo();
   const protectedTrack = await upstreams.soundcloud.track({ title: "Locked Song", cover: null });
   await upstreams.cobalt.fail(protectedTrack.url, "error.api.soundcloud.maybe_drm");
+
   const categories = async () =>
     (await upstreams.analyticsEvents()).filter(
       (event) => event.event === "import_failure_category",
@@ -195,11 +205,13 @@ test("tagium save reports each download outcome with its provider and failure co
     author: "Private Person",
     cover: null,
   });
+
   const busy = await upstreams.youtube.video({
     title: "Busy Clip",
     author: "Somebody",
     cover: null,
   });
+
   await upstreams.cobalt.capacity(busy.url, { retryAfter: "1", times: 1 });
   const missing = await upstreams.youtube.missingVideo();
   const save = saveApp(page);
@@ -207,11 +219,13 @@ test("tagium save reports each download outcome with its provider and failure co
   await save.open();
   await save.save(track.url, "Quiet Room - Private Person (soundcloud).opus");
   await save.download("Quiet Room - Private Person (soundcloud).opus");
+
   const saved = await eventsNamed(upstreams, [
     "download_started",
     "download_resolved",
     "download_finished",
   ]);
+
   expect(only(saved, "download_started")).toMatchObject({
     app_id: "tagium-save",
     provider: "soundcloud",
@@ -274,12 +288,14 @@ test("tagium save reports each download outcome with its provider and failure co
     provider: "soundcloud",
     output_format: "opus",
   });
+
   for (const { event, properties } of events) {
     expect(properties, event).toMatchObject({ app_id: "tagium-save" });
     expect(event, "tagium save sends an editor event").not.toMatch(
       /^(import|audio|album|tracks)_/u,
     );
   }
+
   expectPrivate(events, [
     track.url,
     "Quiet Room",
@@ -301,10 +317,12 @@ test("each app reports page views under its own app and first-party host only", 
     (url) => ["tagium.app", "save.tagium.app"].includes(url.hostname),
     async (route) => {
       const url = new URL(route.request().url());
+
       const response = await route.fetch({
         url: `${baseURL}${url.pathname}${url.search}`,
         maxRetries: 3,
       });
+
       await route.fulfill({ response });
     },
   );
@@ -340,8 +358,10 @@ test("each app reports page views under its own app and first-party host only", 
     .toBeGreaterThan(1);
 
   const events = await upstreams.analyticsEvents();
+
   for (const { event, properties } of events) {
     const host = properties.$host;
+
     if (properties.app_id === "tagium-save") {
       expect([undefined, "save.tagium.app"], `${event} host`).toContain(host);
     } else {
@@ -349,6 +369,7 @@ test("each app reports page views under its own app and first-party host only", 
       expect([undefined, "tagium.app"], `${event} host`).toContain(host);
     }
   }
+
   expectPrivate(events, ["127.0.0.1"]);
 });
 
@@ -358,6 +379,7 @@ test("imports and saves keep working when analytics cannot be reached", async ({
 }) => {
   await page.route(`${FAKE_POSTHOG_ORIGIN}/**`, (route) => route.abort());
   const video = await upstreams.youtube.video({ cover: null });
+
   const track = await upstreams.soundcloud.track({
     title: "Offline",
     author: "Saver",

@@ -107,6 +107,7 @@ test("crops youtube topic covers square like tagium save and keeps other covers 
     const exported = await captureDownload(page, () => downloadTrackButton(page).click());
     const { picture } = (await inspectAudio(exported)).metadata;
     expect(picture).toHaveLength(1);
+
     return picture[0]!;
   };
 
@@ -137,9 +138,11 @@ test("downloads a freshly imported youtube single as a zip on the first confirma
   await page.getByRole("button", { name: "download all" }).click();
 
   const dialog = page.getByRole("dialog", { name: "download 1 track" });
+
   const archive = await captureDownload(page, () =>
     dialog.getByRole("button", { name: /^download ~/u }).click(),
   );
+
   await expect(dialog).toBeHidden();
   expect(archive.filename).toMatch(/^tagium-download-.+\.zip$/u);
   const [entry, ...rest] = unzipDownload(archive);

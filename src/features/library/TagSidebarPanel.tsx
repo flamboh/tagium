@@ -133,6 +133,7 @@ export default function TagSidebarPanel({
     if (!isFileDrag(event)) return;
 
     dragCounterRef.current--;
+
     if (dragCounterRef.current <= 0) {
       dragCounterRef.current = 0;
       setIsDraggingFile(false);
@@ -141,6 +142,7 @@ export default function TagSidebarPanel({
 
   const handleSidebarFileDrop = (event: React.DragEvent<HTMLDivElement>) => {
     const files = Array.from(event.dataTransfer.files);
+
     if (files.length === 0) return;
 
     event.preventDefault();

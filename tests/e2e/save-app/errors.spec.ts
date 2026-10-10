@@ -27,6 +27,7 @@ type Failure = {
 const soundcloudFailing = (code: string, status?: number) => async (upstreams: Upstreams) => {
   const track = await upstreams.soundcloud.track({ cover: null });
   await upstreams.cobalt.fail(track.url, code, status);
+
   return track.url;
 };
 
@@ -56,6 +57,7 @@ const failures: Failure[] = [
     arrange: async (upstreams) => {
       const url = `https://example.com/watch/${crypto.randomUUID()}`;
       await upstreams.cobalt.fail(url, "error.api.link.invalid");
+
       return url;
     },
   },
@@ -70,6 +72,7 @@ const failures: Failure[] = [
         url: `${FAKE_COBALT_ORIGIN}/tunnel?id=hls`,
         filename: "stream.mp4",
       });
+
       return video.url;
     },
   },
@@ -86,6 +89,7 @@ const failures: Failure[] = [
     arrange: async (upstreams) => {
       const video = await upstreams.youtube.video({ cover: null });
       await upstreams.cobalt.fail(video.url, "error.api.content.video.private");
+
       return video.url;
     },
   },
@@ -102,6 +106,7 @@ const failures: Failure[] = [
     arrange: async (upstreams) => {
       const video = await upstreams.youtube.video({ cover: null });
       await upstreams.cobalt.fail(video.url, "error.api.youtube.drm");
+
       return video.url;
     },
   },
@@ -111,6 +116,7 @@ const failures: Failure[] = [
     retryable: true,
     arrange: async (upstreams) => {
       const post = await upstreams.picker({ items: [] });
+
       return post.url;
     },
   },
@@ -122,6 +128,7 @@ const failures: Failure[] = [
     arrange: async (upstreams) => {
       const track = await upstreams.soundcloud.track({ cover: null });
       await upstreams.cobalt.emptyTunnel(track.url);
+
       return track.url;
     },
   },
@@ -192,6 +199,7 @@ test("retries a busy download after the advertised wait and saves it", async ({
     author: "Queue",
     cover: null,
   });
+
   await upstreams.cobalt.capacity(track.url, { retryAfter: "7", times: 1 });
   const save = saveApp(page);
 
@@ -224,9 +232,11 @@ test("retries a failed save using the current download settings", async ({ page,
   await expect
     .poll(async () => (await upstreams.calls({ route: "cobalt.resolve" })).length)
     .toBe(2);
+
   const requests = (await upstreams.calls({ route: "cobalt.resolve" })).map((call) =>
     JSON.parse(call.requestBody!),
   );
+
   expect(requests[0]).toMatchObject({ url: video.url, downloadMode: "auto" });
   expect.soft(requests[1]).toMatchObject({
     url: video.url,
@@ -247,6 +257,7 @@ test("retries media that was busy to fetch and saves it", async ({ page, upstrea
     author: "Queue",
     cover: null,
   });
+
   await upstreams.cobalt.tunnel(track.url, [{ kind: "capacity", retryAfter: "3" }, { kind: "ok" }]);
   const save = saveApp(page);
 
@@ -269,16 +280,19 @@ test("explains repeated downloads beyond the session limit", async ({
   const session = `e2e-${crypto.randomUUID()}`;
   await context.addCookies([{ name: "tagium_client_id", value: session, url: baseURL! }]);
   await upstreams.rateLimits.limit("COBALT_SESSION_RATE_LIMITER", session, 1);
+
   const first = await upstreams.soundcloud.track({
     title: "Allowed",
     author: "Limit",
     cover: null,
   });
+
   const second = await upstreams.soundcloud.track({
     title: "Limited",
     author: "Limit",
     cover: null,
   });
+
   const save = saveApp(page);
 
   await save.open();
@@ -296,6 +310,7 @@ test("recovers silently when the media briefly comes back empty", async ({ page,
     author: "Echo",
     cover: null,
   });
+
   await upstreams.cobalt.emptyTunnel(track.url, 2);
   const save = saveApp(page);
 
@@ -349,5 +364,6 @@ test("explains media that cannot be processed and leaves nothing behind", async 
     message: "download failed. try again or use another link.",
     retryable: true,
   });
+
   if (browserName !== "webkit") await expect.poll(() => storedFileCount(page)).toBe(0);
 });

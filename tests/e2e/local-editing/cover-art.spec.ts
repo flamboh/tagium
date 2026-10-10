@@ -24,6 +24,7 @@ const exportedCover = async (page: Page) => {
   const exported = await downloadTrack(page);
   const { metadata } = await inspectAudio(exported);
   expect(metadata.picture).toHaveLength(1);
+
   return { exported, picture: metadata.picture[0]! };
 };
 
@@ -36,6 +37,7 @@ const pngChunk = (type: string, data: Buffer) => {
   const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
   const checksum = Buffer.alloc(4);
   checksum.writeUInt32BE(crc32(body));
+
   return Buffer.concat([length, body, checksum]);
 };
 
@@ -45,6 +47,7 @@ const png = (width: number, height: number, pixels = true): Upload => {
   header.writeUInt32BE(height, 4);
   header.set([8, 2, 0, 0, 0], 8);
   const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(width * 3, 0x5a)]);
+
   return {
     name: `cover-${width}x${height}.png`,
     mimeType: "image/png",
@@ -84,9 +87,11 @@ for (const format of ["m4a", "opus"] as const) {
     await expect(page.getByRole("button", { name: "upload cover" })).toBeEnabled();
     const cropped = await exportedCover(page);
     expect(cropped.picture.format).toBe("image/jpeg");
+
     const croppedSize = await readCoverArtDimensions(
       new File([Buffer.from(cropped.picture.data)], "cropped.jpg", { type: "image/jpeg" }),
     );
+
     expect(Math.abs(croppedSize.width - croppedSize.height)).toBeLessThanOrEqual(1);
     expect(croppedSize.width).toBeLessThanOrEqual(90);
     await expectLosslessAudio(cropped.exported, source.file);

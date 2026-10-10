@@ -35,6 +35,7 @@ const prefersReducedMotion = () =>
 
 const clearMotionStyles = (anchor: HTMLDivElement | null, motion: HTMLDivElement | null) => {
   if (anchor) anchor.style.height = "";
+
   if (!motion) return;
 
   motion.style.position = "";
@@ -44,14 +45,16 @@ const clearMotionStyles = (anchor: HTMLDivElement | null, motion: HTMLDivElement
   motion.style.zIndex = "";
 };
 
-export default function MediaUrlEntry({
-  layout,
-  controller,
-  leadingAction,
-  placeholder = "soundcloud, youtube, or tagium share link",
-  submitAriaLabel = "start media import",
-  animateSubmitIcon = false,
-}: MediaUrlEntryProps) {
+const layoutClassNames: Record<MediaUrlEntryLayout, string> = {
+  landing: "flex w-full flex-col gap-10 max-lg:[@media(max-height:700px)]:gap-6",
+  standalone: "w-full",
+  editor:
+    "flex-shrink-0 border-t bg-background/95 p-3 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-4 lg:z-10 lg:flex lg:justify-center lg:border-t-0 lg:bg-transparent lg:px-4 lg:p-0",
+  "empty-editor":
+    "pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center border-t bg-background/95 p-3 lg:bottom-4 lg:border-t-0 lg:bg-transparent lg:px-4 lg:p-0",
+};
+
+function useMediaUrlEntryMotion(layout: MediaUrlEntryLayout) {
   const anchorRef = useRef<HTMLDivElement>(null);
   const motionRef = useRef<HTMLDivElement>(null);
   const previousRectRef = useRef<DOMRect | null>(null);
@@ -61,18 +64,22 @@ export default function MediaUrlEntry({
   useLayoutEffect(() => {
     const anchor = anchorRef.current;
     const motion = motionRef.current;
+
     if (!anchor || !motion) return;
 
     const runningAnimation = animationRef.current;
+
     const previousRect = runningAnimation
       ? motion.getBoundingClientRect()
       : previousRectRef.current;
+
     const layoutChanged = previousLayoutRef.current !== layout;
     runningAnimation?.cancel();
     animationRef.current = null;
     clearMotionStyles(anchor, motion);
 
     const nextRect = motion.getBoundingClientRect();
+
     if (
       previousRect &&
       layoutChanged &&
@@ -90,6 +97,7 @@ export default function MediaUrlEntry({
         duration: 420,
         easing: "cubic-bezier(0.22, 1, 0.36, 1)",
       });
+
       animationRef.current = animation;
       animation.onfinish = () => {
         if (animationRef.current !== animation) return;
@@ -114,6 +122,7 @@ export default function MediaUrlEntry({
     };
 
     window.addEventListener("resize", settleMotion);
+
     return () => {
       window.removeEventListener("resize", settleMotion);
       settleMotion();
@@ -122,6 +131,7 @@ export default function MediaUrlEntry({
 
   const showValidationFeedback = () => {
     const feedback = motionRef.current;
+
     if (!feedback || prefersReducedMotion() || typeof feedback.animate !== "function") return;
     feedback.animate(
       [
@@ -135,21 +145,23 @@ export default function MediaUrlEntry({
     );
   };
 
+  return { anchorRef, motionRef, showValidationFeedback };
+}
+
+export default function MediaUrlEntry({
+  layout,
+  controller,
+  leadingAction,
+  placeholder = "soundcloud, youtube, or tagium share link",
+  submitAriaLabel = "start media import",
+  animateSubmitIcon = false,
+}: MediaUrlEntryProps) {
+  const { anchorRef, motionRef, showValidationFeedback } = useMediaUrlEntryMotion(layout);
+
   const canSubmit = controller.sourceUrl.trim().length > 0 && !controller.submitting;
 
   return (
-    <div
-      data-layout={layout}
-      className={cn(
-        layout === "landing" &&
-          "flex w-full flex-col gap-10 max-lg:[@media(max-height:700px)]:gap-6",
-        layout === "standalone" && "w-full",
-        layout === "editor" &&
-          "flex-shrink-0 border-t bg-background/95 p-3 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-4 lg:z-10 lg:flex lg:justify-center lg:border-t-0 lg:bg-transparent lg:px-4 lg:p-0",
-        layout === "empty-editor" &&
-          "pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center border-t bg-background/95 p-3 lg:bottom-4 lg:border-t-0 lg:bg-transparent lg:px-4 lg:p-0",
-      )}
-    >
+    <div data-layout={layout} className={layoutClassNames[layout]}>
       {layout === "landing" && (
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <div className="h-px flex-1 bg-border" />
@@ -169,6 +181,7 @@ export default function MediaUrlEntry({
             noValidate
             onSubmit={async (event) => {
               event.preventDefault();
+
               if (!(await controller.submit())) showValidationFeedback();
             }}
             className="flex items-start gap-2"
@@ -218,35 +231,43 @@ export default function MediaUrlEntry({
                 animateSubmitIcon && "active:scale-[0.97] motion-reduce:active:scale-100",
               )}
             >
-              {animateSubmitIcon ? (
-                <IconSwap
-                  switched={controller.submitting}
-                  first={
-                    <HugeiconsIcon
-                      icon={ArrowRight02Icon}
-                      strokeWidth={2}
-                      className="size-4"
-                      data-media-url-submit-icon="enter"
-                    />
-                  }
-                  second={
-                    <HugeiconsIcon
-                      icon={loaderCircleIcon}
-                      strokeWidth={2}
-                      className="size-4 animate-spin"
-                      data-media-url-submit-icon="loading"
-                    />
-                  }
-                />
-              ) : controller.submitting ? (
-                <HugeiconsIcon icon={loaderCircleIcon} strokeWidth={2} className="animate-spin" />
-              ) : (
-                <HugeiconsIcon icon={ArrowRight02Icon} strokeWidth={2} />
-              )}
+              <MediaUrlSubmitIcon animate={animateSubmitIcon} submitting={controller.submitting} />
             </Button>
           </form>
         </div>
       </div>
     </div>
+  );
+}
+
+function MediaUrlSubmitIcon({ animate, submitting }: { animate: boolean; submitting: boolean }) {
+  if (animate) {
+    return (
+      <IconSwap
+        switched={submitting}
+        first={
+          <HugeiconsIcon
+            icon={ArrowRight02Icon}
+            strokeWidth={2}
+            className="size-4"
+            data-media-url-submit-icon="enter"
+          />
+        }
+        second={
+          <HugeiconsIcon
+            icon={loaderCircleIcon}
+            strokeWidth={2}
+            className="size-4 animate-spin"
+            data-media-url-submit-icon="loading"
+          />
+        }
+      />
+    );
+  }
+
+  return submitting ? (
+    <HugeiconsIcon icon={loaderCircleIcon} strokeWidth={2} className="animate-spin" />
+  ) : (
+    <HugeiconsIcon icon={ArrowRight02Icon} strokeWidth={2} />
   );
 }

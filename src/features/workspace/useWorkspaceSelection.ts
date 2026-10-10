@@ -61,6 +61,7 @@ export const useWorkspaceSelection = ({
     open: boolean;
     trackIds: string[];
   }>({ open: false, trackIds: [] });
+
   const editorRef = useRef(editor);
   const settingsRef = useRef(settings);
   const removeDownloadsRef = useRef(removeDownloads);
@@ -77,16 +78,20 @@ export const useWorkspaceSelection = ({
       const removedFiles = snapshot.files.filter((file) => idSet.has(file.id));
       removeDownloadsRef.current(idsToRemove);
       const affectedAlbumIds: string[] = [];
+
       for (const album of snapshot.albums) {
         if (album.trackIds.some((trackId) => idSet.has(trackId))) {
           affectedAlbumIds.push(album.id);
         }
       }
+
       const nextAlbums = idsToRemove.reduce(
         (albums, fileId) => removeTrackFromAlbums(albums, fileId),
         snapshot.albums,
       );
+
       let nextFiles = snapshot.files.filter((file) => !idSet.has(file.id));
+
       if (settingsRef.current.syncTrackNumbers && affectedAlbumIds.length > 0) {
         nextFiles = applyTrackOrderNumbersToFiles(
           nextFiles,
@@ -95,12 +100,14 @@ export const useWorkspaceSelection = ({
           settingsRef.current,
         );
       }
+
       library.dispatch({
         type: "tracks-removed",
         trackIds: idsToRemove,
         files: nextFiles,
         albums: nextAlbums,
       });
+
       if (removedFiles.length > 0) {
         analytics.capture({
           type: "tracks_removed",
@@ -118,6 +125,7 @@ export const useWorkspaceSelection = ({
 
   const requestRemoveSelected = useCallback(() => {
     const snapshot = library.getSnapshot();
+
     if (editorRef.current.isCoverProcessing || snapshot.selectedFileIds.size === 0) return;
     setRemovalDialog({ open: true, trackIds: Array.from(snapshot.selectedFileIds) });
   }, [library]);
@@ -137,6 +145,7 @@ export const useWorkspaceSelection = ({
     requestRemoveSelectedFiles: requestRemoveSelected,
     clearSelection,
   });
+
   useLayoutEffect(() => {
     keyboardActionsRef.current = {
       enabled: navigation.destination.kind !== "settings",
@@ -167,6 +176,7 @@ export const useWorkspaceSelection = ({
       editorRef.current.commands.flush();
       navigation.showEditor();
       const snapshot = library.getSnapshot();
+
       const target =
         destination.type === "loose"
           ? placement === "append" || !referenceTrackId
@@ -180,6 +190,7 @@ export const useWorkspaceSelection = ({
                 placement,
                 referenceTrackId,
               } as const);
+
       const moved = moveTrackInSidebar(
         snapshot.albums,
         snapshot.looseTrackIds,
@@ -187,7 +198,9 @@ export const useWorkspaceSelection = ({
         target,
         settingsRef.current,
       );
+
       let finalFiles = snapshot.files;
+
       if (moved.albumsToSync.length > 0) {
         finalFiles = applyTrackOrderNumbersToFiles(
           finalFiles,
@@ -196,10 +209,12 @@ export const useWorkspaceSelection = ({
           settingsRef.current,
         );
       }
+
       if (destination.type === "loose") {
         finalFiles = applySingleAlbumTitlesToFiles(finalFiles, [trackId], settingsRef.current);
       } else {
         const destinationAlbum = moved.albums.find((album) => album.id === destination.albumId);
+
         if (destinationAlbum) {
           finalFiles = applyAlbumSharedTagsToFiles(
             finalFiles,
@@ -208,6 +223,7 @@ export const useWorkspaceSelection = ({
           );
         }
       }
+
       library.dispatch({
         type: "content-replaced",
         files: finalFiles,

@@ -19,6 +19,7 @@ export const projectPlaylistAlbumManifest = (
     playlist,
     playlist.tracks.map((track) => {
       const metadata = createPlaylistTrackMetadata(playlist, track);
+
       return {
         filename: `${metadata.filename}.mp3`,
         metadata,

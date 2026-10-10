@@ -9,10 +9,14 @@ export const disableShareThenDeleteArtwork = async (operations: {
   deleteArtwork: (key: string) => Promise<void>;
 }): Promise<ShareTakedownResult> => {
   const record = await operations.disable();
+
   if (!record.found) return "not_found";
+
   if (!record.artworkKey) return "disabled";
+
   try {
     await operations.deleteArtwork(record.artworkKey);
+
     return "disabled";
   } catch {
     return "artwork_delete_failed";

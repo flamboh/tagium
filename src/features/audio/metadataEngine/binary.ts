@@ -6,12 +6,15 @@ export const asciiBytes = (value: string) => Uint8Array.from(value, (value) => v
 export const concatBytes = (...chunks: Uint8Array[]) => {
   const result = new Uint8Array(chunks.reduce((size, chunk) => size + chunk.length, 0));
   let offset = 0;
+
   for (const chunk of chunks) {
     result.set(chunk, offset);
     offset += chunk.length;
   }
+
   return result;
 };
+
 export const readUint24BE = (bytes: Uint8Array, offset: number) =>
   bytes[offset]! * 0x10000 + bytes[offset + 1]! * 0x100 + bytes[offset + 2]!;
 

@@ -21,10 +21,12 @@ const openSettings = async (page: Page, section: "importing" | "editing" | "link
   if (!(await page.getByRole("button", { name: "back to workspace" }).isVisible())) {
     await page.getByRole("button", { name: "settings", exact: true }).click();
   }
+
   await page
     .getByRole("navigation", { name: "settings sections" })
     .getByRole("button", { name: section, exact: true })
     .click();
+
   return page.getByRole("region", { name: section, exact: true });
 };
 
@@ -71,6 +73,7 @@ const expectSettings = async (
   await openSettings(page, "editing");
   await expect(controls.advanced).toBeChecked({ checked: expected.advanced });
   await openSettings(page, "linking");
+
   for (const name of LINK_SWITCHES.slice(0, expected.advanced ? undefined : -1)) {
     await expect(controls.link(name), name).toHaveAttribute("aria-checked", String(expected.links));
   }
@@ -78,15 +81,20 @@ const expectSettings = async (
 
 const imageSize = (bytes: Uint8Array) => {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
   if (bytes[0] === 0x89) return { width: view.getUint32(16), height: view.getUint32(20) };
   let offset = 2;
+
   while (offset < bytes.length) {
     const marker = bytes[offset + 1]!;
+
     if (marker >= 0xc0 && marker <= 0xc3) {
       return { width: view.getUint16(offset + 7), height: view.getUint16(offset + 5) };
     }
+
     offset += 2 + view.getUint16(offset + 2);
   }
+
   return null;
 };
 
@@ -95,9 +103,11 @@ const mp3Bitrate = (bytes: Uint8Array) => {
     bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33
       ? 10 + ((bytes[6]! << 21) | (bytes[7]! << 14) | (bytes[8]! << 7) | bytes[9]!)
       : 0;
+
   while (!(bytes[offset] === 0xff && (bytes[offset + 1]! & 0xe0) === 0xe0)) offset += 1;
   const mpeg1 = (bytes[offset + 1]! & 0x18) === 0x18;
   const index = bytes[offset + 2]! >> 4;
+
   return (
     mpeg1
       ? [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320]
@@ -124,6 +134,7 @@ test("every setting persists across reloads, and unreadable stored settings fall
     APP_SETTINGS_STORAGE_KEY,
   );
   await page.reload();
+
   const defaults = {
     format: "mp3",
     bitrate: "320",
@@ -132,6 +143,7 @@ test("every setting persists across reloads, and unreadable stored settings fall
     advanced: false,
     links: true,
   };
+
   await expectSettings(page, defaults);
   await page.evaluate((key) => localStorage.setItem(key, "{not json"), APP_SETTINGS_STORAGE_KEY);
   await page.reload();
@@ -147,10 +159,12 @@ test("every setting persists across reloads, and unreadable stored settings fall
   await page.locator("label").filter({ hasText: "show advanced fields" }).click();
   await expect(controls.advanced).toBeChecked();
   await openSettings(page, "linking");
+
   for (const name of LINK_SWITCHES) {
     await controls.link(name).click();
     await expect(controls.link(name)).toHaveAttribute("aria-checked", "false");
   }
+
   await page.reload();
   await expectSettings(page, {
     format: "best compatible",
@@ -227,6 +241,7 @@ test("the download format and bitrate choices describe and change the audio tagi
   expect(
     (await upstreams.calls({ route: "cobalt.resolve" })).map((call) => {
       const body = JSON.parse(call.requestBody!);
+
       return [body.url, body.audioFormat, body.audioBitrate];
     }),
   ).toEqual([
@@ -255,22 +270,27 @@ test("the soundcloud album cover setting replaces track covers once, at import",
   upstreams,
 }) => {
   journey();
+
   const coverSize = async (filename: string) => {
     await page.getByRole("button", { name: filename }).click();
     const download = page.getByRole("button", { name: "download track" });
     await expect(download).toBeEnabled(IMPORT_TIMEOUT);
     const { metadata } = await inspectAudio(await captureDownload(page, () => download.click()));
     expect(metadata.picture).toHaveLength(1);
+
     return imageSize(new Uint8Array(metadata.picture![0]!.data));
   };
+
   const albumCover = { width: 64, height: 64 };
   const trackCover = { width: 96, height: 96 };
+
   const covered = await upstreams.soundcloud.set({
     title: "Covered Set",
     isAlbum: true,
     artwork: "artwork",
     tracks: [{ title: "Album Cover Track", cover: "cover" }],
   });
+
   const uncovered = await upstreams.soundcloud.set({
     title: "Own Covers Set",
     isAlbum: true,
@@ -303,6 +323,7 @@ test("link switches decide which track fields follow their source", async ({ pag
     displayDate: "2015-01-02T00:00:00Z",
     tracks: [{ title: "Linked Song" }],
   });
+
   const loose = await upstreams.youtube.video({ title: "Loose Song" });
   await page.goto("/");
   await startImport(page, playlist.url);
@@ -319,9 +340,11 @@ test("link switches decide which track fields follow their source", async ({ pag
   await page.getByRole("button", { name: "1 Linked Song.mp3" }).click();
   await expect(page.getByRole("button", { name: "download track" })).toBeEnabled(IMPORT_TIMEOUT);
   await expect(field("title")).toHaveValue("Linked Song");
+
   for (const name of ["artist", "year", "genre", "track", "album"]) {
     await expect(field(name), name).toBeDisabled();
   }
+
   await expect(field("artist")).toHaveValue("Linker");
   await expect(field("year")).toHaveValue("2015");
   await expect(page.getByRole("button", { name: "cover linked" })).toBeDisabled();
@@ -332,14 +355,17 @@ test("link switches decide which track fields follow their source", async ({ pag
       "linked fields are synced with their source. unlink a field to allow it to be freely edited.",
     ),
   ).toBeVisible();
+
   for (const name of LINK_SWITCHES.slice(0, -1)) {
     await settingsControls(page).link(name).click();
   }
+
   await page.getByRole("button", { name: "back to workspace" }).click();
 
   for (const name of ["artist", "year", "genre", "track"]) {
     await expect(field(name), name).toBeEnabled();
   }
+
   await expect(page.getByRole("button", { name: "upload cover" })).toBeEnabled();
   await field("artist").fill("Solo Artist");
   await field("track").fill("7");
@@ -411,6 +437,7 @@ test("advanced fields are gated by settings and keep their values while hidden",
   const saved = await captureDownload(page, () =>
     page.getByRole("button", { name: "download track" }).click(),
   );
+
   expect((await inspectAudio(saved)).metadata).toMatchObject({ composer: "Retained Composer" });
 });
 
@@ -442,9 +469,11 @@ test("the theme follows the system preference until it is switched by hand", asy
 test("the about section credits cobalt and links to the project", async ({ page }) => {
   await page.goto("/");
   const about = await openSettings(page, "about");
+
   for (const heading of ["about", "ethics", "acknowledgements"]) {
     await expect(about.getByRole("heading", { name: heading, exact: true })).toBeVisible();
   }
+
   await expect(
     about.getByText("tagium exists to make device-local music more accessible to everyone."),
   ).toBeVisible();

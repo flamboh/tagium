@@ -26,6 +26,7 @@ const manifest = {
     },
   ],
 };
+
 const png = Uint8Array.from(
   atob(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL7OwAAAABJRU5ErkJggg==",
@@ -36,6 +37,7 @@ const png = Uint8Array.from(
 const createFakePersistence = () => {
   const records = new Map<string, StoredShareManifest>();
   const artwork = new Map<string, Uint8Array>();
+
   const persistence: ShareManifestPersistence = {
     putArtwork: async ({ key, bytes }) => {
       artwork.set(key, bytes);
@@ -45,6 +47,7 @@ const createFakePersistence = () => {
     },
     getArtwork: async (key) => {
       const bytes = artwork.get(key);
+
       return bytes
         ? {
             body: new Blob([Uint8Array.from(bytes).buffer]).stream(),
@@ -56,11 +59,13 @@ const createFakePersistence = () => {
     create: async (record) => {
       if (records.has(record.slug)) return "conflict";
       records.set(record.slug, record);
+
       return "created";
     },
     get: async (slug) => records.get(slug),
     update: async ({ previous, replacement, revocationTokenHash, now }) => {
       const current = records.get(previous.slug);
+
       if (
         !current ||
         current.status !== "active" ||
@@ -72,10 +77,12 @@ const createFakePersistence = () => {
       )
         return "conflict";
       records.set(previous.slug, replacement);
+
       return "updated";
     },
     disable: async (slug, tokenHash, now) => {
       const record = records.get(slug);
+
       if (
         !record ||
         (record.expiresAt !== null && record.expiresAt <= now) ||
@@ -84,9 +91,11 @@ const createFakePersistence = () => {
         return undefined;
       const disabled = { ...record, status: "disabled" as const };
       records.set(slug, disabled);
+
       return disabled;
     },
   };
+
   return { persistence, records, artwork };
 };
 
@@ -122,6 +131,7 @@ describe("share manifest store", () => {
     expect(record.artworkKey).toMatch(
       new RegExp(`^permanent-shares/${published.slug}/[^/]+\\.png$`),
     );
+
     for (const rule of artworkLifecycle.rules)
       expect(record.artworkKey!.startsWith(rule.conditions.prefix)).toBe(false);
     now = 1_000 + 10 * SHARE_MANIFEST_LIFETIME_MS;
@@ -160,19 +170,25 @@ describe("share manifest store", () => {
       keys.push(input.key);
       await originalPut(input);
     };
+
     let calls = 0;
     fake.persistence.create = async (record) => {
       calls += 1;
+
       if (calls === 1) return "conflict";
       fake.records.set(record.slug, record);
+
       return "created";
     };
+
     const tokens = ["revocation", "first-owner", "second-owner"];
     const slugs = ["aaaaaa", "bbbbbb"];
+
     const store = createShareManifestStore(fake.persistence, {
       randomToken: () => tokens.shift()!,
       randomSlug: () => slugs.shift()!,
     });
+
     await store.publish(manifest, await parseShareArtwork(new File([png], "cover.png")));
 
     expect(keys).toHaveLength(2);
@@ -188,7 +204,9 @@ describe("share manifest store", () => {
       if (failDelete) throw new Error("R2 unavailable");
       fake.artwork.delete(key);
     };
+
     const store = createShareManifestStore(fake.persistence);
+
     const published = await store.publish(
       manifest,
       await parseShareArtwork(new File([png], "cover.png")),
@@ -207,6 +225,7 @@ describe("share manifest store", () => {
     fake.persistence.create = async () => {
       throw new Error("D1 unavailable");
     };
+
     const store = createShareManifestStore(fake.persistence);
     const cover = new File([png], "cover.png");
 
@@ -223,6 +242,7 @@ describe("share manifest store", () => {
       await originalPut(input);
       throw new Error("R2 unavailable");
     };
+
     const store = createShareManifestStore(fake.persistence);
     await expect(
       store.publish(manifest, await parseShareArtwork(new File([png], "cover.png"))),
@@ -271,6 +291,7 @@ describe("share manifest store", () => {
         artworkKey: "shares/already-applied.png",
       });
       fake.artwork.set("shares/already-applied.png", artwork.bytes);
+
       return "conflict";
     };
 
@@ -292,6 +313,7 @@ describe("share manifest store", () => {
     failed.persistence.update = async () => {
       throw new Error("D1 unavailable");
     };
+
     await expect(
       failedStore.update(failedPublish.slug, failedPublish.revocationToken, manifest, {
         kind: "replace",
@@ -307,6 +329,7 @@ describe("share manifest store", () => {
     committed.persistence.deleteArtwork = async () => {
       throw new Error("R2 unavailable");
     };
+
     await expect(
       committedStore.update(committedPublish.slug, committedPublish.revocationToken, manifest, {
         kind: "remove",
@@ -326,6 +349,7 @@ describe("share manifest store", () => {
       await originalUpdate(input);
       throw new Error("D1 ambiguous");
     };
+
     await expect(
       store.update(published.slug, published.revocationToken, manifest, {
         kind: "replace",
@@ -344,13 +368,17 @@ describe("share manifest store", () => {
     fake.persistence.update = async () => {
       throw new Error("D1 ambiguous");
     };
+
     const originalGet = fake.persistence.get;
     let reads = 0;
     fake.persistence.get = async (slug) => {
       reads += 1;
+
       if (reads > 1) throw new Error("D1 unavailable");
+
       return originalGet(slug);
     };
+
     await expect(
       store.update(published.slug, published.revocationToken, manifest, {
         kind: "replace",
@@ -367,8 +395,10 @@ describe("share manifest store", () => {
     const artwork = (await parseShareArtwork(new File([png], "cover.png")))!;
     fake.persistence.update = async (input) => {
       fake.records.set(input.previous.slug, input.replacement);
+
       return "conflict";
     };
+
     await expect(
       store.update(published.slug, published.revocationToken, manifest, {
         kind: "replace",

@@ -82,13 +82,17 @@ const getRequestHeaders = (
     "X-Tagium-Request-Id": context.requestId,
     "X-Tagium-Source-Fingerprint": sourceFingerprint,
   });
+
   if (context.importId) headers.set("X-Tagium-Import-Id", context.importId);
+
   if (context.trackIndex !== undefined) {
     headers.set("X-Tagium-Track-Index", String(context.trackIndex));
   }
+
   if (runtimeEnv.COBALT_API_KEY) {
     headers.set("Authorization", `Api-Key ${runtimeEnv.COBALT_API_KEY}`);
   }
+
   return headers;
 };
 
@@ -97,6 +101,7 @@ const getAllowedOrigin = (request: Request, requestOrigin: string, runtimeEnv: C
 
 const enforceSameOrigin = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
   const requestOrigin = request.headers.get("origin");
+
   if (!requestOrigin) {
     return new Response("Download requests require an Origin header.", { status: 403 });
   }
@@ -116,6 +121,7 @@ const requestCobaltDownload = async (
   sourceFingerprint: string,
 ): Promise<CobaltDownloadResult> => {
   let response: Response;
+
   try {
     const endpoint = new URL("/", getCobaltApiUrl(runtimeEnv));
     response = await fetch(endpoint, {
@@ -137,6 +143,7 @@ const requestCobaltDownload = async (
       error instanceof Error && error.name === "TimeoutError"
         ? "error.api.timed_out"
         : "error.api.unreachable";
+
     return {
       response: { status: "error", error: { code } },
       machineId: undefined,
@@ -148,6 +155,7 @@ const requestCobaltDownload = async (
 
   const upstreamStatus = response.status;
   const contentType = response.headers.get("content-type") ?? undefined;
+
   try {
     return {
       response: await decodeCobaltDownloadResponse(response),
@@ -159,8 +167,10 @@ const requestCobaltDownload = async (
   } catch (error) {
     const invalidMachineId =
       error instanceof Error && error.message === "Cobalt returned invalid machine id.";
+
     const nonJson =
       error instanceof Error && error.message.startsWith("Cobalt API returned non-JSON");
+
     return {
       response: {
         status: "error",
@@ -200,6 +210,7 @@ const cobaltCapacityErrorResponse = (
 ) => {
   const headers = new Headers({ "Content-Type": "application/json" });
   headers.set("Retry-After", retryAfter ?? "2");
+
   return new Response(JSON.stringify(response), { status: 503, headers });
 };
 
@@ -217,6 +228,7 @@ const admissionLimitedResponse = () =>
 
 const withAdmissionCookie = (response: Response, setCookie: string | undefined) => {
   if (setCookie) response.headers.append("Set-Cookie", setCookie);
+
   return response;
 };
 
@@ -283,26 +295,33 @@ export default defineHandler(async (event) => {
   try {
     const runtimeEnv = getRuntimeEnv(event.req);
     const forbidden = enforceSameOrigin(event.req, runtimeEnv);
+
     if (forbidden) return forbidden;
 
     const body = await decodeRequestBody(event.req, cobaltDownloadRequestSchema);
     sourceUrl = body.url;
     context = getRequestLogContext(event.req, body.url);
     const requestSourceFingerprint = await fingerprintUrl(body.url);
+
     if (!requestSourceFingerprint) throw new Error("Download URL fingerprint is unavailable.");
     sourceFingerprint = requestSourceFingerprint;
 
     const admission = getCobaltRequestAdmission(event.req, runtimeEnv);
+
     if (!admission) return admissionUnavailableResponse();
 
     const admissionDecision = await admission.admit(event.req);
+
     const respond = (response: Response) => {
       response.headers.set("X-Tagium-Request-Id", context.requestId);
+
       return withAdmissionCookie(response, admissionDecision.setCookie);
     };
+
     if (admissionDecision.status === "unavailable") {
       return respond(admissionUnavailableResponse());
     }
+
     if (admissionDecision.status === "limited") {
       return respond(admissionLimitedResponse());
     }
@@ -314,11 +333,14 @@ export default defineHandler(async (event) => {
       context,
       requestSourceFingerprint,
     );
+
     if (result.response.status === "error") {
       logFailure(context, body.url, requestSourceFingerprint, result, Date.now() - startedAt);
+
       if (isCobaltCapacityError(result.response)) {
         return respond(cobaltCapacityErrorResponse(result.response, result.retryAfter));
       }
+
       return respond(cobaltErrorResponse(withPublicErrorCode(result.response)));
     }
 
@@ -334,6 +356,7 @@ export default defineHandler(async (event) => {
         failureStage: "cobalt.resolve_policy",
         failureReason: "remote_processing_plan",
       } as const satisfies CobaltDownloadResult;
+
       logFailure(
         context,
         body.url,
@@ -341,6 +364,7 @@ export default defineHandler(async (event) => {
         policyFailure,
         Date.now() - startedAt,
       );
+
       return respond(cobaltErrorResponse(policyFailure.response, 422));
     }
 
@@ -355,6 +379,7 @@ export default defineHandler(async (event) => {
       trackIndex: context.trackIndex,
       sourceFingerprint: requestSourceFingerprint,
     });
+
     return respond(Response.json(proxiedResponse));
   } catch (error) {
     if (HTTPError.isError(error)) throw error;
@@ -379,6 +404,7 @@ export default defineHandler(async (event) => {
         }),
       );
     }
+
     return cobaltErrorResponse({
       status: "error",
       error: { code: "error.api.handler_failure" },

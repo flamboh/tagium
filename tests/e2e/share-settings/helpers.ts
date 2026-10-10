@@ -20,6 +20,7 @@ import { expect, IMPORT_TIMEOUT } from "../support/test";
 import type { FakeYouTubeVideo, Upstreams, YouTubeVideoOptions } from "../support/upstreams";
 
 export const SHARE_URL = /^http:\/\/127\.0\.0\.1:\d+\/share\/[23456789abcdefghjkmnpqrstvwxyz]{6}$/u;
+
 export const RECEIPTS_KEY = "tagium.share-revocations.v1";
 
 export const randomIp = () =>
@@ -54,12 +55,14 @@ export const startImport = async (page: Page, url: string) => {
 
 export const albumMenu = async (page: Page, title: string) => {
   await page.getByRole("button", { name: `album actions for ${title}` }).click();
+
   return page.getByRole("menu", { name: `album actions for ${title}` });
 };
 
 export const trackMenu = async (page: Page, filename: string | RegExp) => {
   const name = typeof filename === "string" ? `track actions for ${filename}` : filename;
   await page.getByRole("button", { name }).click();
+
   return page.getByRole("menu", { name });
 };
 
@@ -74,12 +77,14 @@ export const importAlbum = async (
   await expect(
     page.getByRole("button", { name: `album actions for ${options.title}` }),
   ).toBeVisible(IMPORT_TIMEOUT);
+
   return playlist;
 };
 
 export const openShareDialog = async (page: Page, title: string) => {
   const menu = await albumMenu(page, title);
   await menu.getByRole("menuitem", { name: "share album", exact: true }).click(IMPORT_TIMEOUT);
+
   return page.getByRole("dialog", { name: `share album: ${title}` });
 };
 
@@ -88,6 +93,7 @@ export const publishAlbum = async (page: Page, title: string) => {
   await dialog.getByRole("button", { name: "create share link" }).click();
   const link = dialog.getByRole("textbox", { name: "share link" });
   await expect(link).toHaveValue(SHARE_URL);
+
   return { dialog, url: await link.inputValue() };
 };
 
@@ -98,6 +104,7 @@ export const albumManifest = (options: {
   tracks: { video: FakeYouTubeVideo; title?: string }[];
 }): AlbumManifest => {
   const album: AlbumManifest["album"] = { title: options.title, artist: options.artist, genre: "" };
+
   const manifest: AlbumManifest = {
     version: 1,
     kind: "album",
@@ -117,6 +124,7 @@ export const albumManifest = (options: {
       },
     })),
   };
+
   return manifest;
 };
 
@@ -151,6 +159,7 @@ const postManifest = async (
     if (attemptsLeft > 1 && /socket hang up|ECONNRESET/u.test(String(error))) {
       return postManifest(request, manifest, cover, attemptsLeft - 1);
     }
+
     throw error;
   }
 };
@@ -162,6 +171,7 @@ export const createShare = async (
 ): Promise<CreatedShare> => {
   const response = await postManifest(request, manifest, cover);
   expect(response.status(), await response.text()).toBe(201);
+
   return (await response.json()) as CreatedShare;
 };
 
@@ -214,6 +224,7 @@ export const stubClipboard = async (context: BrowserContext) => {
       },
     });
   });
+
   return {
     copied: (page: Page) => page.evaluate(() => window.e2eCopiedText ?? []),
     deny: (page: Page) => page.evaluate(() => localStorage.setItem("e2e-clipboard", "deny")),

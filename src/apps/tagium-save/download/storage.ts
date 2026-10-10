@@ -54,11 +54,13 @@ const makeTemporaryFileLease = <Value extends Blob>(
   opfsEntryName?: string,
 ): TemporaryFileLease<Value> => {
   let released = false;
+
   const release = async () => {
     if (released) return;
     released = true;
     await cleanup();
   };
+
   return opfsEntryName ? { value, opfsEntryName, release } : { value, release };
 };
 
@@ -75,9 +77,11 @@ const makeMemoryFileStore = (): TemporaryFileStore => {
 
   const materializeBlob = (type?: string) => {
     const bytes = new Uint8Array(currentSize);
+
     for (const patch of patches) {
       bytes.set(patch.data, patch.position);
     }
+
     return new Blob([bytes], type ? { type } : undefined);
   };
 
@@ -88,6 +92,7 @@ const makeMemoryFileStore = (): TemporaryFileStore => {
     },
     write: async (position, data) => {
       ensureActive();
+
       if (!isValidPosition(position)) {
         throw new Error("temporary media storage received an invalid write position.");
       }
@@ -102,10 +107,12 @@ const makeMemoryFileStore = (): TemporaryFileStore => {
     },
     toBlob: async (type) => {
       ensureActive();
+
       return makeTemporaryFileLease(materializeBlob(type), store.cleanup);
     },
     toFile: async (name, type, lastModified = Date.now()) => {
       ensureActive();
+
       return makeTemporaryFileLease(
         new File([materializeBlob(type)], name, {
           type: type ?? "",
@@ -128,6 +135,7 @@ const getOpfsRoot = async (): Promise<FileSystemDirectoryHandle | undefined> => 
   if (typeof navigator === "undefined") return undefined;
 
   const storage = navigator.storage;
+
   if (!storage || typeof storage.getDirectory !== "function") return undefined;
 
   try {
@@ -142,6 +150,7 @@ const getLockManager = () =>
 
 const getTemporaryDirectory = async (create: boolean) => {
   const root = await getOpfsRoot();
+
   try {
     return await root?.getDirectoryHandle(temporaryDirectoryName, { create });
   } catch {
@@ -151,6 +160,7 @@ const getTemporaryDirectory = async (create: boolean) => {
 
 const openSessionDirectory = async (sessionId: string) => {
   const temporaryDirectory = await getTemporaryDirectory(true);
+
   try {
     return await temporaryDirectory?.getDirectoryHandle(sessionId, { create: true });
   } catch {
@@ -162,14 +172,19 @@ const claimSessionDirectory = (sessionId: string) =>
   new Promise<{ directory: FileSystemDirectoryHandle | undefined; locked: boolean }>((resolve) => {
     const resolveUnlocked = async () =>
       resolve({ directory: await openSessionDirectory(sessionId), locked: false });
+
     const locks = getLockManager();
+
     if (!locks) {
       void resolveUnlocked();
+
       return;
     }
+
     locks
       .request(sessionLockName(sessionId), async () => {
         resolve({ directory: await openSessionDirectory(sessionId), locked: true });
+
         return new Promise<never>(() => undefined);
       })
       .catch(resolveUnlocked);
@@ -178,12 +193,15 @@ const claimSessionDirectory = (sessionId: string) =>
 const removeAbandonedSessions = async (currentSessionId: string) => {
   const locks = getLockManager();
   const temporaryDirectory = await getTemporaryDirectory(false);
+
   if (!locks || !temporaryDirectory) return;
 
   const sessionIds: string[] = [];
+
   for await (const name of temporaryDirectory.keys()) {
     if (name !== currentSessionId) sessionIds.push(name);
   }
+
   await Promise.allSettled(
     sessionIds.map((sessionId) =>
       locks.request(sessionLockName(sessionId), { ifAvailable: true }, async (lock) => {
@@ -196,12 +214,15 @@ const removeAbandonedSessions = async (currentSessionId: string) => {
 
 const removeLooseRootEntries = async () => {
   const root = await getOpfsRoot();
+
   if (!root) return;
 
   const names: string[] = [];
+
   for await (const name of root.keys()) {
     if (name !== temporaryDirectoryName) names.push(name);
   }
+
   await Promise.allSettled(names.map((name) => root.removeEntry(name, { recursive: true })));
 };
 
@@ -209,7 +230,9 @@ const openOwnedSession = async (): Promise<TemporaryStorageSession> => {
   const id = randomIdentifier();
   const { directory, locked } = await claimSessionDirectory(id);
   await removeLooseRootEntries().catch(() => undefined);
+
   if (locked) await removeAbandonedSessions(id).catch(() => undefined);
+
   return { id, directory };
 };
 
@@ -261,6 +284,7 @@ const makeOpfsFileStore = async (
     if (handle) {
       await directory.removeEntry(entryName).catch(() => undefined);
     }
+
     return undefined;
   }
 
@@ -279,7 +303,9 @@ const makeOpfsFileStore = async (
   const getBackingFile = async () => {
     await closeWriter();
     const file = await handle?.getFile();
+
     if (!file) throw new Error("temporary media storage file disappeared.");
+
     return file;
   };
 
@@ -290,9 +316,11 @@ const makeOpfsFileStore = async (
     },
     write: async (position, data) => {
       ensureActive();
+
       if (!isValidPosition(position)) {
         throw new Error("temporary media storage received an invalid write position.");
       }
+
       if (closed) {
         throw new Error("temporary media storage was finalized before a write.");
       }
@@ -311,6 +339,7 @@ const makeOpfsFileStore = async (
     toBlob: async (type) => {
       ensureActive();
       const file = await getBackingFile();
+
       return makeTemporaryFileLease(
         new Blob([file], { type: type || file.type }),
         store.cleanup,
@@ -320,6 +349,7 @@ const makeOpfsFileStore = async (
     toFile: async (name, type, lastModified = Date.now()) => {
       ensureActive();
       const file = await getBackingFile();
+
       return makeTemporaryFileLease(
         new File([file], name, {
           type: type || file.type,
@@ -348,6 +378,7 @@ export const createTemporaryFileStore = async (
   prefix = "tagium-video",
 ): Promise<TemporaryFileStore> => {
   const directory = await getSessionDirectory();
+
   if (!directory) return makeMemoryFileStore();
 
   return (await makeOpfsFileStore(directory, prefix)) ?? makeMemoryFileStore();

@@ -25,15 +25,18 @@ export const buildShareAlbumPreview = (
   files: readonly (Pick<TagiumFile, "id" | "filename" | "metadata"> | undefined)[],
 ): SharePreview => {
   const occurrences = new Map<string, number>();
+
   const tracks = album.trackIds.map((trackId, index) => {
     const occurrence = occurrences.get(trackId) ?? 0;
     occurrences.set(trackId, occurrence + 1);
     const file = files[index];
     const title = file?.metadata?.title?.trim() || file?.filename || "untitled track";
+
     return { key: `${trackId}:${occurrence}`, title };
   });
 
   const first = album.cover?.[0];
+
   const cover = first?.data?.byteLength
     ? {
         format: first.format,
@@ -60,6 +63,7 @@ export const buildShareTrackPreview = (
   const metadata = file.metadata ? { ...file.metadata, ...file.pendingMetadataPatch } : undefined;
   const title = metadata?.title?.trim() || metadata?.filename?.trim() || file.filename;
   const first = metadata?.picture?.[0];
+
   const cover = first?.data?.byteLength
     ? {
         format: first.format,

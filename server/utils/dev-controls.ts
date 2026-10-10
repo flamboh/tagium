@@ -9,7 +9,9 @@ export type CobaltRuntimeEnv = {
 };
 
 export type DeployEnv = "local" | "preview" | "production";
+
 export type AudioDevFault = "rate-limit" | "capacity" | "timeout" | "unreachable" | "malformed";
+
 export type TunnelDevFault = "rate-limit" | "capacity" | "timeout" | "empty-body";
 
 type RateLimitBucket = {
@@ -25,9 +27,11 @@ type DevState = {
 };
 
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
+
 const DEFAULT_RATE_LIMIT_MAX_REQUESTS = 60;
 
 const rateLimitBuckets = new Map<string, RateLimitBucket>();
+
 const devState: DevState = {
   rateLimitWindowMs: DEFAULT_RATE_LIMIT_WINDOW_MS,
   rateLimitMaxRequests: DEFAULT_RATE_LIMIT_MAX_REQUESTS,
@@ -88,6 +92,7 @@ export const getDeployEnv = (request: Request, runtimeEnv: CobaltRuntimeEnv) => 
   }
 
   const hostname = getRequestHostname(request);
+
   if (isLocalHostname(hostname) || runtimeEnv.NODE_ENV === "development") {
     return { deployEnv: "local", detectedFrom: "local runtime" };
   }
@@ -95,6 +100,7 @@ export const getDeployEnv = (request: Request, runtimeEnv: CobaltRuntimeEnv) => 
   if (runtimeEnv.CF_PAGES === "1") {
     const productionBranch = getProductionBranch(runtimeEnv);
     const branch = runtimeEnv.CF_PAGES_BRANCH;
+
     return {
       deployEnv: branch && branch !== productionBranch ? "preview" : "production",
       detectedFrom: "CF_PAGES_BRANCH",
@@ -128,6 +134,7 @@ export const updateDevConfig = (input: Schema.Schema.Type<typeof devConfigUpdate
 export const setDevFault = (input: Schema.Schema.Type<typeof devFaultUpdateSchema>) => {
   if (input.target === "audio") {
     devState.nextAudioFault = input.fault ?? undefined;
+
     return;
   }
 
@@ -142,6 +149,7 @@ export const consumeAudioDevFault = (
 
   const fault = devState.nextAudioFault;
   devState.nextAudioFault = undefined;
+
   return fault;
 };
 
@@ -153,6 +161,7 @@ export const consumeTunnelDevFault = (
 
   const fault = devState.nextTunnelFault;
   devState.nextTunnelFault = undefined;
+
   return fault;
 };
 
@@ -163,6 +172,7 @@ export const enforceRateLimit = (request: Request) => {
 
   if (!bucket || now - bucket.startedAt >= devState.rateLimitWindowMs) {
     rateLimitBuckets.set(clientKey, { startedAt: now, count: 1 });
+
     return undefined;
   }
 
@@ -171,6 +181,7 @@ export const enforceRateLimit = (request: Request) => {
   }
 
   bucket.count += 1;
+
   return undefined;
 };
 

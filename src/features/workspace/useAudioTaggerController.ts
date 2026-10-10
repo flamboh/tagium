@@ -31,6 +31,7 @@ export function useAudioTaggerController() {
   const activeView = workspaceNavigation.activeView;
   const activateEditor = workspaceNavigation.showEditor;
   const exporting = useExportSession({ library, editor: editor.commands, settings });
+
   const importing = useAudioImportSession({
     library,
     editor,
@@ -41,8 +42,10 @@ export function useAudioTaggerController() {
       else void exporting.exportTrack(target.trackId);
     },
   });
+
   const sharing = useShareWorkflow({ library, editor, importing, enabled: shareLinksEnabled });
   const busy = importing.status.importing || exporting.exporting;
+
   const workspace = useAudioWorkspace({
     library,
     editor,
@@ -52,10 +55,12 @@ export function useAudioTaggerController() {
     removeDownloads: importing.commands.removeTracks,
     busy,
   });
+
   const mobile = useAudioTaggerMobileNavigation({ navigation: workspaceNavigation, workspace });
   const { files, albums, looseTrackIds } = library.state;
   const shareAlbumActions = shareLinksEnabled ? sharing.shareActions : undefined;
   const shareTrackActions = shareLinksEnabled ? sharing.shareTrackActions : undefined;
+
   const shareSpotlight = useShareLinkSpotlight({
     albums,
     files,
@@ -63,6 +68,7 @@ export function useAudioTaggerController() {
     shareTrackActions,
     visible: !mobile.navigation.isMobile || mobile.navigation.drawerOpen,
   });
+
   const libraryIsEmpty = files.length === 0 && albums.length === 0 && looseTrackIds.length === 0;
   const landingIsActive = libraryIsEmpty && activeView === "editor";
   useBeforeUnloadProtection(
@@ -75,15 +81,22 @@ export function useAudioTaggerController() {
 
   const handleUrlImport = async (sourceUrl: string) => {
     const classification = classifyShareLink(sourceUrl);
+
     if (classification.kind === "invalid-share") throw new InvalidShareLinkError();
+
     if (classification.kind === "share" && !shareLinksEnabled) throw new ShareLinksDisabledError();
+
     if (classification.kind === "share") {
       await sharing.importFromInput(classification.slug);
+
       return;
     }
+
     await importing.commands.importUrl(sourceUrl);
   };
+
   const mediaUrlEntryController = useMediaUrlEntryController(handleUrlImport);
+
   const mediaUrlEntryPresentation = getMediaUrlEntryPresentation(
     libraryIsEmpty,
     activeView === "settings",

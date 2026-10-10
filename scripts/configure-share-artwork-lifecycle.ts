@@ -3,13 +3,16 @@ import { env, exit } from "node:process";
 import { getShareDeploymentResources } from "./share-deployment-bindings";
 
 const deployment = env.TAGIUM_DEPLOY_ENV;
+
 if (deployment !== "preview" && deployment !== "production") {
   console.error(
     "TAGIUM_DEPLOY_ENV must be exactly preview or production before configuring artwork retention.",
   );
   exit(1);
 }
+
 let bucket: string;
+
 try {
   bucket = getShareDeploymentResources(deployment).bucketName;
 } catch (error) {
@@ -32,6 +35,7 @@ const result = spawnSync(
   ],
   { stdio: "inherit" },
 );
+
 if (result.status !== 0) exit(result.status ?? 1);
 
 const verification = spawnSync(
@@ -39,7 +43,9 @@ const verification = spawnSync(
   ["wrangler@4.110.0", "r2", "bucket", "lifecycle", "list", bucket],
   { encoding: "utf8" },
 );
+
 const output = `${verification.stdout ?? ""}\n${verification.stderr ?? ""}`;
+
 if (
   verification.status !== 0 ||
   !output.includes("tagium-share-artwork-expiry") ||

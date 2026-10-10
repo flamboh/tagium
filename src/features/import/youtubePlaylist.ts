@@ -11,11 +11,13 @@ export const resolveYouTubePlaylist = async (url: string) => {
   endpoint.searchParams.set("url", url);
 
   const response = await fetch(endpoint);
+
   if (!response.ok) {
     throw new Error(`youtube playlist request failed (${response.status})`);
   }
 
   const contentType = response.headers.get("content-type");
+
   if (!contentType?.includes("application/json")) {
     throw new Error("youtube playlist route returned non-json. restart tagium dev server.");
   }

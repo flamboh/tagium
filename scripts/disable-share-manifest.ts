@@ -6,6 +6,7 @@ import { disableShareThenDeleteArtwork } from "../server/utils/share-manifest-ma
 import { getShareDeploymentResources } from "./share-deployment-bindings";
 
 const [slug] = argv.slice(2);
+
 const lookupResponseSchema = Schema.Array(
   Schema.Struct({
     results: Schema.optionalKey(
@@ -18,7 +19,9 @@ const lookupResponseSchema = Schema.Array(
     ),
   }),
 );
+
 const deployment = env.TAGIUM_DEPLOY_ENV;
+
 if (
   (deployment !== "preview" && deployment !== "production") ||
   env.SHARE_MAINTAINER_CONFIRM !== "disable" ||
@@ -32,15 +35,19 @@ if (
 }
 
 let resources: ReturnType<typeof getShareDeploymentResources>;
+
 try {
   resources = getShareDeploymentResources(deployment);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   exit(1);
 }
+
 const wrangler = (args: string[]) =>
   spawnSync("npx", ["wrangler@4.110.0", ...args], { encoding: "utf8" });
+
 const quotedSlug = slug.replaceAll("'", "''");
+
 const lookup = wrangler([
   "d1",
   "execute",
@@ -50,9 +57,13 @@ const lookup = wrangler([
   "--command",
   `SELECT slug, artwork_key FROM share_manifests WHERE slug = '${quotedSlug}'`,
 ]);
+
 if (lookup.status !== 0) exit(lookup.status ?? 1);
+
 let artworkKey: string | undefined;
+
 let found = false;
+
 try {
   const payload = Schema.decodeUnknownSync(lookupResponseSchema)(JSON.parse(lookup.stdout));
   const record = payload.flatMap((entry) => entry.results ?? [])[0];
@@ -73,7 +84,9 @@ const result = await disableShareThenDeleteArtwork({
       "--command",
       `UPDATE share_manifests SET status = 'disabled' WHERE slug = '${quotedSlug}'`,
     ]);
+
     if (update.status !== 0) throw new Error("D1 disable failed");
+
     return { found, artworkKey };
   },
   deleteArtwork: async (key) => {
@@ -81,15 +94,18 @@ const result = await disableShareThenDeleteArtwork({
     if (!key.startsWith(`shares/${slug}/`) && !key.startsWith(`permanent-shares/${slug}/`))
       throw new Error("unexpected artwork key");
     const deleted = wrangler(["r2", "object", "delete", resources.bucketName, key]);
+
     if (deleted.status !== 0) throw new Error("R2 deletion failed");
   },
 });
+
 if (result === "artwork_delete_failed") {
   console.error(
     "manifest disabled, but artwork deletion failed; rerun the same command after R2 recovers.",
   );
   exit(1);
 }
+
 console.log(
   result === "not_found"
     ? "manifest was already absent"

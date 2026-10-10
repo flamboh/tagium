@@ -9,6 +9,7 @@ const removableLabels = [
   "official video",
   "lyrics",
 ] as const;
+
 const artistSeparators = [" - ", " – ", " — ", ": "] as const;
 
 export interface MetadataCleanupSuggestion {
@@ -44,8 +45,10 @@ const normalizeComparable = (value: string) =>
 const removeMatchingArtistPrefix = (title: string, artists: string[]) => {
   const comparableTitle = normalizeComparable(title);
   let matchingArtist: string | undefined;
+
   for (const artist of artists) {
     const trimmedArtist = artist.trim();
+
     if (
       trimmedArtist &&
       artistSeparators.some((separator) =>
@@ -56,15 +59,18 @@ const removeMatchingArtistPrefix = (title: string, artists: string[]) => {
       break;
     }
   }
+
   if (!matchingArtist) return title;
 
   const separator = artistSeparators.find((candidate) =>
     comparableTitle.startsWith(`${normalizeComparable(matchingArtist)}${candidate}`),
   );
+
   if (!separator) return title;
 
   const normalizedPrefix = `${normalizeComparable(matchingArtist)}${separator}`;
   const normalizedTitle = title.normalize("NFKC").trim().replace(/\s+/g, " ");
+
   return normalizedTitle.slice(normalizedPrefix.length).trim();
 };
 
@@ -89,6 +95,7 @@ const removeTrailingNoise = (title: string, albumTitle?: string) => {
       removedAlbum = true;
       continue;
     }
+
     if (
       annotation &&
       annotationValue !== undefined &&
@@ -101,15 +108,18 @@ const removeTrailingNoise = (title: string, albumTitle?: string) => {
     }
 
     let albumRemainder = "";
+
     if (comparableAlbum) {
       for (const separator of nextTitle.matchAll(/\s+[-–—]\s+/g)) {
         const suffix = nextTitle.slice(separator.index + separator[0].length);
+
         if (normalizeComparable(suffix) === comparableAlbum) {
           albumRemainder = nextTitle.slice(0, separator.index).trim();
           break;
         }
       }
     }
+
     if (!albumRemainder) break;
     nextTitle = albumRemainder;
     removedAlbum = true;
@@ -124,22 +134,28 @@ export function suggestTitleCleanup(
   albumTitle?: string,
 ): Pick<MetadataCleanupSuggestion, "afterTitle" | "reasons"> | null {
   const trimmedTitle = title.trim();
+
   if (!trimmedTitle) return null;
 
   const reasons: MetadataCleanupSuggestion["reasons"] = [];
   let nextTitle = removeMatchingArtistPrefix(trimmedTitle, artists);
+
   if (nextTitle !== trimmedTitle) reasons.push("artist");
 
   const withoutNoise = removeTrailingNoise(nextTitle, albumTitle);
+
   if (withoutNoise.removedAlbum) reasons.push("album");
+
   if (withoutNoise.removedLabel) reasons.push("label");
   nextTitle = withoutNoise.title;
 
   const normalizedSpacing = nextTitle.replace(/\s+/g, " ").trim();
+
   if (normalizedSpacing !== nextTitle) reasons.push("spacing");
   nextTitle = normalizedSpacing;
 
   if (!nextTitle || nextTitle === title || reasons.length === 0) return null;
+
   return { afterTitle: nextTitle, reasons };
 }
 
@@ -150,14 +166,17 @@ export function findMetadataCleanupSuggestions(
 ): MetadataCleanupSuggestion[] {
   return files.flatMap((file) => {
     if (candidateTrackIds && !candidateTrackIds.has(file.id)) return [];
+
     if (!file.metadata) return [];
 
     const album = albums.find((candidate) => candidate.trackIds.includes(file.id));
+
     const cleanup = suggestTitleCleanup(
       file.metadata.title,
       [file.metadata.artist, album?.artist ?? ""],
       album?.title,
     );
+
     if (!cleanup) return [];
 
     return [
@@ -182,6 +201,7 @@ export function findAlbumMetadataCleanupSuggestions(
   albumId: string,
 ): MetadataCleanupSuggestion[] {
   const album = albums.find((candidate) => candidate.id === albumId);
+
   if (!album) return [];
 
   return findMetadataCleanupSuggestions(files, albums, new Set(album.trackIds));
@@ -195,10 +215,12 @@ export function applyMetadataCleanupSuggestions(
   const suggestionsById = new Map(
     suggestions.map((suggestion) => [suggestion.trackId, suggestion]),
   );
+
   const undoEntries: MetadataCleanupUndoEntry[] = [];
 
   const nextFiles = files.map((file) => {
     const suggestion = suggestionsById.get(file.id);
+
     if (!suggestion || !file.metadata) return file;
 
     undoEntries.push({
@@ -221,12 +243,14 @@ export function applyMetadataCleanupSuggestions(
       ...file.pendingMetadataPatch,
       title: suggestion.afterTitle,
     };
+
     if (syncFilenames) pendingMetadataPatch.filename = sanitizeFilenameBase(suggestion.afterTitle);
 
     const metadata = {
       ...file.metadata,
       title: suggestion.afterTitle,
     };
+
     if (syncFilenames) metadata.filename = sanitizeFilenameBase(suggestion.afterTitle);
 
     return {
@@ -250,6 +274,7 @@ const restorePatchField = (
   if (snapshot.present) return { ...patch, [field]: snapshot.value };
   const nextPatch = { ...patch };
   delete nextPatch[field];
+
   return nextPatch;
 };
 
@@ -258,8 +283,10 @@ export function undoMetadataCleanupSuggestions(
   entries: MetadataCleanupUndoEntry[],
 ): TagiumFile[] {
   const entriesById = new Map(entries.map((entry) => [entry.trackId, entry]));
+
   return files.map((file) => {
     const entry = entriesById.get(file.id);
+
     if (!entry || !file.metadata) return file;
 
     let pendingMetadataPatch = restorePatchField(
@@ -267,6 +294,7 @@ export function undoMetadataCleanupSuggestions(
       "title",
       entry.pendingTitle,
     );
+
     pendingMetadataPatch = restorePatchField(
       pendingMetadataPatch,
       "filename",

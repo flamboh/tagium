@@ -25,13 +25,17 @@ test("cleans up noisy titles, including the active unsaved one, and undoes it", 
   const dialog = page.getByRole("dialog", { name: "track title clean up" });
   await openAlbumAction(page, "Fixture Album", /^clean up tracks/u);
   await expect(dialog).toContainText("review suggested title changes for Fixture Album.");
+
   const night = dialog.getByRole("checkbox", {
     name: /^Night\s+Song \(Live\) \(Official Audio\)\s*Night Song \(Live\)$/u,
   });
+
   const moon = dialog.getByRole("checkbox", { name: /^Moon \[Lyrics\]\s*Moon$/u });
+
   const rain = dialog.getByRole("checkbox", {
     name: /^TAGIUM FIXTURES - Rain – Fixture Album\s*Rain$/u,
   });
+
   await expect(night).toBeChecked();
   await expect(moon).toBeChecked();
   await expect(rain).toBeChecked();

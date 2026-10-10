@@ -4,13 +4,17 @@ export const YOUTUBE_HOSTS = [
   "m.youtube.com",
   "music.youtube.com",
 ] as const;
+
 export const SOUNDCLOUD_HOSTS = [
   "soundcloud.com",
   "www.soundcloud.com",
   "m.soundcloud.com",
 ] as const;
+
 const youtubeSet = new Set<string>(YOUTUBE_HOSTS);
+
 const soundcloudSet = new Set<string>(SOUNDCLOUD_HOSTS);
+
 const videoId = /^[A-Za-z0-9_-]{11}$/;
 
 export type MediaLinkKind = "canonical" | "short" | "mobile" | "nocookie" | "other";
@@ -18,15 +22,19 @@ export type MediaLinkKind = "canonical" | "short" | "mobile" | "nocookie" | "oth
 export const mediaLinkKindFromUrl = (sourceUrl: string): MediaLinkKind => {
   try {
     const host = new URL(sourceUrl).hostname.toLowerCase();
+
     if (host === "youtu.be" || host === "on.soundcloud.com" || host === "snd.sc") {
       return "short";
     }
+
     if (host === "m.youtube.com" || host === "music.youtube.com" || host === "m.soundcloud.com") {
       return "mobile";
     }
+
     if (host === "youtube-nocookie.com" || host === "www.youtube-nocookie.com") {
       return "nocookie";
     }
+
     if (
       host === "youtube.com" ||
       host === "www.youtube.com" ||
@@ -38,6 +46,7 @@ export const mediaLinkKindFromUrl = (sourceUrl: string): MediaLinkKind => {
   } catch {
     // Invalid and generic inputs share the non-identifying "other" kind.
   }
+
   return "other";
 };
 
@@ -52,6 +61,7 @@ const unsupported = (url: URL): ParsedMediaLink => ({
   kind: "unsupported",
   canonicalUrl: url.toString(),
 });
+
 const youtubeTrack = (id: string): ParsedMediaLink | undefined =>
   videoId.test(id)
     ? {
@@ -64,17 +74,21 @@ const youtubeTrack = (id: string): ParsedMediaLink | undefined =>
 
 export function parseMediaLink(input: string): ParsedMediaLink {
   let url: URL;
+
   try {
     url = new URL(input.trim());
   } catch {
     return { provider: "other", kind: "unsupported", canonicalUrl: input.trim() };
   }
+
   if (url.protocol !== "https:" || url.username || url.password || url.port)
     return unsupported(url);
   const host = url.hostname.toLowerCase();
+
   if (host === "youtube-nocookie.com" || host === "www.youtube-nocookie.com") {
     const parts = url.pathname.split("/").filter(Boolean);
     const list = url.searchParams.get("list");
+
     if (
       parts[0] === "embed" &&
       list &&
@@ -86,13 +100,17 @@ export function parseMediaLink(input: string): ParsedMediaLink {
         playlistId: list,
         canonicalUrl: `https://www.youtube.com/playlist?list=${encodeURIComponent(list)}`,
       };
+
     if (parts[0] === "embed" && parts[1] && !parts[1].includes("videoseries"))
       return youtubeTrack(parts[1]) ?? unsupported(url);
+
     return unsupported(url);
   }
+
   if (host === "youtu.be" || youtubeSet.has(host)) {
     const parts = url.pathname.split("/").filter(Boolean);
     const list = url.searchParams.get("list");
+
     if (
       youtubeSet.has(host) &&
       (parts[0] === "playlist" ||
@@ -107,19 +125,25 @@ export function parseMediaLink(input: string): ParsedMediaLink {
         canonicalUrl: `https://www.youtube.com/playlist?list=${encodeURIComponent(list)}`,
       };
     }
+
     let id: string | undefined;
+
     if (host === "youtu.be") id = parts[0];
     else if (parts[0] === "watch") id = url.searchParams.get("v") ?? parts[1];
     else if (["shorts", "live", "embed", "v"].includes(parts[0] ?? "")) id = parts[1];
     else if (parts[0] === "attribution_link") {
       const raw = url.searchParams.get("u");
+
       if (raw?.startsWith("/") && !raw.startsWith("//"))
         return parseMediaLink(`https://${host}${raw}`);
     }
+
     return (id ? youtubeTrack(id) : undefined) ?? unsupported(url);
   }
+
   if (soundcloudSet.has(host)) {
     const parts = url.pathname.split("/").filter(Boolean);
+
     if (
       parts.length >= 3 &&
       parts.length <= 4 &&
@@ -131,13 +155,16 @@ export function parseMediaLink(input: string): ParsedMediaLink {
         (url.searchParams.get("secret_token")?.startsWith("s-")
           ? url.searchParams.get("secret_token")!
           : undefined);
+
       const base = `https://soundcloud.com/${parts[0]}/sets/${parts[2]}`;
+
       return {
         provider: "soundcloud",
         kind: "playlist",
         canonicalUrl: token ? `${base}/${token}` : base,
       };
     }
+
     if (
       parts.length >= 2 &&
       parts.length <= 3 &&
@@ -150,17 +177,22 @@ export function parseMediaLink(input: string): ParsedMediaLink {
         (url.searchParams.get("secret_token")?.startsWith("s-")
           ? url.searchParams.get("secret_token")!
           : undefined);
+
       const base = `https://soundcloud.com/${parts[0]}/${parts[1]}`;
+
       return {
         provider: "soundcloud",
         kind: "track",
         canonicalUrl: token ? `${base}/${token}` : base,
       };
     }
+
     return unsupported(url);
   }
+
   return unsupported(url);
 }
 
 export const isYouTubeHost = (host: string) => youtubeSet.has(host.toLowerCase());
+
 export const isSoundCloudHost = (host: string) => soundcloudSet.has(host.toLowerCase());

@@ -16,6 +16,7 @@ interface SettingsSectionProps {
 }
 
 const checkboxRowClassName = "flex cursor-pointer select-none items-start gap-3 py-1";
+
 const audioFormatLabels = {
   best: "best compatible",
   mp3: "mp3",

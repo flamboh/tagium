@@ -26,13 +26,16 @@ export const createTrackFilenamePreviewStore = (): TrackFilenamePreviewStore => 
       const trackListeners = listeners.get(trackId) ?? new Set<Listener>();
       trackListeners.add(listener);
       listeners.set(trackId, trackListeners);
+
       return () => {
         trackListeners.delete(listener);
+
         if (trackListeners.size === 0) listeners.delete(trackId);
       };
     },
     subscribeFilenameValidity: (listener) => {
       validityListeners.add(listener);
+
       return () => {
         validityListeners.delete(listener);
       };
@@ -42,6 +45,7 @@ export const createTrackFilenamePreviewStore = (): TrackFilenamePreviewStore => 
       else filenames.set(trackId, filename);
       listeners.get(trackId)?.forEach((listener) => listener());
       const valid = filename === undefined ? undefined : filename !== "";
+
       if (filenameValidity.get(trackId) === valid) return;
       filenameValidity = new Map(Array.from(filenames, ([id, value]) => [id, value !== ""]));
       validityListeners.forEach((listener) => listener());
@@ -58,7 +62,9 @@ export const useTrackFilenamePreview = (
     (listener: Listener) => store.subscribe(trackId, listener),
     [store, trackId],
   );
+
   const getSnapshot = useCallback(() => store.getSnapshot(trackId), [store, trackId]);
+
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot) ?? fallback;
 };
 
@@ -68,6 +74,7 @@ export const useLiveTrackFilenameValidity = (store: TrackFilenamePreviewStore) =
     store.getFilenameValidity,
     store.getFilenameValidity,
   );
+
   return useCallback(
     (file: TagiumFile) =>
       file.metadata !== undefined &&

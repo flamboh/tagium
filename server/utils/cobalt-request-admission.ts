@@ -23,19 +23,25 @@ export type CobaltAdmissionRuntimeEnv = {
 } & DevControlRuntimeEnv;
 
 const SESSION_COOKIE_NAME = "tagium_client_id";
+
 const SESSION_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+
 const SESSION_KEY_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
 const readCookie = (request: Request, name: string) => {
   const cookieHeader = request.headers.get("cookie");
+
   if (!cookieHeader) return undefined;
 
   for (const entry of cookieHeader.split(";")) {
     const separatorIndex = entry.indexOf("=");
+
     if (separatorIndex < 0) continue;
     const entryName = entry.slice(0, separatorIndex).trim();
+
     if (entryName !== name) continue;
     const value = entry.slice(separatorIndex + 1).trim();
+
     if (SESSION_KEY_PATTERN.test(value)) return value;
   }
 
@@ -44,9 +50,11 @@ const readCookie = (request: Request, name: string) => {
 
 const getSessionIdentity = (request: Request) => {
   const existingKey = readCookie(request, SESSION_COOKIE_NAME);
+
   if (existingKey) return { key: existingKey };
 
   const key = crypto.randomUUID();
+
   return {
     key,
     setCookie: `${SESSION_COOKIE_NAME}=${key}; Path=/; Max-Age=${SESSION_COOKIE_MAX_AGE_SECONDS}; HttpOnly; Secure; SameSite=Lax`,
@@ -75,9 +83,11 @@ export const createCloudflareCobaltRequestAdmission = ({
       if (!clientResult.success) {
         return { status: "limited", scope: "client", setCookie: session.setCookie };
       }
+
       if (!sessionResult.success) {
         return { status: "limited", scope: "session", setCookie: session.setCookie };
       }
+
       return { status: "allowed", setCookie: session.setCookie };
     } catch {
       return { status: "unavailable", setCookie: session.setCookie };

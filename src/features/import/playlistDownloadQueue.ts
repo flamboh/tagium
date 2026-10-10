@@ -46,6 +46,7 @@ export const createPlaylistDownloadQueueItem = (
   track: PlaylistDownloadQueueTrack,
 ): PlaylistDownloadQueueItem => {
   let tunnelCost = DEFAULT_DOWNLOAD_ADMISSION_COST;
+
   if (track.tunnelCost !== undefined) {
     tunnelCost = track.tunnelCost;
   }
@@ -147,6 +148,7 @@ export const derivePlaylistDownloadQueueSummary = (
   const completedCount = queue.items.filter((item) => item.status === "completed").length;
   const failedCount = queue.items.filter((item) => item.status === "failed").length;
   const canceledCount = queue.items.filter((item) => item.status === "canceled").length;
+
   return {
     label: `downloading ${completedCount}/${queue.items.length}`,
     totalCount: queue.items.length,
@@ -166,12 +168,14 @@ const updatePlaylistDownloadQueueItem = (
   updateItem: (item: PlaylistDownloadQueueItem) => PlaylistDownloadQueueItem,
 ) => {
   let foundItem = false;
+
   const items = queue.items.map((item) => {
     if (item.id !== itemId) {
       return item;
     }
 
     foundItem = true;
+
     return updateItem(item);
   });
 
@@ -187,6 +191,7 @@ const updatePlaylistDownloadQueueItem = (
 
 const estimatePlaylistDownloadQueueEtaMs = (queue: PlaylistDownloadQueueState, nowMs: number) => {
   const completedDurations: number[] = [];
+
   for (const item of queue.items) {
     if (item.status !== "completed") {
       continue;
@@ -197,6 +202,7 @@ const estimatePlaylistDownloadQueueEtaMs = (queue: PlaylistDownloadQueueState, n
     }
 
     const durationMs = item.completedAtMs - item.startedAtMs;
+
     if (durationMs > 0) {
       completedDurations.push(durationMs);
     }
@@ -209,17 +215,20 @@ const estimatePlaylistDownloadQueueEtaMs = (queue: PlaylistDownloadQueueState, n
   const unfinishedItems = queue.items.filter((item) => {
     return item.status === "active" || item.status === "pending";
   });
+
   if (unfinishedItems.length === 0) {
     return undefined;
   }
 
   let totalCompletedDurationMs = 0;
+
   for (const durationMs of completedDurations) {
     totalCompletedDurationMs += durationMs;
   }
 
   const averageDurationMs = totalCompletedDurationMs / completedDurations.length;
   let etaMs = 0;
+
   for (const item of unfinishedItems) {
     if (item.status === "active" && item.startedAtMs !== undefined) {
       etaMs += Math.max(0, averageDurationMs - (nowMs - item.startedAtMs));
@@ -231,4 +240,5 @@ const estimatePlaylistDownloadQueueEtaMs = (queue: PlaylistDownloadQueueState, n
 
   return Math.round(etaMs);
 };
+
 import { DEFAULT_DOWNLOAD_ADMISSION_COST } from "@/shared/cobalt/downloadAdmissionWindow";

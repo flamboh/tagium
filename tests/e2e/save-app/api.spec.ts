@@ -17,6 +17,7 @@ test("the download api only answers requests from its own origin", async ({
     data: { url: video.url },
     headers: { Origin: "https://evil.example.test" },
   });
+
   expect(foreign.status()).toBe(403);
   expect(await foreign.text()).toBe("Download origin is not allowed.");
   expect(await upstreams.calls({ route: "cobalt.resolve" })).toHaveLength(0);
@@ -38,6 +39,7 @@ test("the download api rejects invalid requests before contacting cobalt", async
     const response = await request.post(DOWNLOAD, { data, headers });
     expect(response.status(), JSON.stringify(data)).toBe(400);
   }
+
   expect(await upstreams.calls({ route: "cobalt.resolve" })).toHaveLength(0);
 });
 
@@ -71,6 +73,7 @@ test("the download api forces proxied local processing and signs its tunnels", a
       ignoredOption: "must not reach cobalt",
     },
   });
+
   expect(response.status()).toBe(200);
   expect(response.headers()["x-tagium-request-id"]).toBe("api-request-1");
   expect(response.headers().authorization).toBeUndefined();
@@ -126,8 +129,10 @@ test("the download api forces proxied local processing and signs its tunnels", a
   const tampered = (change: (params: URLSearchParams) => void) => {
     const params = new URLSearchParams(tunnel.searchParams);
     change(params);
+
     return request.get(`${tunnel.pathname}?${params}`);
   };
+
   for (const change of [
     (params: URLSearchParams) => params.set("signature", "0".repeat(64)),
     (params: URLSearchParams) => params.set("machine", "e2e-machine-2"),
@@ -139,6 +144,7 @@ test("the download api forces proxied local processing and signs its tunnels", a
     expect(rejected.status()).toBe(400);
     expect(await rejected.text()).toBe("Invalid Cobalt tunnel URL.");
   }
+
   expect(await upstreams.calls({ route: "cobalt.tunnel.video" })).toHaveLength(1);
 });
 
@@ -150,12 +156,14 @@ test("the download api signs direct post media for a limited time", async ({
   const post = await upstreams.picker({
     items: [{ type: "photo", asset: "cover", directFilename: "photo.jpg" }],
   });
+
   const origin = new URL(baseURL!).origin;
 
   const response = await request.post(DOWNLOAD, {
     headers: { Origin: origin },
     data: { url: post.url },
   });
+
   const plan = await response.json();
   const resource = new URL(plan.picker[0].url, origin);
   expect(resource.pathname).toBe("/api/cobalt/tunnel");
@@ -183,6 +191,7 @@ test("the download api signs direct post media for a limited time", async ({
     const rejected = await request.get(`${resource.pathname}?${params}`);
     expect(rejected.status(), name).toBe(400);
   }
+
   expect(await upstreams.calls({ route: "media.direct" })).toHaveLength(1);
 });
 
@@ -192,11 +201,13 @@ test("the download api passes redirects through and refuses unsafe ones", async 
   upstreams,
 }) => {
   const video = await upstreams.youtube.video();
+
   const redirect = {
     status: "redirect",
     url: "https://cdn.example.test/video.mp4",
     filename: "video.mp4",
   };
+
   await upstreams.cobalt.respond(video.url, [
     { kind: "json", body: redirect },
     { kind: "json", body: { ...redirect, url: "javascript:alert(1)" } },

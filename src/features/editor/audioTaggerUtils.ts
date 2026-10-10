@@ -11,6 +11,7 @@ import type { UploadedTrack } from "@/features/audio/mp3Utils";
 import type { AudioMetadata, MetadataPatch, TagiumFile } from "@/features/library/types";
 
 type MetadataPatchField = keyof MetadataPatch;
+
 export type DirtyMetadataFields = FieldNamesMarkedBoolean<AudioMetadata>;
 
 const metadataPatchFields = EDITABLE_METADATA_FIELDS satisfies readonly MetadataPatchField[];
@@ -23,13 +24,17 @@ export const getTagiumFileImportKey = (file: TagiumFile) =>
 export const getTrackSourceMix = (files: TagiumFile[]): TrackSourceMix => {
   if (files.length === 0) return "unknown";
   const importedCount = files.filter((file) => Boolean(file.downloadRequest)).length;
+
   if (importedCount === 0) return "local";
+
   if (importedCount === files.length) return "imported";
+
   return "mixed";
 };
 
 export const getAcceptedUploadParseResult = (uploads: UploadedTrack[]) => {
   const acceptedUploads = uploads.filter((upload) => upload.file.status !== "error");
+
   return {
     acceptedUploads,
     parseRejectedCount: uploads.length - acceptedUploads.length,
@@ -42,6 +47,7 @@ export const getUploadRejectionMessage = (rejectedUploads: UploadedTrack[]) =>
       const recovery =
         getPublicAudioImportError(upload.file.downloadError) ??
         "try a valid mp3, flac, unencrypted m4a/mp4, or opus file.";
+
       return `${upload.file.filename} could not be imported. ${recovery}`;
     })
     .join("\n");
@@ -100,11 +106,13 @@ export const createSparseMetadataPatch = (
   syncFilenames: boolean,
 ): MetadataPatch | undefined => {
   const patchFields = new Set(fields);
+
   if (syncFilenames && patchFields.has("title")) {
     patchFields.add("filename");
   }
 
   const patch: MetadataPatch = {};
+
   for (const field of metadataPatchFields) {
     if (!patchFields.has(field)) continue;
 
@@ -140,6 +148,7 @@ export const createSparseMetadataPatch = (
         if (validateDiscNumber(metadata.discNumber) === true) {
           patch.discNumber = getNullableNumericPatchValue(metadata.discNumber);
         }
+
         break;
       case "composer":
         patch.composer = metadata.composer;
@@ -148,6 +157,7 @@ export const createSparseMetadataPatch = (
         if (validateBpm(metadata.bpm) === true) {
           patch.bpm = getNullableNumericPatchValue(metadata.bpm);
         }
+
         break;
       case "comment":
         patch.comment = metadata.comment;
@@ -165,6 +175,7 @@ export const createDirtyMetadataPatch = (
   extraFields: Iterable<MetadataPatchField> = [],
 ): MetadataPatch | undefined => {
   const fields = new Set<MetadataPatchField>(extraFields);
+
   for (const field of metadataPatchFields) {
     if (dirtyFields[field]) {
       fields.add(field);

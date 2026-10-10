@@ -34,7 +34,9 @@ const soundCloudTrackSchema = Schema.Struct({
   duration: Schema.optionalKey(Schema.Finite),
   artwork_url: Schema.optionalKey(Schema.NullOr(urlStringSchema)),
 });
+
 const decodeSoundCloudTrackOption = Schema.decodeUnknownOption(soundCloudTrackSchema);
+
 type IndexedSoundCloudTrack = {
   track: Schema.Schema.Type<typeof soundCloudTrackSchema>;
   trackIndex: number;
@@ -56,6 +58,7 @@ const soundCloudPlaylistSchema = Schema.Struct({
   ),
   tracks: Schema.Array(Schema.Unknown),
 });
+
 const soundCloudResolvedTrackSchema = Schema.Struct({
   id: Schema.Finite,
   kind: Schema.Literal("track"),
@@ -75,6 +78,7 @@ const getCoverUrl = (artworkUrl: string | null | undefined) => {
 
 const getYear = (displayDate: string | undefined) => {
   const year = Number.parseInt(displayDate?.slice(0, 4) ?? "", 10);
+
   return Number.isNaN(year) ? undefined : year;
 };
 
@@ -83,9 +87,12 @@ const upstreamFailureDetails = (
   contentType: string | undefined,
 ): SoundCloudLogDetails => {
   const details: SoundCloudLogDetails = { upstreamStatus: response.status };
+
   if (contentType) details.contentType = contentType;
   const retryAfter = response.headers.get("retry-after");
+
   if (retryAfter) details.retryAfter = retryAfter;
+
   return details;
 };
 
@@ -102,9 +109,11 @@ const resolveTrack = async (
   trackUrl.searchParams.set("client_id", clientId);
   const startedAt = Date.now();
   let parseFailure = false;
+
   try {
     const response = await fetch(trackUrl);
     const contentType = response.headers.get("content-type") ?? undefined;
+
     if (!response.ok) {
       await logSoundCloudFailure(
         "track.resolve_fetch",
@@ -114,15 +123,18 @@ const resolveTrack = async (
       );
       throw new SoundCloudTrackResolveError("track.resolve_fetch");
     }
+
     try {
       return Effect.runPromise(
         Schema.decodeUnknownEffect(soundCloudResolvedTrackSchema)(await response.json()),
       );
     } catch (error) {
       parseFailure = true;
+
       const details: SoundCloudLogDetails = {
         errorType: error instanceof Error ? error.name : "UnknownError",
       };
+
       if (contentType) details.contentType = contentType;
       await logSoundCloudFailure("track.resolve_parse", context, details, startedAt);
       throw new SoundCloudTrackResolveError("track.resolve_parse", { cause: error });
@@ -137,6 +149,7 @@ const resolveTrack = async (
       );
       throw new SoundCloudTrackResolveError("track.resolve_fetch", { cause: error });
     }
+
     throw error;
   }
 };
@@ -152,13 +165,16 @@ const resolveTracks = async (
     track: Schema.Schema.Type<typeof soundCloudResolvedTrackSchema>;
     trackIndex: number;
   }> = [];
+
   let failedTracks = decodeFailures;
+
   const failuresByStage: Record<string, number> = decodeFailures
     ? { "track.entry_parse": decodeFailures }
     : {};
 
   for (let index = 0; index < tracks.length; index += TRACK_RESOLVE_CONCURRENCY) {
     const chunk = tracks.slice(index, index + TRACK_RESOLVE_CONCURRENCY);
+
     const settledTracks = await Promise.allSettled(
       chunk.map(({ track, trackIndex }) =>
         resolveTrack(clientId, track, {
@@ -170,14 +186,17 @@ const resolveTracks = async (
 
     for (const [chunkIndex, settledTrack] of settledTracks.entries()) {
       const trackIndex = chunk[chunkIndex].trackIndex;
+
       if (settledTrack.status === "fulfilled") {
         resolvedTracks.push({ track: settledTrack.value, trackIndex });
       } else {
         failedTracks++;
+
         const stage =
           settledTrack.reason instanceof SoundCloudTrackResolveError
             ? settledTrack.reason.stage
             : "track.resolve_unknown";
+
         failuresByStage[stage] = (failuresByStage[stage] ?? 0) + 1;
       }
     }
@@ -205,6 +224,7 @@ const resolveTracks = async (
 
 export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundCloudLogContext) => {
   const parsedSource = parseMediaLink(sourceUrl);
+
   if (parsedSource.provider !== "soundcloud" || parsedSource.kind !== "playlist") {
     throw new Error("soundcloud.set_url_required");
   }
@@ -216,6 +236,7 @@ export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundClou
 
   const playlistStartedAt = Date.now();
   let playlistResponse: Response;
+
   try {
     playlistResponse = await fetch(resolveUrl);
   } catch (error) {
@@ -227,7 +248,9 @@ export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundClou
     );
     throw error;
   }
+
   const contentType = playlistResponse.headers.get("content-type") ?? undefined;
+
   if (!playlistResponse.ok) {
     await logSoundCloudFailure(
       "playlist.resolve_fetch",
@@ -235,12 +258,16 @@ export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundClou
       upstreamFailureDetails(playlistResponse, contentType),
       playlistStartedAt,
     );
+
     if (playlistResponse.status === 404) {
       throw new HTTPError({ status: 404, message: "soundcloud.playlist.not_found" });
     }
+
     throw new Error(`soundcloud.playlist.resolve_http_${playlistResponse.status}`);
   }
+
   let playlistBody: unknown;
+
   try {
     playlistBody = await playlistResponse.json();
   } catch (error) {
@@ -252,7 +279,9 @@ export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundClou
     );
     throw error;
   }
+
   let playlist: Schema.Schema.Type<typeof soundCloudPlaylistSchema>;
+
   try {
     playlist = await Effect.runPromise(
       Schema.decodeUnknownEffect(soundCloudPlaylistSchema)(playlistBody),
@@ -266,11 +295,14 @@ export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundClou
     );
     throw error;
   }
+
   const trackEntries: IndexedSoundCloudTrack[] = [];
   const decodeFailureLogs: Promise<void>[] = [];
   let decodeFailures = 0;
+
   for (const [index, entry] of playlist.tracks.entries()) {
     const track = decodeSoundCloudTrackOption(entry);
+
     if (Option.isSome(track)) {
       trackEntries.push({ track: track.value, trackIndex: index + 1 });
       continue;
@@ -284,7 +316,9 @@ export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundClou
       }),
     );
   }
+
   await Promise.all(decodeFailureLogs);
+
   const tracks = await resolveTracks(
     clientId,
     trackEntries,
@@ -292,11 +326,14 @@ export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundClou
     playlist.tracks.length,
     decodeFailures,
   );
+
   const isAlbum = [playlist.is_album, playlist.set_type === "album"].includes(true);
   let yearDate = playlist.display_date;
+
   if (isAlbum && playlist.release_date) {
     yearDate = playlist.release_date;
   }
+
   const artworkUrl =
     playlist.artwork_url ?? tracks.find(({ track }) => track.artwork_url)?.track.artwork_url;
 

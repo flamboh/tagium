@@ -7,6 +7,7 @@ interface AppLocation {
 
 export function resolveApp({ hostname, search }: AppLocation): TagiumAppId {
   const normalizedHostname = hostname.toLowerCase();
+
   const supportsPreviewOverride =
     normalizedHostname === "localhost" ||
     normalizedHostname === "127.0.0.1" ||
@@ -19,6 +20,7 @@ export function resolveApp({ hostname, search }: AppLocation): TagiumAppId {
   ) {
     return "tagium-save";
   }
+
   return "tagium";
 }
 

@@ -10,10 +10,15 @@ import * as Redacted from "effect/Redacted";
 import { Buffer } from "node:buffer";
 
 const productionStages = new Set(["prod", "production"]);
+
 const shareArtworkRetentionSeconds = 90 * 24 * 60 * 60;
+
 const flyRegistry = "registry.fly.io";
+
 const cobaltAppNamePattern = /^tagium-cobalt-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+
 const cobaltProxyPort = 9000;
+
 const sentryDsn =
   "https://4e610dc86e5ffd151308b361352a1342@o4511707616182272.ingest.us.sentry.io/4511707631124480";
 
@@ -37,6 +42,7 @@ const rateLimit = (name: string, namespaceId: string, limit: number) =>
 const cobaltAppName = (stage: string) =>
   Effect.gen(function* () {
     const name = `tagium-cobalt-${stage.toLowerCase()}`;
+
     if (!cobaltAppNamePattern.test(name) || name.length > 30) {
       return yield* Effect.die(
         new Error(
@@ -44,6 +50,7 @@ const cobaltAppName = (stage: string) =>
         ),
       );
     }
+
     return name;
   });
 
@@ -61,6 +68,7 @@ const requireDigest = (repoDigest: string | undefined) => {
   if (!repoDigest) {
     throw new Error("the cobalt image push did not report a registry digest");
   }
+
   return repoDigest;
 };
 
@@ -72,6 +80,7 @@ export default Alchemy.Stack(
   },
   Effect.gen(function* () {
     const stage = yield* Alchemy.Stage;
+
     if (productionStages.has(stage.toLowerCase())) {
       return yield* Effect.die(
         new Error(
@@ -103,6 +112,7 @@ export default Alchemy.Stack(
       yield* Alchemy.makeRandom("CobaltApiKey", { bytes: 16 }),
       (seed) => Redacted.make(toUuid(Redacted.value(seed))),
     );
+
     const cobaltUrl = Output.interpolate`${cobaltApp.url}/`;
 
     yield* Fly.Machine("CobaltMachine", {
@@ -149,6 +159,7 @@ export default Alchemy.Stack(
     const shareManifests = yield* Cloudflare.D1.Database("ShareManifests", {
       migrations: "migrations",
     });
+
     const shareArtwork = yield* Cloudflare.R2.Bucket("ShareArtwork", {
       forceDestroy: true,
       lifecycleRules: [
@@ -162,6 +173,7 @@ export default Alchemy.Stack(
         },
       ],
     });
+
     const cobaltMachineAffinitySecret = yield* Alchemy.makeRandom("CobaltMachineAffinitySecret");
 
     const app = yield* Cloudflare.Worker("App", {

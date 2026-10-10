@@ -3,19 +3,31 @@ import { Schema } from "effect";
 /** Cobalt request and response contracts used by Tagium Save. */
 
 export const cobaltAudioBitrates = ["320", "256", "128", "96", "64", "8"] as const;
+
 export const cobaltAudioFormats = ["best", "mp3", "ogg", "wav", "opus"] as const;
+
 export const cobaltDownloadModes = ["auto", "audio", "mute"] as const;
+
 export const cobaltFilenameStyles = ["classic", "pretty", "basic", "nerdy"] as const;
+
 export const cobaltVideoCodecs = ["h264", "av1", "vp9"] as const;
+
 export const cobaltVideoContainers = ["auto", "mp4", "webm", "mkv"] as const;
+
 export const cobaltVideoQualities = ["1080", "720", "480", "360", "240", "144"] as const;
 
 export type CobaltAudioBitrate = (typeof cobaltAudioBitrates)[number];
+
 export type CobaltAudioFormat = (typeof cobaltAudioFormats)[number];
+
 export type CobaltDownloadMode = (typeof cobaltDownloadModes)[number];
+
 export type CobaltFilenameStyle = (typeof cobaltFilenameStyles)[number];
+
 export type CobaltVideoCodec = (typeof cobaltVideoCodecs)[number];
+
 export type CobaltVideoContainer = (typeof cobaltVideoContainers)[number];
+
 export type CobaltVideoQuality = (typeof cobaltVideoQualities)[number];
 
 export interface CobaltVideoDownloadRequest {
@@ -66,7 +78,7 @@ export type CobaltVideoDownloadRequestBody = {
   youtubeBetterAudio?: boolean;
 };
 
-export const makeCobaltVideoDownloadRequestBody = (
+export const cobaltVideoDownloadRequestBody = (
   request: CobaltVideoDownloadRequest,
 ): CobaltVideoDownloadRequestBody => {
   const body: CobaltVideoDownloadRequestBody = {
@@ -82,17 +94,24 @@ export const makeCobaltVideoDownloadRequestBody = (
     body.youtubeVideoContainer = request.youtubeVideoContainer ?? "auto";
     body.videoQuality = request.videoQuality ?? "1080";
   }
+
   if (body.downloadMode !== "mute") {
     body.audioBitrate = request.audioBitrate ?? "128";
     body.audioFormat = request.audioFormat ?? "best";
   }
 
   if (request.youtubeDubLang !== undefined) body.youtubeDubLang = request.youtubeDubLang;
+
   if (request.subtitleLang !== undefined) body.subtitleLang = request.subtitleLang;
+
   if (request.disableMetadata !== undefined) body.disableMetadata = request.disableMetadata;
+
   if (request.allowH265 !== undefined) body.allowH265 = request.allowH265;
+
   if (request.convertGif !== undefined) body.convertGif = request.convertGif;
+
   if (request.tiktokFullAudio !== undefined) body.tiktokFullAudio = request.tiktokFullAudio;
+
   if (request.youtubeBetterAudio !== undefined) {
     body.youtubeBetterAudio = request.youtubeBetterAudio;
   }
@@ -174,14 +193,21 @@ export const cobaltDownloadResponseSchema = Schema.Union([
 ]);
 
 export type CobaltPickerItem = Schema.Schema.Type<typeof cobaltPickerItemSchema>;
+
 export type CobaltPickerPlan = Schema.Schema.Type<typeof cobaltPickerDownloadPlanSchema>;
+
 export type CobaltTunnelPlan = Schema.Schema.Type<typeof cobaltTunnelDownloadPlanSchema>;
+
 export type CobaltRedirectPlan = Schema.Schema.Type<typeof cobaltRedirectDownloadPlanSchema>;
+
 export type CobaltLocalProcessingPlan = Schema.Schema.Type<typeof cobaltLocalProcessingPlanSchema>;
+
 export type CobaltDownloadPlan = Schema.Schema.Type<typeof cobaltDownloadPlanSchema>;
+
 export type CobaltDownloadResponse = Schema.Schema.Type<typeof cobaltDownloadResponseSchema>;
 
 export const decodeCobaltDownloadPlanEffect = Schema.decodeUnknownEffect(cobaltDownloadPlanSchema);
+
 export const decodeCobaltDownloadResponseEffect = Schema.decodeUnknownEffect(
   cobaltDownloadResponseSchema,
 );

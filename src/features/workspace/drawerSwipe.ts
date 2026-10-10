@@ -9,9 +9,11 @@ export type SwipePoint = {
 };
 
 export const MOBILE_DRAWER_EDGE_FRACTION = 0.4;
+
 export const MOBILE_DRAWER_SETTLE_PX = 64;
 
 export type SwipeDirection = "open" | "close";
+
 export type SwipeDecision = SwipeDirection | "ignore" | "tracking";
 
 const isEligibleDrawerSwipePointer = (point: SwipePoint) =>
@@ -34,12 +36,14 @@ export const shouldStartDrawerSwipe = (
   target?: EventTarget | null,
 ) => {
   if (!isEligibleDrawerSwipePointer(point)) return false;
+
   if (
     point.clientX > viewportWidth * MOBILE_DRAWER_EDGE_FRACTION ||
     point.clientX < 0 ||
     point.clientY < 0
   )
     return false;
+
   if (
     "Element" in globalThis &&
     target instanceof Element &&
@@ -48,17 +52,21 @@ export const shouldStartDrawerSwipe = (
     ) ||
       (() => {
         let node: Element | null = target;
+
         while (node) {
           const style = window.getComputedStyle(node);
+
           if (isDrawerSwipeScrollOptOut(style.overflowX, node.scrollWidth, node.clientWidth))
             return true;
           node = node.parentElement;
         }
+
         return false;
       })())
   ) {
     return false;
   }
+
   return viewportWidth > 0;
 };
 
@@ -69,7 +77,9 @@ export const getDrawerSwipeDirection = (
   target?: EventTarget | null,
 ): SwipeDirection | null => {
   if (!isEligibleDrawerSwipePointer(point)) return null;
+
   if (drawerOpen) return "close";
+
   return shouldStartDrawerSwipe(point, viewportWidth, target) ? "open" : null;
 };
 
@@ -81,8 +91,12 @@ export const decideDrawerSwipe = (
   const rawDx = current.clientX - start.clientX;
   const dx = direction === "open" ? rawDx : -rawDx;
   const dy = Math.abs(current.clientY - start.clientY);
+
   if (dx < 0) return "ignore";
+
   if (dx < 12 && dy < 12) return "tracking";
+
   if (dx <= 0 || dx < dy * 1.5) return "ignore";
+
   return dx >= MOBILE_DRAWER_SETTLE_PX ? direction : "tracking";
 };

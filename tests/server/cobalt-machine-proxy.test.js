@@ -11,6 +11,7 @@ import {
 const listen = async (server) => {
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
+
   return server.address().port;
 };
 
@@ -18,6 +19,7 @@ const closeServer = async (server) => {
   if (!server.listening) {
     return;
   }
+
   await new Promise((resolve, reject) => {
     server.close((error) => (error ? reject(error) : resolve()));
   });
@@ -33,10 +35,13 @@ const createControlledUpstream = () => {
     requestCount += 1;
     const entry = { request, response, path: request.url };
     const waiter = waiters.shift();
+
     if (waiter) {
       waiter(entry);
+
       return;
     }
+
     requests.push(entry);
   });
 
@@ -44,9 +49,11 @@ const createControlledUpstream = () => {
     server,
     waitForRequest: () => {
       const request = requests.shift();
+
       if (request) {
         return Promise.resolve(request);
       }
+
       return new Promise((resolve) => waiters.push(resolve));
     },
     get requestCount() {
@@ -63,7 +70,9 @@ const createProxy = async (upstreamPort, proxyConfig, lifecycle) => {
     proxyConfig,
     lifecycle,
   });
+
   const port = await listen(server);
+
   return { server, origin: `http://127.0.0.1:${port}` };
 };
 
@@ -108,6 +117,7 @@ describe("cobalt machine proxy", () => {
     vi.useFakeTimers();
     const lifecycle = { draining: false };
     const cobalt = { kill: vi.fn() };
+
     const server = {
       listening: true,
       beginDraining: vi.fn(),
@@ -123,6 +133,7 @@ describe("cobalt machine proxy", () => {
         lifecycle,
         drainTimeoutMs: 50,
       });
+
       await vi.advanceTimersByTimeAsync(50);
       await shutdown;
 
@@ -137,6 +148,7 @@ describe("cobalt machine proxy", () => {
     const upstream = createControlledUpstream();
     const upstreamPort = await listen(upstream.server);
     const lifecycle = { draining: false };
+
     const proxy = await createProxy(
       upstreamPort,
       {
@@ -174,6 +186,7 @@ describe("cobalt machine proxy", () => {
     const upstream = createControlledUpstream();
     const upstreamPort = await listen(upstream.server);
     const lifecycle = { draining: false };
+
     const proxy = await createProxy(
       upstreamPort,
       {
@@ -185,11 +198,13 @@ describe("cobalt machine proxy", () => {
       },
       lifecycle,
     );
+
     const cobalt = { kill: vi.fn() };
     const activeFetch = fetch(`${proxy.origin}/`, { method: "POST", body: "active" });
 
     try {
       const activeUpstream = await upstream.waitForRequest();
+
       const shutdown = drainCobaltProxyServer({
         server: proxy.server,
         cobalt,
@@ -216,6 +231,7 @@ describe("cobalt machine proxy", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const upstream = createControlledUpstream();
     const upstreamPort = await listen(upstream.server);
+
     const proxy = await createProxy(upstreamPort, {
       maxConcurrentResolve: 1,
       maxConcurrentTunnel: 1,
@@ -223,7 +239,9 @@ describe("cobalt machine proxy", () => {
       maxQueuedTunnel: 0,
       maxQueueWaitMs: 1_000,
     });
+
     const firstAbort = new AbortController();
+
     const firstFetch = fetch(`${proxy.origin}/`, {
       method: "POST",
       body: "first",
@@ -232,6 +250,7 @@ describe("cobalt machine proxy", () => {
 
     try {
       await upstream.waitForRequest();
+
       const response = await fetch(`${proxy.origin}/`, {
         method: "POST",
         body: "second",
@@ -255,6 +274,7 @@ describe("cobalt machine proxy", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const upstream = createControlledUpstream();
     const upstreamPort = await listen(upstream.server);
+
     const proxy = await createProxy(upstreamPort, {
       maxConcurrentResolve: 1,
       maxConcurrentTunnel: 1,
@@ -262,7 +282,9 @@ describe("cobalt machine proxy", () => {
       maxQueuedTunnel: 0,
       maxQueueWaitMs: 1_000,
     });
+
     const sourceUrl = "https://soundcloud.com/artist/private-track";
+
     const responsePromise = fetch(`${proxy.origin}/`, {
       method: "POST",
       headers: {
@@ -292,6 +314,7 @@ describe("cobalt machine proxy", () => {
       const event = log.mock.calls
         .map(([entry]) => JSON.parse(entry))
         .find((entry) => entry.requestId === "request-1");
+
       expect(event).toMatchObject({
         event: "cobalt_proxy_request",
         requestId: "request-1",
@@ -315,6 +338,7 @@ describe("cobalt machine proxy", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const upstream = createControlledUpstream();
     const upstreamPort = await listen(upstream.server);
+
     const proxy = await createProxy(upstreamPort, {
       maxConcurrentResolve: 1,
       maxConcurrentTunnel: 1,
@@ -322,7 +346,9 @@ describe("cobalt machine proxy", () => {
       maxQueuedTunnel: 1,
       maxQueueWaitMs: 20,
     });
+
     const firstAbort = new AbortController();
+
     const firstFetch = fetch(`${proxy.origin}/`, {
       method: "POST",
       body: "first",
@@ -331,6 +357,7 @@ describe("cobalt machine proxy", () => {
 
     try {
       await upstream.waitForRequest();
+
       const response = await fetch(`${proxy.origin}/`, {
         method: "POST",
         body: "queued",
@@ -353,6 +380,7 @@ describe("cobalt machine proxy", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const upstream = createControlledUpstream();
     const upstreamPort = await listen(upstream.server);
+
     const proxy = await createProxy(upstreamPort, {
       maxConcurrentResolve: 1,
       maxConcurrentTunnel: 1,
@@ -360,6 +388,7 @@ describe("cobalt machine proxy", () => {
       maxQueuedTunnel: 1,
       maxQueueWaitMs: 1_000,
     });
+
     const firstFetch = fetch(`${proxy.origin}/`, {
       method: "POST",
       body: "first",
@@ -367,9 +396,11 @@ describe("cobalt machine proxy", () => {
 
     try {
       const firstUpstream = await upstream.waitForRequest();
+
       const queuedRequest = http.request(`${proxy.origin}/`, {
         method: "POST",
       });
+
       queuedRequest.on("error", () => undefined);
       queuedRequest.end("queued");
       await new Promise((resolve) => setTimeout(resolve, 20));
@@ -386,6 +417,7 @@ describe("cobalt machine proxy", () => {
         body: "third",
         signal: AbortSignal.timeout(500),
       });
+
       complete(await upstream.waitForRequest(), "third-ok");
       await expect(thirdFetch.then((response) => response.text())).resolves.toBe("third-ok");
     } finally {
@@ -398,6 +430,7 @@ describe("cobalt machine proxy", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const upstream = createControlledUpstream();
     const upstreamPort = await listen(upstream.server);
+
     const proxy = await createProxy(upstreamPort, {
       maxConcurrentResolve: 1,
       maxConcurrentTunnel: 1,
@@ -414,8 +447,10 @@ describe("cobalt machine proxy", () => {
             resolve();
           });
         });
+
         request.once("error", reject);
       });
+
       const upstreamTunnel = await upstream.waitForRequest();
       const upstreamClosed = once(upstreamTunnel.response, "close");
       upstreamTunnel.response.writeHead(200, { "content-type": "audio/mpeg" });
@@ -427,6 +462,7 @@ describe("cobalt machine proxy", () => {
       const nextFetch = fetch(`${proxy.origin}/tunnel?id=next`, {
         signal: AbortSignal.timeout(500),
       });
+
       complete(await upstream.waitForRequest(), "next-ok");
       await expect(nextFetch.then((response) => response.text())).resolves.toBe("next-ok");
     } finally {

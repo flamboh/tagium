@@ -42,6 +42,7 @@ test("imports a youtube playlist as an ordered album, three downloads at a time"
   upstreams,
 }) => {
   await useSettings(context, { audioFormat: "best" });
+
   const playlist = await upstreams.youtube.playlist({
     title: "Status Update Music",
     author: "lucida",
@@ -53,6 +54,7 @@ test("imports a youtube playlist as an ordered album, three downloads at a time"
       { title: "Fourth Video", author: "Fourth Artist" },
     ],
   });
+
   const plans = await holdDownloadPlans(page);
 
   await page.goto("/");
@@ -76,6 +78,7 @@ test("imports a youtube playlist as an ordered album, three downloads at a time"
   await expect(numberField(page, "year")).toHaveValue("");
   await expect(numberField(page, "track")).toHaveValue("1");
   await expect(audioPreview(page)).toContainText("0:00 / 4:14");
+
   for (const [index, video] of playlist.videos.entries()) {
     await trackButtons(page).nth(index).click();
     await expect(field(page, "artist")).toHaveValue(video.author.replace(/ - Topic$/u, ""));
@@ -94,12 +97,14 @@ test("imports a youtube playlist as an ordered album, three downloads at a time"
   expect(plans.years()).toEqual([undefined, undefined, undefined, undefined]);
 
   await page.getByRole("button", { name: "download all" }).click();
+
   const archive = await captureDownload(page, () =>
     page
       .getByRole("dialog", { name: "download 4 tracks" })
       .getByRole("button", { name: /^download ~/u })
       .click(),
   );
+
   const entries = unzipDownload(archive);
   const cover = entries.find((file) => file.filename === "albums/Status Update Music/cover.jpg");
   expect(imageSize(cover!.bytes)).toEqual({
@@ -107,10 +112,12 @@ test("imports a youtube playlist as an ordered album, three downloads at a time"
     height: imageFixtures.thumbnail.height,
   });
   expect(await upstreams.calls({ route: "ytimg.thumbnail" })).not.toHaveLength(0);
+
   for (const [index, video] of playlist.videos.entries()) {
     const entry = entries.find(
       (file) => file.filename === `albums/Status Update Music/${video.title}.m4a`,
     );
+
     const { metadata } = await inspectAudio(entry!);
     expect(metadata).toMatchObject({
       title: video.title,
@@ -126,6 +133,7 @@ test("imports a youtube playlist as an ordered album, three downloads at a time"
         : { width: imageFixtures.thumbnail.width, height: imageFixtures.thumbnail.height },
     );
   }
+
   expect(await upstreams.calls({ route: "youtube.browse" })).toHaveLength(1);
 });
 
@@ -191,6 +199,7 @@ test("canceling a playlist keeps its tracks and retry downloads all of them", as
   await expect(queueStatus(page, "downloaded 4/4")).toBeVisible(SETTLE_TIMEOUT);
   await expect(page.getByRole("button", { name: "download all" })).toBeEnabled();
   expect(plans.requested().slice(3).sort()).toEqual(set.tracks.map((track) => track.url).sort());
+
   for (const track of set.tracks) {
     expect(await cobaltRequestCount(upstreams, track.url)).toBe(1);
   }
@@ -202,6 +211,7 @@ test("a failed playlist track keeps the successes and retry downloads only the f
   upstreams,
 }) => {
   await useSettings(context, { audioFormat: "best" });
+
   const set = await upstreams.soundcloud.set({
     title: "Partial Set",
     author: "Queue Artist",
@@ -241,6 +251,7 @@ test("a failed playlist track keeps the successes and retry downloads only the f
   await expect(queueStatus(page, "failed 1/4")).toBeHidden();
   const [one, two, three, four] = set.tracks;
   expect(await cobaltRequestCount(upstreams, two!.url)).toBe(2);
+
   for (const track of [one!, three!, four!]) {
     expect(await cobaltRequestCount(upstreams, track.url)).toBe(1);
   }
@@ -264,6 +275,7 @@ test("playlist retry skips private, drm and unsupported failures", async ({ page
       detail: "this link is not supported.",
     },
   ];
+
   const set = await upstreams.soundcloud.set({
     title: "Mixed Failures",
     artwork: null,
@@ -281,6 +293,7 @@ test("playlist retry skips private, drm and unsupported failures", async ({ page
       })),
     ],
   });
+
   await page.goto("/");
   await importUrl(page, set.url);
   await expect(queueStatus(page, "failed 4/5")).toBeVisible(SETTLE_TIMEOUT);
@@ -293,6 +306,7 @@ test("playlist retry skips private, drm and unsupported failures", async ({ page
   await expect(page.getByRole("button", { name: /track has an error$/u })).toHaveCount(3);
   expect(await cobaltRequestCount(upstreams, set.tracks[1]!.url)).toBe(2);
   expect(await cobaltRequestCount(upstreams, set.tracks[0]!.url)).toBe(1);
+
   for (const [index, failure] of failures.entries()) {
     expect(await cobaltRequestCount(upstreams, set.tracks[index + 2]!.url)).toBe(1);
     await page
@@ -300,6 +314,7 @@ test("playlist retry skips private, drm and unsupported failures", async ({ page
       .click();
     await expect(page.getByText(failure.detail, { exact: true })).toBeVisible();
   }
+
   await expect(page.getByRole("button", { name: "download all" })).toBeDisabled();
 });
 
@@ -319,6 +334,7 @@ test("a legacy youtube playlist uses its common video artist and each upload yea
       singleAlbum: false,
     },
   });
+
   const playlist = await upstreams.youtube.playlist({
     title: "Common Artist",
     author: "Playlist Curator",
@@ -328,12 +344,14 @@ test("a legacy youtube playlist uses its common video artist and each upload yea
       { title: "Later", author: "Performer", year: 2020, cover: null },
     ],
   });
+
   await page.goto("/");
   await importUrl(page, playlist.url);
   await expect(
     page.getByRole("button", { name: "Common Artist Performer · 2 tracks" }),
   ).toBeVisible();
   await expect(queueStatus(page, "downloaded 2/2")).toBeVisible(SETTLE_TIMEOUT);
+
   for (const [index, video] of playlist.videos.entries()) {
     await page.getByRole("button", { name: `${index + 1} ${video.title}.m4a` }).click();
     await expect(field(page, "artist")).toHaveValue("Performer");
@@ -363,6 +381,7 @@ test("mixed youtube artists leave album artist empty when linking is off and pre
       singleAlbum: false,
     },
   });
+
   const playlist = await upstreams.youtube.playlist({
     title: "Undated Playlist",
     author: "Curator",
@@ -371,9 +390,11 @@ test("mixed youtube artists leave album artist empty when linking is off and pre
       { title: "Dated", author: "Second - Topic", year: 2022, cover: null },
     ],
   });
+
   await page.goto("/");
   await importUrl(page, playlist.url);
   await expect(queueStatus(page, "downloaded 2/2")).toBeVisible(SETTLE_TIMEOUT);
+
   for (const [index, video] of playlist.videos.entries()) {
     await page.getByRole("button", { name: `${index + 1} ${video.title}.m4a` }).click();
     const file = await captureDownload(page, () => downloadTrackButton(page).click());
@@ -391,6 +412,7 @@ test("youtube playlist year lookups wait for downloads and fall back when a look
   upstreams,
 }) => {
   await useSettings(context, { audioFormat: "best" });
+
   const playlist = await upstreams.youtube.playlist({
     title: "Lazy Years",
     videos: [
@@ -404,6 +426,7 @@ test("youtube playlist year lookups wait for downloads and fall back when a look
       },
     ],
   });
+
   const plans = await holdDownloadPlans(page);
   await page.goto("/");
   await importUrl(page, playlist.url);
@@ -415,12 +438,15 @@ test("youtube playlist year lookups wait for downloads and fall back when a look
   expect(await upstreams.calls({ route: "cobalt.resolve" })).toHaveLength(0);
   await plans.releaseAll();
   await expect(queueStatus(page, "downloaded 2/2")).toBeVisible(SETTLE_TIMEOUT);
+
   const failedLookups = await upstreams.calls({
     route: "youtube.next",
     key: playlist.videos[1]!.key,
   });
+
   expect(failedLookups).toHaveLength(1);
   expect(failedLookups[0]!.status).toBe(403);
+
   for (const [index, video] of playlist.videos.entries()) {
     await page.getByRole("button", { name: `${index + 1} ${video.title}.m4a` }).click();
     const file = await captureDownload(page, () => downloadTrackButton(page).click());
