@@ -25,14 +25,14 @@ bunx wrangler@4.110.0 dev --config .output/server/wrangler.json --local \
 
 ## Deployments and one-time setup
 
-The committed `scripts/share-deployment-bindings.ts` target map is the binding source of truth. Preview and production use separate, stable D1 databases, R2 buckets, and rate-limit namespaces; no `SHARE_PREVIEW_*` build variables or Prisma are used. Native Workers Builds should use exactly:
+The committed `scripts/share-deployment-bindings.ts` target map is the binding source of truth. Preview and production use separate, stable D1 databases, R2 buckets, and rate-limit namespaces; no `SHARE_PREVIEW_*` build variables or Prisma are used. Production deploys only from the **Test and deploy production** GitHub workflow, after e2e passes on `main`. Native Workers Builds only uploads branch previews and should use exactly:
 
 ```sh
 bun install --frozen-lockfile
 bun run build:cloudflare
 ```
 
-`build:cloudflare` maps `WORKERS_CI_BRANCH=main` (or `master`) to production and every other branch to preview; it maps `WORKERS_CI_COMMIT_SHA` to `VITE_PUBLIC_RELEASE_SHA`, enables share links, and passes through `VITE_PUBLIC_POSTHOG_HOST` and `VITE_PUBLIC_POSTHOG_KEY`. Workers Builds supplies Bun **1.3.10**. For a manual non-production upload (including a safe config-only check), use `bun run deploy:preview` (add `--no-upload`); production uses `bun run deploy:production` (add `--no-upload`). These commands only materialize and validate generated config, then upload/deploy; they never mutate D1 or R2.
+`build:cloudflare` maps `WORKERS_CI_BRANCH` (or `GITHUB_REF_NAME` in GitHub Actions) `main` or `master` to production and every other branch to preview; it maps `WORKERS_CI_COMMIT_SHA` (or `GITHUB_SHA`) to `VITE_PUBLIC_RELEASE_SHA`, enables share links, and passes through `VITE_PUBLIC_POSTHOG_HOST` and `VITE_PUBLIC_POSTHOG_KEY`. Workers Builds supplies Bun **1.3.10**. For a manual non-production upload (including a safe config-only check), use `bun run deploy:preview` (add `--no-upload`); production uses `bun run deploy:production` (add `--no-upload`). These commands only materialize and validate generated config, then upload/deploy; they never mutate D1 or R2.
 
 Run these reviewed, fail-closed commands once per environment, and again only when intentionally changing infrastructure:
 
@@ -45,7 +45,7 @@ TAGIUM_DEPLOY_ENV=production bun run configure:share-artwork-lifecycle:productio
 
 There is one Worker service named `tagium`. Preview uses `wrangler versions upload` and production uses `wrangler deploy` against that same service; no named Wrangler environments are used, so production routes remain attached to `tagium`.
 
-Cloudflare Build variables still required: `WORKERS_CI_BRANCH`, `WORKERS_CI_COMMIT_SHA`, `VITE_PUBLIC_POSTHOG_HOST=https://t.tagium.app`, and `VITE_PUBLIC_POSTHOG_KEY`. Deploy credentials (`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`) are supplied by the operator or Workers Build environment.
+Cloudflare Build variables still required for previews: `WORKERS_CI_BRANCH`, `WORKERS_CI_COMMIT_SHA`, `VITE_PUBLIC_POSTHOG_HOST=https://t.tagium.app`, and `VITE_PUBLIC_POSTHOG_KEY`. The production deploy reads the `production` GitHub environment: secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `POSTHOG_PROJECT_KEY`, and variable `POSTHOG_HOST=https://t.tagium.app`.
 
 ## Disable or takedown
 

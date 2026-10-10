@@ -58,6 +58,13 @@ PostHog drops events from browsers that look automated, so the sandbox hides
 `navigator.webdriver` and headless `navigator.userAgentData`. A test that needs analytics down can
 `page.route("https://posthog.e2e.test/**", (route) => route.abort())`.
 
+## In CI
+
+Pull requests run the chromium suite only when labeled `e2e`. Every push to `main` runs chromium
+and firefox before the production deploy, with webkit alongside as a non-blocking job. Each browser
+runs as its own job via `E2E_BROWSERS=all` and `--project <browser>`. CI retries flaky tests twice
+and uploads `test-results/` when a job fails.
+
 ## Iterating
 
 - `bun run test:e2e:serve` keeps the harness running, and Playwright reuses it outside CI.
