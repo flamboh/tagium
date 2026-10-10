@@ -56,7 +56,6 @@ describe("download failure report", () => {
   });
 
   it.each([
-    "error.api.content.too_long",
     "error.api.content.video.age",
     "error.api.content.video.live",
     "error.api.content.video.private",
@@ -73,6 +72,20 @@ describe("download failure report", () => {
     );
 
     expect(events).toEqual([]);
+  });
+
+  it("reports content over the duration limit as a warning", async () => {
+    const events = await captureSentryEvents(() =>
+      reportDownloadFailure({
+        route: "audio",
+        stage: "cobalt.resolve_error",
+        requestId: "request-test",
+        errorCode: "error.api.content.too_long",
+        sourceUrl: "https://youtu.be/dQw4w9WgXcQ",
+      }),
+    );
+
+    expect(events[0]?.level).toBe("warning");
   });
 
   it("skips missing SoundCloud content", async () => {
