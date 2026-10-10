@@ -12,7 +12,7 @@ export interface SharePublication {
   status: "active" | "stopped";
 }
 
-/** Seconds into the source audio kept on export. */
+/** Fractions (0–1) of the source audio kept on export. */
 export interface TrackClip {
   start: number;
   end: number;
