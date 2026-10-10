@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { test } from "../support/test";
 import { audioPreview, expect, importUrl, waitForTrackReady } from "./helpers";
 
-type Frame = { status: string; heights: number[] };
+type Frame = { status: string; heights: number[]; layersMatch: boolean };
 
 const holdTunnel = async (page: Page) => {
   let release = () => {};
@@ -23,7 +23,7 @@ const holdTunnel = async (page: Page) => {
 declare global {
   interface Window {
     e2eReleaseDecoding?: () => void;
-    e2eWaveformFrames?: { status: string; d: string }[];
+    e2eWaveformFrames?: { status: string; d: string; layersMatch: boolean }[];
   }
 }
 
@@ -46,25 +46,32 @@ const releaseDecoding = (page: Page) => page.evaluate(() => window.e2eReleaseDec
 
 const recordFrames = (page: Page) =>
   page.addInitScript(() => {
-    const frames: { status: string; d: string }[] = [];
+    const frames: { status: string; d: string; layersMatch: boolean }[] = [];
     window.e2eWaveformFrames = frames;
     new MutationObserver(() => {
       const section = document.querySelector<HTMLElement>("[data-track-waveform]");
 
-      const d = section
-        ?.querySelector('[aria-label="playback position"] svg path')
-        ?.getAttribute("d");
+      const layers = [
+        ...(section?.querySelectorAll('[aria-label="playback position"] svg') ?? []),
+      ].map((svg) => [...svg.querySelectorAll("path")].map((path) => path.getAttribute("d")));
+
+      const d = layers[0]?.[0];
 
       if (section && d && d !== frames.at(-1)?.d) {
-        frames.push({ status: section.dataset.waveformStatus!, d });
+        frames.push({
+          status: section.dataset.waveformStatus!,
+          d,
+          layersMatch: layers.every((paths) => paths.join() === layers[0]!.join()),
+        });
       }
     }).observe(document, { subtree: true, attributes: true, attributeFilter: ["d"] });
   });
 
 const takeFrames = (page: Page): Promise<Frame[]> =>
   page.evaluate(() =>
-    window.e2eWaveformFrames!.splice(0).map(({ status, d }) => ({
+    window.e2eWaveformFrames!.splice(0).map(({ status, d, layersMatch }) => ({
       status,
+      layersMatch,
       heights: [...d.matchAll(/v([\d.]+)/gu)].map((match) => Number(match[1])),
     })),
   );
@@ -109,11 +116,15 @@ const sameHeights = (a: number[], b: number[]) =>
 const meanHeight = (frame: Frame) =>
   frame.heights.reduce((total, height) => total + height, 0) / frame.heights.length;
 
-const expectGroove = (frames: Frame[]) => {
+const expectSteady = (frames: Frame[]) => {
+  expect(frames.length).toBeGreaterThan(20);
   const means = frames.map(meanHeight);
+  const average = means.reduce((total, mean) => total + mean, 0) / means.length;
   const heights = frames.flatMap((frame) => frame.heights);
-  expect(Math.max(...means) - Math.min(...means)).toBeGreaterThan(4);
-  expect(Math.max(...heights)).toBeLessThanOrEqual(0.9 * 21.5 + 0.01);
+  expect(average).toBeGreaterThan(8);
+  expect(Math.min(...means)).toBeGreaterThan(average * 0.85);
+  expect(Math.max(...means)).toBeLessThan(average * 1.15);
+  expect(Math.max(...heights)).toBeLessThanOrEqual(18.01);
   expect(Math.min(...heights)).toBeGreaterThanOrEqual(1);
 };
 
@@ -125,6 +136,7 @@ const expectTween = (frames: Frame[]) => {
   expect(start.status).toBe("loading");
   expect(sameHeights(start.heights, end.heights)).toBe(false);
   const tween = frames.slice(handoff);
+  expect(frames.every((frame) => frame.layersMatch)).toBe(true);
 
   for (const frame of tween) {
     expect(frame.heights).toHaveLength(end.heights.length);
@@ -138,7 +150,7 @@ const expectTween = (frames: Frame[]) => {
   expect(tween.some((frame) => !sameHeights(frame.heights, end.heights))).toBe(true);
 };
 
-test("the waveform bounces to a beat while a track downloads and decodes, then tweens into its peaks", async ({
+test("the waveform drifts steadily while a track downloads and decodes, then tweens into its peaks", async ({
   page,
   upstreams,
 }) => {
@@ -153,9 +165,10 @@ test("the waveform bounces to a beat while a track downloads and decodes, then t
   await importUrl(page, first.url);
   await expect(preview).toHaveAttribute("data-waveform-status", "waiting");
   await expect(preview).toHaveAttribute("data-waveform-loading", "true");
+  await page.waitForTimeout(500);
   await takeFrames(page);
-  expect(await distinctPaths(page, 10)).toBeGreaterThan(3);
-  expectGroove(await takeFrames(page));
+  expect(await distinctPaths(page, 20)).toBeGreaterThan(3);
+  expectSteady(await takeFrames(page));
 
   releaseTunnel();
   await expect(preview).toHaveAttribute("data-waveform-status", "loading");

@@ -8,7 +8,9 @@ const BAR_WIDTH = 2;
 
 const BAR_GAP = 1;
 
-const TWEEN_MS = 300;
+const BAR_HALF = (WAVEFORM_HEIGHT - 1) / 2;
+
+const TWEEN_MS = 350;
 
 // Stands in for the real peaks while the track downloads or decodes.
 const PLACEHOLDER_PEAKS = Array.from({ length: 256 }, (_, index) => {
@@ -26,117 +28,82 @@ export const barsViewBox = (count: number) =>
 
 // Bars mirror around a 1px divider through the vertical center; the lower half is fainter.
 const barPaths = (bars: number[]) => {
-  const half = (WAVEFORM_HEIGHT - 1) / 2;
   let upper = "";
   let lower = "";
 
   for (const [index, bar] of bars.entries()) {
     const x = index * (BAR_WIDTH + BAR_GAP);
-    const height = Math.max(1, bar * half);
-    upper += `M${x} ${half - height}h${BAR_WIDTH}v${height}h${-BAR_WIDTH}Z`;
-    lower += `M${x} ${half + 1}h${BAR_WIDTH}v${height}h${-BAR_WIDTH}Z`;
+    const height = Math.max(1, bar * BAR_HALF);
+    upper += `M${x} ${BAR_HALF - height}h${BAR_WIDTH}v${height}h${-BAR_WIDTH}Z`;
+    lower += `M${x} ${BAR_HALF + 1}h${BAR_WIDTH}v${height}h${-BAR_WIDTH}Z`;
   }
 
   return { upper, lower };
 };
 
-const GROOVE_STEP = 60 / 116 / 4;
+const LOADING_SEED = 11;
 
-const GROOVE_ATTACK = 0.05;
+const LOADING_FLOOR = 2;
 
-const GROOVE_FLOOR = 0.08;
+const LOADING_RANGE = 16;
 
-const GROOVE_CEILING = 0.9;
+const hash = (seed: number, value: number) => {
+  let mixed = Math.imul(seed ^ Math.imul(value, 0x9e3779b1), 0x6d2b79f5);
+  mixed = Math.imul(mixed ^ (mixed >>> 15), mixed | 1);
+  mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61);
 
-const GROOVE_LOOKBACK = 12;
-
-const GROOVE = "k-hgs-h-k-hgs-hgk-hgs-h-k-k-sfff";
-
-const DECAY = new Map([
-  ["k", 0.24],
-  ["s", 0.18],
-  ["h", 0.13],
-  ["g", 0.08],
-  ["f", 0.14],
-]);
-
-const random = (seed: number) => {
-  let value = Math.imul(seed, 0x6d2b79f5);
-  value = Math.imul(value ^ (value >>> 15), value | 1);
-  value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-
-  return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
 };
 
-const clumps = (seed: number, points: number, x: number) => {
-  const position = x * (points - 1);
-  const left = Math.floor(position);
-  const t = position - left;
+const approach = (elapsed: number, timeConstant: number) => 1 - Math.exp(-elapsed / timeConstant);
 
-  return (
-    random(seed + left) + (random(seed + left + 1) - random(seed + left)) * t * t * (3 - 2 * t)
-  );
+const smoothstep = (progress: number) => progress * progress * (3 - 2 * progress);
+
+const envelope = (x: number) => 0.15 + 0.85 * Math.min(1, 14 * x, 14 * (1 - x));
+
+const loudness = (key: number) => 0.8 + 0.2 * hash(LOADING_SEED + 3, key);
+
+const loudnessHold = (key: number) => 900 + 600 * hash(LOADING_SEED + 4, key);
+
+const flicker = (index: number, clock: number) => {
+  const period = 160 + 60 * hash(LOADING_SEED, index);
+  const offset = 60 * hash(LOADING_SEED + 1, index);
+  const key = Math.floor((clock + offset) / period);
+
+  return 0.35 + 0.65 * hash(LOADING_SEED + 2, index * 7919 + key);
 };
 
-const band = (x: number, center: number, width: number) =>
-  Math.exp(-0.5 * ((x - center) / width) ** 2);
+const loadingFloor = (count: number) =>
+  Array.from({ length: count }, () => LOADING_FLOOR / BAR_HALF);
 
-const hitHeight = (hit: string, step: number, x: number, grain: number) => {
-  const seed = step * 4096;
-  const texture = clumps(seed + 2048, grain, x);
+function createLoadingWave() {
+  let clock = 0;
+  let key = 0;
+  let level = loudness(0);
+  let levelEnds = loudnessHold(0);
 
-  if (hit === "k") return 0.25 + 0.55 * clumps(seed, 7, x) + 0.15 * texture;
+  return (heights: number[], elapsed: number) => {
+    clock += elapsed;
 
-  if (hit === "h") return 0.14 + 0.32 * texture;
-
-  if (hit === "g") return 0.1 + 0.16 * texture;
-
-  if (hit === "s") {
-    const center = 0.15 + 0.7 * random(seed + 4095);
-
-    return 0.2 + 0.15 * texture + 0.55 * band(x, center, 0.06);
-  }
-
-  const roll = (step % GROOVE.length) - (GROOVE.length - 4);
-  const forward = random(Math.floor(step / GROOVE.length) * 4096 + 4094) < 0.5;
-  const center = forward ? 0.05 + 0.25 * roll : 0.95 - 0.25 * roll;
-
-  return 0.2 + 0.1 * texture + (0.5 + 0.1 * roll) * band(x, center, 0.07);
-};
-
-const envelope = (age: number, decay: number) =>
-  age < GROOVE_ATTACK
-    ? 1 - (1 - age / GROOVE_ATTACK) ** 2
-    : Math.exp(-(age - GROOVE_ATTACK) / decay);
-
-const loadingGroove = (count: number, seconds: number) => {
-  const grain = Math.max(8, Math.round(count / 5));
-
-  const floors = Array.from(
-    { length: count },
-    (_, index) => GROOVE_FLOOR + 0.06 * clumps(-4096, grain, (index + 0.5) / count),
-  );
-
-  const bars = [...floors];
-  const current = Math.floor(seconds / GROOVE_STEP);
-
-  for (let step = Math.max(0, current - GROOVE_LOOKBACK); step <= current; step += 1) {
-    const hit = GROOVE[step % GROOVE.length]!;
-    const decay = DECAY.get(hit);
-
-    if (!decay) continue;
-    const level = envelope(seconds - step * GROOVE_STEP, decay);
-
-    if (level < 0.01) continue;
-
-    for (let index = 0; index < count; index += 1) {
-      const height = hitHeight(hit, step, (index + 0.5) / count, grain);
-      bars[index] = Math.max(bars[index]!, floors[index]! + (height - floors[index]!) * level);
+    while (clock >= levelEnds) {
+      key += 1;
+      levelEnds += loudnessHold(key);
     }
-  }
 
-  return bars.map((bar) => Math.min(GROOVE_CEILING, bar));
-};
+    level += (loudness(key) - level) * approach(elapsed, 540);
+    const ease = approach(elapsed, 70);
+    const last = Math.max(1, heights.length - 1);
+
+    return heights.map((height, index) => {
+      const x = heights.length > 1 ? index / last : 0.5;
+
+      const target =
+        (LOADING_FLOOR + LOADING_RANGE * envelope(x) * level * flicker(index, clock)) / BAR_HALF;
+
+      return height + (target - height) * ease;
+    });
+  };
+}
 
 const resampleLinear = (values: number[], count: number) => {
   if (values.length === 0 || count <= 0) return [];
@@ -152,9 +119,14 @@ const resampleLinear = (values: number[], count: number) => {
   });
 };
 
-type Goal = { kind: "wave" } | { kind: "hold" } | { kind: "peaks"; peaks: number[] };
+type Goal =
+  | { kind: "loading" }
+  | { kind: "hold" }
+  | { kind: "placeholder"; peaks: number[] }
+  | { kind: "peaks"; peaks: number[] };
 
 interface BarsInput {
+  surface: HTMLElement | null;
   peaks: number[] | null;
   loading: boolean;
   barCount: number;
@@ -165,7 +137,15 @@ const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
 
 function createBarsController() {
   const svgs = new Set<SVGSVGElement>();
-  let input: BarsInput = { peaks: null, loading: false, barCount: 0, active: false };
+
+  let input: BarsInput = {
+    surface: null,
+    peaks: null,
+    loading: false,
+    barCount: 0,
+    active: false,
+  };
+
   let motion = !window.matchMedia(reducedMotionQuery).matches;
   let visible = document.visibilityState === "visible";
   let intersecting = true;
@@ -174,9 +154,10 @@ function createBarsController() {
   let goalBars: number[] = [];
   let heights: number[] | null = null;
   let paths = { upper: "", lower: "" };
+  let ready: number | null = null;
   let from: number[] | null = null;
   let blend = 0;
-  let clock = 0;
+  const wave = createLoadingWave();
   let previous: number | null = null;
   let frame = 0;
 
@@ -185,39 +166,45 @@ function createBarsController() {
     svg.children[1]?.setAttribute("d", paths.lower);
   };
 
-  const paint = (bars: number[]) => {
+  const paint = (bars: number[], readiness: number) => {
     heights = bars.length > 0 ? bars : null;
     paths = barPaths(bars);
 
     for (const svg of svgs) write(svg);
+
+    if (readiness === ready) return;
+    ready = readiness;
+    input.surface?.style.setProperty("--waveform-ready", String(readiness));
   };
 
-  const target = () => (goal.kind === "wave" ? loadingGroove(count, clock) : goalBars);
+  const resting = () => (goal.kind === "loading" ? (heights ?? loadingFloor(count)) : goalBars);
+
+  const settled = () => (goal.kind === "peaks" ? 1 : 0);
 
   const step = (now: number) => {
     const elapsed = previous === null ? 0 : Math.max(0, now - previous);
     previous = now;
-
-    if (goal.kind === "wave") clock += elapsed / 1000;
-    const next = target();
     const start = from;
 
-    if (start) {
+    if (goal.kind === "loading") {
+      paint(wave(resting(), elapsed), 0);
+    } else if (start) {
       blend += elapsed;
       const progress = Math.min(1, blend / TWEEN_MS);
-      const eased = 1 - (1 - progress) ** 4;
+      const eased = smoothstep(progress);
       paint(
         progress < 1
-          ? next.map((bar, index) => start[index]! + (bar - start[index]!) * eased)
-          : next,
+          ? goalBars.map((bar, index) => start[index]! + (bar - start[index]!) * eased)
+          : goalBars,
+        eased,
       );
 
       if (progress >= 1) from = null;
     } else {
-      paint(next);
+      paint(goalBars, settled());
     }
 
-    frame = goal.kind === "wave" || from ? requestAnimationFrame(step) : 0;
+    frame = goal.kind === "loading" || from ? requestAnimationFrame(step) : 0;
   };
 
   const stop = () => {
@@ -229,11 +216,13 @@ function createBarsController() {
   const nextGoal = (): Goal => {
     if (input.peaks) return { kind: "peaks", peaks: input.peaks };
 
-    if (motion && input.loading) return { kind: "wave" };
+    if (motion && input.loading) return { kind: "loading" };
 
-    if (motion && heights && goal.kind !== "peaks") return { kind: "hold" };
+    if (motion && heights && (goal.kind === "loading" || goal.kind === "hold")) {
+      return { kind: "hold" };
+    }
 
-    return { kind: "peaks", peaks: PLACEHOLDER_PEAKS };
+    return { kind: "placeholder", peaks: PLACEHOLDER_PEAKS };
   };
 
   const sync = () => {
@@ -250,17 +239,17 @@ function createBarsController() {
       (upcoming.kind === "peaks" && goal.kind === "peaks" && upcoming.peaks !== goal.peaks);
 
     if (changed) {
-      from = motion && heights && upcoming.kind !== "hold" ? heights : null;
+      from = motion && heights && upcoming.kind === "peaks" ? heights : null;
       blend = 0;
       goal = upcoming;
     }
 
-    if (goal.kind !== "peaks") goalBars = heights ?? [];
-    else goalBars = count > 0 ? resamplePeaks(goal.peaks, count) : [];
+    if ("peaks" in goal) goalBars = count > 0 ? resamplePeaks(goal.peaks, count) : [];
+    else goalBars = heights ?? [];
     const running = input.active && intersecting && visible && motion && count > 0;
     cancelAnimationFrame(frame);
 
-    if (running && (goal.kind === "wave" || from)) {
+    if (running && (goal.kind === "loading" || from)) {
       step(performance.now());
 
       return;
@@ -268,7 +257,7 @@ function createBarsController() {
 
     stop();
     from = null;
-    paint(target());
+    paint(resting(), settled());
   };
 
   return {
@@ -294,13 +283,16 @@ function createBarsController() {
   };
 }
 
-export function useWaveformBars(surfaceRef: RefObject<HTMLElement | null>, input: BarsInput) {
+export function useWaveformBars(
+  surfaceRef: RefObject<HTMLElement | null>,
+  input: Omit<BarsInput, "surface">,
+) {
   const [controller] = useState(createBarsController);
   const { peaks, loading, barCount, active } = input;
 
   useLayoutEffect(() => {
-    controller.update({ peaks, loading, barCount, active });
-  }, [controller, peaks, loading, barCount, active]);
+    controller.update({ surface: surfaceRef.current, peaks, loading, barCount, active });
+  }, [controller, surfaceRef, peaks, loading, barCount, active]);
 
   useEffect(() => {
     const surface = surfaceRef.current;

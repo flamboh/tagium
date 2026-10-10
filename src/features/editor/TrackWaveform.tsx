@@ -24,8 +24,7 @@ import {
 import type { TagiumFile, TrackClip } from "@/features/library/types";
 import { cn } from "@/lib/utils";
 
-const WAVEFORM_LAYER_CLASS =
-  "pointer-events-none absolute inset-0 transition-[opacity,fill] duration-300 ease-out motion-reduce:transition-none";
+const WAVEFORM_LAYER_CLASS = "pointer-events-none absolute inset-0";
 
 type WaveformStatus = "waiting" | "loading" | "ready" | "unavailable";
 
@@ -306,7 +305,6 @@ function useTrackWaveform({
     endRatio,
     progressRatio,
     resetClip,
-    waveform,
     loading,
     barCount,
     barsRef,
@@ -343,7 +341,6 @@ export default function TrackWaveform(props: TrackWaveformProps) {
     endRatio,
     progressRatio,
     resetClip,
-    waveform,
     loading,
     barCount,
     barsRef,
@@ -470,7 +467,7 @@ export default function TrackWaveform(props: TrackWaveformProps) {
             <div
               className={cn(
                 WAVEFORM_LAYER_CLASS,
-                waveform ? "fill-muted-foreground/25" : "fill-muted-foreground/20",
+                "fill-muted-foreground [fill-opacity:calc(0.45-0.2*var(--waveform-ready))]",
               )}
             >
               <WaveformBars count={barCount} svgRef={barsRef} />
@@ -478,15 +475,14 @@ export default function TrackWaveform(props: TrackWaveformProps) {
             <div
               className={cn(
                 WAVEFORM_LAYER_CLASS,
-                "fill-muted-foreground/70",
-                !waveform && "opacity-0",
+                "fill-muted-foreground/70 opacity-(--waveform-ready)",
               )}
               style={{ clipPath: clipInset(startRatio, endRatio) }}
             >
               <WaveformBars count={barCount} svgRef={barsRef} />
             </div>
             <div
-              className={cn(WAVEFORM_LAYER_CLASS, "fill-primary", !waveform && "opacity-0")}
+              className={cn(WAVEFORM_LAYER_CLASS, "fill-primary opacity-(--waveform-ready)")}
               style={{ clipPath: clipInset(startRatio, progressRatio) }}
             >
               <WaveformBars count={barCount} svgRef={barsRef} />
