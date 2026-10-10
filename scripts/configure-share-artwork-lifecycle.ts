@@ -28,7 +28,7 @@ const result = spawnSync(
     "set",
     bucket,
     "--file",
-    "migrations/share-artwork-lifecycle.json",
+    "scripts/share-artwork-lifecycle.json",
   ],
   { stdio: "inherit" },
 );

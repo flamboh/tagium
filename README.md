@@ -51,6 +51,18 @@ and their Cloudflare bindings are present.
 Deploys go through Cloudflare Workers Builds; `bun run deploy:preview` and
 `deploy:production` exist for manual uploads.
 
+Isolated preview stages are declared in `alchemy.run.ts`. Each stage gets its own Worker, D1
+database, and R2 bucket on a workers.dev URL. With `CLOUDFLARE_API_TOKEN`,
+`CLOUDFLARE_ACCOUNT_ID`, and `COBALT_API_KEY` set:
+
+```sh
+bun run alchemy:deploy --stage dev-yourname
+bun run alchemy:destroy --stage dev-yourname
+```
+
+Pull requests deploy to `pr-<number>` once the `ALCHEMY_PREVIEWS` repository variable is `true`.
+The `prod` and `production` stages are refused.
+
 ## License
 
 AGPL-3.0-only.
