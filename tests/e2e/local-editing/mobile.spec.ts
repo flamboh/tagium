@@ -34,11 +34,17 @@ test("edits, navigates and exports from the library drawer on a phone", async ({
   await expect(drawer).toBeHidden();
   await expect(title).toHaveValue(fixtureTitle("flac"));
 
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await openLibrary.click({ trial: true });
+  const editorLibraryBox = await openLibrary.boundingBox();
+  expect(editorLibraryBox).not.toBeNull();
   await openLibrary.click();
   await drawer.getByRole("button", { name: "settings", exact: true }).click();
   await expect(drawer).toBeHidden();
   await expect(page.getByRole("heading", { name: "settings" })).toBeVisible();
+  await expect.poll(() => openLibrary.boundingBox()).toEqual(editorLibraryBox);
   await page.getByRole("button", { name: "back to workspace" }).click();
+  await expect.poll(() => openLibrary.boundingBox()).toEqual(editorLibraryBox);
   await expect(title).toHaveValue(fixtureTitle("flac"));
 
   await openLibrary.click();

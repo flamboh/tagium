@@ -713,7 +713,13 @@ const encodeTags = (tags: OpusTags, changes: MetadataChanges) => {
   replaceText("ALBUM", changes.album);
   replaceText("COMPOSER", changes.composer);
   replaceText("COMMENT", changes.comment);
-  if (changes.comment !== undefined) replacements.set("DESCRIPTION", []);
+  if (
+    changes.comment !== undefined &&
+    firstValue(tags.comments, "COMMENT") === undefined &&
+    firstValue(tags.comments, "DESCRIPTION") !== undefined
+  ) {
+    replacements.set("DESCRIPTION", []);
+  }
   replaceText("COPYRIGHT", changes.copyright);
   replaceText("LANGUAGE", changes.language);
   if (changes.year !== undefined) {

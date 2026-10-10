@@ -347,7 +347,8 @@ export function applyLinkedAlbumArtistsToFiles(
     if (
       (trackIdSet && !trackIdSet.has(file.id)) ||
       !file.metadata ||
-      file.metadata.albumArtist === file.metadata.artist
+      file.metadata.albumArtist ||
+      !file.metadata.artist
     ) {
       return file;
     }

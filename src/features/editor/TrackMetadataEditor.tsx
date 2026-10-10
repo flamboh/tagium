@@ -819,11 +819,19 @@ function LoadedTrackMetadataEditor({
     defaultValue: selectedFile.metadata.title,
   });
   const watchedFilename = useWatch({ control, name: "filename", defaultValue: "" });
-  const linkedAlbumArtistDisplay = useWatch({
+  const watchedArtist = useWatch({
     control,
     name: "artist",
     defaultValue: selectedFile.metadata.artist,
   });
+  const watchedAlbumArtist = useWatch({
+    control,
+    name: "albumArtist",
+    defaultValue: selectedFile.metadata.albumArtist,
+  });
+  const linkedAlbumArtistDisplay = selectedFileAlbum
+    ? watchedArtist
+    : watchedAlbumArtist || watchedArtist;
   const advancedFields = useAdvancedMetadataFormBoundary({
     register,
     control,

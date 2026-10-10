@@ -1,8 +1,18 @@
 import { audioFixtureTags, fixtureTitle } from "../fixtures/catalog.ts";
-import { audioFixture, expectLosslessAudio, inspectAudio, unzipDownload } from "../support/audio";
+import {
+  audioFixture,
+  expectLosslessAudio,
+  inspectAudio,
+  unzipDownload,
+  retaggedAudioFixture,
+} from "../support/audio";
 import { expect, test } from "../support/test";
 import {
   confirmDownload,
+  downloadTrack,
+  field,
+  editorMode,
+  seedSettings,
   goHome,
   libraryCount,
   pickFiles,
@@ -54,7 +64,7 @@ test("exports a loose track and an album on the first confirmation with unique n
     await expectLosslessAudio(entry, tone.file);
   }
   const single = entries.find((entry) => entry.filename.startsWith("singles/"))!;
-  expect((await inspectAudio(single)).metadata.albumArtist).toBe(audioFixtureTags.artist);
+  expect((await inspectAudio(single)).metadata.albumArtist).toBe(audioFixtureTags.albumArtist);
 
   await page.getByRole("button", { name: "download Fixture Album" }).click();
   const albumArchive = await confirmDownload(page, "download 2 tracks");
@@ -98,3 +108,31 @@ test("export confirmation takes focus and cancels without downloading", async ({
   await expect(trigger).toBeFocused();
   expect(downloads).toEqual([]);
 });
+
+for (const existingAlbumArtist of ["Various Artists", ""]) {
+  test(`the default album artist link preserves ${existingAlbumArtist || "a blank value until filled"} when editing and exporting a single`, async ({
+    page,
+  }) => {
+    await seedSettings(page, { advancedMetadata: true });
+    const source = await retaggedAudioFixture("mp3", "single.mp3", {
+      albumArtist: existingAlbumArtist,
+    });
+    await page.goto("/");
+    await pickFiles(page, [source.upload]);
+    await expect(field(page, "title")).toHaveValue(fixtureTitle("mp3"));
+    const expectedAlbumArtist = existingAlbumArtist || audioFixtureTags.artist;
+    await field(page, "title").fill("Edited single");
+    const exported = await downloadTrack(page);
+    expect((await inspectAudio(exported)).metadata).toMatchObject({
+      title: "Edited single",
+      albumArtist: expectedAlbumArtist,
+    });
+    await page.getByRole("button", { name: "download all", exact: true }).click();
+    const archive = await confirmDownload(page, "download 1 track");
+    const single = unzipDownload(archive).find((entry) => entry.filename.endsWith(".mp3"))!;
+    expect((await inspectAudio(single)).metadata.albumArtist).toBe(expectedAlbumArtist);
+    await editorMode(page, "advanced").click();
+    await expect(field(page, "album artist")).toHaveValue(expectedAlbumArtist);
+    await expectLosslessAudio(single, source.file);
+  });
+}
