@@ -7,6 +7,7 @@ import { IconSwap } from "@/components/ui/icon-swap";
 import {
   formatTimestamp,
   fullClip,
+  getLoadedWaveform,
   getPointerTime,
   loadWaveform,
   moveClipEdge,
@@ -31,6 +32,9 @@ const PLACEHOLDER_PEAKS = Array.from({ length: 256 }, (_, index) => {
 
   return Math.min(1, Math.max(0.12, swell + Math.abs(jitter) * 0.35));
 });
+
+const BAR_CLASS =
+  "transform-fill transition-transform duration-300 ease-out motion-reduce:transition-none";
 
 type WaveformStatus = "waiting" | "loading" | "ready" | "unavailable";
 
@@ -457,23 +461,20 @@ export default function TrackWaveform(props: TrackWaveformProps) {
             )}
             style={{ height: WAVEFORM_HEIGHT }}
           >
-            {waveform ? (
-              <>
-                <WaveformBars bars={bars} className="fill-muted-foreground/25" />
-                <WaveformBars
-                  bars={bars}
-                  className="fill-muted-foreground/70"
-                  clipPath={clipInset(startRatio, endRatio)}
-                />
-                <WaveformBars
-                  bars={bars}
-                  className="fill-primary"
-                  clipPath={clipInset(startRatio, progressRatio)}
-                />
-              </>
-            ) : (
-              <WaveformBars bars={bars} className="fill-muted-foreground/20" />
-            )}
+            <WaveformBars
+              bars={bars}
+              className={waveform ? "fill-muted-foreground/25" : "fill-muted-foreground/20"}
+            />
+            <WaveformBars
+              bars={bars}
+              className={cn("fill-muted-foreground/70", !waveform && "opacity-0")}
+              clipPath={clipInset(startRatio, endRatio)}
+            />
+            <WaveformBars
+              bars={bars}
+              className={cn("fill-primary", !waveform && "opacity-0")}
+              clipPath={clipInset(startRatio, progressRatio)}
+            />
             {canPlay && (
               <>
                 <span
@@ -529,8 +530,15 @@ function useWaveformSource(
   const [playbackFile, setPlaybackFile] = useState(file);
 
   if (!playbackFile && file) setPlaybackFile(file);
-  const [waveform, setWaveform] = useState<WaveformData | null>(null);
-  const [status, setStatus] = useState<WaveformStatus>(file ? "loading" : "waiting");
+
+  const [waveform, setWaveform] = useState<WaveformData | null>(
+    () => getLoadedWaveform(file) ?? null,
+  );
+
+  const [status, setStatus] = useState<WaveformStatus>(
+    waveform ? "ready" : file ? "loading" : "waiting",
+  );
+
   const [mediaDuration, setMediaDuration] = useState(0);
   const [playbackFailed, setPlaybackFailed] = useState(false);
   useEffect(() => {
@@ -552,7 +560,7 @@ function useWaveformSource(
 
   const decodeDuration = normalizeSeconds(fallbackDuration) || normalizeSeconds(mediaDuration);
   useEffect(() => {
-    if (!playbackFile || decodeDuration === 0) return;
+    if (!playbackFile || decodeDuration === 0 || getLoadedWaveform(playbackFile)) return;
     let current = true;
     setStatus("loading");
     loadWaveform(playbackFile, decodeDuration).then(
@@ -641,7 +649,7 @@ function WaveformBars({
     <svg
       aria-hidden
       className={cn(
-        "pointer-events-none absolute inset-x-0 top-1 h-[calc(100%-0.5rem)] w-full",
+        "pointer-events-none absolute inset-x-0 top-1 h-[calc(100%-0.5rem)] w-full transition-[opacity,fill] duration-300 ease-out motion-reduce:transition-none",
         className,
       )}
       viewBox={`0 0 ${width} ${WAVEFORM_HEIGHT}`}
@@ -650,12 +658,27 @@ function WaveformBars({
     >
       {bars.map((bar, index) => {
         const x = index * (BAR_WIDTH + BAR_GAP);
-        const height = Math.max(1, bar * half);
+        const transform = `scaleY(${Math.max(1, bar * half) / half})`;
 
         return (
           <g key={index}>
-            <rect x={x} y={half - height} width={BAR_WIDTH} height={height} />
-            <rect x={x} y={half + 1} width={BAR_WIDTH} height={height} opacity={0.45} />
+            <rect
+              x={x}
+              y={0}
+              width={BAR_WIDTH}
+              height={half}
+              className={cn(BAR_CLASS, "origin-bottom")}
+              style={{ transform }}
+            />
+            <rect
+              x={x}
+              y={half + 1}
+              width={BAR_WIDTH}
+              height={half}
+              opacity={0.45}
+              className={cn(BAR_CLASS, "origin-top")}
+              style={{ transform }}
+            />
           </g>
         );
       })}

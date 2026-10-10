@@ -30,6 +30,8 @@ type DecodedAudio = Pick<
 
 const waveformCache = new WeakMap<File, Promise<WaveformData>>();
 
+const loadedWaveforms = new WeakMap<File, WaveformData>();
+
 let decodeQueue: Promise<unknown> = Promise.resolve();
 
 export const normalizeSeconds = (value: number | null | undefined) =>
@@ -176,7 +178,13 @@ export const loadWaveform = (file: File, durationHint: number) => {
   const pending = decodeQueue.then(() => decodeWaveform(file, durationHint));
   decodeQueue = pending.catch(() => undefined);
   waveformCache.set(file, pending);
-  pending.catch(() => waveformCache.delete(file));
+  pending.then(
+    (data) => loadedWaveforms.set(file, data),
+    () => waveformCache.delete(file),
+  );
 
   return pending;
 };
+
+export const getLoadedWaveform = (file: File | undefined) =>
+  file ? loadedWaveforms.get(file) : undefined;
