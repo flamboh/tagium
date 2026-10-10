@@ -24,7 +24,7 @@ import {
 } from "@/features/import/playlistDownloadController";
 import type { Playlist } from "@/features/import/playlist";
 import { resolveSoundCloudSet } from "@/features/import/soundcloudSet";
-import { reportSystemFailure } from "@/shared/systemFailure";
+import { getTrackFailureDisplay, reportSystemFailure } from "@/shared/systemFailure";
 import { resolveTrackMetadata, type TrackMetadata } from "@/features/import/trackMetadata";
 import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
@@ -602,6 +602,7 @@ export const createAudioUrlImportSession = ({
       const trackIds = new Set(queueSnapshot.trackIds);
       const tracks = library.getSnapshot().files.flatMap((file) => {
         if (!trackIds.has(file.id) || file.file) return [];
+        if (file.downloadError && !getTrackFailureDisplay(file.downloadError).retryable) return [];
         const track = managedDownloadTrackFromFile(file);
         return track ? [track] : [];
       });

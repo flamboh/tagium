@@ -2,6 +2,11 @@ name: CI
 
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
   workflow_dispatch:
     inputs:
       deploy_cobalt:
@@ -25,13 +30,49 @@ jobs:
 
       - uses: voidzero-dev/setup-vp@v1
         with:
-          node-version: "24"
+          node-version-file: .node-version
           cache: true
 
       - run: vp install
       - run: vp check
       - run: vp test
       - run: vp build
+
+  e2e:
+    name: E2E (chromium)
+    if: >-
+      github.event_name == 'pull_request' &&
+      contains(github.event.pull_request.labels.*.name, 'e2e') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'e2e')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: .node-version
+          cache: true
+
+      - run: vp install
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-chromium-${{ hashFiles('bun.lock') }}
+
+      - run: vp exec playwright install --with-deps chromium
+      - run: vp exec playwright test
+
+      - name: Upload e2e diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: e2e-chromium-results
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 7
 
   fly_changes:
     name: Check for Cobalt deployment changes
@@ -87,3 +128,8 @@ jobs:
         run: flyctl deploy --remote-only --wait-timeout 10m --config fly.cobalt.toml
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  live:
+    name: Live smoke
+    needs: deploy_cobalt
+    uses: ./.github/workflows/live.yaml

@@ -100,6 +100,9 @@ const fixture = () =>
     audio,
   );
 
+const flacWithComments = (comments: string[]) =>
+  concat(utf8("fLaC"), block(0, streamInfo()), block(4, vorbis(comments), true), audio);
+
 const outputBytes = async (parts: BlobPart[]) =>
   new Uint8Array(await new Blob(parts).arrayBuffer());
 
@@ -245,6 +248,99 @@ describe("FLAC metadata driver", () => {
     expect([...cleared.subarray(audioOffset(cleared))]).toEqual([
       ...original.subarray(audioOffset(original)),
     ]);
+  });
+
+  it.each([
+    [
+      "an FFmpeg DESCRIPTION field",
+      ["DESCRIPTION=first line\nsecond line"],
+      "first line\nsecond line",
+    ],
+    ["a lowercase comment field", ["comment=lowercase key"], "lowercase key"],
+    ["COMMENT ahead of a DESCRIPTION alias", ["DESCRIPTION=alias", "Comment=primary"], "primary"],
+  ])("reads the user comment from %s", async (_case, comments, expected) => {
+    const inspected = await Effect.runPromise(
+      flacDriver.inspect(makeBlobByteSource(new Blob([flacWithComments(comments)]))),
+    );
+    expect(inspected.metadata.comment).toBe(expected);
+  });
+
+  it.each(["Updated", ""])(
+    "preserves a separate DESCRIPTION when writing comment %j",
+    async (comment) => {
+      const original = flacWithComments([
+        "dEsCrIpTiOn=Separate description",
+        "comment=Primary comment",
+      ]);
+      const inspected = await Effect.runPromise(
+        flacDriver.inspect(makeBlobByteSource(new Blob([original]))),
+      );
+      expect(inspected.metadata.comment).toBe("Primary comment");
+      const plan = await Effect.runPromise(
+        flacDriver.patch(makeBlobByteSource(new Blob([original])), { comment }),
+      );
+      const patched = await outputBytes(plan.parts);
+      expect(new TextDecoder().decode(patched)).toContain("dEsCrIpTiOn=Separate description");
+      expect(new TextDecoder().decode(patched)).not.toContain("Primary comment");
+      const updated = await Effect.runPromise(
+        flacDriver.inspect(makeBlobByteSource(new Blob([patched]))),
+      );
+      expect(updated.metadata.comment).toBe(comment || "Separate description");
+    },
+  );
+
+  it("preserves DESCRIPTION when an empty COMMENT was displayed", async () => {
+    const original = flacWithComments(["DESCRIPTION=Separate description", "COMMENT="]);
+    const inspected = await Effect.runPromise(
+      flacDriver.inspect(makeBlobByteSource(new Blob([original]))),
+    );
+    expect(inspected.metadata.comment).toBe("");
+    const plan = await Effect.runPromise(
+      flacDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "Updated" }),
+    );
+    expect(new TextDecoder().decode(await outputBytes(plan.parts))).toContain(
+      "DESCRIPTION=Separate description",
+    );
+  });
+
+  it("replaces a displayed DESCRIPTION alias with one COMMENT field", async () => {
+    const original = flacWithComments(["DESCRIPTION=FFmpeg comment", "X-private=opaque value"]);
+    const patchedPlan = await Effect.runPromise(
+      flacDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "Updated" }),
+    );
+    const patched = await outputBytes(patchedPlan.parts);
+    const patchedText = new TextDecoder().decode(patched);
+    expect(patchedText).toContain("COMMENT=Updated");
+    expect(patchedText).not.toContain("FFmpeg comment");
+    expect(patchedText).toContain("X-private=opaque value");
+    expect([...patched.subarray(audioOffset(patched))]).toEqual([...audio]);
+    const inspected = await Effect.runPromise(
+      flacDriver.inspect(makeBlobByteSource(new Blob([patched]))),
+    );
+    expect(inspected.metadata.comment).toBe("Updated");
+
+    const clearedPlan = await Effect.runPromise(
+      flacDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "" }),
+    );
+    const clearedText = new TextDecoder().decode(await outputBytes(clearedPlan.parts));
+    expect(clearedText).not.toMatch(/COMMENT=|DESCRIPTION=/iu);
+    expect(clearedText).toContain("X-private=opaque value");
+  });
+
+  it("preserves DESCRIPTION in a different Vorbis block from the displayed COMMENT", async () => {
+    const original = concat(
+      utf8("fLaC"),
+      block(0, streamInfo()),
+      block(4, vorbis(["DESCRIPTION=Separate description"])),
+      block(4, vorbis(["COMMENT=Primary comment"]), true),
+      audio,
+    );
+    const plan = await Effect.runPromise(
+      flacDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "Updated" }),
+    );
+    const patched = await outputBytes(plan.parts);
+    expect(new TextDecoder().decode(patched)).toContain("DESCRIPTION=Separate description");
+    expect([...patched.subarray(audioOffset(patched))]).toEqual([...audio]);
   });
 
   it("only replaces pictures when an explicit picture change is present", async () => {

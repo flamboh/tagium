@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { env, exit } from "node:process";
 
-const branch = env.WORKERS_CI_BRANCH ?? "";
+const branch = env.WORKERS_CI_BRANCH ?? env.GITHUB_REF_NAME ?? "";
 const deployEnv = branch === "main" || branch === "master" ? "production" : "preview";
 const releaseSha =
   env.WORKERS_CI_COMMIT_SHA ?? env.CF_PAGES_COMMIT_SHA ?? env.GITHUB_SHA ?? "local";

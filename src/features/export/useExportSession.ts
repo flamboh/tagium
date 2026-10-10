@@ -4,16 +4,17 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { SubmitHandler } from "react-hook-form";
 import { analytics } from "@/analytics";
 import { applyTrackClips, clipAudioFile } from "@/features/audio/audioClip";
+import { downloadBlob } from "@/lib/download";
 import {
   allTracksReadyForDownload,
   createLibraryDownloadFilename,
   createZipBlob,
-  downloadBlob,
   getLibraryDownloadEntries,
   isTrackReadyForDownload,
 } from "@/features/export/downloadLibrary";
 import {
   applyAlbumSharedTagsToFiles,
+  applyLinkedAlbumArtistsToFiles,
   applySingleAlbumTitlesToFiles,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
@@ -120,6 +121,11 @@ export const useExportSession = ({
       projectedFiles = applySingleAlbumTitlesToFiles(
         projectedFiles,
         singleTrackIds,
+        settingsRef.current,
+      );
+      projectedFiles = applyLinkedAlbumArtistsToFiles(
+        projectedFiles,
+        trackIds,
         settingsRef.current,
       );
       if (settingsRef.current.syncTrackNumbers) {

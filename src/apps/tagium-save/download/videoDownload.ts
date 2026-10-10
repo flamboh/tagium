@@ -9,7 +9,7 @@ import {
   type CobaltPickerItem,
   type CobaltVideoDownloadRequest,
 } from "./cobaltDownloadSchemas";
-import { outputFormatFromFilename } from "./ffmpegArgs";
+import { makeMetadataFfmpegArgs, outputFormatFromFilename } from "./ffmpegArgs";
 
 /** The browser-facing Cobalt request accepted by the downloader. */
 export type VideoDownloadRequest = CobaltVideoDownloadRequest;
@@ -19,12 +19,13 @@ export type VideoDownloadPlan = CobaltDownloadPlan;
 import {
   adoptTemporaryFileLease,
   createTemporaryFileStore,
+  startTemporaryStorageSession,
   type TemporaryFileLease,
 } from "./storage";
 import type {
   VideoWorkerMessage,
   VideoWorkerCancelRequest,
-  VideoWorkerProcessingRequest,
+  VideoWorkerJob,
   VideoWorkerProgress,
 } from "./cobaltVideoProcessingWorker";
 
@@ -264,7 +265,7 @@ const fetchPlan = async (
 
 const fetchTunnelFile = async (
   url: string,
-  filename: string,
+  filename: string | ((response: Response) => string),
   sourceUrl: string,
   callbacks: VideoDownloadCallbacks | undefined,
   signal: AbortSignal,
@@ -348,7 +349,7 @@ const fetchTunnelFile = async (
     }
 
     const fileLease = await inputStore.toFile(
-      safeFilename(filename),
+      safeFilename(typeof filename === "string" ? filename : filename(response)),
       contentType,
       stableLastModified(sourceUrl),
     );
@@ -362,6 +363,12 @@ const fetchTunnelFile = async (
 const localPlanMediaInputCount = (plan: CobaltLocalProcessingPlan) =>
   plan.output.subtitles ? plan.tunnel.length - 1 : plan.tunnel.length;
 
+const copiesTunnelDirectly = (plan: CobaltLocalProcessingPlan) =>
+  plan.type === "proxy" &&
+  !plan.audio &&
+  (plan.output.type.startsWith("image/") ||
+    makeMetadataFfmpegArgs(plan.output.metadata).length === 0);
+
 const pickerTypeDefaults: Record<
   CobaltPickerItem["type"],
   { extension: string; contentType: string }
@@ -371,19 +378,29 @@ const pickerTypeDefaults: Record<
   gif: { extension: "gif", contentType: "image/gif" },
 };
 
-const pickerFilename = (item: CobaltPickerItem) => {
-  const fallback = pickerTypeDefaults[item.type];
-  let pathSegment = "";
+const decodeExtendedFilename = (value: string) => {
   try {
-    const base = typeof location === "undefined" ? "https://tagium.invalid" : location.href;
-    const pathname = new URL(item.url, base).pathname;
-    pathSegment = decodeURIComponent(pathname.slice(pathname.lastIndexOf("/") + 1));
+    return decodeURIComponent(value);
   } catch {
-    pathSegment = "";
+    return undefined;
   }
+};
 
-  const hasExtension = /\.[a-z0-9]{1,12}$/i.test(pathSegment);
-  return hasExtension ? safeFilename(pathSegment) : `tagium-${item.type}.${fallback.extension}`;
+const contentDispositionFilename = (response: Response) => {
+  const header = response.headers.get("Content-Disposition");
+  if (!header) return undefined;
+  const extended = /(?:^|;)\s*filename\*\s*=\s*utf-8''([^;]+)/i.exec(header)?.[1];
+  const decoded = extended ? decodeExtendedFilename(extended.trim()) : undefined;
+  if (decoded) return decoded;
+  const plain = /(?:^|;)\s*filename\s*=\s*(?:"([^"]*)"|([^;]*))/i.exec(header);
+  return (plain?.[1] ?? plain?.[2])?.trim();
+};
+
+const pickerFilename = (item: CobaltPickerItem, response: Response) => {
+  const filename = contentDispositionFilename(response);
+  return filename && /\.[a-z0-9]{1,12}$/i.test(filename)
+    ? filename
+    : `tagium-${item.type}.${pickerTypeDefaults[item.type].extension}`;
 };
 
 const pickerContentType = (item: CobaltPickerItem) => pickerTypeDefaults[item.type].contentType;
@@ -452,6 +469,7 @@ const decodeWorkerMessage = (value: unknown): VideoWorkerMessage | undefined => 
 const runLocalProcessingWorker = (
   plan: CobaltLocalProcessingPlan,
   files: File[],
+  temporaryStorageSession: string,
   sourceUrl: string,
   callbacks: VideoDownloadCallbacks | undefined,
   signal: AbortSignal,
@@ -552,7 +570,7 @@ const runLocalProcessingWorker = (
       );
     };
 
-    const request: VideoWorkerProcessingRequest = { files, plan };
+    const request: VideoWorkerJob = { files, plan, temporaryStorageSession };
     try {
       worker.postMessage({ cobaltVideoProcessing: request });
     } catch (error) {
@@ -611,7 +629,7 @@ const executePlan = async (
   }
 
   validateLocalPlan(plan);
-  if (plan.type === "proxy") {
+  if (copiesTunnelDirectly(plan)) {
     const tunnel = plan.tunnel[0];
     if (!tunnel) {
       throw new VideoDownloadError("processing", "cobalt proxy response is missing its tunnel.");
@@ -654,6 +672,7 @@ const executePlan = async (
     const outputLease = await runLocalProcessingWorker(
       plan,
       inputLeases.map((lease) => lease.value),
+      await startTemporaryStorageSession(),
       request.sourceUrl,
       callbacks,
       signal,
@@ -673,7 +692,7 @@ const executePickerItem = async (
 ): Promise<VideoFileDownloadResult> => {
   const fileLease = await fetchTunnelFile(
     item.url,
-    pickerFilename(item),
+    (response) => pickerFilename(item, response),
     request.sourceUrl || item.url,
     callbacks,
     signal,

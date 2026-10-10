@@ -3,6 +3,7 @@
  * api/src/processing/services/soundcloud.js
  */
 import { Effect, Option, Schema } from "effect";
+import { HTTPError } from "nitro";
 import { getSoundCloudClientId } from "./soundcloud";
 import {
   logSoundCloudCompletion,
@@ -234,6 +235,9 @@ export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundClou
       upstreamFailureDetails(playlistResponse, contentType),
       playlistStartedAt,
     );
+    if (playlistResponse.status === 404) {
+      throw new HTTPError({ status: 404, message: "soundcloud.playlist.not_found" });
+    }
     throw new Error(`soundcloud.playlist.resolve_http_${playlistResponse.status}`);
   }
   let playlistBody: unknown;

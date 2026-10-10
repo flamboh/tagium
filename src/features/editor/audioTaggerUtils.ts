@@ -80,13 +80,18 @@ export const getSubmittedAudioMetadata = (
   syncFilenames: boolean,
   albumArtistLinked = false,
   singleAlbumLinked = false,
+  albumTrack = false,
+  savedArtist: string | null = null,
 ): AudioMetadata => ({
   ...data,
   filename: sanitizeFilenameBase(syncFilenames ? data.title : data.filename),
   album: singleAlbumLinked ? data.title : data.album,
   year: getNullableNumericMetadataValue(data.year),
   trackNumber: getNullableNumericMetadataValue(data.trackNumber),
-  albumArtist: albumArtistLinked ? data.artist : data.albumArtist,
+  albumArtist:
+    albumArtistLinked && (albumTrack || !data.albumArtist || data.albumArtist === savedArtist)
+      ? data.artist
+      : data.albumArtist,
 });
 
 export const createSparseMetadataPatch = (

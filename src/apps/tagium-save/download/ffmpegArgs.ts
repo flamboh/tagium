@@ -56,13 +56,6 @@ export const outputFormatFromFilename = (filename: string) => {
 const mediaInputCount = (plan: CobaltLocalProcessingPlan, inputNames: readonly string[]) =>
   plan.output.subtitles ? inputNames.length - 1 : inputNames.length;
 
-const appendVideoOutputFlags = (args: string[], format: string) => {
-  args.push("-c:v", "copy");
-  if (format === "mp4") {
-    args.push("-movflags", "faststart+frag_keyframe+empty_moov");
-  }
-};
-
 const appendMappedVideoAndAudio = (
   args: string[],
   plan: CobaltLocalProcessingPlan,
@@ -95,22 +88,27 @@ const appendSubtitleFlags = (
   args.push("-map", `${subtitleInputIndex}:s:0`, "-c:s", format === "mp4" ? "mov_text" : "webvtt");
 };
 
-const appendAudioFlags = (
-  args: string[],
-  plan: CobaltLocalProcessingPlan,
-  inputNames: readonly string[],
-) => {
-  const audio = plan.audio;
-  if (!audio) {
+const coverFormats = new Set(["mp3", "m4a"]);
+
+type AudioSettings = NonNullable<CobaltLocalProcessingPlan["audio"]>;
+
+const requireAudioSettings = (plan: CobaltLocalProcessingPlan): AudioSettings => {
+  if (!plan.audio) {
     throw new Error("cobalt local processing response is missing audio settings.");
   }
+  return plan.audio;
+};
 
-  if (audio.cover && audio.format === "mp3" && inputNames.length > 1) {
+const appendAudioFlags = (args: string[], audio: AudioSettings, inputNames: readonly string[]) => {
+  if (audio.cover && coverFormats.has(audio.format) && inputNames.length > 1) {
     args.push("-map", "0", "-map", "1");
     if (audio.cropCover) {
       args.push("-c:v", "mjpeg", "-vf", "scale=-1:720,crop=720:720");
     } else {
       args.push("-c:v", "copy");
+    }
+    if (audio.format === "m4a") {
+      args.push("-disposition:v", "attached_pic");
     }
   } else {
     args.push("-vn");
@@ -119,13 +117,12 @@ const appendAudioFlags = (
     args.push("-c:a", "copy");
   } else {
     args.push("-b:a", `${audio.bitrate}k`);
-  }
-
-  if (audio.format === "mp3" && audio.bitrate === "8") {
-    args.push("-ar", "12000");
-  }
-  if (audio.format === "opus") {
-    args.push("-vbr", "off");
+    if (audio.format === "mp3" && audio.bitrate === "8") {
+      args.push("-ar", "12000");
+    }
+    if (audio.format === "opus") {
+      args.push("-vbr", "off");
+    }
   }
 
   // The output format is appended once, after all stream and metadata flags.
@@ -162,26 +159,26 @@ export const makeLocalProcessingFfmpegArgs = (
     case "merge":
     case "remux":
       appendMappedVideoAndAudio(args, plan, inputNames);
-      appendVideoOutputFlags(args, format);
-      args.push("-c:a", "copy");
+      args.push("-c:v", "copy", "-c:a", "copy");
       appendSubtitleFlags(args, plan, inputNames, format);
       args.push(...makeMetadataFfmpegArgs(plan.output.metadata));
       break;
     case "mute":
-      args.push("-map", "0:v:0");
-      appendVideoOutputFlags(args, format);
-      args.push("-an");
+      args.push("-map", "0:v:0", "-c:v", "copy", "-an");
       appendSubtitleFlags(args, plan, inputNames, format);
       args.push(...makeMetadataFfmpegArgs(plan.output.metadata));
       break;
     case "proxy":
-      args.push("-map", "0");
-      args.push("-c", "copy");
-      appendSubtitleFlags(args, plan, inputNames, format);
+      if (plan.audio) {
+        appendAudioFlags(args, { ...plan.audio, copy: true }, inputNames);
+      } else {
+        args.push("-map", "0:v?", "-map", "0:a?", "-c", "copy");
+        appendSubtitleFlags(args, plan, inputNames, format);
+      }
       args.push(...makeMetadataFfmpegArgs(plan.output.metadata));
       break;
     case "audio":
-      appendAudioFlags(args, plan, inputNames);
+      appendAudioFlags(args, requireAudioSettings(plan), inputNames);
       args.push(...makeMetadataFfmpegArgs(plan.output.metadata));
       break;
     case "gif":
@@ -197,7 +194,7 @@ export const makeLocalProcessingFfmpegArgs = (
   const outputContainer =
     plan.type === "gif"
       ? "gif"
-      : plan.type === "audio" && format === "m4a"
+      : format === "m4a"
         ? "ipod"
         : format === "mkv"
           ? "matroska"

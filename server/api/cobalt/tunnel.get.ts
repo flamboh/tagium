@@ -10,6 +10,7 @@ import {
   consumeTunnelDevFault,
   type CobaltRuntimeEnv as DevControlRuntimeEnv,
 } from "../../utils/dev-controls";
+import { reportDownloadFailure } from "../../utils/download-failure-report";
 
 type CobaltRuntimeEnv = {
   COBALT_API_URL?: string;
@@ -255,6 +256,19 @@ const cobaltDevTunnelFaultResponse = (fault: ReturnType<typeof consumeTunnelDevF
   return undefined;
 };
 
+const directResourceDisposition = (resourceUrl: URL) => {
+  let filename: string;
+  try {
+    filename = decodeURIComponent(
+      resourceUrl.pathname.slice(resourceUrl.pathname.lastIndexOf("/") + 1),
+    );
+  } catch {
+    return undefined;
+  }
+  if (!/\.[a-z0-9]{1,12}$/i.test(filename)) return undefined;
+  return `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`;
+};
+
 const parseTunnelRequest = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
   const requestUrl = new URL(request.url);
   const kind = requestUrl.searchParams.get("kind");
@@ -358,6 +372,8 @@ export default defineHandler(async (event) => {
   let machineId: string | null | undefined;
   let observability: TunnelObservabilityContext = {};
   let upstreamAttempts = 0;
+  const reportFailure = (stage: string, upstreamStatus?: number) =>
+    reportDownloadFailure({ route: "tunnel", stage, requestId, upstreamStatus, machineId });
 
   try {
     const runtimeEnv = getRuntimeEnv(event.req);
@@ -444,6 +460,7 @@ export default defineHandler(async (event) => {
       const capacityError =
         response.status === 503 ? tryParseCobaltCapacityError(responseText) : undefined;
       if (capacityError) {
+        reportFailure("upstream capacity exceeded", response.status);
         logTunnelFailure("upstream capacity exceeded", {
           ...getTunnelLogContext(requestId, tunnelUrl, machineId, observability),
           elapsedMs: Date.now() - startedAt,
@@ -457,6 +474,7 @@ export default defineHandler(async (event) => {
         );
       }
 
+      reportFailure("upstream non-ok", response.status);
       logTunnelFailure("upstream non-ok", {
         ...getTunnelLogContext(requestId, tunnelUrl, machineId, observability),
         elapsedMs: Date.now() - startedAt,
@@ -471,6 +489,7 @@ export default defineHandler(async (event) => {
     }
 
     if (!body) {
+      reportFailure("upstream empty body", response.status);
       logTunnelFailure("upstream empty body", {
         ...getTunnelLogContext(requestId, tunnelUrl, machineId, observability),
         elapsedMs: Date.now() - startedAt,
@@ -493,6 +512,14 @@ export default defineHandler(async (event) => {
     if (estimatedLength && /^\d+$/.test(estimatedLength) && estimatedLength !== "0") {
       responseHeaders.set("Estimated-Content-Length", estimatedLength);
     }
+    const contentDisposition =
+      response.headers.get("content-disposition") ??
+      (tunnelRequest.resource === "direct"
+        ? directResourceDisposition(tunnelRequest.tunnelUrl)
+        : undefined);
+    if (contentDisposition) {
+      responseHeaders.set("Content-Disposition", contentDisposition);
+    }
     responseHeaders.set("Cache-Control", "private, no-store");
 
     withTunnelTelemetry(
@@ -503,6 +530,7 @@ export default defineHandler(async (event) => {
     return new Response(body, { headers: responseHeaders });
   } catch (error) {
     if (error instanceof Error) {
+      if (!event.req.signal.aborted) reportFailure(`fetch threw ${error.name}`);
       logTunnelFailure("fetch threw", {
         ...getTunnelLogContext(requestId, tunnelUrl, machineId, observability),
         elapsedMs: Date.now() - startedAt,
@@ -518,6 +546,7 @@ export default defineHandler(async (event) => {
       });
     }
 
+    reportFailure("fetch threw non-error");
     logTunnelFailure("fetch threw non-error", {
       ...getTunnelLogContext(requestId, tunnelUrl, machineId, observability),
       elapsedMs: Date.now() - startedAt,

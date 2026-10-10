@@ -12,7 +12,10 @@ import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type { AppSettings } from "@/features/library/types";
 
-type CleanupEditor = { form: Pick<TrackEditorSession["form"], "reset"> };
+type CleanupEditor = {
+  commands: Pick<TrackEditorSession["commands"], "flush">;
+  form: Pick<TrackEditorSession["form"], "reset">;
+};
 
 type CleanupDialogScope =
   | { type: "album"; albumId: string; albumTitle: string }
@@ -85,6 +88,7 @@ export const useWorkspaceCleanup = ({
 
   const openDialog = useCallback(
     (scope: CleanupDialogScope, focusTarget: HTMLButtonElement | null = null) => {
+      editorRef.current.commands.flush();
       setDialogScope(scope);
       setReturnFocusTarget(focusTarget);
       setSelectionSessionKey((current) => current + 1);

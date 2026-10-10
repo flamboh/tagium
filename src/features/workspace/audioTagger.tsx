@@ -15,8 +15,9 @@ export default function AudioTagger() {
   const controller = useAudioTaggerController();
   const { library, editor, activeView, sharing, mobile } = controller;
   const { navigation: mobileNavigation, menuButtonRef } = mobile;
-  const menuInTrackHeader =
-    mobileNavigation.isMobile && activeView === "editor" && Boolean(editor.selectedFile);
+  const menuInViewHeader =
+    mobileNavigation.isMobile &&
+    (activeView === "settings" || (activeView === "editor" && Boolean(editor.selectedFile)));
   const mobileMenuButton = mobileNavigation.isMobile ? (
     <Button
       ref={menuButtonRef}
@@ -59,14 +60,14 @@ export default function AudioTagger() {
   return (
     <>
       <AudioTaggerDialogs controller={controller} />
-      {mobileMenuButton && !menuInTrackHeader && (
+      {mobileMenuButton && !menuInViewHeader && (
         <div className="fixed left-3 top-3 z-30 md:hidden">{mobileMenuButton}</div>
       )}
       <div className="min-h-svh touch-pan-y flex flex-col overflow-x-hidden bg-background md:h-svh md:touch-auto md:flex-row md:overflow-hidden">
         <AudioTaggerSidebar controller={controller} />
         <AudioTaggerMainColumn
           controller={controller}
-          menuInTrackHeader={menuInTrackHeader}
+          menuInViewHeader={menuInViewHeader}
           mobileMenuButton={mobileMenuButton}
         />
       </div>

@@ -128,6 +128,15 @@ const encodeText = (value: string, version: Id3Version) => {
   return bytes;
 };
 
+const hasUnsupportedFormatFlags = (bytes: Uint8Array, offset: number, version: Id3Version) => {
+  const formatFlags = version === 2 ? 0 : bytes[offset + 9]!;
+  return version === 3
+    ? (formatFlags & 0xe0) !== 0
+    : version === 4
+      ? (formatFlags & 0x4f) !== 0
+      : false;
+};
+
 const parseId3 = (bytes: Uint8Array<ArrayBuffer>): ParsedTag | undefined => {
   if (bytes.length < 10 || ascii(bytes, 0, 3) !== "ID3") return undefined;
   // SAFETY: the range check immediately below rejects every byte outside the supported versions.
@@ -229,14 +238,7 @@ const parseId3 = (bytes: Uint8Array<ArrayBuffer>): ParsedTag | undefined => {
     const frameEnd = offset + headerSize + size;
     if (size <= 0 || frameEnd > 10 + payloadSize) throw readFailure(`truncated ID3 frame ${id}.`);
     const owned = Object.values(ids).some((frameIds) => frameIds.some((ownedId) => ownedId === id));
-    const formatFlags = version === 2 ? 0 : bytes[offset + 9]!;
-    const unsupportedOwnedFlags =
-      version === 3
-        ? (formatFlags & 0xe0) !== 0
-        : version === 4
-          ? (formatFlags & 0x4f) !== 0
-          : false;
-    if (owned && unsupportedOwnedFlags) {
+    if (owned && hasUnsupportedFormatFlags(bytes, offset, version)) {
       throw readFailure(
         `ID3 frame ${id} uses unsupported compression, encryption, grouping, or unsynchronisation flags.`,
       );
@@ -308,22 +310,47 @@ const splitTerminated = (bytes: Uint8Array, encoding: number) => {
 
 const parseComment = (frame: RawFrame, version: Id3Version) => {
   const payload = payloadOf(frame, version);
-  if (payload.length < 4) return { language: "", description: "", value: "" };
+  if (payload.length < 4) return { description: "", value: "" };
   const encoding = payload[0] ?? 0;
   const [descriptionBytes, valueBytes] = splitTerminated(payload.subarray(4), encoding);
   return {
-    language: ascii(payload, 1, 3).toLowerCase(),
     description: decodeText(concatBytes(Uint8Array.of(encoding), descriptionBytes), version),
     value: decodeText(concatBytes(Uint8Array.of(encoding), valueBytes), version),
   };
 };
 
-const primaryCommentFrame = (tag: ParsedTag | undefined) => {
-  const comments = tag?.frames.filter((frame) => idSets.comment.has(frame.id)) ?? [];
-  return comments.find((frame) => {
-    const comment = parseComment(frame, tag!.version);
-    return comment.language === "eng" && comment.description.length === 0;
-  });
+const userTextIds = new Set(["TXXX", "TXX"]);
+
+const userTextComment = (frame: RawFrame, version: Id3Version) => {
+  if (hasUnsupportedFormatFlags(frame.bytes, 0, version)) return undefined;
+  const payload = payloadOf(frame, version);
+  const encoding = payload[0] ?? 0;
+  if (encoding > (version === 4 ? 3 : 1)) return undefined;
+  const [descriptionBytes, valueBytes] = splitTerminated(payload.subarray(1), encoding);
+  try {
+    const description = decodeText(concatBytes(Uint8Array.of(encoding), descriptionBytes), version);
+    if (description.toLowerCase() !== "comment") return undefined;
+    return decodeText(concatBytes(Uint8Array.of(encoding), valueBytes), version);
+  } catch {
+    return undefined;
+  }
+};
+
+const userCommentValue = (frame: RawFrame, version: Id3Version) => {
+  if (idSets.comment.has(frame.id)) {
+    const comment = parseComment(frame, version);
+    return comment.description.length === 0 ? comment.value : undefined;
+  }
+  return userTextIds.has(frame.id) ? userTextComment(frame, version) : undefined;
+};
+
+const readUserComment = (tag: ParsedTag | undefined) => {
+  const comments =
+    tag?.frames.flatMap((frame) => {
+      const value = userCommentValue(frame, tag.version);
+      return value === undefined ? [] : [{ id: frame.id, value }];
+    }) ?? [];
+  return (comments.find(({ id }) => idSets.comment.has(id)) ?? comments[0])?.value;
 };
 
 const parsePicture = (frame: RawFrame, version: Id3Version): ArtworkEntry | undefined => {
@@ -619,6 +646,7 @@ const encodeComment = (value: string, version: Id3Version) => {
   return concatBytes(
     Uint8Array.of(encoding),
     asciiBytes("eng"),
+    encodeText("", version).subarray(1),
     terminator,
     encodeText(value, version).subarray(1),
   );
@@ -636,10 +664,11 @@ const buildTag = (parsed: ParsedTag | undefined, changes: MetadataChanges) => {
       for (const id of ids[key as keyof typeof ids]) changedIds.add(id);
     }
   }
-  const primaryComment = changes.comment === undefined ? undefined : primaryCommentFrame(parsed);
   const frames: Uint8Array[] = [];
   for (const frame of parsed?.frames ?? []) {
-    if (!changedIds.has(frame.id) && frame !== primaryComment) frames.push(frame.bytes);
+    if (changedIds.has(frame.id)) continue;
+    if (changes.comment !== undefined && userCommentValue(frame, version) !== undefined) continue;
+    frames.push(frame.bytes);
   }
   const addText = (key: Exclude<keyof typeof ids, "picture">, value: string) => {
     if (value.length > 0)
@@ -848,7 +877,6 @@ export const mp3Driver: FormatDriver = {
         const parsedValue = Number(match[1]);
         return parsedValue >= 1 && parsedValue <= 999 ? parsedValue : null;
       };
-      const primaryComment = primaryCommentFrame(parsed);
       return {
         format,
         metadata: {
@@ -869,9 +897,7 @@ export const mp3Driver: FormatDriver = {
           composer: String(
             firstText(parsed, idSets.composer) ?? firstApeValue(ape, apeKeys.composer) ?? "",
           ),
-          comment: primaryComment
-            ? parseComment(primaryComment, parsed!.version).value
-            : String(firstApeValue(ape, apeKeys.comment) ?? ""),
+          comment: readUserComment(parsed) ?? firstApeValue(ape, apeKeys.comment) ?? "",
           discNumber: canonicalInteger(discText, true),
           bpm: canonicalInteger(bpmText),
         },

@@ -1,6 +1,6 @@
 import EncodeLibAV, { type LibAV as LibAVInstance } from "@imput/libav.js-encode-cli";
 import type { CobaltLocalProcessingPlan } from "./cobaltDownloadSchemas";
-import { createTemporaryFileStore } from "./storage";
+import { createTemporaryFileStore, joinTemporaryStorageSession } from "./storage";
 import {
   makeLocalProcessingFfmpegArgs,
   outputFormatFromFilename,
@@ -12,6 +12,10 @@ export const VIDEO_INPUT_PREFIX = "tagium-video-input";
 export type VideoWorkerProcessingRequest = {
   files: File[];
   plan: CobaltLocalProcessingPlan;
+};
+
+export type VideoWorkerJob = VideoWorkerProcessingRequest & {
+  temporaryStorageSession: string;
 };
 
 export type VideoWorkerProgress = {
@@ -27,7 +31,7 @@ export type VideoWorkerMessage =
 
 export type VideoWorkerCancelRequest = { cancel: true };
 
-export type VideoWorkerRequest = VideoWorkerProcessingRequest | VideoWorkerCancelRequest;
+export type VideoWorkerRequest = VideoWorkerJob | VideoWorkerCancelRequest;
 
 type LibAVLike = {
   onwrite?: (name: string, position: number, data: Uint8Array | Int8Array) => void;
@@ -218,9 +222,10 @@ const postVideoWorkerMessage = (message: VideoWorkerMessage) => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
-const isVideoWorkerProcessingRequest = (value: unknown): value is VideoWorkerProcessingRequest => {
+const isVideoWorkerJob = (value: unknown): value is VideoWorkerJob => {
   if (!isRecord(value) || !Array.isArray(value.files) || !isRecord(value.plan)) return false;
   if (!value.files.every((file) => file instanceof Blob)) return false;
+  if (typeof value.temporaryStorageSession !== "string") return false;
   return (
     value.plan.status === "local-processing" &&
     typeof value.plan.type === "string" &&
@@ -240,9 +245,9 @@ if (typeof self !== "undefined") {
       cancelLocalVideo();
       return;
     }
-    if (!isVideoWorkerProcessingRequest(requestData)) return;
+    if (!isVideoWorkerJob(requestData)) return;
     cancellationRequested = false;
-    const request = requestData;
-    await processLocalVideo(request);
+    joinTemporaryStorageSession(requestData.temporaryStorageSession);
+    await processLocalVideo(requestData);
   };
 }

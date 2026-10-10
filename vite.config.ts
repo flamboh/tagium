@@ -233,6 +233,12 @@ export default defineConfig({
           browser: true,
         },
       },
+      {
+        files: ["tests/e2e/**/*.ts"],
+        rules: {
+          "no-empty-pattern": ["error", { allowObjectPatternsAsParameters: true }],
+        },
+      },
     ],
     options: {
       typeAware: true,
@@ -240,7 +246,7 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ["**/node_modules/**", "**/.git/**", "**/.repos/**", "**/e2e/**"],
+    exclude: ["**/node_modules/**", "**/.git/**", "**/.repos/**", "**/e2e/**", "tests/live/**"],
   },
   plugins: [react(), libavAssets(), ...(isTest ? [] : [nitro()])],
   resolve: {

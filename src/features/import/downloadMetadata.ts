@@ -1,4 +1,5 @@
 import filenamify from "filenamify";
+import { parseMediaLink } from "@/lib/media-link";
 import type { Playlist } from "@/features/import/playlist";
 import type { AudioMetadata, MetadataPatch } from "@/features/library/types";
 
@@ -11,6 +12,7 @@ const filenameFromTitle = (title: string) => {
 export const createDownloadMetadata = ({
   title,
   artist,
+  albumArtist = artist,
   album,
   genre,
   year,
@@ -19,6 +21,7 @@ export const createDownloadMetadata = ({
 }: {
   title: string;
   artist: string;
+  albumArtist?: string;
   album: string;
   genre: string;
   year?: number;
@@ -28,7 +31,7 @@ export const createDownloadMetadata = ({
   filename: filenameFromTitle(title).replace(/\.mp3$/i, ""),
   title,
   artist,
-  albumArtist: artist,
+  albumArtist,
   album,
   genre,
   duration: duration ?? 0,
@@ -43,16 +46,22 @@ export const createDownloadMetadata = ({
   bpm: null,
 });
 
+export const getPlaylistTrackPendingYear = (
+  playlist: Playlist,
+  track: Playlist["tracks"][number],
+) => (parseMediaLink(track.url).provider === "youtube" ? undefined : playlist.year);
+
 export const createPlaylistTrackMetadata = (
   playlist: Playlist,
   track: Playlist["tracks"][number],
 ) =>
   createDownloadMetadata({
     title: track.title,
-    artist: playlist.artist,
+    artist: track.artist ?? playlist.artist,
+    albumArtist: playlist.artist,
     album: playlist.title,
     genre: playlist.genre,
-    year: playlist.year,
+    year: getPlaylistTrackPendingYear(playlist, track),
     duration: track.duration,
     trackNumber: track.trackNumber,
   });
@@ -63,11 +72,13 @@ export const createPlaylistPendingMetadataPatch = (
 ): MetadataPatch => {
   const patch: MetadataPatch = {
     title: track.title,
-    artist: playlist.artist,
+    artist: track.artist ?? playlist.artist,
+    albumArtist: playlist.artist,
     album: playlist.title,
     genre: playlist.genre,
   };
-  if (playlist.year !== undefined) patch.year = playlist.year;
+  const year = getPlaylistTrackPendingYear(playlist, track);
+  if (year !== undefined) patch.year = year;
   if (track.trackNumber !== undefined) patch.trackNumber = track.trackNumber;
   return patch;
 };
