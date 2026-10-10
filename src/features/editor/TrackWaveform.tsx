@@ -5,10 +5,10 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import { IconSwap } from "@/components/ui/icon-swap";
 import {
+  FULL_CLIP,
   formatTimestamp,
-  fullClip,
   getLoadedWaveform,
-  getPointerTime,
+  getPointerFraction,
   loadWaveform,
   moveClipEdge,
   normalizeClip,
@@ -40,6 +40,11 @@ interface TrackWaveformProps {
   trailing?: ReactNode;
 }
 
+const formatClipPoint = (fraction: number, duration: number) =>
+  duration > 0
+    ? formatTimestamp(Math.round(fraction * duration * 100) / 100)
+    : `${Math.round(fraction * 100)}%`;
+
 const clipInset = (from: number, to: number) =>
   `inset(0 ${Math.max(0, 100 - to * 100)}% 0 ${Math.max(0, from * 100)}%)`;
 
@@ -68,14 +73,14 @@ function useTrackWaveform({
   } = useWaveformSource(audioRef, file, downloadStatus, fallbackDuration);
 
   const [playing, setPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(clip?.start ?? 0);
+  const [currentTime, setCurrentTime] = useState((clip?.start ?? 0) * duration);
   const [draftClip, setDraftClip] = useState<TrackClip | null>(null);
   const [width, setWidth] = useState(0);
 
-  const range = draftClip ?? normalizeClip(clip, duration) ?? fullClip(duration);
+  const range = draftClip ?? normalizeClip(clip, duration) ?? FULL_CLIP;
+  const playbackRange = { start: range.start * duration, end: range.end * duration };
   const canPlay = active && Boolean(playbackFile) && !playbackFailed && duration > 0;
   const position = Math.min(duration, Math.max(0, currentTime));
-  const ratio = (time: number) => (duration > 0 ? Math.min(1, Math.max(0, time / duration)) : 0);
   const clipped = normalizeClip(range, duration) !== undefined;
   // Hold the last clip so the label doesn't flash the full range while it fades out on reset.
   const [labelRange, setLabelRange] = useState(range);
@@ -106,9 +111,9 @@ function useTrackWaveform({
 
   // timeupdate fires a few times a second; follow the playhead per frame while playing and
   // stop at the clip end.
-  const rangeRef = useRef(range);
+  const rangeRef = useRef(playbackRange);
   useLayoutEffect(() => {
-    rangeRef.current = range;
+    rangeRef.current = playbackRange;
   });
   useEffect(() => {
     if (!playing) return;
@@ -157,9 +162,9 @@ function useTrackWaveform({
       return;
     }
 
-    if (audio.currentTime < range.start || audio.currentTime >= range.end - 0.05) {
-      audio.currentTime = range.start;
-      setCurrentTime(range.start);
+    if (audio.currentTime < playbackRange.start || audio.currentTime >= playbackRange.end - 0.05) {
+      audio.currentTime = playbackRange.start;
+      setCurrentTime(playbackRange.start);
     }
 
     try {
@@ -182,31 +187,33 @@ function useTrackWaveform({
     onClipChange(normalizeClip(next, duration));
   };
 
-  const pointerTime = (event: PointerEvent<HTMLElement>) => {
+  const pointerFraction = (event: PointerEvent<HTMLElement>) => {
     const bounds = surfaceRef.current?.getBoundingClientRect();
 
-    return bounds ? getPointerTime(event.clientX, bounds.left, bounds.width, duration) : 0;
+    return bounds ? getPointerFraction(event.clientX, bounds.left, bounds.width) : 0;
   };
 
-  const dragEdge = (edge: ClipEdge, time: number) => {
-    const next = moveClipEdge(range, edge, time, duration);
+  const dragEdge = (edge: ClipEdge, fraction: number) => {
+    const next = moveClipEdge(range, edge, fraction, duration);
     setDraftClip(next);
 
     // Keep the playhead inside the clip so the next play starts where the user expects.
-    if (edge === "start") seekTo(next.start);
-    else if (currentTime > next.end) seekTo(next.end);
+    if (!canPlay) return next;
+
+    if (edge === "start") seekTo(next.start * duration);
+    else if (currentTime > next.end * duration) seekTo(next.end * duration);
 
     return next;
   };
 
   const startDrag = (event: PointerEvent<HTMLDivElement>, edge?: ClipEdge) => {
-    if (!canPlay || event.button !== 0) return;
+    if (event.button !== 0 || !(edge || canPlay)) return;
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = edge ? { kind: "edge", edge } : { kind: "seek" };
 
-    if (edge) dragEdge(edge, pointerTime(event));
-    else seekTo(pointerTime(event));
+    if (edge) dragEdge(edge, pointerFraction(event));
+    else seekTo(pointerFraction(event) * duration);
   };
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -214,8 +221,8 @@ function useTrackWaveform({
 
     if (!drag) return;
 
-    if (drag.kind === "edge") dragEdge(drag.edge, pointerTime(event));
-    else seekTo(pointerTime(event));
+    if (drag.kind === "edge") dragEdge(drag.edge, pointerFraction(event));
+    else seekTo(pointerFraction(event) * duration);
   };
 
   const endDrag = () => {
@@ -232,8 +239,8 @@ function useTrackWaveform({
     const actions = new Map<string, () => void>([
       ["ArrowLeft", () => seekTo(position - step)],
       ["ArrowRight", () => seekTo(position + step)],
-      ["Home", () => seekTo(range.start)],
-      ["End", () => seekTo(range.end)],
+      ["Home", () => seekTo(playbackRange.start)],
+      ["End", () => seekTo(playbackRange.end)],
       [" ", () => void togglePlayback()],
       ["Enter", () => void togglePlayback()],
     ]);
@@ -246,9 +253,9 @@ function useTrackWaveform({
   };
 
   const handleEdgeKeyDown = (edge: ClipEdge) => (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!canPlay) return;
     event.stopPropagation();
-    const step = event.shiftKey ? 10 : 1;
+    const seconds = event.shiftKey ? 10 : 1;
+    const step = duration > 0 ? seconds / duration : seconds / 100;
     const current = range[edge];
 
     const targets = new Map([
@@ -257,7 +264,7 @@ function useTrackWaveform({
       ["ArrowRight", current + step],
       ["ArrowUp", current + step],
       ["Home", edge === "start" ? 0 : range.start],
-      ["End", edge === "end" ? duration : range.end],
+      ["End", edge === "end" ? 1 : range.end],
     ]);
 
     const target = targets.get(event.key);
@@ -282,9 +289,9 @@ function useTrackWaveform({
     active,
   });
 
-  const startRatio = ratio(range.start);
-  const endRatio = ratio(range.end);
-  const progressRatio = ratio(position);
+  const startRatio = range.start;
+  const endRatio = range.end;
+  const progressRatio = duration > 0 ? position / duration : 0;
 
   return {
     active,
@@ -298,7 +305,6 @@ function useTrackWaveform({
     statusMessage,
     clipped,
     labelRange,
-    range,
     duration,
     position,
     startRatio,
@@ -334,7 +340,6 @@ export default function TrackWaveform(props: TrackWaveformProps) {
     statusMessage,
     clipped,
     labelRange,
-    range,
     duration,
     position,
     startRatio,
@@ -377,8 +382,10 @@ export default function TrackWaveform(props: TrackWaveformProps) {
         ref={audioRef}
         preload="metadata"
         onLoadedMetadata={(event) => {
-          setMediaDuration(normalizeSeconds(event.currentTarget.duration));
-          event.currentTarget.currentTime = rangeRef.current.start;
+          const mediaDuration = normalizeSeconds(event.currentTarget.duration);
+          setMediaDuration(mediaDuration);
+          event.currentTarget.currentTime = startRatio * mediaDuration;
+          setCurrentTime(startRatio * mediaDuration);
         }}
         onDurationChange={(event) =>
           setMediaDuration(normalizeSeconds(event.currentTarget.duration))
@@ -431,7 +438,8 @@ export default function TrackWaveform(props: TrackWaveformProps) {
           >
             <span className="inline-flex items-center gap-1 rounded-full bg-muted py-px pr-0.5 pl-2 text-foreground/80">
               <span className="tabular-nums">
-                clip {formatTimestamp(labelRange.start)}–{formatTimestamp(labelRange.end)}
+                clip {formatClipPoint(labelRange.start, duration)}–
+                {formatClipPoint(labelRange.end, duration)}
               </span>
               <button
                 type="button"
@@ -467,7 +475,10 @@ export default function TrackWaveform(props: TrackWaveformProps) {
             <div
               className={cn(
                 WAVEFORM_LAYER_CLASS,
-                "fill-muted-foreground [fill-opacity:calc(0.45-0.2*var(--waveform-ready))]",
+                "fill-muted-foreground",
+                clipped
+                  ? "[fill-opacity:0.25]"
+                  : "[fill-opacity:calc(0.45-0.2*var(--waveform-ready))]",
               )}
             >
               <WaveformBars count={barCount} svgRef={barsRef} />
@@ -475,7 +486,10 @@ export default function TrackWaveform(props: TrackWaveformProps) {
             <div
               className={cn(
                 WAVEFORM_LAYER_CLASS,
-                "fill-muted-foreground/70 opacity-(--waveform-ready)",
+                "fill-muted-foreground",
+                clipped
+                  ? "[fill-opacity:calc(0.267+0.433*var(--waveform-ready))]"
+                  : "opacity-(--waveform-ready) [fill-opacity:0.7]",
               )}
               style={{ clipPath: clipInset(startRatio, endRatio) }}
             >
@@ -487,45 +501,42 @@ export default function TrackWaveform(props: TrackWaveformProps) {
             >
               <WaveformBars count={barCount} svgRef={barsRef} />
             </div>
-            {canPlay && (
-              <>
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute inset-y-0 w-px bg-foreground"
-                  style={{ left: `${progressRatio * 100}%` }}
-                />
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-y-0 border border-x-primary/60 border-y-primary/20"
-                  style={{
-                    left: `${startRatio * 100}%`,
-                    right: `${100 - endRatio * 100}%`,
-                  }}
-                />
-                <ClipHandle
-                  edge="start"
-                  ratio={startRatio}
-                  value={range.start}
-                  duration={duration}
-                  onPointerDown={(event) => startDrag(event, "start")}
-                  onKeyDown={handleEdgeKeyDown("start")}
-                />
-                <ClipHandle
-                  edge="end"
-                  ratio={endRatio}
-                  value={range.end}
-                  duration={duration}
-                  onPointerDown={(event) => startDrag(event, "end")}
-                  onKeyDown={handleEdgeKeyDown("end")}
-                />
-              </>
-            )}
+            <span
+              aria-hidden
+              className={cn(
+                "pointer-events-none absolute inset-y-0 w-px bg-foreground transition-opacity duration-200 ease-out motion-reduce:transition-none",
+                !canPlay && "opacity-0",
+              )}
+              style={{ left: `${progressRatio * 100}%` }}
+            />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 border border-x-primary/60 border-y-primary/20"
+              style={{
+                left: `${startRatio * 100}%`,
+                right: `${100 - endRatio * 100}%`,
+              }}
+            />
+            <ClipHandle
+              edge="start"
+              ratio={startRatio}
+              duration={duration}
+              onPointerDown={(event) => startDrag(event, "start")}
+              onKeyDown={handleEdgeKeyDown("start")}
+            />
+            <ClipHandle
+              edge="end"
+              ratio={endRatio}
+              duration={duration}
+              onPointerDown={(event) => startDrag(event, "end")}
+              onKeyDown={handleEdgeKeyDown("end")}
+            />
           </div>
         </div>
         <AnimatedWidth className="shrink-0 text-sm text-muted-foreground tabular-nums">
           <span className="text-foreground">{formatTimestamp(position)}</span>
           {" / "}
-          {formatTimestamp(duration)}
+          {duration > 0 ? formatTimestamp(duration) : "−:−−"}
         </AnimatedWidth>
       </div>
     </section>
@@ -648,14 +659,12 @@ function AnimatedWidth({ children, className }: { children: ReactNode; className
 function ClipHandle({
   edge,
   ratio,
-  value,
   duration,
   onPointerDown,
   onKeyDown,
 }: {
   edge: ClipEdge;
   ratio: number;
-  value: number;
   duration: number;
   onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
@@ -666,9 +675,9 @@ function ClipHandle({
       tabIndex={0}
       aria-label={edge === "start" ? "clip start" : "clip end"}
       aria-valuemin={0}
-      aria-valuemax={Math.round(duration)}
-      aria-valuenow={Math.round(value)}
-      aria-valuetext={formatTimestamp(value)}
+      aria-valuemax={duration > 0 ? Math.round(duration) : 100}
+      aria-valuenow={Math.round(ratio * (duration > 0 ? duration : 100))}
+      aria-valuetext={formatClipPoint(ratio, duration)}
       onPointerDown={onPointerDown}
       onKeyDown={onKeyDown}
       className={cn(

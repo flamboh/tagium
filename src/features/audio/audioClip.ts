@@ -51,8 +51,8 @@ export const clipAudioFile = (
     const blob = yield* runAudioClipWorker({
       file,
       kind: getAudioFormat(track).kind,
-      start: clip.start,
-      end: clip.end,
+      start: clip.start * metadata.duration,
+      end: clip.end * metadata.duration,
     });
 
     const clipped = new File([blob], file.name, {
