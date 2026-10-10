@@ -158,15 +158,31 @@ test("keeps filenames valid while the title changes and allows a custom filename
 });
 
 test("blocks download all while the active track's synced filename is blank", async ({ page }) => {
-  test.fail(
-    true,
-    "product bug: download all reads the unflushed library, so it exports singles/-.mp3 with a blank title",
-  );
   await page.goto("/");
-  await pickFiles(page, [audioFixture("mp3").upload]);
-  await field(page, "title").fill("   ");
+  await pickFiles(page, [
+    audioFixture("mp3", "tone-1.mp3").upload,
+    audioFixture("mp3", "tone-2.mp3").upload,
+  ]);
+  await libraryCount(page, 2);
+  const title = field(page, "title");
+  const downloadAllButton = page.getByRole("button", { name: "download all", exact: true });
+  const downloadAlbum = page.getByRole("button", { name: "download Fixture Album" });
+  await expect(downloadAllButton).toBeEnabled();
+  await expect(downloadAlbum).toBeEnabled();
+
+  await title.fill("   ");
   await expect(downloadTrackButton(page)).toBeDisabled();
-  await expect(page.getByRole("button", { name: "download all", exact: true })).toBeDisabled({
-    timeout: 3_000,
-  });
+  await expect(downloadAllButton).toBeDisabled();
+  await expect(downloadAlbum).toBeDisabled();
+
+  await trackRow(page, `2 ${fixtureTitle("mp3")}.mp3`).click();
+  await expect(title).toHaveValue(fixtureTitle("mp3"));
+  await expect(downloadAllButton).toBeDisabled();
+  await expect(downloadAlbum).toBeDisabled();
+
+  await trackRow(page, `1 ${fixtureTitle("mp3")}.mp3`).click();
+  await title.fill("Named again");
+  await expect(downloadTrackButton(page)).toBeEnabled();
+  await expect(downloadAllButton).toBeEnabled();
+  await expect(downloadAlbum).toBeEnabled();
 });

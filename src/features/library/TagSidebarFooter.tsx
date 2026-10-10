@@ -2,27 +2,27 @@ import { Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { allTracksReadyForDownload } from "@/features/export/downloadLibrary";
-import { isValidFilenameBase } from "@/features/library/filename";
 import type { TagSidebarPanelProps } from "@/features/library/TagSidebarPanel";
+import { useLiveTrackFilenameValidity } from "@/features/library/trackFilenamePreview";
 import { cn } from "@/lib/utils";
 
 type FooterProps = Pick<
   TagSidebarPanelProps,
-  "files" | "loading" | "settingsOpen" | "onDownloadAll" | "onOpenSettings"
+  "files" | "filenamePreviewStore" | "loading" | "settingsOpen" | "onDownloadAll" | "onOpenSettings"
 >;
 
 export default function TagSidebarFooter({
   files,
+  filenamePreviewStore,
   loading,
   settingsOpen,
   onDownloadAll,
   onOpenSettings,
 }: FooterProps) {
-  const canDownloadAll = files.length > 0 && allTracksReadyForDownload(files);
-  const hasInvalidFilename = files.some(
-    (file) => file.metadata && !isValidFilenameBase(file.metadata.filename),
-  );
+  const hasValidFilename = useLiveTrackFilenameValidity(filenamePreviewStore);
+  const hasInvalidFilename = files.some((file) => file.metadata && !hasValidFilename(file));
+  const canDownloadAll =
+    files.length > 0 && files.every((file) => Boolean(file.file) && hasValidFilename(file));
   const downloadAllReason = loading
     ? "download in progress"
     : files.length === 0

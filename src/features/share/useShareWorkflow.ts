@@ -20,7 +20,7 @@ import {
   removeRevocationReceipt,
   storeRevocationReceipt,
 } from "@/features/share/revocationReceipt";
-import { detectAnotherTagiumTab, listenForTagiumPresence } from "@/features/share/sharePresence";
+import { listenForTagiumPresence, watchForAnotherTagiumTab } from "@/features/share/sharePresence";
 import { shareLinkForSlug, shareSlugFromPathname } from "@/features/share/shareLink";
 import { shareEligibility, shareTrackEligibility } from "@/features/share/shareEligibility";
 import { manifestArtwork, manifestTrackCount, type Manifest } from "@/features/share/shareManifest";
@@ -124,7 +124,7 @@ export const useShareWorkflow = ({
     {},
   );
   const [adding, setAdding] = useState(false);
-  const [anotherTabOpen, setAnotherTabOpen] = useState(false);
+  const [anotherTabSlug, setAnotherTabSlug] = useState<string | null>(null);
   const [, setExpiryTick] = useState(0);
   const loadingSlugRef = useRef<string | null>(null);
   const pageLoadIdRef = useRef(0);
@@ -350,7 +350,6 @@ export const useShareWorkflow = ({
           trackCount: manifestTrackCount(fetched.manifest),
           viewer: getPublicationCapability(slug) ? "creator" : "recipient",
         });
-        void detectAnotherTagiumTab().then(setAnotherTabOpen);
         return fetched;
       } catch (error) {
         if (loadingSlugRef.current !== slug || pageLoadIdRef.current !== loadId) throw error;
@@ -366,6 +365,12 @@ export const useShareWorkflow = ({
   );
 
   useEffect(() => listenForTagiumPresence(), []);
+
+  const readySlug = page?.status === "ready" ? page.slug : null;
+  useEffect(() => {
+    if (!readySlug) return;
+    return watchForAnotherTagiumTab(() => setAnotherTabSlug(readySlug));
+  }, [readySlug]);
 
   useEffect(() => {
     if (!enabled && location.pathname.startsWith("/share/")) history.replaceState({}, "", "/");
@@ -855,7 +860,7 @@ export const useShareWorkflow = ({
     page,
     dialog,
     adding,
-    anotherTabOpen,
+    anotherTabOpen: readySlug !== null && anotherTabSlug === readySlug,
     alreadyAddedTargetId,
     canStopSharing,
     shareActions,

@@ -131,25 +131,29 @@ test("opening a share while tagium is open in another tab offers to copy the lin
   );
   const clipboard = await stubClipboard(context);
 
+  await page.addInitScript(() => {
+    window.BroadcastChannel = class extends window.BroadcastChannel {
+      override postMessage(...args: Parameters<BroadcastChannel["postMessage"]>) {
+        window.setTimeout(() => super.postMessage(...args), 600);
+      }
+    };
+  });
   await page.goto("/");
   const shareTab = await context.newPage();
   const toast = notifications(shareTab).getByRole("listitem").filter({
     hasText:
       "tagium is already open in another tab. copy the link and add the album there instead.",
   });
-  const openShareBesideTagium = () =>
-    expect(async () => {
-      await shareTab.goto(share.url);
-      await expect(toast).toBeVisible({ timeout: 5_000 });
-    }).toPass();
 
-  await openShareBesideTagium();
+  await shareTab.goto(share.url);
+  await expect(toast).toBeVisible();
   await toast.getByRole("button", { name: "copy link" }).click();
   await expect(notifications(shareTab).getByText("share link copied")).toBeVisible();
   expect(await clipboard.copied(shareTab)).toEqual([share.url]);
 
   await clipboard.deny(shareTab);
-  await openShareBesideTagium();
+  await shareTab.goto(share.url);
+  await expect(toast).toBeVisible();
   await toast.getByRole("button", { name: "copy link" }).click();
   await expect(notifications(shareTab).getByText("copy failed")).toBeVisible();
   await expect(

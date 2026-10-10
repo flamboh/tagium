@@ -9,40 +9,32 @@ const presenceMessageSchema = Schema.Struct({
   to: Schema.optionalKey(Schema.String),
 });
 
-export const detectAnotherTagiumTab = (waitMs = 180) =>
-  new Promise<boolean>((resolve) => {
-    if (!globalThis.BroadcastChannel) {
-      resolve(false);
-      return;
-    }
-    const channel = new globalThis.BroadcastChannel(CHANNEL_NAME);
-    let found = false;
-    const finish = () => {
-      channel.close();
-      resolve(found);
-    };
-    channel.onmessage = (event) => {
-      const decoded = Schema.decodeUnknownOption(presenceMessageSchema)(event.data);
-      if (Option.isNone(decoded)) return;
-      const message = decoded.value;
-      if (message.type !== "present" || message.to !== TAB_ID || message.from === TAB_ID) return;
-      found = true;
-      finish();
-    };
-    channel.postMessage({ type: "presence?", from: TAB_ID });
-    window.setTimeout(finish, waitMs);
-  });
+const decodePresenceMessage = (event: MessageEvent) =>
+  Option.getOrUndefined(Schema.decodeUnknownOption(presenceMessageSchema)(event.data));
+
+export const watchForAnotherTagiumTab = (onFound: () => void) => {
+  if (!globalThis.BroadcastChannel) return () => undefined;
+  const channel = new globalThis.BroadcastChannel(CHANNEL_NAME);
+  channel.onmessage = (event) => {
+    const message = decodePresenceMessage(event);
+    if (message?.type !== "present" || !message.from || message.from === TAB_ID) return;
+    if (message.to !== undefined && message.to !== TAB_ID) return;
+    channel.close();
+    onFound();
+  };
+  channel.postMessage({ type: "presence?", from: TAB_ID });
+  return () => channel.close();
+};
 
 export const listenForTagiumPresence = () => {
   if (!globalThis.BroadcastChannel) return () => undefined;
   const channel = new globalThis.BroadcastChannel(CHANNEL_NAME);
   channel.onmessage = (event) => {
-    const decoded = Schema.decodeUnknownOption(presenceMessageSchema)(event.data);
-    if (Option.isNone(decoded)) return;
-    const message = decoded.value;
-    if (message.type === "presence?" && message.from && message.from !== TAB_ID) {
+    const message = decodePresenceMessage(event);
+    if (message?.type === "presence?" && message.from && message.from !== TAB_ID) {
       channel.postMessage({ type: "present", from: TAB_ID, to: message.from });
     }
   };
+  channel.postMessage({ type: "present", from: TAB_ID });
   return () => channel.close();
 };
