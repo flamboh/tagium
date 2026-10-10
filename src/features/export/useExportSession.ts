@@ -14,6 +14,7 @@ import {
 } from "@/features/export/downloadLibrary";
 import {
   applyAlbumSharedTagsToFiles,
+  applyLinkedAlbumArtistsToFiles,
   applySingleAlbumTitlesToFiles,
   applySyncedFilenamesToFiles,
   applyTrackOrderNumbersToFiles,
@@ -120,6 +121,11 @@ export const useExportSession = ({
       projectedFiles = applySingleAlbumTitlesToFiles(
         projectedFiles,
         singleTrackIds,
+        settingsRef.current,
+      );
+      projectedFiles = applyLinkedAlbumArtistsToFiles(
+        projectedFiles,
+        trackIds,
         settingsRef.current,
       );
       if (settingsRef.current.syncTrackNumbers) {
