@@ -1,5 +1,5 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { KeyboardEvent, PointerEvent, ReactNode, RefObject } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { KeyboardEvent, PointerEvent, ReactNode, Ref, RefObject } from "react";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
@@ -13,30 +13,18 @@ import {
   moveClipEdge,
   normalizeClip,
   normalizeSeconds,
-  resamplePeaks,
   type WaveformData,
 } from "@/features/editor/waveform";
-import type { TrackClip } from "@/features/library/types";
+import {
+  WAVEFORM_HEIGHT,
+  barCountForWidth,
+  barsViewBox,
+  useWaveformBars,
+} from "@/features/editor/waveformBars";
+import type { TagiumFile, TrackClip } from "@/features/library/types";
 import { cn } from "@/lib/utils";
 
-const WAVEFORM_HEIGHT = 44;
-
-const BAR_WIDTH = 2;
-
-const BAR_GAP = 1;
-
-// Stands in for the real peaks while the track downloads or decodes.
-const PLACEHOLDER_PEAKS = Array.from({ length: 256 }, (_, index) => {
-  const swell = 0.45 + 0.3 * Math.sin(index / 9) * Math.sin(index / 23);
-  const jitter = (Math.sin(index * 12.9898) * 43758.5453) % 1;
-
-  return Math.min(1, Math.max(0.12, swell + Math.abs(jitter) * 0.35));
-});
-
-const BAR_GROWTH_MS = 300;
-
-const WAVEFORM_LAYER_CLASS =
-  "pointer-events-none absolute inset-0 transition-[opacity,fill] duration-300 ease-out motion-reduce:transition-none";
+const WAVEFORM_LAYER_CLASS = "pointer-events-none absolute inset-0";
 
 type WaveformStatus = "waiting" | "loading" | "ready" | "unavailable";
 
@@ -45,6 +33,7 @@ type ClipEdge = "start" | "end";
 interface TrackWaveformProps {
   active: boolean;
   file?: File;
+  downloadStatus: TagiumFile["downloadStatus"];
   fallbackDuration: number;
   clip?: TrackClip;
   onClipChange: (clip: TrackClip | undefined) => void;
@@ -57,6 +46,7 @@ const clipInset = (from: number, to: number) =>
 function useTrackWaveform({
   active,
   file,
+  downloadStatus,
   fallbackDuration,
   clip,
   onClipChange,
@@ -70,11 +60,12 @@ function useTrackWaveform({
     playbackFile,
     waveform,
     status,
+    loading,
     duration,
     playbackFailed,
     setPlaybackFailed,
     setMediaDuration,
-  } = useWaveformSource(audioRef, file, fallbackDuration);
+  } = useWaveformSource(audioRef, file, downloadStatus, fallbackDuration);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(clip?.start ?? 0);
@@ -282,33 +273,14 @@ function useTrackWaveform({
       ? "waveform unavailable for this track"
       : null;
 
-  const barCount = Math.floor((width + BAR_GAP) / (BAR_WIDTH + BAR_GAP));
+  const barCount = barCountForWidth(width);
 
-  const placeholderBars = useMemo(
-    () => (barCount > 0 ? resamplePeaks(PLACEHOLDER_PEAKS, barCount) : []),
-    [barCount],
-  );
-
-  const peaks = waveform?.peaks ?? PLACEHOLDER_PEAKS;
-
-  const targetBars = useMemo(
-    () => (barCount > 0 ? resamplePeaks(peaks, barCount) : []),
-    [peaks, barCount],
-  );
-
-  const growth = useBarGrowth(Boolean(waveform));
-
-  const bars = useMemo(
-    () =>
-      growth < 1
-        ? targetBars.map((bar, index) => {
-            const from = placeholderBars[index] ?? bar;
-
-            return from + (bar - from) * growth;
-          })
-        : targetBars,
-    [growth, placeholderBars, targetBars],
-  );
+  const barsRef = useWaveformBars(surfaceRef, {
+    peaks: waveform?.peaks ?? null,
+    loading,
+    barCount,
+    active,
+  });
 
   const startRatio = ratio(range.start);
   const endRatio = ratio(range.end);
@@ -333,8 +305,9 @@ function useTrackWaveform({
     endRatio,
     progressRatio,
     resetClip,
-    waveform,
-    bars,
+    loading,
+    barCount,
+    barsRef,
     startDrag,
     handlePointerMove,
     endDrag,
@@ -368,8 +341,9 @@ export default function TrackWaveform(props: TrackWaveformProps) {
     endRatio,
     progressRatio,
     resetClip,
-    waveform,
-    bars,
+    loading,
+    barCount,
+    barsRef,
     startDrag,
     handlePointerMove,
     endDrag,
@@ -387,6 +361,7 @@ export default function TrackWaveform(props: TrackWaveformProps) {
     <section
       data-track-waveform
       data-waveform-status={status}
+      data-waveform-loading={loading || undefined}
       aria-label="audio preview"
       className="relative flex min-w-0 flex-col px-3 pt-4.5"
     >
@@ -492,26 +467,25 @@ export default function TrackWaveform(props: TrackWaveformProps) {
             <div
               className={cn(
                 WAVEFORM_LAYER_CLASS,
-                waveform ? "fill-muted-foreground/25" : "fill-muted-foreground/20",
+                "fill-muted-foreground [fill-opacity:calc(0.45-0.2*var(--waveform-ready))]",
               )}
             >
-              <WaveformBars bars={bars} />
+              <WaveformBars count={barCount} svgRef={barsRef} />
             </div>
             <div
               className={cn(
                 WAVEFORM_LAYER_CLASS,
-                "fill-muted-foreground/70",
-                !waveform && "opacity-0",
+                "fill-muted-foreground/70 opacity-(--waveform-ready)",
               )}
               style={{ clipPath: clipInset(startRatio, endRatio) }}
             >
-              <WaveformBars bars={bars} />
+              <WaveformBars count={barCount} svgRef={barsRef} />
             </div>
             <div
-              className={cn(WAVEFORM_LAYER_CLASS, "fill-primary", !waveform && "opacity-0")}
+              className={cn(WAVEFORM_LAYER_CLASS, "fill-primary opacity-(--waveform-ready)")}
               style={{ clipPath: clipInset(startRatio, progressRatio) }}
             >
-              <WaveformBars bars={bars} />
+              <WaveformBars count={barCount} svgRef={barsRef} />
             </div>
             {canPlay && (
               <>
@@ -561,6 +535,7 @@ export default function TrackWaveform(props: TrackWaveformProps) {
 function useWaveformSource(
   audioRef: RefObject<HTMLAudioElement | null>,
   file: File | undefined,
+  downloadStatus: TagiumFile["downloadStatus"],
   fallbackDuration: number,
 ) {
   // Metadata writes replace the track's File without touching its audio; keep the first one
@@ -568,14 +543,17 @@ function useWaveformSource(
   const [playbackFile, setPlaybackFile] = useState(file);
 
   if (!playbackFile && file) setPlaybackFile(file);
+  const [decoded, setDecoded] = useState<WaveformData | null>(null);
+  const [failed, setFailed] = useState(false);
+  const waveform = decoded ?? getLoadedWaveform(playbackFile) ?? null;
 
-  const [waveform, setWaveform] = useState<WaveformData | null>(
-    () => getLoadedWaveform(file) ?? null,
-  );
-
-  const [status, setStatus] = useState<WaveformStatus>(
-    waveform ? "ready" : file ? "loading" : "waiting",
-  );
+  const status: WaveformStatus = waveform
+    ? "ready"
+    : failed
+      ? "unavailable"
+      : playbackFile
+        ? "loading"
+        : "waiting";
 
   const [mediaDuration, setMediaDuration] = useState(0);
   const [playbackFailed, setPlaybackFailed] = useState(false);
@@ -600,15 +578,12 @@ function useWaveformSource(
   useEffect(() => {
     if (!playbackFile || decodeDuration === 0 || getLoadedWaveform(playbackFile)) return;
     let current = true;
-    setStatus("loading");
     loadWaveform(playbackFile, decodeDuration).then(
       (data) => {
-        if (!current) return;
-        setWaveform(data);
-        setStatus("ready");
+        if (current) setDecoded(data);
       },
       () => {
-        if (current) setStatus("unavailable");
+        if (current) setFailed(true);
       },
     );
 
@@ -622,45 +597,20 @@ function useWaveformSource(
     normalizeSeconds(waveform?.duration) ||
     normalizeSeconds(fallbackDuration);
 
+  const loading =
+    !playbackFailed &&
+    (status === "loading" || (status === "waiting" && downloadStatus === "downloading"));
+
   return {
     playbackFile,
     waveform,
     status,
+    loading,
     duration,
     playbackFailed,
     setPlaybackFailed,
     setMediaDuration,
   };
-}
-
-function useBarGrowth(ready: boolean) {
-  const [readyOnMount] = useState(ready);
-  const [growth, setGrowth] = useState(ready ? 1 : 0);
-  useEffect(() => {
-    if (!ready || readyOnMount) return;
-
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setGrowth(1);
-
-      return;
-    }
-
-    let frame = 0;
-    const startedAt = performance.now();
-
-    const tick = (now: number) => {
-      const progress = Math.min(1, (now - startedAt) / BAR_GROWTH_MS);
-      setGrowth(1 - (1 - progress) ** 4);
-
-      if (progress < 1) frame = requestAnimationFrame(tick);
-    };
-
-    frame = requestAnimationFrame(tick);
-
-    return () => cancelAnimationFrame(frame);
-  }, [ready, readyOnMount]);
-
-  return growth;
 }
 
 function AnimatedWidth({ children, className }: { children: ReactNode; className: string }) {
@@ -732,29 +682,23 @@ function ClipHandle({
   );
 }
 
-const WaveformBars = memo(function WaveformBars({ bars }: { bars: number[] }) {
-  const width = Math.max(1, bars.length * (BAR_WIDTH + BAR_GAP) - BAR_GAP);
-  // Bars mirror around a 1px divider through the vertical center; the lower half is fainter.
-  const half = (WAVEFORM_HEIGHT - 1) / 2;
-  const upper: string[] = [];
-  const lower: string[] = [];
-
-  for (const [index, bar] of bars.entries()) {
-    const x = index * (BAR_WIDTH + BAR_GAP);
-    const height = Math.max(1, bar * half);
-    upper.push(`M${x} ${half - height}h${BAR_WIDTH}v${height}h${-BAR_WIDTH}Z`);
-    lower.push(`M${x} ${half + 1}h${BAR_WIDTH}v${height}h${-BAR_WIDTH}Z`);
-  }
-
+const WaveformBars = memo(function WaveformBars({
+  count,
+  svgRef,
+}: {
+  count: number;
+  svgRef: Ref<SVGSVGElement>;
+}) {
   return (
     <svg
+      ref={svgRef}
       aria-hidden
       className="absolute inset-x-0 top-1 h-[calc(100%-0.5rem)] w-full"
-      viewBox={`0 0 ${width} ${WAVEFORM_HEIGHT}`}
+      viewBox={barsViewBox(count)}
       preserveAspectRatio="none"
     >
-      <path d={upper.join("")} />
-      <path d={lower.join("")} opacity={0.45} />
+      <path />
+      <path opacity={0.45} />
     </svg>
   );
 });
