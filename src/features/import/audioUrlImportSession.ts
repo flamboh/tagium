@@ -48,11 +48,9 @@ const retryProvider = (
       try {
         const parsed = parseMediaLink(track.downloadRequest.sourceUrl);
 
-        return parsed.provider === "youtube"
-          ? "youtube"
-          : parsed.provider === "soundcloud"
-            ? "soundcloud"
-            : "other";
+        return parsed.provider === "youtube" || parsed.provider === "soundcloud"
+          ? parsed.provider
+          : "other";
       } catch {
         return "other";
       }

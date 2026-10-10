@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
 import { AudioMetadataReadError } from "@/features/audio/audioErrors";
 import type { ByteSource } from "@/features/audio/metadataEngine/byteSource";
-import { makeBlobByteSource } from "@/features/audio/metadataEngine/byteSource";
+import { blobByteSource } from "@/features/audio/metadataEngine/byteSource";
 import { mp4Driver } from "@/features/audio/metadataEngine/mp4";
 
 const u32 = (value: number) =>
@@ -170,15 +170,13 @@ const makeFixture = ({
 };
 
 const runInspect = (bytes: Uint8Array<ArrayBuffer>) =>
-  Effect.runPromise(mp4Driver.inspect(makeBlobByteSource(new Blob([bytes]))));
+  Effect.runPromise(mp4Driver.inspect(blobByteSource(new Blob([bytes]))));
 
 const runPatch = async (
   bytes: Uint8Array<ArrayBuffer>,
   changes: Parameters<typeof mp4Driver.patch>[1],
 ) => {
-  const plan = await Effect.runPromise(
-    mp4Driver.patch(makeBlobByteSource(new Blob([bytes])), changes),
-  );
+  const plan = await Effect.runPromise(mp4Driver.patch(blobByteSource(new Blob([bytes])), changes));
 
   return new Uint8Array(await new Blob(plan.parts, { type: plan.type }).arrayBuffer());
 };
@@ -404,15 +402,14 @@ describe("mp4Driver", () => {
     await expect(runInspect(makeFixture({ codec: "alac" }).bytes)).resolves.toMatchObject({
       format: { kind: "m4a" },
     });
-    await expect(runInspect(makeFixture({ codec: "enca" }).bytes)).rejects.toMatchObject({
-      _tag: "AudioMetadataReadError",
-      message: expect.stringContaining("encrypted"),
-    });
-    await expect(runInspect(ascii("not an mp4 file"))).rejects.toMatchObject({
-      _tag: "AudioMetadataReadError",
-    });
+    const encrypted = runInspect(makeFixture({ codec: "enca" }).bytes);
+    await expect(encrypted).rejects.toBeInstanceOf(AudioMetadataReadError);
+    await expect(encrypted).rejects.toThrow("encrypted");
+    await expect(runInspect(ascii("not an mp4 file"))).rejects.toBeInstanceOf(
+      AudioMetadataReadError,
+    );
     const truncated = makeFixture().bytes.slice(0, -3);
-    await expect(runInspect(truncated)).rejects.toMatchObject({ _tag: "AudioMetadataReadError" });
+    await expect(runInspect(truncated)).rejects.toBeInstanceOf(AudioMetadataReadError);
   });
 
   it("rejects fragmented and external-reference layouts before patch planning", async () => {

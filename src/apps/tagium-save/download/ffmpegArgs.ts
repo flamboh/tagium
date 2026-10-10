@@ -26,9 +26,7 @@ const stripMetadataControlCharacters = (value: string) =>
     })
     .join("");
 
-export const makeMetadataFfmpegArgs = (
-  metadata: Record<string, string | undefined> | undefined,
-) => {
+export const metadataFfmpegArgs = (metadata: Record<string, string | undefined> | undefined) => {
   if (!metadata) return [];
 
   return Object.entries(metadata).flatMap(([name, value]) => {
@@ -153,7 +151,7 @@ const appendAudioFlags = (args: string[], audio: AudioSettings, inputNames: read
  * local-processing type. Input names are supplied by the worker so tests and
  * callers can inspect the command without coupling to LibAV's filesystem.
  */
-export const makeLocalProcessingFfmpegArgs = (
+export const localProcessingFfmpegArgs = (
   plan: CobaltLocalProcessingPlan,
   inputNames: readonly string[],
   outputName: string,
@@ -181,12 +179,12 @@ export const makeLocalProcessingFfmpegArgs = (
       appendMappedVideoAndAudio(args, plan, inputNames);
       args.push("-c:v", "copy", "-c:a", "copy");
       appendSubtitleFlags(args, plan, inputNames, format);
-      args.push(...makeMetadataFfmpegArgs(plan.output.metadata));
+      args.push(...metadataFfmpegArgs(plan.output.metadata));
       break;
     case "mute":
       args.push("-map", "0:v:0", "-c:v", "copy", "-an");
       appendSubtitleFlags(args, plan, inputNames, format);
-      args.push(...makeMetadataFfmpegArgs(plan.output.metadata));
+      args.push(...metadataFfmpegArgs(plan.output.metadata));
       break;
     case "proxy":
       if (plan.audio) {
@@ -196,11 +194,11 @@ export const makeLocalProcessingFfmpegArgs = (
         appendSubtitleFlags(args, plan, inputNames, format);
       }
 
-      args.push(...makeMetadataFfmpegArgs(plan.output.metadata));
+      args.push(...metadataFfmpegArgs(plan.output.metadata));
       break;
     case "audio":
       appendAudioFlags(args, requireAudioSettings(plan), inputNames);
-      args.push(...makeMetadataFfmpegArgs(plan.output.metadata));
+      args.push(...metadataFfmpegArgs(plan.output.metadata));
       break;
     case "gif":
       args.push(

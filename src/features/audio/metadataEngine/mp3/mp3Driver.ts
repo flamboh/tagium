@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Match } from "effect";
 import { AudioMetadataReadError, AudioMetadataWriteError } from "@/features/audio/audioErrors";
 import {
   ascii,
@@ -131,14 +131,12 @@ const decodeText = (payload: Uint8Array, version: Id3Version) => {
 
   const body = payload.subarray(1);
 
-  const value =
-    encoding === 0
-      ? latinDecoder.decode(body)
-      : encoding === 1
-        ? decodeUtf16(body)
-        : encoding === 2
-          ? decodeUtf16(body, true)
-          : fatalTextDecoder.decode(body);
+  const value = Match.value(encoding).pipe(
+    Match.when(0, () => latinDecoder.decode(body)),
+    Match.when(1, () => decodeUtf16(body)),
+    Match.when(2, () => decodeUtf16(body, true)),
+    Match.orElse(() => fatalTextDecoder.decode(body)),
+  );
 
   return trimNulls(value);
 };
@@ -160,11 +158,11 @@ const encodeText = (value: string, version: Id3Version) => {
 const hasUnsupportedFormatFlags = (bytes: Uint8Array, offset: number, version: Id3Version) => {
   const formatFlags = version === 2 ? 0 : bytes[offset + 9]!;
 
-  return version === 3
-    ? (formatFlags & 0xe0) !== 0
-    : version === 4
-      ? (formatFlags & 0x4f) !== 0
-      : false;
+  return Match.value(version).pipe(
+    Match.when(3, () => (formatFlags & 0xe0) !== 0),
+    Match.when(4, () => (formatFlags & 0x4f) !== 0),
+    Match.orElse(() => false),
+  );
 };
 
 const parseId3 = (bytes: Uint8Array<ArrayBuffer>): ParsedTag | undefined => {
@@ -290,12 +288,14 @@ const parseId3 = (bytes: Uint8Array<ArrayBuffer>): ParsedTag | undefined => {
     if (!/^[A-Z0-9]{3,4}$/u.test(id))
       throw readFailure(`invalid ID3 frame id ${JSON.stringify(id)}.`);
 
-    const size =
-      version === 2
-        ? bytes[offset + 3]! * 0x10000 + bytes[offset + 4]! * 0x100 + bytes[offset + 5]!
-        : version === 4
-          ? synchsafeToNumber(bytes, offset + 4)
-          : readUint32BE(bytes, offset + 4);
+    const size = Match.value(version).pipe(
+      Match.when(
+        2,
+        () => bytes[offset + 3]! * 0x10000 + bytes[offset + 4]! * 0x100 + bytes[offset + 5]!,
+      ),
+      Match.when(4, () => synchsafeToNumber(bytes, offset + 4)),
+      Match.orElse(() => readUint32BE(bytes, offset + 4)),
+    );
 
     const frameEnd = offset + headerSize + size;
 
@@ -639,14 +639,12 @@ const patchApe = (ape: ParsedApe, changes: MetadataChanges) => {
     }
 
     if (value !== undefined) {
-      const key =
-        field === "albumArtist"
-          ? "Album Artist"
-          : field === "discNumber"
-            ? "Disc"
-            : field === "bpm"
-              ? "BPM"
-              : field[0]!.toUpperCase() + field.slice(1);
+      const key = Match.value(field).pipe(
+        Match.when("albumArtist", () => "Album Artist"),
+        Match.when("discNumber", () => "Disc"),
+        Match.when("bpm", () => "BPM"),
+        Match.orElse((other) => other[0]!.toUpperCase() + other.slice(1)),
+      );
 
       items.push(encodeApeItem(key, value));
     }

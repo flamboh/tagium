@@ -3,7 +3,7 @@ import { AudioMetadataWriteError } from "@/features/audio/audioErrors";
 import { audioFilenameBase, audioFilename } from "@/features/audio/audioFormat";
 import type { AudioMetadata } from "@/features/audio/metadata";
 import { validateAdvancedMetadataNumber } from "@/features/audio/metadataFields";
-import { makeBlobByteSource } from "@/features/audio/metadataEngine/byteSource";
+import { blobByteSource } from "@/features/audio/metadataEngine/byteSource";
 import { detectAudioFormat } from "@/features/audio/metadataEngine/detect";
 import type { FormatDriver } from "@/features/audio/metadataEngine/driver";
 import { flacDriver } from "@/features/audio/metadataEngine/flac";
@@ -30,7 +30,7 @@ const sourceFormat = (driver: FormatDriver, filename: string) =>
 
 const inspectFile = (file: File) =>
   Effect.gen(function* () {
-    const source = makeBlobByteSource(file);
+    const source = blobByteSource(file);
     const kind = yield* detectAudioFormat(source);
     const driver = drivers[kind];
     const inspection = yield* driver.inspect(source);
@@ -162,7 +162,7 @@ export const patchAudioFile = (file: File, metadata: AudioMetadata) =>
     const validationError = validateEditableNumbers(metadata);
 
     if (validationError) return yield* Effect.fail(validationError);
-    const source = makeBlobByteSource(file);
+    const source = blobByteSource(file);
 
     const kind = yield* detectAudioFormat(source).pipe(
       Effect.mapError(
@@ -198,7 +198,7 @@ export const patchAudioFileWithChanges = (
     const validationError = validateChangedNumbers(changes);
 
     if (validationError) return yield* Effect.fail(validationError);
-    const source = makeBlobByteSource(file);
+    const source = blobByteSource(file);
 
     const kind = yield* detectAudioFormat(source).pipe(
       Effect.mapError(

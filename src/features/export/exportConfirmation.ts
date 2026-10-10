@@ -184,9 +184,11 @@ export const planExport = (
   const looseTrackIds =
     groups.find((group) => group.id === "loose")?.tracks.map(({ id }) => id) ?? [];
 
-  const files = trackIds
-    .map((id) => filesById.get(id))
-    .filter((file): file is TagiumFile => !!file);
+  const files = trackIds.flatMap((id) => {
+    const file = filesById.get(id);
+
+    return file ? [file] : [];
+  });
 
   const entries = getLibraryDownloadEntries({
     albums,

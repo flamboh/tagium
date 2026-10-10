@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Match } from "effect";
 import { AudioMetadataReadError, AudioMetadataWriteError } from "@/features/audio/audioErrors";
 import type { ByteSource } from "@/features/audio/metadataEngine/byteSource";
 import {
@@ -537,12 +537,11 @@ const parseMetadata = (
 
         if (item.type === "covr") {
           pictures.push({
-            format:
-              payload.type === 14
-                ? "image/png"
-                : payload.type === 13
-                  ? "image/jpeg"
-                  : "application/octet-stream",
+            format: Match.value(payload.type).pipe(
+              Match.when(14, () => "image/png"),
+              Match.when(13, () => "image/jpeg"),
+              Match.orElse(() => "application/octet-stream"),
+            ),
             type: 3,
             description: "",
             data: new Uint8Array(payload.bytes),

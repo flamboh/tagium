@@ -206,18 +206,17 @@ const applyPendingMetadataPatch = (
 ): AudioMetadata => {
   if (!pendingPatch) return metadata;
 
-  return patchFields.reduce<AudioMetadata>((nextMetadata, field) => {
-    if (!hasOwn(pendingPatch, field)) return nextMetadata;
+  const updates: Partial<AudioMetadata> = {};
+
+  for (const field of patchFields) {
+    if (!hasOwn(pendingPatch, field)) continue;
 
     const value = pendingPatch[field];
 
-    if (value === undefined) return nextMetadata;
+    if (value !== undefined) Object.assign(updates, { [field]: value });
+  }
 
-    return {
-      ...nextMetadata,
-      [field]: value,
-    };
-  }, metadata);
+  return { ...metadata, ...updates };
 };
 
 const normalizePendingMetadataPatch = (

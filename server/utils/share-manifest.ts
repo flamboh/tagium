@@ -1,3 +1,4 @@
+import { Match } from "effect";
 import {
   decodeManifest,
   manifestArtwork,
@@ -476,12 +477,13 @@ export const createShareManifestStore = (
 
       const artwork = artworkUpdate.kind === "replace" ? artworkUpdate.artwork : undefined;
 
-      const nextManifest =
-        artworkUpdate.kind === "remove"
-          ? withoutArtwork(manifest)
-          : artworkUpdate.kind === "replace"
-            ? withArtwork(manifest, artwork)
-            : withRetainedArtwork(manifest, previous);
+      const nextManifest = Match.value(artworkUpdate).pipe(
+        Match.discriminatorsExhaustive("kind")({
+          retain: () => withRetainedArtwork(manifest, previous),
+          remove: () => withoutArtwork(manifest),
+          replace: (update) => withArtwork(manifest, update.artwork),
+        }),
+      );
 
       const payloadJson = JSON.stringify(nextManifest);
       const payloadBytes = utf8.encode(payloadJson).byteLength;
@@ -511,24 +513,25 @@ export const createShareManifestStore = (
         payloadBytes,
         trackCount: manifestTrackCount(nextManifest),
         artworkKey,
-        artworkType:
-          artworkUpdate.kind === "replace"
-            ? artwork?.type
-            : artworkUpdate.kind === "retain"
-              ? previous.artworkType
-              : undefined,
-        artworkBytes:
-          artworkUpdate.kind === "replace"
-            ? artwork?.bytes.byteLength
-            : artworkUpdate.kind === "retain"
-              ? previous.artworkBytes
-              : undefined,
-        artworkSha256:
-          artworkUpdate.kind === "replace"
-            ? artwork?.sha256
-            : artworkUpdate.kind === "retain"
-              ? previous.artworkSha256
-              : undefined,
+        ...Match.value(artworkUpdate).pipe(
+          Match.discriminatorsExhaustive("kind")({
+            retain: () => ({
+              artworkType: previous.artworkType,
+              artworkBytes: previous.artworkBytes,
+              artworkSha256: previous.artworkSha256,
+            }),
+            remove: () => ({
+              artworkType: undefined,
+              artworkBytes: undefined,
+              artworkSha256: undefined,
+            }),
+            replace: (update) => ({
+              artworkType: update.artwork.type,
+              artworkBytes: update.artwork.bytes.byteLength,
+              artworkSha256: update.artwork.sha256,
+            }),
+          }),
+        ),
       };
 
       if (artwork && artworkKey) {

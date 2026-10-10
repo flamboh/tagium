@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { Effect } from "effect";
-import { makeBlobByteSource } from "../../../src/features/audio/metadataEngine/byteSource";
+import { Effect, Match } from "effect";
+import { blobByteSource } from "../../../src/features/audio/metadataEngine/byteSource";
 import { flacDriver } from "../../../src/features/audio/metadataEngine/flac";
 import { mp3Driver } from "../../../src/features/audio/metadataEngine/mp3/mp3Driver";
 import { mp4Driver } from "../../../src/features/audio/metadataEngine/mp4";
@@ -113,7 +113,7 @@ const fixtures = {
 
 export const materializeFixture = async (family: FixtureFamily) => {
   const plan = await Effect.runPromise(
-    drivers[family].patch(makeBlobByteSource(new Blob([fixtures[family]()])), {
+    drivers[family].patch(blobByteSource(new Blob([fixtures[family]()])), {
       title: "Plain title",
       artist: "Artist 1",
       album: "Synthetic Album 1",
@@ -190,14 +190,13 @@ const opusPayload = (bytes: Uint8Array) => {
 };
 
 export const audioPayloadSha256 = (family: FixtureFamily, bytes: Uint8Array) => {
-  const payload =
-    family === "mp3"
-      ? mp3Payload(bytes)
-      : family === "flac"
-        ? flacPayload(bytes)
-        : family === "m4a"
-          ? mp4Payload(bytes)
-          : opusPayload(bytes);
+  const payload = Match.value(family).pipe(
+    Match.when("mp3", () => mp3Payload(bytes)),
+    Match.when("flac", () => flacPayload(bytes)),
+    Match.when("m4a", () => mp4Payload(bytes)),
+    Match.when("opus", () => opusPayload(bytes)),
+    Match.exhaustive,
+  );
 
   return createHash("sha256").update(payload).digest("hex");
 };

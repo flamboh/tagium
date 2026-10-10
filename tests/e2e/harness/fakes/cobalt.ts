@@ -1,3 +1,4 @@
+import { Match } from "effect";
 import { createHash, randomBytes } from "node:crypto";
 import { videoStreamFixtures, type VideoCodec } from "../../fixtures/catalog.ts";
 import {
@@ -166,7 +167,11 @@ const youtubeVideoPlan = (
     : "h264";
 
   if (youtubeStreams(scenario, codec).length === 0) {
-    codec = codec === "av1" ? "vp9" : codec === "vp9" ? "av1" : codec;
+    codec = Match.value(codec).pipe(
+      Match.when("av1", () => "vp9" as const),
+      Match.when("vp9", () => "av1" as const),
+      Match.orElse((other) => other),
+    );
   }
 
   if (youtubeStreams(scenario, codec).length === 0) codec = "h264";

@@ -15,7 +15,7 @@ export interface ByteSource {
 const readError = (message: string, cause?: unknown) =>
   new AudioMetadataReadError({ message, cause });
 
-export const makeBlobByteSource = (blob: Blob): ByteSource => {
+export const blobByteSource = (blob: Blob): ByteSource => {
   let cached: { offset: number; bytes: Uint8Array<ArrayBuffer> } | undefined;
 
   return {

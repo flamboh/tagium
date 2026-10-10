@@ -1,6 +1,7 @@
 import { Effect } from "effect";
+import { AudioMetadataReadError, AudioMetadataWriteError } from "@/features/audio/audioErrors";
 import { describe, expect, it } from "vite-plus/test";
-import { makeBlobByteSource, type ByteSource } from "@/features/audio/metadataEngine/byteSource";
+import { blobByteSource, type ByteSource } from "@/features/audio/metadataEngine/byteSource";
 import { flacDriver } from "@/features/audio/metadataEngine/flac";
 
 const concat = (...parts: Uint8Array[]) => {
@@ -133,7 +134,7 @@ describe("FLAC metadata driver", () => {
   it("reads stream facts, first-value comment precedence, genres, and every picture", async () => {
     const bytes = fixture();
     const seenReads: number[] = [];
-    const source = makeBlobByteSource(new Blob([bytes]));
+    const source = blobByteSource(new Blob([bytes]));
 
     const instrumented: ByteSource = {
       ...source,
@@ -182,7 +183,7 @@ describe("FLAC metadata driver", () => {
     const original = fixture();
 
     const plan = await Effect.runPromise(
-      flacDriver.patch(makeBlobByteSource(new Blob([original])), {}),
+      flacDriver.patch(blobByteSource(new Blob([original])), {}),
     );
 
     expect(await outputBytes(plan.parts)).toEqual(original);
@@ -191,13 +192,11 @@ describe("FLAC metadata driver", () => {
 
   it("patches owned comments while preserving unknown blocks, comments, pictures, and audio", async () => {
     const original = fixture();
-    const source = makeBlobByteSource(new Blob([original]));
+    const source = blobByteSource(new Blob([original]));
     const plan = await Effect.runPromise(flacDriver.patch(source, { title: "Changed 🦊" }));
     const patched = await outputBytes(plan.parts);
 
-    const result = await Effect.runPromise(
-      flacDriver.inspect(makeBlobByteSource(new Blob([patched]))),
-    );
+    const result = await Effect.runPromise(flacDriver.inspect(blobByteSource(new Blob([patched]))));
 
     expect(result.metadata.title).toBe("Changed 🦊");
     expect(result.metadata.picture.map((entry) => [...entry.data])).toEqual([
@@ -216,7 +215,7 @@ describe("FLAC metadata driver", () => {
     const original = fixture();
 
     const patchedPlan = await Effect.runPromise(
-      flacDriver.patch(makeBlobByteSource(new Blob([original])), {
+      flacDriver.patch(blobByteSource(new Blob([original])), {
         albumArtist: "New Album Artist",
         composer: "New Composer",
         comment: "New comment",
@@ -228,7 +227,7 @@ describe("FLAC metadata driver", () => {
     const patched = await outputBytes(patchedPlan.parts);
 
     const inspected = await Effect.runPromise(
-      flacDriver.inspect(makeBlobByteSource(new Blob([patched]))),
+      flacDriver.inspect(blobByteSource(new Blob([patched]))),
     );
 
     expect(inspected.metadata).toMatchObject({
@@ -247,7 +246,7 @@ describe("FLAC metadata driver", () => {
     ]);
 
     const clearedPlan = await Effect.runPromise(
-      flacDriver.patch(makeBlobByteSource(new Blob([patched])), {
+      flacDriver.patch(blobByteSource(new Blob([patched])), {
         albumArtist: "",
         composer: "",
         comment: "",
@@ -259,7 +258,7 @@ describe("FLAC metadata driver", () => {
     const cleared = await outputBytes(clearedPlan.parts);
 
     const clearedInspection = await Effect.runPromise(
-      flacDriver.inspect(makeBlobByteSource(new Blob([cleared]))),
+      flacDriver.inspect(blobByteSource(new Blob([cleared]))),
     );
 
     expect(clearedInspection.metadata).toMatchObject({
@@ -285,7 +284,7 @@ describe("FLAC metadata driver", () => {
     ["COMMENT ahead of a DESCRIPTION alias", ["DESCRIPTION=alias", "Comment=primary"], "primary"],
   ])("reads the user comment from %s", async (_case, comments, expected) => {
     const inspected = await Effect.runPromise(
-      flacDriver.inspect(makeBlobByteSource(new Blob([flacWithComments(comments)]))),
+      flacDriver.inspect(blobByteSource(new Blob([flacWithComments(comments)]))),
     );
 
     expect(inspected.metadata.comment).toBe(expected);
@@ -300,13 +299,13 @@ describe("FLAC metadata driver", () => {
       ]);
 
       const inspected = await Effect.runPromise(
-        flacDriver.inspect(makeBlobByteSource(new Blob([original]))),
+        flacDriver.inspect(blobByteSource(new Blob([original]))),
       );
 
       expect(inspected.metadata.comment).toBe("Primary comment");
 
       const plan = await Effect.runPromise(
-        flacDriver.patch(makeBlobByteSource(new Blob([original])), { comment }),
+        flacDriver.patch(blobByteSource(new Blob([original])), { comment }),
       );
 
       const patched = await outputBytes(plan.parts);
@@ -314,7 +313,7 @@ describe("FLAC metadata driver", () => {
       expect(new TextDecoder().decode(patched)).not.toContain("Primary comment");
 
       const updated = await Effect.runPromise(
-        flacDriver.inspect(makeBlobByteSource(new Blob([patched]))),
+        flacDriver.inspect(blobByteSource(new Blob([patched]))),
       );
 
       expect(updated.metadata.comment).toBe(comment || "Separate description");
@@ -325,13 +324,13 @@ describe("FLAC metadata driver", () => {
     const original = flacWithComments(["DESCRIPTION=Separate description", "COMMENT="]);
 
     const inspected = await Effect.runPromise(
-      flacDriver.inspect(makeBlobByteSource(new Blob([original]))),
+      flacDriver.inspect(blobByteSource(new Blob([original]))),
     );
 
     expect(inspected.metadata.comment).toBe("");
 
     const plan = await Effect.runPromise(
-      flacDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "Updated" }),
+      flacDriver.patch(blobByteSource(new Blob([original])), { comment: "Updated" }),
     );
 
     expect(new TextDecoder().decode(await outputBytes(plan.parts))).toContain(
@@ -343,7 +342,7 @@ describe("FLAC metadata driver", () => {
     const original = flacWithComments(["DESCRIPTION=FFmpeg comment", "X-private=opaque value"]);
 
     const patchedPlan = await Effect.runPromise(
-      flacDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "Updated" }),
+      flacDriver.patch(blobByteSource(new Blob([original])), { comment: "Updated" }),
     );
 
     const patched = await outputBytes(patchedPlan.parts);
@@ -354,13 +353,13 @@ describe("FLAC metadata driver", () => {
     expect([...patched.subarray(audioOffset(patched))]).toEqual([...audio]);
 
     const inspected = await Effect.runPromise(
-      flacDriver.inspect(makeBlobByteSource(new Blob([patched]))),
+      flacDriver.inspect(blobByteSource(new Blob([patched]))),
     );
 
     expect(inspected.metadata.comment).toBe("Updated");
 
     const clearedPlan = await Effect.runPromise(
-      flacDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "" }),
+      flacDriver.patch(blobByteSource(new Blob([original])), { comment: "" }),
     );
 
     const clearedText = new TextDecoder().decode(await outputBytes(clearedPlan.parts));
@@ -378,7 +377,7 @@ describe("FLAC metadata driver", () => {
     );
 
     const plan = await Effect.runPromise(
-      flacDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "Updated" }),
+      flacDriver.patch(blobByteSource(new Blob([original])), { comment: "Updated" }),
     );
 
     const patched = await outputBytes(plan.parts);
@@ -388,7 +387,7 @@ describe("FLAC metadata driver", () => {
 
   it("only replaces pictures when an explicit picture change is present", async () => {
     const original = fixture();
-    const source = makeBlobByteSource(new Blob([original]));
+    const source = blobByteSource(new Blob([original]));
 
     const plan = await Effect.runPromise(
       flacDriver.patch(source, {
@@ -398,9 +397,7 @@ describe("FLAC metadata driver", () => {
 
     const patched = await outputBytes(plan.parts);
 
-    const result = await Effect.runPromise(
-      flacDriver.inspect(makeBlobByteSource(new Blob([patched]))),
-    );
+    const result = await Effect.runPromise(flacDriver.inspect(blobByteSource(new Blob([patched]))));
 
     expect(result.metadata.picture).toHaveLength(1);
     expect(result.metadata.picture[0]).toMatchObject({
@@ -415,14 +412,12 @@ describe("FLAC metadata driver", () => {
   it("returns typed errors for malformed and truncated streams without producing output", async () => {
     const invalid = concat(utf8("fLaC"), block(0, streamInfo(), true), Uint8Array.of(0, 0));
     await expect(
-      Effect.runPromise(flacDriver.inspect(makeBlobByteSource(new Blob([invalid])))),
-    ).rejects.toMatchObject({ _tag: "AudioMetadataReadError" });
+      Effect.runPromise(flacDriver.inspect(blobByteSource(new Blob([invalid])))),
+    ).rejects.toBeInstanceOf(AudioMetadataReadError);
 
     const truncated = fixture().slice(0, 50);
     await expect(
-      Effect.runPromise(
-        flacDriver.patch(makeBlobByteSource(new Blob([truncated])), { title: "x" }),
-      ),
-    ).rejects.toMatchObject({ _tag: "AudioMetadataWriteError" });
+      Effect.runPromise(flacDriver.patch(blobByteSource(new Blob([truncated])), { title: "x" })),
+    ).rejects.toBeInstanceOf(AudioMetadataWriteError);
   });
 });

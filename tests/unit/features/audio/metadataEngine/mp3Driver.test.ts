@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 import { numberToSynchsafe, readUint32LE, uint32LE } from "@/features/audio/metadataEngine/binary";
-import { makeBlobByteSource } from "@/features/audio/metadataEngine/byteSource";
+import { blobByteSource } from "@/features/audio/metadataEngine/byteSource";
 import { mp3Driver } from "@/features/audio/metadataEngine/mp3/mp3Driver";
 import { validMp3Bytes } from "../../../support/mp3TestFixtures";
 
@@ -178,9 +178,7 @@ describe("mp3Driver", () => {
   it("returns the original byte source for a no-op", async () => {
     const input = concat(tag(frame("TIT2", "Title")), validMp3Bytes());
 
-    const plan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([input])), {}),
-    );
+    const plan = await Effect.runPromise(mp3Driver.patch(blobByteSource(new Blob([input])), {}));
 
     expect(new Uint8Array(await new Blob(plan.parts).arrayBuffer())).toEqual(input);
   });
@@ -189,14 +187,14 @@ describe("mp3Driver", () => {
     const unknown = rawFrame("PRIV", Uint8Array.of(9, 8, 7, 6));
     const trailing = concat(validMp3Bytes(), encoder.encode("APETAGEX-opaque-tail"));
     const input = concat(tag(frame("TIT2", "Before"), unknown), trailing);
-    const source = makeBlobByteSource(new Blob([input]));
+    const source = blobByteSource(new Blob([input]));
     const plan = await Effect.runPromise(mp3Driver.patch(source, { title: "After 😀" }));
     const output = new Uint8Array(await new Blob(plan.parts).arrayBuffer());
     expect(output.slice(-trailing.length)).toEqual(trailing);
     expect(Array.from(output).join(",")).toContain(Array.from(unknown).join(","));
 
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([output]))),
+      mp3Driver.inspect(blobByteSource(new Blob([output]))),
     );
 
     expect(inspected.metadata.title).toBe("After 😀");
@@ -204,7 +202,7 @@ describe("mp3Driver", () => {
 
   it("derives technical fields without browser codec playback", async () => {
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([validMp3Bytes()]))),
+      mp3Driver.inspect(blobByteSource(new Blob([validMp3Bytes()]))),
     );
 
     expect(inspected.metadata).toMatchObject({ bitrate: 128_000, sampleRate: 44_100 });
@@ -214,13 +212,13 @@ describe("mp3Driver", () => {
 
   it("projects and preserves the track total when editing the track number", async () => {
     const input = concat(tag(frame("TRCK", "3/12")), validMp3Bytes());
-    const source = makeBlobByteSource(new Blob([input]));
+    const source = blobByteSource(new Blob([input]));
     const inspected = await Effect.runPromise(mp3Driver.inspect(source));
     expect(inspected.metadata).toMatchObject({ trackNumber: 3, trackTotal: 12 });
 
     const plan = await Effect.runPromise(mp3Driver.patch(source, { trackNumber: 4 }));
     const output = new Blob(plan.parts);
-    const updated = await Effect.runPromise(mp3Driver.inspect(makeBlobByteSource(output)));
+    const updated = await Effect.runPromise(mp3Driver.inspect(blobByteSource(output)));
     expect(updated.metadata).toMatchObject({ trackNumber: 4, trackTotal: 12 });
   });
 
@@ -242,7 +240,7 @@ describe("mp3Driver", () => {
       audio,
     );
 
-    const source = makeBlobByteSource(new Blob([input]));
+    const source = blobByteSource(new Blob([input]));
 
     const inspected = await Effect.runPromise(mp3Driver.inspect(source));
     expect(inspected.metadata).toMatchObject({
@@ -268,9 +266,7 @@ describe("mp3Driver", () => {
     expect(Array.from(patched).join(",")).toContain(Array.from(unknown).join(","));
     expect(Array.from(patched).join(",")).toContain(Array.from(alternateComment).join(","));
 
-    const updated = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([patched]))),
-    );
+    const updated = await Effect.runPromise(mp3Driver.inspect(blobByteSource(new Blob([patched]))));
 
     expect(updated.metadata).toMatchObject({
       albumArtist: "New Album Artist",
@@ -282,7 +278,7 @@ describe("mp3Driver", () => {
     expect(new TextDecoder("latin1").decode(patched)).toContain("1/3");
 
     const clearedPlan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([patched])), {
+      mp3Driver.patch(blobByteSource(new Blob([patched])), {
         albumArtist: "",
         composer: "",
         comment: "",
@@ -294,7 +290,7 @@ describe("mp3Driver", () => {
     const cleared = new Uint8Array(await new Blob(clearedPlan.parts).arrayBuffer());
 
     const clearedInspection = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([cleared]))),
+      mp3Driver.inspect(blobByteSource(new Blob([cleared]))),
     );
 
     expect(clearedInspection.metadata).toMatchObject({
@@ -324,7 +320,7 @@ describe("mp3Driver", () => {
       ),
     );
 
-    const source = makeBlobByteSource(new Blob([input]));
+    const source = blobByteSource(new Blob([input]));
     const inspected = await Effect.runPromise(mp3Driver.inspect(source));
     expect(inspected.metadata).toMatchObject({
       albumArtist: "APE Album Artist",
@@ -349,9 +345,7 @@ describe("mp3Driver", () => {
     expect(includes(patched, unknown)).toBe(true);
     expect(new TextDecoder("latin1").decode(patched)).toContain("1/3");
 
-    const updated = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([patched]))),
-    );
+    const updated = await Effect.runPromise(mp3Driver.inspect(blobByteSource(new Blob([patched]))));
 
     expect(updated.metadata).toMatchObject({
       albumArtist: "New Album Artist",
@@ -362,7 +356,7 @@ describe("mp3Driver", () => {
     });
 
     const clearedPlan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([patched])), {
+      mp3Driver.patch(blobByteSource(new Blob([patched])), {
         albumArtist: "",
         composer: "",
         comment: "",
@@ -376,7 +370,7 @@ describe("mp3Driver", () => {
     expect(includes(cleared, unknown)).toBe(true);
 
     const clearedInspection = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([cleared]))),
+      mp3Driver.inspect(blobByteSource(new Blob([cleared]))),
     );
 
     expect(clearedInspection.metadata).toMatchObject({
@@ -394,7 +388,7 @@ describe("mp3Driver", () => {
     const input = concat(audio, apeTagWithHeader(apeItem("Composer", "Before"), unknown));
 
     const plan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([input])), { composer: "After" }),
+      mp3Driver.patch(blobByteSource(new Blob([input])), { composer: "After" }),
     );
 
     const output = new Uint8Array(await new Blob(plan.parts).arrayBuffer());
@@ -415,7 +409,7 @@ describe("mp3Driver", () => {
     expect(footerOffset! + 32 - readUint32LE(output, footerOffset! + 12)).toBe(headerOffset! + 32);
 
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([output]))),
+      mp3Driver.inspect(blobByteSource(new Blob([output]))),
     );
 
     expect(inspected.metadata.composer).toBe("After");
@@ -426,7 +420,7 @@ describe("mp3Driver", () => {
     const input = concat(audio, apeTagWithHeader(apeItem("Composer", "Before")));
 
     const plan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([input])), { composer: "" }),
+      mp3Driver.patch(blobByteSource(new Blob([input])), { composer: "" }),
     );
 
     const output = new Uint8Array(await new Blob(plan.parts).arrayBuffer());
@@ -440,7 +434,7 @@ describe("mp3Driver", () => {
     const input = concat(audio, apeTagWithHeader(apeItem("Composer", "Before"), unknown));
 
     const plan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([input])), { composer: "" }),
+      mp3Driver.patch(blobByteSource(new Blob([input])), { composer: "" }),
     );
 
     const output = new Uint8Array(await new Blob(plan.parts).arrayBuffer());
@@ -450,7 +444,7 @@ describe("mp3Driver", () => {
     expect(signatures).toHaveLength(2);
 
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([output]))),
+      mp3Driver.inspect(blobByteSource(new Blob([output]))),
     );
 
     expect(inspected.metadata.composer).toBe("");
@@ -484,7 +478,7 @@ describe("mp3Driver", () => {
     ],
   ])("reads the user comment from %s", async (_case, tagBytes, expected) => {
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([tagBytes, validMp3Bytes()]))),
+      mp3Driver.inspect(blobByteSource(new Blob([tagBytes, validMp3Bytes()]))),
     );
 
     expect(inspected.metadata.comment).toBe(expected);
@@ -497,7 +491,7 @@ describe("mp3Driver", () => {
     );
 
     const plan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([input])), { comment: "Updated" }),
+      mp3Driver.patch(blobByteSource(new Blob([input])), { comment: "Updated" }),
     );
 
     const output = new Uint8Array(await new Blob(plan.parts).arrayBuffer());
@@ -522,7 +516,7 @@ describe("mp3Driver", () => {
     const input = concat(tag(...staleComments, ...keptFrames), audio);
 
     const patchedPlan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([input])), { comment: "Updated" }),
+      mp3Driver.patch(blobByteSource(new Blob([input])), { comment: "Updated" }),
     );
 
     const patched = new Uint8Array(await new Blob(patchedPlan.parts).arrayBuffer());
@@ -534,13 +528,13 @@ describe("mp3Driver", () => {
     for (const kept of keptFrames) expect(includes(patched, kept)).toBe(true);
 
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([patched]))),
+      mp3Driver.inspect(blobByteSource(new Blob([patched]))),
     );
 
     expect(inspected.metadata.comment).toBe("Updated");
 
     const clearedPlan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([patched])), { comment: "" }),
+      mp3Driver.patch(blobByteSource(new Blob([patched])), { comment: "" }),
     );
 
     const cleared = new Uint8Array(await new Blob(clearedPlan.parts).arrayBuffer());
@@ -549,7 +543,7 @@ describe("mp3Driver", () => {
     for (const kept of keptFrames) expect(includes(cleared, kept)).toBe(true);
 
     const clearedInspection = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([cleared]))),
+      mp3Driver.inspect(blobByteSource(new Blob([cleared]))),
     );
 
     expect(clearedInspection.metadata.comment).toBe("");
@@ -560,7 +554,7 @@ describe("mp3Driver", () => {
     ["BPM", frame("TBPM", "128 BPM"), { bpm: null }],
   ])("rejects malformed complete %s grammar", async (_field, malformed, expected) => {
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([tag(malformed), validMp3Bytes()]))),
+      mp3Driver.inspect(blobByteSource(new Blob([tag(malformed), validMp3Bytes()]))),
     );
 
     expect(inspected.metadata).toMatchObject(expected);
@@ -569,7 +563,7 @@ describe("mp3Driver", () => {
   it("rejects malformed advanced numeric suffixes from APEv2 fallbacks", async () => {
     const inspected = await Effect.runPromise(
       mp3Driver.inspect(
-        makeBlobByteSource(
+        blobByteSource(
           new Blob([validMp3Bytes(), apeTag(apeItem("Disc", "2x"), apeItem("BPM", "128 BPM"))]),
         ),
       ),
@@ -579,7 +573,7 @@ describe("mp3Driver", () => {
   });
 
   it("round-trips ID3v2.4 multi-value genres and writes Cobalt extension fields", async () => {
-    const source = makeBlobByteSource(new Blob([validMp3Bytes()]));
+    const source = blobByteSource(new Blob([validMp3Bytes()]));
 
     const plan = await Effect.runPromise(
       mp3Driver.patch(source, {
@@ -596,7 +590,7 @@ describe("mp3Driver", () => {
     const output = new Uint8Array(await new Blob(plan.parts).arrayBuffer());
 
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([output]))),
+      mp3Driver.inspect(blobByteSource(new Blob([output]))),
     );
 
     expect(inspected.metadata).toMatchObject({
@@ -611,7 +605,7 @@ describe("mp3Driver", () => {
   });
 
   it("uses three-byte frame identifiers when editing ID3v2.2 dates", async () => {
-    const source = makeBlobByteSource(
+    const source = blobByteSource(
       new Blob([tagV22(frameV22("TT2", "Before"), frameV22("TYE", "1999")), validMp3Bytes()]),
     );
 
@@ -620,7 +614,7 @@ describe("mp3Driver", () => {
     );
 
     const output = new Blob(plan.parts);
-    const inspected = await Effect.runPromise(mp3Driver.inspect(makeBlobByteSource(output)));
+    const inspected = await Effect.runPromise(mp3Driver.inspect(blobByteSource(output)));
     expect(inspected.metadata).toMatchObject({ title: "After", artist: "Artist", year: 2032 });
   });
 
@@ -645,7 +639,7 @@ describe("mp3Driver", () => {
     "rejects malformed declared %s extended-header sizes on inspect and patch",
     async (_version, tagBytes) => {
       const input = concat(tagBytes, validMp3Bytes());
-      const source = makeBlobByteSource(new Blob([input]));
+      const source = blobByteSource(new Blob([input]));
       await expect(Effect.runPromise(mp3Driver.inspect(source))).rejects.toThrow(
         /extended header/iu,
       );
@@ -668,12 +662,12 @@ describe("mp3Driver", () => {
       concat(tagWithExtendedHeader(4, v24Restrictions, frame("TIT2", "Title")), validMp3Bytes()),
     ]) {
       const inspected = await Effect.runPromise(
-        mp3Driver.inspect(makeBlobByteSource(new Blob([input]))),
+        mp3Driver.inspect(blobByteSource(new Blob([input]))),
       );
 
       expect(inspected.metadata.title).toBe("Title");
       await Effect.runPromise(
-        mp3Driver.patch(makeBlobByteSource(new Blob([input])), { title: "Updated" }),
+        mp3Driver.patch(blobByteSource(new Blob([input])), { title: "Updated" }),
       );
     }
   });
@@ -686,7 +680,7 @@ describe("mp3Driver", () => {
       validMp3Bytes(),
     );
 
-    const source = makeBlobByteSource(new Blob([input]));
+    const source = blobByteSource(new Blob([input]));
     await expect(Effect.runPromise(mp3Driver.inspect(source))).rejects.toThrow(/CRC length/iu);
     await expect(Effect.runPromise(mp3Driver.patch(source, { title: "Updated" }))).rejects.toThrow(
       /CRC length/iu,
@@ -699,7 +693,7 @@ describe("mp3Driver", () => {
     const second = new Uint8Array(522);
     second.set([0xff, 0xfb, 0xa0, 0x64]);
     await expect(
-      Effect.runPromise(mp3Driver.inspect(makeBlobByteSource(new Blob([first, second])))),
+      Effect.runPromise(mp3Driver.inspect(blobByteSource(new Blob([first, second])))),
     ).rejects.toThrow("VBR MP3 is missing a Xing/Info or VBRI frame count.");
   });
 
@@ -709,7 +703,7 @@ describe("mp3Driver", () => {
     footer.set([0xd0, 0x07], 8);
     footer.set([16, 0, 0, 0], 12);
     await expect(
-      Effect.runPromise(mp3Driver.inspect(makeBlobByteSource(new Blob([validMp3Bytes(), footer])))),
+      Effect.runPromise(mp3Driver.inspect(blobByteSource(new Blob([validMp3Bytes(), footer])))),
     ).rejects.toThrow("APEv2 footer declares an invalid size or item count.");
   });
 });

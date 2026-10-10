@@ -127,7 +127,15 @@ export const stalledAssetResponse = (
 
 export const fontResponse = () => new Response(font, { headers: { "content-type": "font/ttf" } });
 
-export const json = (body: unknown, init: ResponseInit = {}) => {
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly JsonValue[]
+  | { readonly [key: string]: JsonValue | undefined };
+
+export const json = (body: JsonValue, init: ResponseInit = {}) => {
   const headers = new Headers(init.headers);
   headers.set("content-type", "application/json; charset=utf-8");
 

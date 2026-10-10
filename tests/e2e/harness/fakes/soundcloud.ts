@@ -1,3 +1,4 @@
+import { Match } from "effect";
 import { Buffer } from "node:buffer";
 import {
   FAKE_SOUNDCLOUD_CLIENT_ID,
@@ -123,12 +124,11 @@ export const fakeSoundCloudArtwork = (request: FakeRequest): FakeResult => {
   const key = token ? Buffer.from(token, "hex").toString() : null;
   const scenario = request.registry.get(key);
 
-  const image =
-    scenario?.type === "media"
-      ? scenario.cover
-      : scenario?.type === "soundcloud-set"
-        ? scenario.artwork
-        : null;
+  const image = Match.value(scenario).pipe(
+    Match.when({ type: "media" }, (media) => media.cover),
+    Match.when({ type: "soundcloud-set" }, (set) => set.artwork),
+    Match.orElse(() => null),
+  );
 
   if (!image) return unexpected("sndcdn.artwork", key);
 

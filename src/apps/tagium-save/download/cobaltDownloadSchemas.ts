@@ -78,7 +78,7 @@ export type CobaltVideoDownloadRequestBody = {
   youtubeBetterAudio?: boolean;
 };
 
-export const makeCobaltVideoDownloadRequestBody = (
+export const cobaltVideoDownloadRequestBody = (
   request: CobaltVideoDownloadRequest,
 ): CobaltVideoDownloadRequestBody => {
   const body: CobaltVideoDownloadRequestBody = {

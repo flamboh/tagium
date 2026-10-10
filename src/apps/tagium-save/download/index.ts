@@ -9,7 +9,7 @@ export {
   cobaltVideoQualities,
   decodeCobaltDownloadPlanEffect,
   decodeCobaltDownloadResponseEffect,
-  makeCobaltVideoDownloadRequestBody,
+  cobaltVideoDownloadRequestBody,
   type CobaltAudioBitrate,
   type CobaltAudioFormat,
   type CobaltDownloadMode,
@@ -34,8 +34,8 @@ export type {
 } from "./cobaltDownloadSchemas";
 
 export {
-  makeLocalProcessingFfmpegArgs,
-  makeMetadataFfmpegArgs,
+  localProcessingFfmpegArgs,
+  metadataFfmpegArgs,
   outputFormatFromFilename,
   VIDEO_PROGRESS_FILENAME,
 } from "./ffmpegArgs";

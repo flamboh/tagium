@@ -2,14 +2,14 @@ import { Effect } from "effect";
 import { cobaltDownloadScheduler } from "@/shared/cobalt/cobaltDownloadScheduler";
 import {
   decodeCobaltDownloadResponseEffect,
-  makeCobaltVideoDownloadRequestBody,
+  cobaltVideoDownloadRequestBody,
   type CobaltDownloadResponse,
   type CobaltDownloadPlan,
   type CobaltLocalProcessingPlan,
   type CobaltPickerItem,
   type CobaltVideoDownloadRequest,
 } from "./cobaltDownloadSchemas";
-import { makeMetadataFfmpegArgs, outputFormatFromFilename } from "./ffmpegArgs";
+import { metadataFfmpegArgs, outputFormatFromFilename } from "./ffmpegArgs";
 
 /** The browser-facing Cobalt request accepted by the downloader. */
 export type VideoDownloadRequest = CobaltVideoDownloadRequest;
@@ -253,7 +253,7 @@ const fetchPlan = async (
       method: "POST",
       headers,
       signal,
-      body: JSON.stringify(makeCobaltVideoDownloadRequestBody(request)),
+      body: JSON.stringify(cobaltVideoDownloadRequestBody(request)),
     });
   } catch (error) {
     if (signal.aborted || isAbortError(error)) throw error;
@@ -391,8 +391,7 @@ const localPlanMediaInputCount = (plan: CobaltLocalProcessingPlan) =>
 const copiesTunnelDirectly = (plan: CobaltLocalProcessingPlan) =>
   plan.type === "proxy" &&
   !plan.audio &&
-  (plan.output.type.startsWith("image/") ||
-    makeMetadataFfmpegArgs(plan.output.metadata).length === 0);
+  (plan.output.type.startsWith("image/") || metadataFfmpegArgs(plan.output.metadata).length === 0);
 
 const pickerTypeDefaults: Record<
   CobaltPickerItem["type"],
@@ -916,15 +915,8 @@ export const downloadVideoFile = (
 
 export type VideoDownloadSelection = CobaltDownloadPlan | CobaltPickerItem;
 
-const isPickerItemInput = (value: unknown): value is CobaltPickerItem => {
-  if (!isRecord(value) || !("type" in value) || !("url" in value)) return false;
-
-  return (
-    (value.type === "photo" || value.type === "video" || value.type === "gif") &&
-    typeof value.url === "string" &&
-    value.url.length > 0
-  );
-};
+const isPickerItemInput = (selection: VideoDownloadSelection): selection is CobaltPickerItem =>
+  !("status" in selection);
 
 /** Executes an already-resolved plan through the same guarded download path. */
 export function executeVideoDownload(

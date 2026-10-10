@@ -2,7 +2,7 @@ import EncodeLibAV, { type LibAV as LibAVInstance } from "@imput/libav.js-encode
 import type { CobaltLocalProcessingPlan } from "./cobaltDownloadSchemas";
 import { createTemporaryFileStore, joinTemporaryStorageSession } from "./storage";
 import {
-  makeLocalProcessingFfmpegArgs,
+  localProcessingFfmpegArgs,
   outputFormatFromFilename,
   VIDEO_PROGRESS_FILENAME,
 } from "./ffmpegArgs";
@@ -153,7 +153,7 @@ export const encodeWithLibAV = async (
     await libav.mkwriterdev(VIDEO_PROGRESS_FILENAME);
 
     const exitStatus = await libav.ffmpeg(
-      makeLocalProcessingFfmpegArgs(request.plan, inputNames, output),
+      localProcessingFfmpegArgs(request.plan, inputNames, output),
     );
 
     await pendingWrites;
