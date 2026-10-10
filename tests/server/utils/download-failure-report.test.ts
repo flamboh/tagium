@@ -55,6 +55,34 @@ describe("download failure report", () => {
     expect(events).toEqual([]);
   });
 
+  it("skips missing SoundCloud content", async () => {
+    const events = await captureSentryEvents(() =>
+      reportDownloadFailure({
+        route: "audio",
+        stage: "cobalt.resolve_error",
+        requestId: "request-test",
+        errorCode: "error.api.fetch.soundcloud.resolve_fetch.404.contentType-application/json",
+        sourceUrl: "https://soundcloud.com/forss/missing",
+      }),
+    );
+
+    expect(events).toEqual([]);
+  });
+
+  it("reports SoundCloud resolve failures that are not missing content", async () => {
+    const events = await captureSentryEvents(() =>
+      reportDownloadFailure({
+        route: "audio",
+        stage: "cobalt.resolve_error",
+        requestId: "request-test",
+        errorCode: "error.api.fetch.soundcloud.resolve_fetch.401",
+        sourceUrl: "https://soundcloud.com/forss/introitus",
+      }),
+    );
+
+    expect(events).toHaveLength(1);
+  });
+
   it("reports policy failures even when the code looks like user input", async () => {
     const events = await captureSentryEvents(() =>
       reportDownloadFailure({

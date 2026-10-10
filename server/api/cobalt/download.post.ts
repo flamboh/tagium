@@ -19,6 +19,7 @@ import {
   type RequestLogContext,
 } from "../../utils/request-observability";
 import { decodeRequestBody } from "../../utils/schema";
+import { publicCobaltErrorCode } from "../../utils/cobalt-error-code";
 import { reportDownloadFailure } from "../../utils/download-failure-report";
 import type { CobaltRuntimeEnv as DevControlRuntimeEnv } from "../../utils/dev-controls";
 
@@ -177,16 +178,6 @@ const requestCobaltDownload = async (
           : "invalid_json_or_schema",
     };
   }
-};
-
-const publicCobaltErrorCode = (code: string) => {
-  if (
-    code.startsWith("error.api.fetch.soundcloud.stream_fetch") ||
-    code.startsWith("error.api.fetch.soundcloud.stream_parse")
-  ) {
-    return "error.api.fetch.empty";
-  }
-  return code.startsWith("error.api.fetch.soundcloud.") ? "error.api.fetch.fail" : code;
 };
 
 const withPublicErrorCode = (response: Extract<CobaltDownloadResponse, { status: "error" }>) => ({

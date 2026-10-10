@@ -268,6 +268,40 @@ describe("cobalt audio endpoint", () => {
     expect(await response.text()).toBe("error.api.fetch.empty");
   });
 
+  it("reports missing SoundCloud tracks as unavailable content", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          status: "error",
+          error: { code: "error.api.fetch.soundcloud.resolve_fetch.404" },
+        }),
+      ),
+    );
+
+    const response = await handler(makeEvent(makeAudioRequest()));
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe("error.api.content.video.unavailable");
+  });
+
+  it("keeps other SoundCloud resolve failures generic", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          status: "error",
+          error: { code: "error.api.fetch.soundcloud.resolve_fetch.401" },
+        }),
+      ),
+    );
+
+    const response = await handler(makeEvent(makeAudioRequest()));
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe("error.api.fetch.fail");
+  });
+
   it("infers direct YouTube track year from its upload date", async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = input instanceof Request ? input.url : new URL(input).toString();
