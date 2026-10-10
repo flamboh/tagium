@@ -996,6 +996,7 @@ function LoadedTrackMetadataEditor({
                   key={selectedFile.id}
                   active={viewActive ?? true}
                   file={selectedFile.file}
+                  downloadStatus={selectedFile.downloadStatus}
                   fallbackDuration={selectedFile.metadata.duration}
                   clip={selectedFile.clip}
                   onClipChange={(clip) => onTrackClipChange(selectedFile.id, clip)}
