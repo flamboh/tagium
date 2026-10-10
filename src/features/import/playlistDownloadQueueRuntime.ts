@@ -128,6 +128,7 @@ export const removePlaylistDownloadTracks = <Track extends PlaylistDownloadRunti
 ): RemovePlaylistDownloadTracksResult<Track> => {
   const requestedTrackIds = new Set(trackIds);
   const removedItems = run.model.items.filter((item) => requestedTrackIds.has(item.id));
+
   if (removedItems.length === 0) {
     return { removedTrackIds: [], pendingTracks: [], activeTrackIds: [] };
   }
@@ -135,6 +136,7 @@ export const removePlaylistDownloadTracks = <Track extends PlaylistDownloadRunti
   const removedTrackIds = new Set(removedItems.map((item) => item.id));
   const pendingTracks = run.pending.filter((track) => removedTrackIds.has(track.fileId));
   const activeTrackIds: string[] = [];
+
   for (const track of run.active) {
     if (removedTrackIds.has(track.fileId)) activeTrackIds.push(track.fileId);
   }
@@ -164,19 +166,23 @@ export const enqueuePlaylistDownloadQueueTracks = <Track extends PlaylistDownloa
 
   for (const track of tracks) {
     const queueItem = run.model.items.find((item) => item.id === track.fileId);
+
     if (
       queueItem?.status === "failed" ||
       queueItem?.status === "canceled" ||
       (queueItem?.status === "completed" && fileErrorTrackIds.has(track.fileId))
     ) {
       retryTracks.push(track);
+
       if (queueItem.status === "failed") {
         run.failed -= 1;
       }
+
       if (queueItem.status === "completed") {
         run.completed -= 1;
         run.model = markPlaylistDownloadCanceled(run.model, track.fileId, nowMs);
       }
+
       run.model = retryPlaylistDownloadItem(run.model, track.fileId);
       continue;
     }
@@ -187,6 +193,7 @@ export const enqueuePlaylistDownloadQueueTracks = <Track extends PlaylistDownloa
   }
 
   const queuedTracks = [...retryTracks, ...newTracks];
+
   if (queuedTracks.length === 0) return queuedTracks;
 
   run.pending.push(...queuedTracks);
@@ -209,19 +216,24 @@ export const reserveNextPlaylistDownloadTrack = <Track extends PlaylistDownloadR
   nowMs: number,
 ): ReserveNextPlaylistDownloadResult<Track> => {
   const nextTrack = run.pending[0];
+
   if (!nextTrack) {
     run.waitingForTunnelBudget = false;
+
     return { status: "empty" };
   }
 
   const queueItem = run.model.items.find((item) => item.id === nextTrack.fileId);
+
   if (!queueItem) {
     throw new Error("playlist download item not found.");
   }
+
   const budget = admission.reserve(queueItem.tunnelCost, nowMs);
 
   if (budget.status === "waiting") {
     run.waitingForTunnelBudget = true;
+
     return {
       status: "waiting-for-tunnel-budget",
       waitMs: budget.waitMs,
@@ -230,6 +242,7 @@ export const reserveNextPlaylistDownloadTrack = <Track extends PlaylistDownloadR
 
   run.waitingForTunnelBudget = false;
   run.pending = run.pending.slice(1);
+
   return {
     status: "reserved",
     track: nextTrack,
@@ -246,8 +259,10 @@ export const markPlaylistDownloadTrackActive = <Track extends PlaylistDownloadRu
     title: track.title,
     startedAt,
   };
+
   run.model = markPlaylistDownloadActive(run.model, track.fileId, startedAt);
   run.active = [...run.active, activeTrack];
+
   return activeTrack;
 };
 
@@ -290,11 +305,14 @@ export const cancelPendingPlaylistDownloadTracks = (
   nowMs: number,
 ) => {
   const canceledTrackIds = run.pending.map((track) => track.fileId);
+
   for (const trackId of canceledTrackIds) {
     run.model = markPlaylistDownloadCanceled(run.model, trackId, nowMs);
   }
+
   run.pending = [];
   run.waitingForTunnelBudget = false;
+
   return canceledTrackIds;
 };
 
@@ -303,18 +321,22 @@ export const cancelActivePlaylistDownloadTracks = (
   nowMs: number,
 ) => {
   const canceledTrackIds = run.active.map((track) => track.fileId);
+
   for (const trackId of canceledTrackIds) {
     run.model = markPlaylistDownloadCanceled(run.model, trackId, nowMs);
   }
+
   return canceledTrackIds;
 };
 
 export const finishPlaylistDownloadQueueRunIfIdle = (run: PlaylistDownloadQueueRun) => {
   if (run.active.length > 0) return false;
+
   if (!run.canceled && run.pending.length > 0) return false;
 
   run.done = true;
   run.waitingForTunnelBudget = false;
+
   return true;
 };
 

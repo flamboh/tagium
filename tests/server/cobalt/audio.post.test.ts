@@ -22,6 +22,7 @@ type RateLimitBinding = {
 };
 
 const machineAffinitySecret = "test-machine-affinity-secret";
+
 const cobaltRequestSchema = Schema.Struct({
   audioFormat: Schema.String,
   youtubeHLS: Schema.Boolean,
@@ -102,6 +103,7 @@ describe("cobalt audio endpoint", () => {
       vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
         const serializedBody = Schema.decodeUnknownSync(Schema.String)(init?.body);
         cobaltBody = Schema.decodeUnknownSync(cobaltRequestSchema)(JSON.parse(serializedBody));
+
         return Response.json({
           status: "tunnel",
           url: "https://cobalt.test/tunnel?id=123456789012345678901",
@@ -133,6 +135,7 @@ describe("cobalt audio endpoint", () => {
       "fetch",
       vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
         upstreamHeaders = new Headers(init?.headers);
+
         return Response.json(
           {
             status: "error",
@@ -161,9 +164,11 @@ describe("cobalt audio endpoint", () => {
     expect(upstreamHeaders.get("X-Tagium-Import-Id")).toBe("import-1");
     expect(upstreamHeaders.get("X-Tagium-Track-Index")).toBe("7");
     expect(upstreamHeaders.get("X-Tagium-Source-Fingerprint")).toMatch(/^sha256:[a-f0-9]{32}$/);
+
     const event = warn.mock.calls
       .map(([entry]) => JSON.parse(entry))
       .find((entry) => entry.event === "cobalt_audio_failure");
+
     expect(event).toMatchObject({
       requestId: "request-1",
       importId: "import-1",

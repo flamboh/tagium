@@ -1,6 +1,7 @@
 import { wrapRequestHandler } from "@sentry/cloudflare";
 
 type SentryOptions = Parameters<typeof wrapRequestHandler>[0]["options"];
+
 export type SentryEvent = Parameters<NonNullable<SentryOptions["beforeSend"]>>[0];
 
 export const captureSentryEvents = async (run: () => void | Promise<void>) => {
@@ -12,6 +13,7 @@ export const captureSentryEvents = async (run: () => void | Promise<void>) => {
         defaultIntegrations: false,
         beforeSend: (event) => {
           events.push(event);
+
           return null;
         },
       },
@@ -20,8 +22,10 @@ export const captureSentryEvents = async (run: () => void | Promise<void>) => {
     },
     async () => {
       await run();
+
       return new Response(null);
     },
   );
+
   return events;
 };

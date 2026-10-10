@@ -46,12 +46,14 @@ test("imports a soundcloud track with its provider tags and exports it in a zip"
   await expect(audioPreview(page)).toContainText("0:00 / 0:02");
 
   await page.getByRole("button", { name: "download all" }).click();
+
   const archive = await captureDownload(page, () =>
     page
       .getByRole("dialog", { name: "download 1 track" })
       .getByRole("button", { name: /^download ~/u })
       .click(),
   );
+
   const [entry, ...rest] = unzipDownload(archive);
   expect(rest).toHaveLength(0);
   expect(entry!.filename).toBe("singles/Introitus.mp3");
@@ -74,6 +76,7 @@ test("imports a soundcloud album in order with album tags, seconds durations and
   upstreams,
 }) => {
   journey();
+
   const set = await upstreams.soundcloud.set({
     title: "Ecclesia",
     author: "Forss",
@@ -88,6 +91,7 @@ test("imports a soundcloud album in order with album tags, seconds durations and
       { title: "Gloria", cover: "cover" },
     ],
   });
+
   const plans = await holdDownloadPlans(page);
 
   await page.goto("/");
@@ -114,12 +118,14 @@ test("imports a soundcloud album in order with album tags, seconds durations and
   await plans.releaseAll();
   await expect(queueStatus(page, "downloaded 3/3")).toBeVisible(SETTLE_TIMEOUT);
   await page.getByRole("button", { name: "download all" }).click();
+
   const archive = await captureDownload(page, () =>
     page
       .getByRole("dialog", { name: "download 3 tracks" })
       .getByRole("button", { name: /^download ~/u })
       .click(),
   );
+
   const entries = unzipDownload(archive);
   expect(entries.map((entry) => entry.filename).sort()).toEqual([
     "albums/Ecclesia/Gloria.mp3",
@@ -127,6 +133,7 @@ test("imports a soundcloud album in order with album tags, seconds durations and
     "albums/Ecclesia/Kyrie.mp3",
     "albums/Ecclesia/cover.png",
   ]);
+
   for (const [index, title] of ["Introitus", "Kyrie", "Gloria"].entries()) {
     const entry = entries.find((file) => file.filename === `albums/Ecclesia/${title}.mp3`)!;
     const { metadata } = await inspectAudio(entry);
@@ -149,6 +156,7 @@ for (const { name, isAlbum, albumCover } of [
 ]) {
   test(`keeps each track's own cover for ${name}`, async ({ page, context, upstreams }) => {
     await useSettings(context, { applySoundCloudAlbumCoverToTracks: albumCover });
+
     const set = await upstreams.soundcloud.set({
       title: "Remixes",
       author: "Forss",
@@ -187,11 +195,13 @@ test("resolves soundcloud short links to the canonical track and set", async ({
   upstreams,
 }) => {
   journey();
+
   const track = await upstreams.soundcloud.track({
     title: "Short Track",
     author: "Shorty",
     cover: null,
   });
+
   const set = await upstreams.soundcloud.set({
     title: "Short Set",
     author: "Shorty",
@@ -201,6 +211,7 @@ test("resolves soundcloud short links to the canonical track and set", async ({
       { title: "Set Two", cover: null },
     ],
   });
+
   const trackLink = await upstreams.soundcloud.shortLink(track.url);
   const setLink = await upstreams.soundcloud.shortLink(set.url);
 

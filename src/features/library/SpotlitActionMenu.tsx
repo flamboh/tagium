@@ -46,6 +46,7 @@ export function SpotlitActionMenu({
         open={menuOpen}
         onOpenChange={(open) => {
           setMenuOpen(open);
+
           if (!open) spotlight?.onDismiss();
         }}
       >

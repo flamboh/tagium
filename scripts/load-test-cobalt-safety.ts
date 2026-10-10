@@ -2,6 +2,7 @@ const PRODUCTION_COBALT_ORIGINS = new Set(["https://tagium-cobalt.fly.dev"]);
 
 export const parseLoadTestTarget = (value: string) => {
   let target: URL;
+
   try {
     target = new URL(value);
   } catch {
@@ -11,6 +12,7 @@ export const parseLoadTestTarget = (value: string) => {
   if (target.protocol !== "https:") {
     throw new Error("Load-test target must use HTTPS.");
   }
+
   if (
     target.username ||
     target.password ||
@@ -20,6 +22,7 @@ export const parseLoadTestTarget = (value: string) => {
   ) {
     throw new Error("Load-test target must be an origin URL without credentials, path, or query.");
   }
+
   if (PRODUCTION_COBALT_ORIGINS.has(target.origin)) {
     throw new Error(`Refusing to load-test production Cobalt at ${target.origin}.`);
   }
@@ -29,6 +32,7 @@ export const parseLoadTestTarget = (value: string) => {
 
 export const assertTunnelMatchesLoadTestTarget = (target: URL, tunnelValue: string) => {
   let tunnel: URL;
+
   try {
     tunnel = new URL(tunnelValue);
   } catch {

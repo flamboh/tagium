@@ -44,15 +44,19 @@ export type YouTubeVideoOptions = MediaOptions & {
   video?: VideoStreamFixtureName[];
   uploadYearStatus?: number;
 };
+
 type PostOptions = {
   url?: string;
   cobalt?: Sequence<CobaltBehavior>;
   tunnel?: Sequence<TunnelBehavior>;
 };
+
 export type PickerOptions = PostOptions & Omit<Extract<PostMedia, { kind: "picker" }>, "kind">;
+
 export type GifPostOptions = PostOptions & Omit<Extract<PostMedia, { kind: "gif" }>, "kind">;
 
 const defaultYouTubeVideoStreams: VideoStreamFixtureName[] = ["h264-1080", "h264-720", "h264-480"];
+
 export type SoundCloudTrackOptions = MediaOptions & { user?: string; slug?: string; id?: number };
 
 export type FakeMedia = {
@@ -63,7 +67,9 @@ export type FakeMedia = {
   durationSec: number;
   year: number | undefined;
 };
+
 export type FakeYouTubeVideo = FakeMedia & { id: string; shortUrl: string };
+
 export type FakeSoundCloudTrack = FakeMedia & { id: number };
 
 const token = (bytes: number) => randomBytes(bytes).toString("hex");
@@ -81,16 +87,22 @@ export const createUpstreams = (owner: string) => {
       method: "POST",
       body: JSON.stringify({ owner, ...body }),
     });
+
     if (!response.ok) {
       throw new Error(`e2e harness ${path} failed (${response.status}): ${await response.text()}`);
     }
   };
+
   const register = (scenarios: Scenario[]) => post("/scenarios", { scenarios });
+
   const keyFor = (url: string) => {
     const key = mediaKeyFromUrl(url);
+
     if (!key) throw new Error(`no fake upstream key for ${url}`);
+
     return key;
   };
+
   const describe = (scenario: MediaScenario): FakeMedia => ({
     key: scenario.key,
     url: scenario.sourceUrl,
@@ -102,6 +114,7 @@ export const createUpstreams = (owner: string) => {
 
   const youtubeVideoScenario = (options: YouTubeVideoOptions = {}) => {
     const id = options.id ?? randomBytes(8).toString("base64url");
+
     const scenario: MediaScenario = {
       type: "media",
       key: youtubeVideoKey(id),
@@ -119,11 +132,13 @@ export const createUpstreams = (owner: string) => {
       cobalt: options.cobalt ?? { kind: "ok" },
       tunnel: options.tunnel ?? { kind: "ok" },
     };
+
     const video: FakeYouTubeVideo = {
       ...describe(scenario),
       id,
       shortUrl: `https://youtu.be/${id}`,
     };
+
     return { scenario, video };
   };
 
@@ -131,6 +146,7 @@ export const createUpstreams = (owner: string) => {
     const user = options.user ?? `e2e-artist-${token(4)}`;
     const slug = options.slug ?? `track-${token(4)}`;
     const pathname = `/${user}/${slug}`;
+
     const scenario: MediaScenario = {
       type: "media",
       key: soundcloudKey(pathname),
@@ -149,14 +165,18 @@ export const createUpstreams = (owner: string) => {
       cobalt: options.cobalt ?? { kind: "ok" },
       tunnel: options.tunnel ?? { kind: "ok" },
     };
+
     const track: FakeSoundCloudTrack = { ...describe(scenario), id: scenario.soundcloudId! };
+
     return { scenario, track };
   };
 
   const overrideCobalt = (url: string, cobalt: Sequence<CobaltBehavior>) =>
     post("/overrides", { key: keyFor(url), cobalt });
+
   const overrideTunnel = (url: string, tunnel: Sequence<TunnelBehavior>) =>
     post("/overrides", { key: keyFor(url), tunnel });
+
   const repeat = <T>(behavior: T, times: number | undefined, then: T): Sequence<T> =>
     times === undefined ? behavior : [...Array.from({ length: times }, () => behavior), then];
 
@@ -166,6 +186,7 @@ export const createUpstreams = (owner: string) => {
       async video(options: YouTubeVideoOptions = {}) {
         const { scenario, video } = youtubeVideoScenario(options);
         await register([scenario]);
+
         return video;
       },
       async missingVideo(options: YouTubeVideoOptions = {}) {
@@ -187,6 +208,7 @@ export const createUpstreams = (owner: string) => {
       }) {
         const id = options.id ?? `PLe2e${randomBytes(12).toString("base64url")}`;
         const videos = options.videos.map((video) => youtubeVideoScenario(video));
+
         const playlist = {
           type: "youtube-playlist" as const,
           key: youtubePlaylistKey(id),
@@ -199,7 +221,9 @@ export const createUpstreams = (owner: string) => {
           status: options.status,
           alert: options.missing ? "The playlist does not exist." : undefined,
         };
+
         await register([...videos.map(({ scenario }) => scenario), playlist]);
+
         return {
           id,
           key: playlist.key,
@@ -214,6 +238,7 @@ export const createUpstreams = (owner: string) => {
       async track(options: SoundCloudTrackOptions = {}) {
         const { scenario, track } = soundcloudTrackScenario(options);
         await register([scenario]);
+
         return track;
       },
       async set(options: {
@@ -231,10 +256,12 @@ export const createUpstreams = (owner: string) => {
       }) {
         const user = options.user ?? `e2e-artist-${token(4)}`;
         const pathname = `/${user}/sets/${options.slug ?? `set-${token(4)}`}`;
+
         const tracks = options.tracks.map((track) => ({
           ...soundcloudTrackScenario({ user, ...track }),
           stub: track.stub === true,
         }));
+
         const set = {
           type: "soundcloud-set" as const,
           key: soundcloudKey(pathname),
@@ -249,7 +276,9 @@ export const createUpstreams = (owner: string) => {
           tracks: tracks.map(({ scenario, stub }) => ({ key: scenario.key, stub })),
           status: options.status,
         };
+
         await register([...tracks.map(({ scenario }) => scenario), set]);
+
         return {
           key: set.key,
           url: set.sourceUrl,
@@ -261,6 +290,7 @@ export const createUpstreams = (owner: string) => {
       async shortLink(target: string) {
         const url = new URL(`https://on.soundcloud.com/${token(5)}`);
         await register([{ type: "short-link", key: shortLinkKey(url), location: target }]);
+
         return url.toString();
       },
     },
@@ -268,6 +298,7 @@ export const createUpstreams = (owner: string) => {
       const url = new URL(
         options.url ?? `https://x.com/e2e${token(4)}/status/${randomInt(1e9, 2e9)}`,
       );
+
       const scenario: PostScenario = {
         type: "post",
         key: linkKey(url),
@@ -276,7 +307,9 @@ export const createUpstreams = (owner: string) => {
         cobalt: options.cobalt ?? { kind: "ok" },
         tunnel: options.tunnel ?? { kind: "ok" },
       };
+
       await register([scenario]);
+
       return { key: scenario.key, url: scenario.sourceUrl, id: url.pathname.split("/").at(-1)! };
     },
     picker({ items, audio, ...options }: PickerOptions) {
@@ -314,9 +347,11 @@ export const createUpstreams = (owner: string) => {
     },
     async calls(filter: { route?: string | RegExp; key?: string; unexpected?: boolean } = {}) {
       const params = new URLSearchParams({ owner });
+
       if (filter.unexpected !== undefined) params.set("unexpected", filter.unexpected ? "1" : "0");
       const response = await fetch(`${E2E_CONTROL_URL}/calls?${params}`);
       const calls = (await response.json()) as UpstreamCall[];
+
       return calls.filter(
         (call) =>
           (filter.key === undefined || call.key === filter.key) &&
@@ -330,6 +365,7 @@ export const createUpstreams = (owner: string) => {
       const params = new URLSearchParams({ owner });
       const response = await fetch(`${E2E_CONTROL_URL}/calls?${params}`);
       const calls = (await response.json()) as UpstreamCall[];
+
       return calls
         .filter((call) => call.route === "posthog.capture")
         .flatMap((call) => {
@@ -337,7 +373,9 @@ export const createUpstreams = (owner: string) => {
             | AnalyticsEvent
             | AnalyticsEvent[]
             | { batch: AnalyticsEvent[] };
+
           if (Array.isArray(payload)) return payload;
+
           return "batch" in payload ? payload.batch : [payload];
         });
     },
@@ -348,7 +386,9 @@ export const createUpstreams = (owner: string) => {
         unexpected: "1",
         since: String(since),
       });
+
       const response = await fetch(`${E2E_CONTROL_URL}/calls?${params}`);
+
       return (await response.json()) as UpstreamCall[];
     },
     release: () => post("/release", {}),

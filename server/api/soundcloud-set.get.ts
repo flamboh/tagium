@@ -9,5 +9,6 @@ export default defineHandler(async (event) => {
   if (!sourceUrl) {
     throw new Error("soundcloud.url_required");
   }
+
   return resolveSoundCloudSet(sourceUrl, getSoundCloudLogContext(event.req, sourceUrl));
 });

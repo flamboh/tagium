@@ -5,7 +5,9 @@ import { Schema } from "effect";
 import { getShareDeploymentResources } from "./share-deployment-bindings";
 
 const createMigration = "migrations/0001_share_manifests.sql";
+
 const nullableExpiryMigration = "migrations/0002_nullable_share_expiry.sql";
+
 const deployment = env.TAGIUM_DEPLOY_ENV;
 
 if (deployment !== "preview" && deployment !== "production") {
@@ -16,12 +18,14 @@ if (deployment !== "preview" && deployment !== "production") {
 }
 
 let database: string;
+
 try {
   database = getShareDeploymentResources(deployment).databaseName;
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   exit(1);
 }
+
 for (const migration of [createMigration, nullableExpiryMigration]) {
   if (!existsSync(migration)) {
     console.error(`required share migration is missing: ${migration}`);
@@ -41,6 +45,7 @@ const execute = (migration: string) => {
     ["wrangler@4.110.0", "d1", "execute", database, "--remote", "--file", migration],
     { stdio: "inherit" },
   );
+
   if (result.status !== 0) exit(result.status ?? 1);
 };
 
@@ -59,12 +64,16 @@ const expiryRequired = () => {
     ],
     { encoding: "utf8" },
   );
+
   if (result.status !== 0) return undefined;
+
   try {
     const columns = Schema.decodeUnknownSync(tableInfoSchema)(JSON.parse(result.stdout)).flatMap(
       (entry) => entry.results,
     );
+
     const expiry = columns.find((column) => column.name === "expires_at");
+
     return expiry ? expiry.notnull === 1 : undefined;
   } catch {
     return undefined;
@@ -73,12 +82,16 @@ const expiryRequired = () => {
 
 // Only these reviewed migrations run; do not glob this directory.
 execute(createMigration);
+
 const required = expiryRequired();
+
 if (required === undefined) {
   console.error("could not verify share_manifests schema after migration; refusing deployment.");
   exit(1);
 }
+
 if (required) execute(nullableExpiryMigration);
+
 if (expiryRequired() !== false) {
   console.error("could not verify nullable share_manifests.expires_at; refusing deployment.");
   exit(1);

@@ -10,8 +10,11 @@ import "./index.css";
 holdForFonts();
 
 const appId = resolveApp(window.location);
+
 initializeAnalytics(appId);
+
 if (appId === "tagium-save") void startTemporaryStorageSession();
+
 document.title = getAppTitle(appId);
 
 createRoot(document.getElementById("root")!).render(

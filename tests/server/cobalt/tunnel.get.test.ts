@@ -16,6 +16,7 @@ type RuntimeRequest = Request & {
 };
 
 const machineAffinitySecret = "test-machine-affinity-secret";
+
 const tunnelUrl =
   "https://cobalt.test/tunnel?id=123456789012345678901&exp=1234567890123&sig=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&sec=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&iv=cccccccccccccccccccccc";
 
@@ -52,6 +53,7 @@ const makeDirectResourceRequest = (
   );
   const resourceRequest = new Request(url, request) as RuntimeRequest;
   resourceRequest.runtime = request.runtime;
+
   return resourceRequest;
 };
 
@@ -70,6 +72,7 @@ describe("cobalt tunnel endpoint", () => {
       async (_input: string | URL | Request, _init?: RequestInit) =>
         new Response(null, { status: 302, headers: { Location: "https://example.test/private" } }),
     );
+
     vi.stubGlobal("fetch", fetchMock);
 
     const response = await handler(makeEvent(makeTunnelRequest()));

@@ -47,9 +47,11 @@ export function mergeUploadedTracksIntoAlbums(
 
   if (forceSingleAlbum && parsedUploads.length > 0) {
     const albumSeedUploads = options.albumSeedUploads ?? parsedUploads;
+
     const firstSeed =
       albumSeedUploads.find((upload) => upload.albumSeed.title.trim())?.albumSeed ??
       albumSeedUploads[0].albumSeed;
+
     const albumTitle = firstSeed.title || `album ${nextAlbums.length + 1}`;
 
     const createdAlbum: AlbumGroup = {
@@ -66,22 +68,28 @@ export function mergeUploadedTracksIntoAlbums(
       const nextArtist = parsedUploads
         .map((upload) => upload.albumSeed.artist)
         .find((artist) => Boolean(artist));
+
       createdAlbum.artist = nextArtist || "";
     }
+
     if (!createdAlbum.genre) {
       const nextGenre = parsedUploads
         .map((upload) => upload.albumSeed.genre)
         .find((genre) => Boolean(genre));
+
       createdAlbum.genre = nextGenre || "";
     }
+
     if (!createdAlbum.cover || createdAlbum.cover.length === 0) {
       const nextCover = parsedUploads
         .map((upload) => upload.albumSeed.cover)
         .find((cover) => cover && cover.length > 0);
+
       createdAlbum.cover = nextCover;
     }
 
     nextAlbums.push(createdAlbum);
+
     return {
       albums: nextAlbums,
       firstSelectedAlbumId: createdAlbum.id,
@@ -93,12 +101,15 @@ export function mergeUploadedTracksIntoAlbums(
   const albumByKey = new Map(
     nextAlbums.map((album) => [buildAlbumKey(album.title, album.artist), album]),
   );
+
   const uploadedAlbumCounts = new Map<string, number>();
+
   for (const { albumSeed } of parsedUploads) {
     if (!albumSeed.title.trim()) continue;
     const key = buildAlbumKey(albumSeed.title, albumSeed.artist);
     uploadedAlbumCounts.set(key, (uploadedAlbumCounts.get(key) ?? 0) + 1);
   }
+
   let firstSelectedAlbumId: string | null = null;
   const unassignedTrackIds: string[] = [];
   const albumsToSync = new Set<string>();
@@ -107,8 +118,10 @@ export function mergeUploadedTracksIntoAlbums(
     const { albumSeed } = upload;
 
     const key = buildAlbumKey(albumSeed.title, albumSeed.artist);
+
     if (!albumSeed.title.trim() || (uploadedAlbumCounts.get(key) ?? 0) < 2) {
       unassignedTrackIds.push(upload.file.id);
+
       return;
     }
 
@@ -129,15 +142,19 @@ export function mergeUploadedTracksIntoAlbums(
     }
 
     if (!targetAlbum.artist && albumSeed.artist) targetAlbum.artist = albumSeed.artist;
+
     if (!targetAlbum.genre && albumSeed.genre) targetAlbum.genre = albumSeed.genre;
+
     if ((!targetAlbum.cover || targetAlbum.cover.length === 0) && albumSeed.cover) {
       targetAlbum.cover = albumSeed.cover;
     }
 
     targetAlbum.trackIds.push(upload.file.id);
+
     if (syncTrackNumbers) {
       albumsToSync.add(targetAlbum.id);
     }
+
     if (index === 0 || !firstSelectedAlbumId) {
       firstSelectedAlbumId = targetAlbum.id;
     }
@@ -177,6 +194,7 @@ export function moveTrackInSidebar(
   if (sourceAlbum) {
     sourceAlbum.trackIds = sourceAlbum.trackIds.filter((id) => id !== trackId);
   }
+
   if (sourceLooseIndex >= 0) {
     looseTrackIds.splice(sourceLooseIndex, 1);
   }
@@ -189,18 +207,23 @@ export function moveTrackInSidebar(
     if (placement === "append") {
       return trackIds.length;
     }
+
     if (!referenceTrackId) {
       return trackIds.length;
     }
+
     const referenceIndex = trackIds.indexOf(referenceTrackId);
+
     if (referenceIndex < 0) {
       return trackIds.length;
     }
+
     return placement === "before" ? referenceIndex : referenceIndex + 1;
   };
 
   if (target.type === "album") {
     const targetAlbum = albums.find((album) => album.id === target.albumId);
+
     if (!targetAlbum) {
       return {
         albums: pruneEmptyAlbums(albums),
@@ -208,6 +231,7 @@ export function moveTrackInSidebar(
         albumsToSync: new Array<string>(),
       };
     }
+
     if (target.placement !== "append" && target.referenceTrackId === trackId) {
       return {
         albums: pruneEmptyAlbums(albums),
@@ -215,11 +239,13 @@ export function moveTrackInSidebar(
         albumsToSync: new Array<string>(),
       };
     }
+
     const insertIndex = resolveInsertIndex(
       targetAlbum.trackIds,
       target.placement,
       target.placement === "append" ? undefined : target.referenceTrackId,
     );
+
     targetAlbum.trackIds.splice(insertIndex, 0, trackId);
   } else {
     if (target.placement !== "append" && target.referenceTrackId === trackId) {
@@ -229,15 +255,18 @@ export function moveTrackInSidebar(
         albumsToSync: new Array<string>(),
       };
     }
+
     const insertIndex = resolveInsertIndex(
       looseTrackIds,
       target.placement,
       target.placement === "append" ? undefined : target.referenceTrackId,
     );
+
     looseTrackIds.splice(insertIndex, 0, trackId);
   }
 
   const prunedAlbums = pruneEmptyAlbums(albums);
+
   const albumIdsToCheck = [sourceAlbumId, target.type === "album" ? target.albumId : null]
     .filter((id): id is string => Boolean(id))
     .filter((id, index, list) => list.indexOf(id) === index);
@@ -286,14 +315,17 @@ export function createAlbumFromTracks(
 
   for (const trackId of uniqueTrackIds) {
     const sourceAlbum = albums.find((album) => album.trackIds.includes(trackId));
+
     if (sourceAlbum) {
       sourceAlbum.trackIds = sourceAlbum.trackIds.filter((id) => id !== trackId);
       sourceAlbumIds.push(sourceAlbum.id);
     }
+
     looseTrackIds = looseTrackIds.filter((id) => id !== trackId);
   }
 
   const newAlbumId = crypto.randomUUID();
+
   const createdAlbum: AlbumGroup = {
     id: newAlbumId,
     title: metadata.title,
@@ -318,10 +350,13 @@ export function createAlbumFromTracks(
 export function reorderAlbums(prevAlbums: AlbumGroup[], albumId: string, targetIndex: number) {
   const albums = [...prevAlbums];
   const sourceIndex = albums.findIndex((album) => album.id === albumId);
+
   if (sourceIndex < 0 || sourceIndex === targetIndex) {
     return albums;
   }
+
   const [movedAlbum] = albums.splice(sourceIndex, 1);
   albums.splice(targetIndex, 0, movedAlbum);
+
   return albums;
 }

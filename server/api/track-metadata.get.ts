@@ -12,24 +12,30 @@ const oEmbedSchema = Schema.Struct({
   author_name: Schema.optionalKey(Schema.String),
   thumbnail_url: Schema.optionalKey(urlStringSchema),
 });
+
 const soundCloudTrackSchema = Schema.Struct({
   title: nonEmptyStringSchema,
   artwork_url: Schema.optionalKey(Schema.NullOr(urlStringSchema)),
   user: Schema.optionalKey(Schema.Struct({ username: Schema.optionalKey(Schema.String) })),
 });
+
 const soundCloudShortHosts = new Set(["on.soundcloud.com", "snd.sc"]);
 
 const normalizeTrackMetadataSourceUrl = async (sourceUrl: string, signal: AbortSignal) => {
   const parsed = parseMediaLink(sourceUrl);
+
   if (parsed.kind !== "unsupported") return parsed.canonicalUrl;
 
   const candidate = new URL(sourceUrl);
+
   if (!soundCloudShortHosts.has(candidate.hostname.toLowerCase())) return sourceUrl;
+
   return (await resolveSoundCloudShortLink(sourceUrl, { signal })).canonicalUrl;
 };
 
 const isSoundCloudUrl = (url: URL) => {
   const parsed = parseMediaLink(url.toString());
+
   return parsed.provider === "soundcloud" && parsed.kind === "track";
 };
 
@@ -47,10 +53,13 @@ export const resolveSoundCloudTrackMetadata = async (
   resolveUrl.searchParams.set("url", sourceUrl);
   resolveUrl.searchParams.set("client_id", clientId);
   const response = await fetch(resolveUrl, { signal: options.signal });
+
   if (!response.ok) throw new Error(`track_metadata.fetch_failed (${response.status})`);
+
   const metadata = await Effect.runPromise(
     Schema.decodeUnknownEffect(soundCloudTrackSchema)(await response.json()),
   );
+
   return {
     title: metadata.title.trim(),
     artist: metadata.user?.username?.trim() ?? "",
@@ -60,11 +69,14 @@ export const resolveSoundCloudTrackMetadata = async (
 
 export const getTrackMetadataEndpoint = (sourceUrl: string) => {
   const parsed = parseMediaLink(sourceUrl);
+
   if (parsed.provider !== "youtube" || parsed.kind !== "track") return undefined;
+
   if (parsed.provider === "youtube") {
     const endpoint = new URL("https://www.youtube.com/oembed");
     endpoint.searchParams.set("url", sourceUrl);
     endpoint.searchParams.set("format", "json");
+
     return endpoint;
   }
 
@@ -77,6 +89,7 @@ export const normalizeTrackMetadataArtist = (artist: string, endpoint: URL) =>
 export default defineHandler(async (event) => {
   const requestUrl = new URL(event.req.url, "http://tagium.local");
   const requestedSourceUrl = requestUrl.searchParams.get("url");
+
   if (!requestedSourceUrl) throw new Error("track_metadata.url_required");
   const sourceUrl = await normalizeTrackMetadataSourceUrl(requestedSourceUrl, event.req.signal);
 
@@ -85,10 +98,13 @@ export default defineHandler(async (event) => {
   }
 
   const endpoint = getTrackMetadataEndpoint(sourceUrl);
+
   if (!endpoint) return new Response(null, { status: 204 });
 
   const response = await fetch(endpoint, { signal: event.req.signal });
+
   if (!response.ok) throw new Error(`track_metadata.fetch_failed (${response.status})`);
+
   const metadata = await Effect.runPromise(
     Schema.decodeUnknownEffect(oEmbedSchema)(await response.json()),
   );

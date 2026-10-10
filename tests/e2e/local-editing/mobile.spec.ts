@@ -67,6 +67,7 @@ const swipe = (
   page.evaluate(
     ({ from, to, pointerType }) => {
       const target = document.elementFromPoint(from.x, from.y) ?? document.body;
+
       const pointer = (x: number, y: number): PointerEventInit => ({
         bubbles: true,
         cancelable: true,
@@ -79,7 +80,9 @@ const swipe = (
         width: 24,
         height: 24,
       });
+
       target.dispatchEvent(new PointerEvent("pointerdown", pointer(from.x, from.y)));
+
       for (let step = 1; step <= 8; step += 1) {
         target.dispatchEvent(
           new PointerEvent(
@@ -88,6 +91,7 @@ const swipe = (
           ),
         );
       }
+
       target.dispatchEvent(new PointerEvent("pointerup", pointer(to.x, to.y)));
     },
     { from, to, pointerType },

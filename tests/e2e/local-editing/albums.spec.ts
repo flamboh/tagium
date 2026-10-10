@@ -84,6 +84,7 @@ test("applies album edits and a new cover to every format it exports", async ({ 
       Buffer.from(artwork.bytes),
     ),
   ).toBe(true);
+
   for (const [index, format] of formats.entries()) {
     const entry = entries.find((file) => file.filename.endsWith(`.${format}`))!;
     const { metadata } = await inspectAudio(entry);
@@ -147,9 +148,11 @@ test("removes a track and deletes a full album only after confirmation", async (
   );
   await libraryCount(page, 3);
   const removeTrack = page.getByRole("dialog", { name: "remove track?" });
+
   const flacActions = page.getByRole("button", {
     name: `track actions for ${fixtureTitle("flac")}.flac`,
   });
+
   await flacActions.click();
   await page.getByRole("menuitem", { name: "remove track" }).click();
   await expect(removeTrack).toContainText(

@@ -26,6 +26,7 @@ const getFrameHeader = (bytes: Uint8Array, offset: number): FrameHeader | null =
   const bitrateIndex = (bytes[offset + 2]! >> 4) & 0x0f;
   const sampleRateIndex = (bytes[offset + 2]! >> 2) & 0x03;
   const padding = (bytes[offset + 2]! >> 1) & 0x01;
+
   if (versionBits === 1 || layerBits === 0 || bitrateIndex === 15 || sampleRateIndex === 3) {
     return null;
   }
@@ -34,6 +35,7 @@ const getFrameHeader = (bytes: Uint8Array, offset: number): FrameHeader | null =
   const layer = 4 - layerBits;
   const divisor = isMpeg1 ? 1 : versionBits === 2 ? 2 : 4;
   const sampleRate = [44_100, 48_000, 32_000][sampleRateIndex]! / divisor;
+
   if (bitrateIndex === 0) {
     return { versionBits, layer, sampleRate, bitrateIndex, frameLength: null };
   }
@@ -47,11 +49,14 @@ const getFrameHeader = (bytes: Uint8Array, offset: number): FrameHeader | null =
     : layer === 1
       ? bitrateKbps.mpeg2Layer1
       : bitrateKbps.mpeg2Layer23;
+
   const bitrate = table[bitrateIndex]! * 1_000;
+
   const frameLength =
     layer === 1
       ? Math.floor(((12 * bitrate) / sampleRate + padding) * 4)
       : Math.floor(((layer === 3 && !isMpeg1 ? 72 : 144) * bitrate) / sampleRate + padding);
+
   return { versionBits, layer, sampleRate, bitrateIndex, frameLength };
 };
 
@@ -65,6 +70,7 @@ const hasCompleteKnownLengthFrames = (bytes: Uint8Array, offset: number, first: 
   if (first.frameLength === null || offset + first.frameLength > bytes.length) return false;
   const nextOffset = offset + first.frameLength;
   const next = getFrameHeader(bytes, nextOffset);
+
   return (
     next !== null &&
     next.frameLength !== null &&
@@ -77,34 +83,43 @@ const hasCompleteFreeFormatFrames = (bytes: Uint8Array, offset: number, first: F
   // Free-format headers omit bitrate, so infer frame size from repeated, equally spaced syncs.
   // Requiring three complete frames avoids treating payload bytes or truncated data as evidence.
   const searchEnd = Math.min(bytes.length - 4, offset + 16_384);
+
   for (let secondOffset = offset + 4; secondOffset <= searchEnd; secondOffset++) {
     const second = getFrameHeader(bytes, secondOffset);
+
     if (!second || !headersAreCompatible(first, second)) continue;
     const spacing = secondOffset - offset;
     const thirdOffset = secondOffset + spacing;
     const third = getFrameHeader(bytes, thirdOffset);
+
     if (third && headersAreCompatible(first, third) && thirdOffset + spacing <= bytes.length) {
       return true;
     }
   }
+
   return false;
 };
 
 const getAudioStart = (bytes: Uint8Array) => {
   if (bytes.length < 10 || bytes[0] !== 0x49 || bytes[1] !== 0x44 || bytes[2] !== 0x33) return 0;
+
   if ([bytes[6], bytes[7], bytes[8], bytes[9]].some((value) => (value! & 0x80) !== 0)) return -1;
   const tagSize = (bytes[6]! << 21) | (bytes[7]! << 14) | (bytes[8]! << 7) | bytes[9]!;
+
   return 10 + tagSize + ((bytes[5]! & 0x10) !== 0 ? 10 : 0);
 };
 
 export const isMp3Bytes = (bytes: Uint8Array) => {
   const audioStart = getAudioStart(bytes);
+
   if (audioStart < 0 || audioStart >= bytes.length) return false;
   const scanEnd = Math.min(bytes.length - 4, audioStart + 16_384);
 
   for (let offset = audioStart; offset <= scanEnd; offset++) {
     const first = getFrameHeader(bytes, offset);
+
     if (!first) continue;
+
     if (
       (first.frameLength === null && hasCompleteFreeFormatFrames(bytes, offset, first)) ||
       hasCompleteKnownLengthFrames(bytes, offset, first)
@@ -112,6 +127,7 @@ export const isMp3Bytes = (bytes: Uint8Array) => {
       return true;
     }
   }
+
   return false;
 };
 
@@ -120,23 +136,29 @@ const startsWithAscii = (bytes: Uint8Array, value: string, offset = 0) =>
 
 export const getMp3AdmissionError = (file: File, bytes: Uint8Array) => {
   if (bytes.length === 0) return `${file.name} is empty. choose a valid mp3 file.`;
+
   if (!/\.mp3$/i.test(file.name)) {
     return `${file.name} is not an mp3. tagium currently supports mp3 files only.`;
   }
+
   const knownUnsupported =
     startsWithAscii(bytes, "RIFF") ||
     startsWithAscii(bytes, "fLaC") ||
     startsWithAscii(bytes, "OggS") ||
     startsWithAscii(bytes, "ftyp", 4);
+
   if (knownUnsupported) {
     return `${file.name} is not an mp3. tagium currently supports mp3 files only.`;
   }
+
   if (isMp3Bytes(bytes)) return null;
+
   return `${file.name} is not a valid mp3. the file may be corrupt or renamed.`;
 };
 
 export const normalizeMp3Filename = (filename: string) => {
   const basename = filename.replace(/\.[^.]+$/, "") || "track";
+
   return `${basename}.mp3`;
 };
 

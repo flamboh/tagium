@@ -17,10 +17,12 @@ test("the creator's browser stops a share from its page after a failed attempt, 
   newContext,
 }) => {
   const video = await upstreams.youtube.video({ title: "Owned Song" });
+
   const share = await createShare(
     request,
     albumManifest({ title: "Owned Album", artist: "Owner", tracks: [{ video }] }),
   );
+
   await seedReceipt(context, share);
 
   const visitor = await (await newContext()).newPage();
@@ -125,10 +127,12 @@ test("opening a share while tagium is open in another tab offers to copy the lin
   upstreams,
 }) => {
   const video = await upstreams.youtube.video();
+
   const share = await createShare(
     request,
     albumManifest({ title: "Tab Album", artist: "Owner", tracks: [{ video }] }),
   );
+
   const clipboard = await stubClipboard(context);
 
   await page.addInitScript(() => {
@@ -140,6 +144,7 @@ test("opening a share while tagium is open in another tab offers to copy the lin
   });
   await page.goto("/");
   const shareTab = await context.newPage();
+
   const toast = notifications(shareTab).getByRole("listitem").filter({
     hasText:
       "tagium is already open in another tab. copy the link and add the album there instead.",

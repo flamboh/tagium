@@ -57,6 +57,7 @@ const stripMetadataControlCharacters = (value: string) =>
   Array.from(value)
     .filter((character) => {
       const code = character.charCodeAt(0);
+
       return code > 31 && code !== 127;
     })
     .join("");
@@ -81,6 +82,7 @@ const isObjectState = (value: unknown): value is object =>
 const isMalformedTerminalLocalProcessingMessage = (data: unknown) => {
   if (!isObjectState(data) || !("cobaltLocalProcessing" in data)) return false;
   const message = data.cobaltLocalProcessing;
+
   return isObjectState(message) && ("blob" in message || "error" in message);
 };
 
@@ -95,17 +97,21 @@ const runLocalProcessingWorker = (request: LocalAudioProcessingRequest, signal?:
     (worker) =>
       Effect.callback<Blob, Error>((resume) => {
         let completed = false;
+
         const complete = (effect: Effect.Effect<Blob, Error>) => {
           if (completed) {
             return;
           }
+
           completed = true;
           cleanup();
           resume(effect);
         };
+
         const cleanup = () => {
           signal?.removeEventListener("abort", onAbort);
         };
+
         const onAbort = () => {
           complete(Effect.fail(toPublicAudioError(signal?.reason)));
         };
@@ -114,6 +120,7 @@ const runLocalProcessingWorker = (request: LocalAudioProcessingRequest, signal?:
           signal?.throwIfAborted();
         } catch (error) {
           complete(Effect.fail(toPublicAudioError(error)));
+
           return Effect.void;
         }
 
@@ -126,6 +133,7 @@ const runLocalProcessingWorker = (request: LocalAudioProcessingRequest, signal?:
 
               if ("blob" in message) {
                 complete(Effect.succeed(message.blob));
+
                 return;
               }
 
@@ -170,15 +178,19 @@ export const validateLocalAudioPlan = (plan: LocalAudioPlan) => {
   if (plan.type !== "audio" && plan.type !== "proxy") {
     throw new Error("cobalt local processing response was not audio or proxy.");
   }
+
   if (!plan.audio) {
     throw new Error("cobalt local processing response missing audio settings.");
   }
+
   if (plan.tunnel.length === 0) {
     throw new Error("cobalt local processing response missing audio tunnel.");
   }
+
   if (plan.tunnel.length > 2) {
     throw new Error("cobalt local processing response included unexpected tunnels.");
   }
+
   if (plan.audio.cover && plan.tunnel.length !== 2) {
     throw new Error("cobalt local processing response missing cover tunnel.");
   }
@@ -193,27 +205,40 @@ const tagCobaltAudioFile = async (
   const { inspection, metadata } = await Effect.runPromise(inspectAudioFile(file));
   const supplied = plan.output.metadata;
   const changes: MetadataChanges = {};
+
   if (supplied?.title) changes.title = stripMetadataControlCharacters(supplied.title);
+
   if (supplied?.artist) changes.artist = stripMetadataControlCharacters(supplied.artist);
+
   if (supplied?.album) changes.album = stripMetadataControlCharacters(supplied.album);
+
   if (supplied?.date) changes.dateText = stripMetadataControlCharacters(supplied.date);
+
   if (supplied?.genre) changes.genre = stripMetadataControlCharacters(supplied.genre);
+
   if (supplied?.track) changes.trackText = stripMetadataControlCharacters(supplied.track);
+
   if (supplied?.album_artist)
     changes.albumArtist = stripMetadataControlCharacters(supplied.album_artist);
+
   if (supplied?.composer) changes.composer = stripMetadataControlCharacters(supplied.composer);
+
   const supportsExtendedText =
     inspection.format.kind === "mp3" || inspection.format.kind === "opus";
+
   if (supportsExtendedText && supplied?.copyright) {
     changes.copyright = stripMetadataControlCharacters(supplied.copyright);
   }
+
   if (supportsExtendedText && supplied?.sublanguage) {
     changes.language = stripMetadataControlCharacters(supplied.sublanguage);
   }
+
   if (coverFile) {
     const cover = plan.audio?.cropCover
       ? await cropCoverArtToSquare(coverFile).catch(() => coverFile)
       : coverFile;
+
     changes.picture = [
       {
         format: cover.type || "image/jpeg",
@@ -223,9 +248,11 @@ const tagCobaltAudioFile = async (
       },
     ];
   }
+
   const tagged = await Effect.runPromise(
     patchAudioFileWithChanges(file, changes, metadata.filename),
   );
+
   return new File([tagged], plan.output.filename, {
     type: tagged.type,
     lastModified,
@@ -253,6 +280,7 @@ const makeLocalAudioProcessor = Effect.fn("makeLocalAudioProcessor")(() =>
               yield* service.validateLocalAudioPlan(plan);
 
               const outputFormat = plan.output.filename.split(".").pop()?.toLowerCase();
+
               if (!outputFormat) {
                 return yield* Effect.fail(
                   new Error("cobalt local processing response missing output format."),
@@ -260,6 +288,7 @@ const makeLocalAudioProcessor = Effect.fn("makeLocalAudioProcessor")(() =>
               }
 
               const audioTunnel = plan.tunnel[0];
+
               if (!audioTunnel) {
                 return yield* Effect.fail(
                   new Error("cobalt local processing response missing audio tunnel."),
@@ -268,14 +297,18 @@ const makeLocalAudioProcessor = Effect.fn("makeLocalAudioProcessor")(() =>
 
               const canPostTag =
                 outputFormat === "mp3" || outputFormat === "m4a" || outputFormat === "opus";
+
               const coverTunnel = canPostTag ? plan.tunnel[1] : undefined;
               const audioFileEffect = fetchTunnelFile(audioTunnel, "input-0");
+
               const audioAndCover = coverTunnel
                 ? Effect.all([audioFileEffect, fetchTunnelFile(coverTunnel, "input-1")], {
                     concurrency: 2,
                   })
                 : Effect.map(audioFileEffect, (audioFile) => [audioFile, undefined] as const);
+
               const [audioFile, coverFile] = yield* audioAndCover;
+
               const blob = yield* service.runLocalProcessingWorker(
                 {
                   audioFile,
@@ -292,6 +325,7 @@ const makeLocalAudioProcessor = Effect.fn("makeLocalAudioProcessor")(() =>
                 },
                 signal,
               );
+
               signal?.throwIfAborted();
 
               const file = new File([blob], plan.output.filename, {
@@ -300,6 +334,7 @@ const makeLocalAudioProcessor = Effect.fn("makeLocalAudioProcessor")(() =>
               });
 
               signal?.throwIfAborted();
+
               if (!canPostTag || (!coverFile && !plan.output.metadata)) {
                 return file;
               }

@@ -37,7 +37,10 @@ export const resolveTrackMetadata = async (
   endpoint.searchParams.set("url", sourceUrl);
 
   const response = await fetch(endpoint);
+
   if (response.status === 204) return undefined;
+
   if (!response.ok) throw new Error(`track metadata request failed (${response.status})`);
+
   return decodeTrackMetadata(await response.json());
 };

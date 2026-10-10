@@ -14,6 +14,7 @@ export type SaveSettings = {
 
 export const saveApp = (page: Page) => {
   const recent = page.getByRole("list", { name: "recent downloads" });
+
   const app = {
     url: page.getByRole("textbox", { name: "media url" }),
     submit: page.getByRole("button", { name: "start video download" }),
@@ -33,6 +34,7 @@ export const saveApp = (page: Page) => {
     },
     async configure(settings: SaveSettings) {
       await app.settings.click();
+
       const labels = {
         mode: "mode",
         quality: "quality",
@@ -40,9 +42,11 @@ export const saveApp = (page: Page) => {
         codec: "codec",
         audio: "audio",
       } as const;
+
       for (const [key, value] of Object.entries(settings) as [keyof SaveSettings, string][]) {
         await page.getByLabel(labels[key], { exact: true }).selectOption(value);
       }
+
       await page.keyboard.press("Escape");
       await expect(page.getByLabel("mode", { exact: true })).toBeHidden();
     },
@@ -59,10 +63,13 @@ export const saveApp = (page: Page) => {
       const file = await captureDownload(page, () =>
         app.downloadButton(filename).nth(index).click(),
       );
+
       expectDownloadName(file, filename);
+
       return { ...file, filename };
     },
   };
+
   return app;
 };
 
@@ -70,23 +77,29 @@ export const temporarySessions = (page: Page) =>
   page.evaluate(async () => {
     const root = await navigator.storage.getDirectory();
     let directory: FileSystemDirectoryHandle;
+
     try {
       directory = await root.getDirectoryHandle("tagium-save-temporary");
     } catch {
       return {};
     }
+
     const sessions: Record<string, number> = {};
+
     for await (const [name, handle] of directory.entries()) {
       if (!(handle instanceof FileSystemDirectoryHandle)) continue;
       let files = 0;
+
       try {
         for await (const _ of handle.keys()) files += 1;
       } catch (error) {
         if (error instanceof DOMException && error.name === "NotFoundError") continue;
         throw error;
       }
+
       sessions[name] = files;
     }
+
     return sessions;
   });
 

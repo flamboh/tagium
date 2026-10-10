@@ -13,6 +13,7 @@ const ytcfg = {
   INNERTUBE_CLIENT_VERSION: "2.20260101.00.00",
   INNERTUBE_CONTEXT: { client: { clientName: "WEB", clientVersion: "2.20260101.00.00", hl: "en" } },
 };
+
 const ytcfgScript = `<script>ytcfg.set(${JSON.stringify(ytcfg)});</script>`;
 
 const thumbnailUrl = (videoId: string) => `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
@@ -67,7 +68,9 @@ const playlistPage = (request: FakeRequest, playlist: YouTubePlaylistScenario, o
     .map((key) => request.registry.media(key))
     .filter((video) => video !== undefined)
     .map((scenario) => videoRenderer(scenario, playlist.renderer));
+
   const nextOffset = offset + playlist.pageSize;
+
   return nextOffset < playlist.videoKeys.length
     ? [
         ...videos,
@@ -84,6 +87,7 @@ const playlistPage = (request: FakeRequest, playlist: YouTubePlaylistScenario, o
 
 const playlistHtml = (request: FakeRequest, playlist: YouTubePlaylistScenario) => {
   const firstVideoId = playlist.videoKeys[0]?.slice("yt:".length);
+
   const initialData = {
     metadata: { playlistMetadataRenderer: { title: playlist.title } },
     sidebar: {
@@ -139,6 +143,7 @@ const playlistHtml = (request: FakeRequest, playlist: YouTubePlaylistScenario) =
       },
     },
   };
+
   return `<!doctype html><html><head>${ytcfgScript}</head><body><script>var ytInitialData = ${JSON.stringify(initialData)};</script></body></html>`;
 };
 
@@ -146,6 +151,7 @@ const alertHtml = (text: string) => {
   const initialData = {
     alerts: [{ alertRenderer: { type: "ERROR", text: { runs: [{ text }] } } }],
   };
+
   return `<!doctype html><html><head>${ytcfgScript}</head><body><script>var ytInitialData = ${JSON.stringify(initialData)};</script></body></html>`;
 };
 
@@ -161,6 +167,7 @@ const parseJsonBody = (request: FakeRequest): InnertubeRequestBody => {
 
 export const fakeYouTube = (request: FakeRequest): FakeResult => {
   const { url, registry } = request;
+
   if (request.method === "GET" && url.pathname === "/") {
     return { route: "youtube.home", key: null, response: html(`<!doctype html>${ytcfgScript}`) };
   }
@@ -168,7 +175,9 @@ export const fakeYouTube = (request: FakeRequest): FakeResult => {
   if (request.method === "GET" && url.pathname === "/oembed") {
     const key = mediaKeyFromUrl(url.searchParams.get("url") ?? "");
     const scenario = registry.media(key);
+
     if (!scenario) return unexpected("youtube.oembed", key);
+
     if (scenario.metadata.kind === "status") {
       return {
         route: "youtube.oembed",
@@ -178,6 +187,7 @@ export const fakeYouTube = (request: FakeRequest): FakeResult => {
         }),
       };
     }
+
     return {
       route: "youtube.oembed",
       key,
@@ -198,7 +208,9 @@ export const fakeYouTube = (request: FakeRequest): FakeResult => {
     const videoId = parseJsonBody(request).videoId;
     const key = typeof videoId === "string" ? youtubeVideoKey(videoId) : null;
     const scenario = registry.media(key);
+
     if (!scenario) return unexpected("youtube.next", key);
+
     if (scenario.uploadYearStatus !== undefined) {
       return {
         route: "youtube.next",
@@ -206,6 +218,7 @@ export const fakeYouTube = (request: FakeRequest): FakeResult => {
         response: new Response("unavailable", { status: scenario.uploadYearStatus }),
       };
     }
+
     const primaryInfo =
       scenario.year === undefined
         ? { title: { runs: [{ text: scenario.title }] } }
@@ -213,6 +226,7 @@ export const fakeYouTube = (request: FakeRequest): FakeResult => {
             title: { runs: [{ text: scenario.title }] },
             dateText: { simpleText: `Jan 2, ${scenario.year}` },
           };
+
     return {
       route: "youtube.next",
       key,
@@ -229,7 +243,9 @@ export const fakeYouTube = (request: FakeRequest): FakeResult => {
   if (request.method === "GET" && url.pathname === "/playlist") {
     const key = youtubePlaylistKey(url.searchParams.get("list") ?? "");
     const playlist = registry.get(key);
+
     if (playlist?.type !== "youtube-playlist") return unexpected("youtube.playlist", key);
+
     return {
       route: "youtube.playlist",
       key,
@@ -244,7 +260,9 @@ export const fakeYouTube = (request: FakeRequest): FakeResult => {
     const [playlistId, rawOffset] = typeof token === "string" ? token.split(":") : [];
     const key = youtubePlaylistKey(playlistId ?? "");
     const playlist = registry.get(key);
+
     if (playlist?.type !== "youtube-playlist") return unexpected("youtube.browse", key);
+
     return {
       route: "youtube.browse",
       key,
@@ -267,7 +285,9 @@ export const fakeYouTubeImages = (request: FakeRequest): FakeResult => {
   const videoId = request.url.pathname.split("/")[2] ?? "";
   const key = youtubeVideoKey(videoId);
   const scenario = request.registry.media(key);
+
   if (!scenario) return unexpected("ytimg.thumbnail", key);
+
   return {
     route: "ytimg.thumbnail",
     key,

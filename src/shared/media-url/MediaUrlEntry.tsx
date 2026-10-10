@@ -35,6 +35,7 @@ const prefersReducedMotion = () =>
 
 const clearMotionStyles = (anchor: HTMLDivElement | null, motion: HTMLDivElement | null) => {
   if (anchor) anchor.style.height = "";
+
   if (!motion) return;
 
   motion.style.position = "";
@@ -61,18 +62,22 @@ export default function MediaUrlEntry({
   useLayoutEffect(() => {
     const anchor = anchorRef.current;
     const motion = motionRef.current;
+
     if (!anchor || !motion) return;
 
     const runningAnimation = animationRef.current;
+
     const previousRect = runningAnimation
       ? motion.getBoundingClientRect()
       : previousRectRef.current;
+
     const layoutChanged = previousLayoutRef.current !== layout;
     runningAnimation?.cancel();
     animationRef.current = null;
     clearMotionStyles(anchor, motion);
 
     const nextRect = motion.getBoundingClientRect();
+
     if (
       previousRect &&
       layoutChanged &&
@@ -90,6 +95,7 @@ export default function MediaUrlEntry({
         duration: 420,
         easing: "cubic-bezier(0.22, 1, 0.36, 1)",
       });
+
       animationRef.current = animation;
       animation.onfinish = () => {
         if (animationRef.current !== animation) return;
@@ -114,6 +120,7 @@ export default function MediaUrlEntry({
     };
 
     window.addEventListener("resize", settleMotion);
+
     return () => {
       window.removeEventListener("resize", settleMotion);
       settleMotion();
@@ -122,6 +129,7 @@ export default function MediaUrlEntry({
 
   const showValidationFeedback = () => {
     const feedback = motionRef.current;
+
     if (!feedback || prefersReducedMotion() || typeof feedback.animate !== "function") return;
     feedback.animate(
       [
@@ -169,6 +177,7 @@ export default function MediaUrlEntry({
             noValidate
             onSubmit={async (event) => {
               event.preventDefault();
+
               if (!(await controller.submit())) showValidationFeedback();
             }}
             className="flex items-start gap-2"

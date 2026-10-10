@@ -19,16 +19,21 @@ import type { TrackClip } from "@/features/library/types";
 import { cn } from "@/lib/utils";
 
 const WAVEFORM_HEIGHT = 44;
+
 const BAR_WIDTH = 2;
+
 const BAR_GAP = 1;
+
 // Stands in for the real peaks while the track downloads or decodes.
 const PLACEHOLDER_PEAKS = Array.from({ length: 256 }, (_, index) => {
   const swell = 0.45 + 0.3 * Math.sin(index / 9) * Math.sin(index / 23);
   const jitter = (Math.sin(index * 12.9898) * 43758.5453) % 1;
+
   return Math.min(1, Math.max(0.12, swell + Math.abs(jitter) * 0.35));
 });
 
 type WaveformStatus = "waiting" | "loading" | "ready" | "unavailable";
+
 type ClipEdge = "start" | "end";
 
 interface TrackWaveformProps {
@@ -54,6 +59,7 @@ function useTrackWaveform({
   const audioRef = useRef<HTMLAudioElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ kind: "seek" } | { kind: "edge"; edge: ClipEdge } | null>(null);
+
   const {
     playbackFile,
     waveform,
@@ -63,6 +69,7 @@ function useTrackWaveform({
     setPlaybackFailed,
     setMediaDuration,
   } = useWaveformSource(audioRef, file, fallbackDuration);
+
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(clip?.start ?? 0);
   const [draftClip, setDraftClip] = useState<TrackClip | null>(null);
@@ -75,18 +82,23 @@ function useTrackWaveform({
   const clipped = normalizeClip(range, duration) !== undefined;
   // Hold the last clip so the label doesn't flash the full range while it fades out on reset.
   const [labelRange, setLabelRange] = useState(range);
+
   if (clipped && (labelRange.start !== range.start || labelRange.end !== range.end)) {
     setLabelRange(range);
   }
 
   useLayoutEffect(() => {
     const surface = surfaceRef.current;
+
     if (!surface) return;
     setWidth(surface.clientWidth);
+
     const observer = new ResizeObserver(([entry]) => {
       if (entry) setWidth(entry.contentRect.width);
     });
+
     observer.observe(surface);
+
     return () => observer.disconnect();
   }, []);
 
@@ -104,20 +116,27 @@ function useTrackWaveform({
   useEffect(() => {
     if (!playing) return;
     let frame = 0;
+
     const tick = () => {
       const audio = audioRef.current;
+
       if (!audio) return;
       const { start, end } = rangeRef.current;
+
       if (audio.currentTime >= end) {
         audio.pause();
         audio.currentTime = start;
         setCurrentTime(start);
+
         return;
       }
+
       setCurrentTime(audio.currentTime);
       frame = requestAnimationFrame(tick);
     };
+
     frame = requestAnimationFrame(tick);
+
     return () => cancelAnimationFrame(frame);
   }, [playing]);
 
@@ -125,21 +144,27 @@ function useTrackWaveform({
     const audio = audioRef.current;
     const { start, end } = rangeRef.current;
     const next = Math.min(end, Math.max(start, time));
+
     if (audio) audio.currentTime = next;
     setCurrentTime(next);
   }, []);
 
   const togglePlayback = async () => {
     const audio = audioRef.current;
+
     if (!audio || !canPlay) return;
+
     if (!audio.paused) {
       audio.pause();
+
       return;
     }
+
     if (audio.currentTime < range.start || audio.currentTime >= range.end - 0.05) {
       audio.currentTime = range.start;
       setCurrentTime(range.start);
     }
+
     try {
       await audio.play();
     } catch {
@@ -149,6 +174,7 @@ function useTrackWaveform({
 
   const resetClip = () => {
     const audio = audioRef.current;
+
     if (audio) audio.currentTime = 0;
     setCurrentTime(0);
     onClipChange(undefined);
@@ -161,15 +187,18 @@ function useTrackWaveform({
 
   const pointerTime = (event: PointerEvent<HTMLElement>) => {
     const bounds = surfaceRef.current?.getBoundingClientRect();
+
     return bounds ? getPointerTime(event.clientX, bounds.left, bounds.width, duration) : 0;
   };
 
   const dragEdge = (edge: ClipEdge, time: number) => {
     const next = moveClipEdge(range, edge, time, duration);
     setDraftClip(next);
+
     // Keep the playhead inside the clip so the next play starts where the user expects.
     if (edge === "start") seekTo(next.start);
     else if (currentTime > next.end) seekTo(next.end);
+
     return next;
   };
 
@@ -178,13 +207,16 @@ function useTrackWaveform({
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = edge ? { kind: "edge", edge } : { kind: "seek" };
+
     if (edge) dragEdge(edge, pointerTime(event));
     else seekTo(pointerTime(event));
   };
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
+
     if (!drag) return;
+
     if (drag.kind === "edge") dragEdge(drag.edge, pointerTime(event));
     else seekTo(pointerTime(event));
   };
@@ -192,12 +224,14 @@ function useTrackWaveform({
   const endDrag = () => {
     const drag = dragRef.current;
     dragRef.current = null;
+
     if (drag?.kind === "edge" && draftClip) commitClip(draftClip);
   };
 
   const handlePositionKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!canPlay) return;
     const step = event.shiftKey ? 15 : 5;
+
     const actions = new Map<string, () => void>([
       ["ArrowLeft", () => seekTo(position - step)],
       ["ArrowRight", () => seekTo(position + step)],
@@ -206,7 +240,9 @@ function useTrackWaveform({
       [" ", () => void togglePlayback()],
       ["Enter", () => void togglePlayback()],
     ]);
+
     const action = actions.get(event.key);
+
     if (!action) return;
     event.preventDefault();
     action();
@@ -217,6 +253,7 @@ function useTrackWaveform({
     event.stopPropagation();
     const step = event.shiftKey ? 10 : 1;
     const current = range[edge];
+
     const targets = new Map([
       ["ArrowLeft", current - step],
       ["ArrowDown", current - step],
@@ -225,7 +262,9 @@ function useTrackWaveform({
       ["Home", edge === "start" ? 0 : range.start],
       ["End", edge === "end" ? duration : range.end],
     ]);
+
     const target = targets.get(event.key);
+
     if (target === undefined) return;
     event.preventDefault();
     commitClip(dragEdge(edge, target));
@@ -236,6 +275,7 @@ function useTrackWaveform({
     : status === "unavailable"
       ? "waveform unavailable for this track"
       : null;
+
   const barCount = Math.floor((width + BAR_GAP) / (BAR_WIDTH + BAR_GAP));
   const bars = width > 0 ? resamplePeaks(waveform?.peaks ?? PLACEHOLDER_PEAKS, barCount) : [];
   const startRatio = ratio(range.start);
@@ -310,6 +350,7 @@ export default function TrackWaveform(props: TrackWaveformProps) {
     playbackFile,
     setPlaybackFailed,
   } = useTrackWaveform(props);
+
   return (
     <section
       data-track-waveform
@@ -486,6 +527,7 @@ function useWaveformSource(
   // Metadata writes replace the track's File without touching its audio; keep the first one
   // so playback is not interrupted by a reload.
   const [playbackFile, setPlaybackFile] = useState(file);
+
   if (!playbackFile && file) setPlaybackFile(file);
   const [waveform, setWaveform] = useState<WaveformData | null>(null);
   const [status, setStatus] = useState<WaveformStatus>(file ? "loading" : "waiting");
@@ -493,11 +535,13 @@ function useWaveformSource(
   const [playbackFailed, setPlaybackFailed] = useState(false);
   useEffect(() => {
     const audio = audioRef.current;
+
     if (!playbackFile || !audio) return;
     // react-doctor-disable-next-line no-create-object-url-without-revoke -- revoked in the cleanup below.
     const objectUrl = URL.createObjectURL(playbackFile);
     audio.src = objectUrl;
     audio.load();
+
     return () => {
       audio.pause();
       audio.removeAttribute("src");
@@ -521,6 +565,7 @@ function useWaveformSource(
         if (current) setStatus("unavailable");
       },
     );
+
     return () => {
       current = false;
     };
@@ -530,6 +575,7 @@ function useWaveformSource(
     normalizeSeconds(mediaDuration) ||
     normalizeSeconds(waveform?.duration) ||
     normalizeSeconds(fallbackDuration);
+
   return {
     playbackFile,
     waveform,
@@ -590,6 +636,7 @@ function WaveformBars({
   const width = Math.max(1, bars.length * (BAR_WIDTH + BAR_GAP) - BAR_GAP);
   // Bars mirror around a 1px divider through the vertical center; the lower half is fainter.
   const half = (WAVEFORM_HEIGHT - 1) / 2;
+
   return (
     <svg
       aria-hidden
@@ -604,6 +651,7 @@ function WaveformBars({
       {bars.map((bar, index) => {
         const x = index * (BAR_WIDTH + BAR_GAP);
         const height = Math.max(1, bar * half);
+
         return (
           <g key={index}>
             <rect x={x} y={half - height} width={BAR_WIDTH} height={height} />

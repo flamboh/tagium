@@ -1,27 +1,34 @@
 import { Effect } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 import { numberToSynchsafe, readUint32LE, uint32LE } from "@/features/audio/metadataEngine/binary";
-import { makeBlobByteSource } from "@/features/audio/metadataEngine/byteSource";
+import { blobByteSource } from "@/features/audio/metadataEngine/byteSource";
 import { mp3Driver } from "@/features/audio/metadataEngine/mp3/mp3Driver";
 import { validMp3Bytes } from "../../../support/mp3TestFixtures";
 
 const encoder = new TextEncoder();
+
 const concat = (...chunks: Uint8Array[]) => {
   const bytes = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
   let offset = 0;
+
   for (const chunk of chunks) {
     bytes.set(chunk, offset);
     offset += chunk.length;
   }
+
   return bytes;
 };
+
 const frame = (id: string, value: string) => {
   const payload = concat(Uint8Array.of(3), encoder.encode(value));
   const size = Uint8Array.of(0, 0, 0, payload.length);
+
   return concat(encoder.encode(id), size, Uint8Array.of(0, 0), payload);
 };
+
 const rawFrame = (id: string, payload: Uint8Array) =>
   concat(encoder.encode(id), Uint8Array.of(0, 0, 0, payload.length), Uint8Array.of(0, 0), payload);
+
 const commentFrame = (description: string, value: string, language = "eng") =>
   rawFrame(
     "COMM",
@@ -33,11 +40,13 @@ const commentFrame = (description: string, value: string, language = "eng") =>
       encoder.encode(value),
     ),
   );
+
 const userTextFrame = (description: string, value: string) =>
   rawFrame(
     "TXXX",
     concat(Uint8Array.of(3), encoder.encode(description), Uint8Array.of(0), encoder.encode(value)),
   );
+
 const utf16 = (value: string) =>
   concat(
     Uint8Array.of(0xff, 0xfe),
@@ -45,13 +54,16 @@ const utf16 = (value: string) =>
       Uint8Array.of(value.charCodeAt(index) & 0xff, value.charCodeAt(index) >>> 8),
     ),
   );
+
 const commentFrameV23 = (description: string, value: string, language: Uint8Array) =>
   rawFrame(
     "COMM",
     concat(Uint8Array.of(1), language, utf16(description), Uint8Array.of(0, 0), utf16(value)),
   );
+
 const tagV23 = (...frames: Uint8Array[]) => {
   const body = concat(...frames);
+
   return concat(
     encoder.encode("ID3"),
     Uint8Array.of(3, 0, 0),
@@ -59,8 +71,10 @@ const tagV23 = (...frames: Uint8Array[]) => {
     body,
   );
 };
+
 const apeItem = (key: string, value: string | Uint8Array, flags = 0) => {
   const bytes = value instanceof Uint8Array ? value : encoder.encode(value);
+
   return concat(
     uint32LE(bytes.length),
     uint32LE(flags),
@@ -69,14 +83,17 @@ const apeItem = (key: string, value: string | Uint8Array, flags = 0) => {
     bytes,
   );
 };
+
 const apeTag = (...items: Uint8Array[]) => {
   const footer = new Uint8Array(32);
   footer.set(encoder.encode("APETAGEX"));
   footer.set(uint32LE(2_000), 8);
   footer.set(uint32LE(items.reduce((size, item) => size + item.length, 32)), 12);
   footer.set(uint32LE(items.length), 16);
+
   return concat(...items, footer);
 };
+
 const apeTagWithHeader = (...items: Uint8Array[]) => {
   const size = items.reduce((total, item) => total + item.length, 32);
   const header = new Uint8Array(32);
@@ -87,19 +104,25 @@ const apeTagWithHeader = (...items: Uint8Array[]) => {
   header.set(uint32LE(0xa000_0000), 20);
   const footer = header.slice();
   footer.set(uint32LE(0x8000_0000), 20);
+
   return concat(header, ...items, footer);
 };
+
 const includes = (haystack: Uint8Array, needle: Uint8Array) => {
   outer: for (let index = 0; index <= haystack.length - needle.length; index++) {
     for (let inner = 0; inner < needle.length; inner++) {
       if (haystack[index + inner] !== needle[inner]) continue outer;
     }
+
     return true;
   }
+
   return false;
 };
+
 const tag = (...frames: Uint8Array[]) => {
   const body = concat(...frames);
+
   return concat(
     encoder.encode("ID3"),
     Uint8Array.of(4, 0, 0),
@@ -107,8 +130,10 @@ const tag = (...frames: Uint8Array[]) => {
     body,
   );
 };
+
 const frameV22 = (id: string, value: string) => {
   const payload = concat(Uint8Array.of(0), encoder.encode(value));
+
   return concat(
     encoder.encode(id),
     Uint8Array.of(
@@ -119,10 +144,13 @@ const frameV22 = (id: string, value: string) => {
     payload,
   );
 };
+
 const frameV23 = (id: string, value: string) =>
   rawFrame(id, concat(Uint8Array.of(0), encoder.encode(value)));
+
 const tagV22 = (...frames: Uint8Array[]) => {
   const body = concat(...frames);
+
   return concat(
     encoder.encode("ID3"),
     Uint8Array.of(2, 0, 0),
@@ -130,12 +158,14 @@ const tagV22 = (...frames: Uint8Array[]) => {
     body,
   );
 };
+
 const tagWithExtendedHeader = (
   version: 3 | 4,
   extendedHeader: Uint8Array,
   ...frames: Uint8Array[]
 ) => {
   const body = concat(extendedHeader, ...frames);
+
   return concat(
     encoder.encode("ID3"),
     Uint8Array.of(version, 0, 0x40),
@@ -147,9 +177,9 @@ const tagWithExtendedHeader = (
 describe("mp3Driver", () => {
   it("returns the original byte source for a no-op", async () => {
     const input = concat(tag(frame("TIT2", "Title")), validMp3Bytes());
-    const plan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([input])), {}),
-    );
+
+    const plan = await Effect.runPromise(mp3Driver.patch(blobByteSource(new Blob([input])), {}));
+
     expect(new Uint8Array(await new Blob(plan.parts).arrayBuffer())).toEqual(input);
   });
 
@@ -157,21 +187,24 @@ describe("mp3Driver", () => {
     const unknown = rawFrame("PRIV", Uint8Array.of(9, 8, 7, 6));
     const trailing = concat(validMp3Bytes(), encoder.encode("APETAGEX-opaque-tail"));
     const input = concat(tag(frame("TIT2", "Before"), unknown), trailing);
-    const source = makeBlobByteSource(new Blob([input]));
+    const source = blobByteSource(new Blob([input]));
     const plan = await Effect.runPromise(mp3Driver.patch(source, { title: "After 😀" }));
     const output = new Uint8Array(await new Blob(plan.parts).arrayBuffer());
     expect(output.slice(-trailing.length)).toEqual(trailing);
     expect(Array.from(output).join(",")).toContain(Array.from(unknown).join(","));
+
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([output]))),
+      mp3Driver.inspect(blobByteSource(new Blob([output]))),
     );
+
     expect(inspected.metadata.title).toBe("After 😀");
   });
 
   it("derives technical fields without browser codec playback", async () => {
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([validMp3Bytes()]))),
+      mp3Driver.inspect(blobByteSource(new Blob([validMp3Bytes()]))),
     );
+
     expect(inspected.metadata).toMatchObject({ bitrate: 128_000, sampleRate: 44_100 });
     expect(inspected.metadata.albumArtist).toBe("");
     expect(inspected.metadata.duration).toBeGreaterThan(0);
@@ -179,13 +212,13 @@ describe("mp3Driver", () => {
 
   it("projects and preserves the track total when editing the track number", async () => {
     const input = concat(tag(frame("TRCK", "3/12")), validMp3Bytes());
-    const source = makeBlobByteSource(new Blob([input]));
+    const source = blobByteSource(new Blob([input]));
     const inspected = await Effect.runPromise(mp3Driver.inspect(source));
     expect(inspected.metadata).toMatchObject({ trackNumber: 3, trackTotal: 12 });
 
     const plan = await Effect.runPromise(mp3Driver.patch(source, { trackNumber: 4 }));
     const output = new Blob(plan.parts);
-    const updated = await Effect.runPromise(mp3Driver.inspect(makeBlobByteSource(output)));
+    const updated = await Effect.runPromise(mp3Driver.inspect(blobByteSource(output)));
     expect(updated.metadata).toMatchObject({ trackNumber: 4, trackTotal: 12 });
   });
 
@@ -193,6 +226,7 @@ describe("mp3Driver", () => {
     const unknown = rawFrame("PRIV", Uint8Array.of(9, 8, 7, 6));
     const alternateComment = commentFrame("archive", "Keep alternate");
     const audio = validMp3Bytes();
+
     const input = concat(
       tag(
         frame("TPE2", "Album Artist"),
@@ -205,7 +239,8 @@ describe("mp3Driver", () => {
       ),
       audio,
     );
-    const source = makeBlobByteSource(new Blob([input]));
+
+    const source = blobByteSource(new Blob([input]));
 
     const inspected = await Effect.runPromise(mp3Driver.inspect(source));
     expect(inspected.metadata).toMatchObject({
@@ -225,13 +260,14 @@ describe("mp3Driver", () => {
         bpm: 140,
       }),
     );
+
     const patched = new Uint8Array(await new Blob(patchedPlan.parts).arrayBuffer());
     expect(patched.slice(-audio.length)).toEqual(audio);
     expect(Array.from(patched).join(",")).toContain(Array.from(unknown).join(","));
     expect(Array.from(patched).join(",")).toContain(Array.from(alternateComment).join(","));
-    const updated = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([patched]))),
-    );
+
+    const updated = await Effect.runPromise(mp3Driver.inspect(blobByteSource(new Blob([patched]))));
+
     expect(updated.metadata).toMatchObject({
       albumArtist: "New Album Artist",
       composer: "New Composer",
@@ -242,7 +278,7 @@ describe("mp3Driver", () => {
     expect(new TextDecoder("latin1").decode(patched)).toContain("1/3");
 
     const clearedPlan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([patched])), {
+      mp3Driver.patch(blobByteSource(new Blob([patched])), {
         albumArtist: "",
         composer: "",
         comment: "",
@@ -250,10 +286,13 @@ describe("mp3Driver", () => {
         bpm: null,
       }),
     );
+
     const cleared = new Uint8Array(await new Blob(clearedPlan.parts).arrayBuffer());
+
     const clearedInspection = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([cleared]))),
+      mp3Driver.inspect(blobByteSource(new Blob([cleared]))),
     );
+
     expect(clearedInspection.metadata).toMatchObject({
       albumArtist: "",
       composer: "",
@@ -268,6 +307,7 @@ describe("mp3Driver", () => {
   it("updates and clears APEv2-only advanced fields without losing unknown items or audio", async () => {
     const audio = validMp3Bytes();
     const unknown = apeItem("X-PRIVATE", Uint8Array.of(0xff, 0, 0x7f), 2);
+
     const input = concat(
       audio,
       apeTag(
@@ -279,7 +319,8 @@ describe("mp3Driver", () => {
         unknown,
       ),
     );
-    const source = makeBlobByteSource(new Blob([input]));
+
+    const source = blobByteSource(new Blob([input]));
     const inspected = await Effect.runPromise(mp3Driver.inspect(source));
     expect(inspected.metadata).toMatchObject({
       albumArtist: "APE Album Artist",
@@ -298,13 +339,14 @@ describe("mp3Driver", () => {
         bpm: 140,
       }),
     );
+
     const patched = new Uint8Array(await new Blob(patchedPlan.parts).arrayBuffer());
     expect(includes(patched, audio)).toBe(true);
     expect(includes(patched, unknown)).toBe(true);
     expect(new TextDecoder("latin1").decode(patched)).toContain("1/3");
-    const updated = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([patched]))),
-    );
+
+    const updated = await Effect.runPromise(mp3Driver.inspect(blobByteSource(new Blob([patched]))));
+
     expect(updated.metadata).toMatchObject({
       albumArtist: "New Album Artist",
       composer: "New Composer",
@@ -314,7 +356,7 @@ describe("mp3Driver", () => {
     });
 
     const clearedPlan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([patched])), {
+      mp3Driver.patch(blobByteSource(new Blob([patched])), {
         albumArtist: "",
         composer: "",
         comment: "",
@@ -322,12 +364,15 @@ describe("mp3Driver", () => {
         bpm: null,
       }),
     );
+
     const cleared = new Uint8Array(await new Blob(clearedPlan.parts).arrayBuffer());
     expect(includes(cleared, audio)).toBe(true);
     expect(includes(cleared, unknown)).toBe(true);
+
     const clearedInspection = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([cleared]))),
+      mp3Driver.inspect(blobByteSource(new Blob([cleared]))),
     );
+
     expect(clearedInspection.metadata).toMatchObject({
       albumArtist: "",
       composer: "",
@@ -341,9 +386,11 @@ describe("mp3Driver", () => {
     const audio = validMp3Bytes();
     const unknown = apeItem("Binary", Uint8Array.of(9, 8, 7), 2);
     const input = concat(audio, apeTagWithHeader(apeItem("Composer", "Before"), unknown));
+
     const plan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([input])), { composer: "After" }),
+      mp3Driver.patch(blobByteSource(new Blob([input])), { composer: "After" }),
     );
+
     const output = new Uint8Array(await new Blob(plan.parts).arrayBuffer());
     expect(includes(output, audio)).toBe(true);
     expect(includes(output, unknown)).toBe(true);
@@ -353,24 +400,29 @@ describe("mp3Driver", () => {
         offset + 8 <= output.length &&
         new TextDecoder("latin1").decode(output.subarray(offset, offset + 8)) === "APETAGEX",
     );
+
     expect(signatures).toHaveLength(2);
     const [headerOffset, footerOffset] = signatures;
     expect(readUint32LE(output, headerOffset! + 12)).toBe(readUint32LE(output, footerOffset! + 12));
     expect(readUint32LE(output, headerOffset! + 16)).toBe(2);
     expect(readUint32LE(output, footerOffset! + 16)).toBe(2);
     expect(footerOffset! + 32 - readUint32LE(output, footerOffset! + 12)).toBe(headerOffset! + 32);
+
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([output]))),
+      mp3Driver.inspect(blobByteSource(new Blob([output]))),
     );
+
     expect(inspected.metadata.composer).toBe("After");
   });
 
   it("removes an optional APEv2 header and footer when all owned entries are cleared", async () => {
     const audio = validMp3Bytes();
     const input = concat(audio, apeTagWithHeader(apeItem("Composer", "Before")));
+
     const plan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([input])), { composer: "" }),
+      mp3Driver.patch(blobByteSource(new Blob([input])), { composer: "" }),
     );
+
     const output = new Uint8Array(await new Blob(plan.parts).arrayBuffer());
     expect(output).toEqual(concat(tag(), audio));
     expect(new TextDecoder("latin1").decode(output)).not.toContain("APETAGEX");
@@ -380,17 +432,21 @@ describe("mp3Driver", () => {
     const audio = validMp3Bytes();
     const unknown = apeItem("Binary", Uint8Array.of(9, 8, 7), 2);
     const input = concat(audio, apeTagWithHeader(apeItem("Composer", "Before"), unknown));
+
     const plan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([input])), { composer: "" }),
+      mp3Driver.patch(blobByteSource(new Blob([input])), { composer: "" }),
     );
+
     const output = new Uint8Array(await new Blob(plan.parts).arrayBuffer());
     expect(includes(output, audio)).toBe(true);
     expect(includes(output, unknown)).toBe(true);
     const signatures = new TextDecoder("latin1").decode(output).match(/APETAGEX/gu);
     expect(signatures).toHaveLength(2);
+
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([output]))),
+      mp3Driver.inspect(blobByteSource(new Blob([output]))),
     );
+
     expect(inspected.metadata.composer).toBe("");
   });
 
@@ -422,8 +478,9 @@ describe("mp3Driver", () => {
     ],
   ])("reads the user comment from %s", async (_case, tagBytes, expected) => {
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([tagBytes, validMp3Bytes()]))),
+      mp3Driver.inspect(blobByteSource(new Blob([tagBytes, validMp3Bytes()]))),
     );
+
     expect(inspected.metadata.comment).toBe(expected);
   });
 
@@ -432,48 +489,63 @@ describe("mp3Driver", () => {
       tagV23(commentFrameV23("", "Old", encoder.encode("XXX"))),
       validMp3Bytes(),
     );
+
     const plan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([input])), { comment: "Updated" }),
+      mp3Driver.patch(blobByteSource(new Blob([input])), { comment: "Updated" }),
     );
+
     const output = new Uint8Array(await new Blob(plan.parts).arrayBuffer());
     expect(includes(output, commentFrameV23("", "Updated", encoder.encode("eng")))).toBe(true);
   });
 
   it("replaces every user comment alias with one COMM frame and keeps described comments", async () => {
     const audio = validMp3Bytes();
+
     const staleComments = [
       userTextFrame("comment", "FFmpeg comment"),
       commentFrame("", "English comment"),
       commentFrame("", "Comentario", "spa"),
     ];
+
     const keptFrames = [
       commentFrame("iTunNORM", " 00000001 00000002"),
       commentFrame("archive", "Keep alternate"),
       userTextFrame("source", "Keep user text"),
     ];
+
     const input = concat(tag(...staleComments, ...keptFrames), audio);
+
     const patchedPlan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([input])), { comment: "Updated" }),
+      mp3Driver.patch(blobByteSource(new Blob([input])), { comment: "Updated" }),
     );
+
     const patched = new Uint8Array(await new Blob(patchedPlan.parts).arrayBuffer());
     expect(patched.slice(-audio.length)).toEqual(audio);
     expect(includes(patched, commentFrame("", "Updated"))).toBe(true);
+
     for (const stale of staleComments) expect(includes(patched, stale)).toBe(false);
+
     for (const kept of keptFrames) expect(includes(patched, kept)).toBe(true);
+
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([patched]))),
+      mp3Driver.inspect(blobByteSource(new Blob([patched]))),
     );
+
     expect(inspected.metadata.comment).toBe("Updated");
 
     const clearedPlan = await Effect.runPromise(
-      mp3Driver.patch(makeBlobByteSource(new Blob([patched])), { comment: "" }),
+      mp3Driver.patch(blobByteSource(new Blob([patched])), { comment: "" }),
     );
+
     const cleared = new Uint8Array(await new Blob(clearedPlan.parts).arrayBuffer());
     expect(includes(cleared, commentFrame("", "Updated"))).toBe(false);
+
     for (const kept of keptFrames) expect(includes(cleared, kept)).toBe(true);
+
     const clearedInspection = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([cleared]))),
+      mp3Driver.inspect(blobByteSource(new Blob([cleared]))),
     );
+
     expect(clearedInspection.metadata.comment).toBe("");
   });
 
@@ -482,24 +554,27 @@ describe("mp3Driver", () => {
     ["BPM", frame("TBPM", "128 BPM"), { bpm: null }],
   ])("rejects malformed complete %s grammar", async (_field, malformed, expected) => {
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([tag(malformed), validMp3Bytes()]))),
+      mp3Driver.inspect(blobByteSource(new Blob([tag(malformed), validMp3Bytes()]))),
     );
+
     expect(inspected.metadata).toMatchObject(expected);
   });
 
   it("rejects malformed advanced numeric suffixes from APEv2 fallbacks", async () => {
     const inspected = await Effect.runPromise(
       mp3Driver.inspect(
-        makeBlobByteSource(
+        blobByteSource(
           new Blob([validMp3Bytes(), apeTag(apeItem("Disc", "2x"), apeItem("BPM", "128 BPM"))]),
         ),
       ),
     );
+
     expect(inspected.metadata).toMatchObject({ discNumber: null, bpm: null });
   });
 
   it("round-trips ID3v2.4 multi-value genres and writes Cobalt extension fields", async () => {
-    const source = makeBlobByteSource(new Blob([validMp3Bytes()]));
+    const source = blobByteSource(new Blob([validMp3Bytes()]));
+
     const plan = await Effect.runPromise(
       mp3Driver.patch(source, {
         genre: ["Rock", "Pop"],
@@ -511,10 +586,13 @@ describe("mp3Driver", () => {
         language: "eng",
       }),
     );
+
     const output = new Uint8Array(await new Blob(plan.parts).arrayBuffer());
+
     const inspected = await Effect.runPromise(
-      mp3Driver.inspect(makeBlobByteSource(new Blob([output]))),
+      mp3Driver.inspect(blobByteSource(new Blob([output]))),
     );
+
     expect(inspected.metadata).toMatchObject({
       year: 2024,
       genre: ["Rock", "Pop"],
@@ -522,18 +600,21 @@ describe("mp3Driver", () => {
       trackTotal: 12,
     });
     const encoded = new TextDecoder("latin1").decode(output);
+
     for (const frameId of ["TPE2", "TCOM", "TCOP", "TLAN"]) expect(encoded).toContain(frameId);
   });
 
   it("uses three-byte frame identifiers when editing ID3v2.2 dates", async () => {
-    const source = makeBlobByteSource(
+    const source = blobByteSource(
       new Blob([tagV22(frameV22("TT2", "Before"), frameV22("TYE", "1999")), validMp3Bytes()]),
     );
+
     const plan = await Effect.runPromise(
       mp3Driver.patch(source, { title: "After", artist: "Artist", year: 2032 }),
     );
+
     const output = new Blob(plan.parts);
-    const inspected = await Effect.runPromise(mp3Driver.inspect(makeBlobByteSource(output)));
+    const inspected = await Effect.runPromise(mp3Driver.inspect(blobByteSource(output)));
     expect(inspected.metadata).toMatchObject({ title: "After", artist: "Artist", year: 2032 });
   });
 
@@ -558,7 +639,7 @@ describe("mp3Driver", () => {
     "rejects malformed declared %s extended-header sizes on inspect and patch",
     async (_version, tagBytes) => {
       const input = concat(tagBytes, validMp3Bytes());
-      const source = makeBlobByteSource(new Blob([input]));
+      const source = blobByteSource(new Blob([input]));
       await expect(Effect.runPromise(mp3Driver.inspect(source))).rejects.toThrow(
         /extended header/iu,
       );
@@ -573,6 +654,7 @@ describe("mp3Driver", () => {
     const v24 = concat(numberToSynchsafe(6), Uint8Array.of(1, 0));
     const v24Crc = concat(numberToSynchsafe(12), Uint8Array.of(1, 0x20, 5, 0, 0, 0, 0, 0));
     const v24Restrictions = concat(numberToSynchsafe(8), Uint8Array.of(1, 0x10, 1, 0));
+
     for (const input of [
       concat(tagWithExtendedHeader(3, v23, frameV23("TIT2", "Title")), validMp3Bytes()),
       concat(tagWithExtendedHeader(4, v24, frame("TIT2", "Title")), validMp3Bytes()),
@@ -580,22 +662,25 @@ describe("mp3Driver", () => {
       concat(tagWithExtendedHeader(4, v24Restrictions, frame("TIT2", "Title")), validMp3Bytes()),
     ]) {
       const inspected = await Effect.runPromise(
-        mp3Driver.inspect(makeBlobByteSource(new Blob([input]))),
+        mp3Driver.inspect(blobByteSource(new Blob([input]))),
       );
+
       expect(inspected.metadata.title).toBe("Title");
       await Effect.runPromise(
-        mp3Driver.patch(makeBlobByteSource(new Blob([input])), { title: "Updated" }),
+        mp3Driver.patch(blobByteSource(new Blob([input])), { title: "Updated" }),
       );
     }
   });
 
   it("rejects ID3v2.4 extended headers with malformed flag-data lengths", async () => {
     const malformedCrc = concat(numberToSynchsafe(12), Uint8Array.of(1, 0x20, 4, 0, 0, 0, 0, 0));
+
     const input = concat(
       tagWithExtendedHeader(4, malformedCrc, frame("TIT2", "Title")),
       validMp3Bytes(),
     );
-    const source = makeBlobByteSource(new Blob([input]));
+
+    const source = blobByteSource(new Blob([input]));
     await expect(Effect.runPromise(mp3Driver.inspect(source))).rejects.toThrow(/CRC length/iu);
     await expect(Effect.runPromise(mp3Driver.patch(source, { title: "Updated" }))).rejects.toThrow(
       /CRC length/iu,
@@ -608,7 +693,7 @@ describe("mp3Driver", () => {
     const second = new Uint8Array(522);
     second.set([0xff, 0xfb, 0xa0, 0x64]);
     await expect(
-      Effect.runPromise(mp3Driver.inspect(makeBlobByteSource(new Blob([first, second])))),
+      Effect.runPromise(mp3Driver.inspect(blobByteSource(new Blob([first, second])))),
     ).rejects.toThrow("VBR MP3 is missing a Xing/Info or VBRI frame count.");
   });
 
@@ -618,7 +703,7 @@ describe("mp3Driver", () => {
     footer.set([0xd0, 0x07], 8);
     footer.set([16, 0, 0, 0], 12);
     await expect(
-      Effect.runPromise(mp3Driver.inspect(makeBlobByteSource(new Blob([validMp3Bytes(), footer])))),
+      Effect.runPromise(mp3Driver.inspect(blobByteSource(new Blob([validMp3Bytes(), footer])))),
     ).rejects.toThrow("APEv2 footer declares an invalid size or item count.");
   });
 });

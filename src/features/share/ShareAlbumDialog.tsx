@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Copy01Icon, MusicNote04Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { Match } from "effect";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +45,7 @@ interface ShareAlbumDialogProps {
 
 export default function ShareAlbumDialog(props: ShareAlbumDialogProps) {
   if (props.state.status === "closed") return null;
+
   return <ShareAlbumDialogSession {...props} state={props.state} />;
 }
 
@@ -62,14 +64,16 @@ function ShareAlbumDialogSession({
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const open = true;
+
   const dialogView =
     state.status === "published" || state.status === "link" ? "share-link" : "share-creator";
-  const linkUrl =
-    state.status === "published"
-      ? state.receipt.url
-      : state.status === "link"
-        ? state.url
-        : undefined;
+
+  const linkUrl = Match.value(state).pipe(
+    Match.when({ status: "published" }, (published) => published.receipt.url),
+    Match.when({ status: "link" }, (link) => link.url),
+    Match.orElse(() => undefined),
+  );
+
   const targetName = state.preview.kind;
 
   const closeDialog = () => {
@@ -77,10 +81,12 @@ function ShareAlbumDialogSession({
     setConfirmStop(false);
     setStopError(null);
     setStopping(false);
+
     if (copyTimerRef.current !== null) {
       clearTimeout(copyTimerRef.current);
       copyTimerRef.current = null;
     }
+
     onClose();
   };
 
@@ -96,15 +102,19 @@ function ShareAlbumDialogSession({
   useEffect(() => {
     if (!cover) {
       setCoverUrl(null);
+
       return;
     }
+
     const url = URL.createObjectURL(cover.blob);
     setCoverUrl(url);
+
     return () => URL.revokeObjectURL(url);
   }, [cover]);
 
   const copyLink = async () => {
     if (!linkUrl) return;
+
     try {
       if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
       await navigator.clipboard.writeText(linkUrl);
@@ -114,6 +124,7 @@ function ShareAlbumDialogSession({
       inputRef.current?.select();
       setCopyStatus("manual");
     }
+
     if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
     copyTimerRef.current = setTimeout(() => {
       setCopyStatus("idle");
@@ -124,6 +135,7 @@ function ShareAlbumDialogSession({
   const stopSharing = async () => {
     setStopping(true);
     setStopError(null);
+
     try {
       await onStopSharing();
       setConfirmStop(false);
@@ -225,92 +237,16 @@ function ShareAlbumDialogSession({
           )}
 
           <DialogFooter className="border-t p-4">
-            {state.status === "published" ? (
-              <div className="grid w-full grid-cols-2 gap-2">
-                <div className="min-w-0">
-                  {confirmStop ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-9 w-full"
-                      onClick={() => setConfirmStop(false)}
-                    >
-                      keep sharing
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-9 w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => setConfirmStop(true)}
-                    >
-                      stop sharing
-                    </Button>
-                  )}
-                </div>
-                {confirmStop ? (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    className="h-9 w-full"
-                    disabled={stopping}
-                    onClick={() => void stopSharing()}
-                  >
-                    {stopping && (
-                      <HugeiconsIcon
-                        icon={loaderCircleIcon}
-                        strokeWidth={2}
-                        aria-hidden="true"
-                        className="animate-spin motion-reduce:animate-none"
-                      />
-                    )}
-                    stop sharing
-                  </Button>
-                ) : (
-                  <Button type="button" className="h-9 w-full" onClick={closeDialog}>
-                    done
-                  </Button>
-                )}
-              </div>
-            ) : state.status === "link" ? (
-              <Button type="button" className="h-9 w-full" onClick={closeDialog}>
-                done
-              </Button>
-            ) : (
-              <div className="grid w-full grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-9 w-full"
-                  disabled={state.status === "publishing"}
-                  onClick={closeDialog}
-                >
-                  cancel
-                </Button>
-                <Button
-                  type="button"
-                  className="h-9 w-full"
-                  disabled={state.status === "publishing"}
-                  onClick={onPublish}
-                >
-                  {state.status === "publishing" && (
-                    <HugeiconsIcon
-                      icon={loaderCircleIcon}
-                      strokeWidth={2}
-                      aria-hidden="true"
-                      className="animate-spin motion-reduce:animate-none"
-                    />
-                  )}
-                  {state.status === "publishing"
-                    ? state.intent === "update"
-                      ? `updating shared ${targetName}…`
-                      : "creating link…"
-                    : state.intent === "update"
-                      ? `update shared ${targetName}`
-                      : "create share link"}
-                </Button>
-              </div>
-            )}
+            <ShareDialogFooterActions
+              state={state}
+              targetName={targetName}
+              confirmStop={confirmStop}
+              stopping={stopping}
+              onConfirmStopChange={setConfirmStop}
+              onStopSharing={() => void stopSharing()}
+              onClose={closeDialog}
+              onPublish={onPublish}
+            />
           </DialogFooter>
         </>
       </DialogContent>
@@ -320,6 +256,7 @@ function ShareAlbumDialogSession({
 
 const formatExpiry = (expiresAt: string) => {
   const date = new Date(expiresAt);
+
   return Number.isNaN(date.getTime())
     ? "in 90 days"
     : date.toLocaleDateString(undefined, {
@@ -369,6 +306,119 @@ function SharePreview({ preview, coverUrl }: { preview: SharePreview; coverUrl: 
           <li className="list-none p-1 text-muted-foreground">no tracks</li>
         )}
       </ol>
+    </div>
+  );
+}
+
+function ShareDialogFooterActions({
+  state,
+  targetName,
+  confirmStop,
+  stopping,
+  onConfirmStopChange,
+  onStopSharing,
+  onClose,
+  onPublish,
+}: {
+  state: Exclude<ShareDialogState, { status: "closed" }>;
+  targetName: SharePreview["kind"];
+  confirmStop: boolean;
+  stopping: boolean;
+  onConfirmStopChange: (confirmStop: boolean) => void;
+  onStopSharing: () => void;
+  onClose: () => void;
+  onPublish: () => void;
+}) {
+  if (state.status === "published") {
+    return (
+      <div className="grid w-full grid-cols-2 gap-2">
+        <div className="min-w-0">
+          {confirmStop ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9 w-full"
+              onClick={() => onConfirmStopChange(false)}
+            >
+              keep sharing
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-9 w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => onConfirmStopChange(true)}
+            >
+              stop sharing
+            </Button>
+          )}
+        </div>
+        {confirmStop ? (
+          <Button
+            type="button"
+            variant="destructive"
+            className="h-9 w-full"
+            disabled={stopping}
+            onClick={onStopSharing}
+          >
+            {stopping && (
+              <HugeiconsIcon
+                icon={loaderCircleIcon}
+                strokeWidth={2}
+                aria-hidden="true"
+                className="animate-spin motion-reduce:animate-none"
+              />
+            )}
+            stop sharing
+          </Button>
+        ) : (
+          <Button type="button" className="h-9 w-full" onClick={onClose}>
+            done
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  if (state.status === "link") {
+    return (
+      <Button type="button" className="h-9 w-full" onClick={onClose}>
+        done
+      </Button>
+    );
+  }
+
+  const publishing = state.status === "publishing";
+  const updating = state.intent === "update";
+
+  return (
+    <div className="grid w-full grid-cols-2 gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        className="h-9 w-full"
+        disabled={publishing}
+        onClick={onClose}
+      >
+        cancel
+      </Button>
+      <Button type="button" className="h-9 w-full" disabled={publishing} onClick={onPublish}>
+        {publishing && (
+          <HugeiconsIcon
+            icon={loaderCircleIcon}
+            strokeWidth={2}
+            aria-hidden="true"
+            className="animate-spin motion-reduce:animate-none"
+          />
+        )}
+        {publishing
+          ? updating
+            ? `updating shared ${targetName}…`
+            : "creating link…"
+          : updating
+            ? `update shared ${targetName}`
+            : "create share link"}
+      </Button>
     </div>
   );
 }

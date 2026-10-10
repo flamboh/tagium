@@ -64,6 +64,7 @@ const wavBytes = () => {
   bytes.writeUInt16LE(16, 34);
   bytes.write("data", 36, "ascii");
   bytes.writeUInt32LE(800, 40);
+
   return bytes;
 };
 
@@ -115,11 +116,13 @@ export const dropFiles = async (page: Page, target: Locator, files: Upload[]) =>
   const dataTransfer = await page.evaluateHandle(
     (entries) => {
       const transfer = new DataTransfer();
+
       for (const entry of entries) {
         const binary = atob(entry.base64);
         const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
         transfer.items.add(new File([bytes], entry.name, { type: entry.mimeType }));
       }
+
       return transfer;
     },
     files.map((file) => ({
@@ -128,6 +131,7 @@ export const dropFiles = async (page: Page, target: Locator, files: Upload[]) =>
       base64: file.buffer.toString("base64"),
     })),
   );
+
   await target.dispatchEvent("dragenter", { dataTransfer });
   await target.dispatchEvent("dragover", { dataTransfer });
   await target.dispatchEvent("drop", { dataTransfer });
@@ -156,11 +160,13 @@ export const downloadTrack = (page: Page) =>
 export const confirmDownload = async (page: Page, dialogName: string) => {
   const dialog = page.getByRole("dialog", { name: dialogName });
   await expect(dialog).toBeVisible();
+
   return captureDownload(page, () => dialog.getByRole("button", { name: /^download ~/u }).click());
 };
 
 export const downloadAll = async (page: Page, dialogName: string) => {
   await page.getByRole("button", { name: "download all", exact: true }).click();
+
   return confirmDownload(page, dialogName);
 };
 
@@ -181,6 +187,7 @@ export const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]
 
 export const openSettings = async (page: Page, section?: "importing" | "editing" | "linking") => {
   await page.getByRole("button", { name: "settings", exact: true }).click();
+
   if (section) {
     await page
       .getByRole("navigation", { name: "settings sections" })

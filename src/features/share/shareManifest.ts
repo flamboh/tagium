@@ -3,8 +3,11 @@ import { parseMediaLink } from "@/lib/media-link";
 
 /** The largest persisted JSON manifest. Artwork bytes are deliberately not part of it. */
 export const MAX_MANIFEST_PAYLOAD_BYTES = 256 * 1024;
+
 export const MAX_MANIFEST_TRACKS = 100;
+
 export const MAX_MANIFEST_STRING_LENGTH = 1_024;
+
 export const MANIFEST_VERSION = 1;
 
 const boundedString = (maximumLength = MAX_MANIFEST_STRING_LENGTH) =>
@@ -26,9 +29,11 @@ const yearSchema = positiveInteger(1_000, 9_999);
 const isSupportedSourceUrl = (value: string) => {
   try {
     const url = new URL(value);
+
     if (url.protocol !== "https:" || url.username || url.password) return false;
 
     const parsed = parseMediaLink(value);
+
     return parsed.kind !== "unsupported";
   } catch {
     return false;
@@ -107,10 +112,15 @@ const trackManifestSchema = Schema.Struct({
 export const manifestSchema = Schema.Union([albumManifestSchema, trackManifestSchema]);
 
 export type Manifest = Schema.Schema.Type<typeof manifestSchema>;
+
 export type AlbumManifest = Schema.Schema.Type<typeof albumManifestSchema>;
+
 export type TrackManifest = Schema.Schema.Type<typeof trackManifestSchema>;
+
 export type ManifestTrack = Schema.Schema.Type<typeof trackSchema>;
+
 export type ManifestArtwork = Schema.Schema.Type<typeof artworkSchema>;
+
 export type ManifestAudioBitrate = ManifestTrack["audioBitrate"];
 
 export const manifestArtwork = (manifest: Manifest): ManifestArtwork | undefined =>
@@ -122,9 +132,11 @@ export const manifestTracks = (manifest: Manifest): readonly ManifestTrack[] =>
 export const manifestTrackCount = (manifest: Manifest) => manifestTracks(manifest).length;
 
 export const SHARE_ANALYTICS_ID_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
 export const shareAnalyticsIdSchema = Schema.String.check(
   Schema.isPattern(SHARE_ANALYTICS_ID_PATTERN),
 );
+
 export const isShareAnalyticsId = (value: unknown): value is string =>
   typeof value === "string" && SHARE_ANALYTICS_ID_PATTERN.test(value);
 
@@ -152,6 +164,7 @@ export const shareExpiryIsoSchema = Schema.String.pipe(
       Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value,
   ),
 );
+
 export const isShareExpiryIso = (value: unknown): value is string =>
   typeof value === "string" &&
   Number.isFinite(Date.parse(value)) &&
@@ -165,11 +178,14 @@ export const isManifestPayloadWithinLimit = (manifest: Manifest) =>
 
 /** Decodes only the supported version and rejects an oversized persisted payload. */
 const decodeManifestInput = Schema.decodeUnknownSync(manifestSchema);
+
 export const decodeManifest = (input: unknown): Manifest => {
   const manifest = decodeManifestInput(input);
+
   if (!isManifestPayloadWithinLimit(manifest)) {
     throw new Error(`manifest payload must be ${MAX_MANIFEST_PAYLOAD_BYTES} bytes or smaller`);
   }
+
   return manifest;
 };
 
@@ -201,6 +217,7 @@ export const toManifestReplayInput = (
   options: { sourceManifestSlug?: string } = {},
 ): ManifestReplayInput => {
   if (manifest.kind !== "album") throw new Error("track manifests cannot replay as albums");
+
   const playlist: ManifestReplayInput["playlist"] = {
     title: manifest.album.title,
     artist: manifest.album.artist,
@@ -212,7 +229,9 @@ export const toManifestReplayInput = (
       trackNumber: track.metadata.trackNumber ?? 1,
     })),
   };
+
   if (manifest.album.year !== undefined) playlist.year = manifest.album.year;
+
   if (manifest.album.sourceUrl !== undefined) playlist.sourceUrl = manifest.album.sourceUrl;
 
   const replay: ManifestReplayInput = {
@@ -223,9 +242,11 @@ export const toManifestReplayInput = (
       metadata: track.metadata,
     })),
   };
+
   if (options.sourceManifestSlug !== undefined) {
     replay.sourceManifestSlug = options.sourceManifestSlug;
   }
+
   return replay;
 };
 
@@ -279,6 +300,7 @@ interface ProjectedTrackMetadata {
   year?: number;
   trackNumber?: number;
 }
+
 interface ProjectedManifestTrack extends ManifestTrack {
   artwork?: ManifestArtwork;
 }
@@ -287,7 +309,9 @@ export const projectManifestTrack = (file: ManifestTrackProjection): ManifestTra
   if (!file.downloadRequest || !file.metadata) {
     throw new Error("only downloaded-source tracks with metadata can be shared");
   }
+
   const metadata = { ...file.metadata, ...file.pendingMetadataPatch };
+
   const projectedMetadata: ProjectedTrackMetadata = {
     filename: metadata.filename || file.filename.replace(/\.mp3$/i, ""),
     title: metadata.title,
@@ -295,8 +319,11 @@ export const projectManifestTrack = (file: ManifestTrackProjection): ManifestTra
     album: metadata.album,
     genre: typeof metadata.genre === "string" ? metadata.genre : metadata.genre.join(", "),
   };
+
   if (metadata.year !== null) projectedMetadata.year = metadata.year;
+
   if (metadata.trackNumber !== null) projectedMetadata.trackNumber = metadata.trackNumber;
+
   return {
     sourceUrl:
       supportedProvenance(file.downloadRequest.sourceUrl) ?? file.downloadRequest.sourceUrl,
@@ -312,13 +339,17 @@ export const projectTrackManifest = (
   const track: ProjectedManifestTrack = {
     ...projectManifestTrack(file),
   };
+
   if (artwork !== undefined) track.artwork = artwork;
+
   const manifest = decodeManifest({
     version: MANIFEST_VERSION,
     kind: "track",
     track,
   });
+
   if (manifest.kind !== "track") throw new Error("projected track manifest had the wrong kind");
+
   return manifest;
 };
 
@@ -332,16 +363,22 @@ export const projectAlbumManifest = (
     artist: album.artist,
     genre: album.genre,
   };
+
   if (album.year !== undefined) projectedAlbum.year = album.year;
   const sourceUrl = supportedProvenance(album.sourceUrl);
+
   if (sourceUrl !== undefined) projectedAlbum.sourceUrl = sourceUrl;
+
   if (artwork !== undefined) projectedAlbum.artwork = artwork;
+
   const manifest = decodeManifest({
     version: MANIFEST_VERSION,
     kind: "album",
     album: projectedAlbum,
     tracks: files.map(projectManifestTrack),
   });
+
   if (manifest.kind !== "album") throw new Error("projected album manifest had the wrong kind");
+
   return manifest;
 };

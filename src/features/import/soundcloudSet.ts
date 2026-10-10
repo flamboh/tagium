@@ -12,15 +12,19 @@ export const resolveSoundCloudSet = async (url: string, importId?: string) => {
 
   const headers = new Headers();
   headers.set("X-Tagium-Request-Id", crypto.randomUUID());
+
   if (importId) {
     headers.set("X-Tagium-Import-Id", importId);
   }
+
   const response = await fetch(endpoint, { headers });
+
   if (!response.ok) {
     throw new Error(`soundcloud set request failed (${response.status})`);
   }
 
   const contentType = response.headers.get("content-type");
+
   if (!contentType?.includes("application/json")) {
     throw new Error("soundcloud set route returned non-json. restart tagium dev server.");
   }

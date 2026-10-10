@@ -52,15 +52,20 @@ const rowPlacement = (
   initialY: number | null,
 ): Exclude<TrackPlacement, "append"> => {
   if (!position.overRect) return "after";
+
   if (initialY === null) {
     const sourceIndex = trackIds.indexOf(sourceTrackId);
     const targetIndex = trackIds.indexOf(targetTrackId);
+
     if (sourceIndex >= 0 && targetIndex >= 0 && sourceIndex > targetIndex) return "before";
+
     if (sourceIndex < 0) return "before";
+
     return "after";
   }
 
   const y = initialY + position.deltaY;
+
   return y > position.overRect.top + position.overRect.height / 2 ? "after" : "before";
 };
 
@@ -68,6 +73,7 @@ const isCenteredLooseDrop = (position: SidebarDropPosition, initialY: number | n
   if (!position.overRect || initialY === null) return false;
   const y = initialY + position.deltaY;
   const relativePosition = (y - position.overRect.top) / position.overRect.height;
+
   return relativePosition > 0.3 && relativePosition < 0.7;
 };
 
@@ -77,6 +83,7 @@ const trackIdsForDrop = (
   looseTrackIds: string[],
 ) => {
   if (drop.container === "loose") return looseTrackIds;
+
   return albums.find((album) => album.id === drop.albumId)?.trackIds ?? [];
 };
 
@@ -92,11 +99,14 @@ export const resolveSidebarDragCommand = ({
 }: ResolveSidebarDragCommandOptions): SidebarDragCommand | null => {
   if (active.type === "album") {
     const targetAlbumId = albumIdFromDrop(over);
+
     if (!targetAlbumId || targetAlbumId === active.albumId) return null;
 
     const sourceIndex = albums.findIndex((album) => album.id === active.albumId);
     const targetIndex = albums.findIndex((album) => album.id === targetAlbumId);
+
     if (sourceIndex < 0 || targetIndex < 0) return null;
+
     return { type: "reorder-album", albumId: active.albumId, targetIndex };
   }
 
@@ -110,6 +120,7 @@ export const resolveSidebarDragCommand = ({
       trackIdsForDrop(over, albums, looseTrackIds),
       dragStartY,
     );
+
     if (over.container === "loose") {
       if (active.container === "loose" && isCenteredLooseDrop(position, dragStartY)) {
         return {
@@ -118,6 +129,7 @@ export const resolveSidebarDragCommand = ({
           targetTrackId: over.trackId,
         };
       }
+
       return {
         type: "move-track-to-loose",
         trackId: active.trackId,

@@ -18,6 +18,7 @@ import { devToastKinds, spawnDevToast } from "./devToast";
 import { DiscoveryFlagsSection } from "./DiscoveryFlagsSection";
 
 type AudioFault = "rate-limit" | "capacity" | "timeout" | "unreachable" | "malformed";
+
 type TunnelFault = "rate-limit" | "capacity" | "timeout" | "empty-body";
 
 const devConfigSchema = Schema.Struct({
@@ -45,7 +46,9 @@ const devConfigSchema = Schema.Struct({
     ),
   }),
 });
+
 type DevConfig = Schema.Schema.Type<typeof devConfigSchema>;
+
 type DevConfigPatch =
   | { rateLimit: { windowMs: number; maxRequests: number } }
   | { resetRateLimitBuckets: true };
@@ -69,7 +72,9 @@ const tunnelFaults: Array<{ value: TunnelFault; label: string }> = [
 
 const readDevConfig = async (signal: AbortSignal) => {
   const response = await fetch("/api/dev/config", { signal });
+
   if (!response.ok) return null;
+
   return decodeDevConfig(await response.json());
 };
 
@@ -77,6 +82,7 @@ const formatReset = (resetAt: number | undefined) => {
   if (!resetAt) return "none";
 
   const seconds = Math.max(Math.ceil((resetAt - Date.now()) / 1_000), 0);
+
   return `${seconds}s`;
 };
 
@@ -94,9 +100,11 @@ export function DevPanel({ appId }: { appId: TagiumAppId }) {
 
     try {
       const nextConfig = await readDevConfig(request.signal);
+
       if (request.signal.aborted || activeConfigRequest.current !== request) return;
 
       setConfig(nextConfig);
+
       if (nextConfig) {
         setWindowMs(String(nextConfig.rateLimit.windowMs));
         setMaxRequests(String(nextConfig.rateLimit.maxRequests));
@@ -110,6 +118,7 @@ export function DevPanel({ appId }: { appId: TagiumAppId }) {
 
   useEffect(() => {
     void refresh();
+
     return () => {
       activeConfigRequest.current?.abort();
       activeConfigRequest.current = null;
@@ -120,12 +129,14 @@ export function DevPanel({ appId }: { appId: TagiumAppId }) {
 
   const patchConfig = async (body: DevConfigPatch) => {
     setBusy(true);
+
     try {
       const response = await fetch("/api/dev/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+
       if (response.ok) {
         const nextConfig = decodeDevConfig(await response.json());
         setConfig(nextConfig);
@@ -139,12 +150,14 @@ export function DevPanel({ appId }: { appId: TagiumAppId }) {
 
   const setFault = async (target: "audio" | "tunnel", fault: AudioFault | TunnelFault | null) => {
     setBusy(true);
+
     try {
       const response = await fetch("/api/dev/fault", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target, fault }),
       });
+
       if (response.ok) {
         setConfig(decodeDevConfig(await response.json()));
       }

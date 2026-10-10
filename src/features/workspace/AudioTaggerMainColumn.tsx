@@ -16,6 +16,7 @@ type ColumnProps = {
 function AudioTaggerViews({ controller, menuInViewHeader, mobileMenuButton }: ColumnProps) {
   const { library, editor, settings, activeView, importing, exporting, mobile, libraryIsEmpty } =
     controller;
+
   const { selectedFileId } = library.state;
   const headerLeadingAction = menuInViewHeader ? mobileMenuButton : undefined;
 
@@ -85,8 +86,10 @@ function AudioTaggerViews({ controller, menuInViewHeader, mobileMenuButton }: Co
 
 export default function AudioTaggerMainColumn(props: ColumnProps) {
   const { controller } = props;
+
   const { mobile, landingIsActive, importing, mediaUrlEntryPresentation, mediaUrlEntryController } =
     controller;
+
   const mobileNavigation = mobile.navigation;
 
   return (

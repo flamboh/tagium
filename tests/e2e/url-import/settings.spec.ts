@@ -69,6 +69,7 @@ test("keeps the original provider audio when best compatible is chosen", async (
     audio: "m4a",
     cover: null,
   });
+
   const track = await upstreams.soundcloud.track({
     title: "Original Track",
     audio: "opus",
@@ -117,6 +118,7 @@ test("downloads a single right after import when the setting is on", async ({
   upstreams,
 }) => {
   await useSettings(context, { downloadAfterImport: true });
+
   const video = await upstreams.youtube.video({
     title: "Instant Song",
     author: "Hurry",
@@ -144,6 +146,7 @@ test("downloads an album right after import even when its cover cannot be import
   upstreams,
 }) => {
   await useSettings(context, { downloadAfterImport: true });
+
   const playlist = await upstreams.youtube.playlist({
     title: "Coverless",
     author: "Mixer",
@@ -154,6 +157,7 @@ test("downloads an album right after import even when its cover cannot be import
   });
 
   await page.goto("/");
+
   const archive = await captureDownload(page, async () => {
     await importUrl(page, playlist.url);
     await expect(notifications(page).getByText("cover art was not imported")).toBeVisible();
@@ -163,6 +167,7 @@ test("downloads an album right after import even when its cover cannot be import
       ),
     ).toBeVisible();
   });
+
   await expect(page.getByText("downloaded 2/2", { exact: true })).toBeVisible(SETTLE_TIMEOUT);
 
   expect(archive.filename).toMatch(/\.zip$/u);
@@ -171,6 +176,7 @@ test("downloads an album right after import even when its cover cannot be import
     "Coverless/Coverless One.mp3",
     "Coverless/Coverless Two.mp3",
   ]);
+
   for (const [index, entry] of entries
     .toSorted((left, right) => left.filename.localeCompare(right.filename))
     .entries()) {

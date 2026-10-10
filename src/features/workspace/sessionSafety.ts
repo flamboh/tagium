@@ -22,6 +22,7 @@ export const useBeforeUnloadProtection = (enabled: boolean) => {
     };
 
     window.addEventListener("beforeunload", protectSession);
+
     return () => window.removeEventListener("beforeunload", protectSession);
   }, [enabled]);
 };

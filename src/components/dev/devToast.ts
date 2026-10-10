@@ -10,6 +10,7 @@ export const spawnDevToast = (kind: DevToastKind) => {
 
   if (kind === "neutral") {
     toast(title, options);
+
     return;
   }
 
