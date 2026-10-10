@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Copy01Icon, MusicNote04Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Match } from "effect";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,79 +56,19 @@ function ShareAlbumDialogSession({
 }: Omit<ShareAlbumDialogProps, "state"> & {
   state: Exclude<ShareDialogState, { status: "closed" }>;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "manual">("idle");
   const [confirmStop, setConfirmStop] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const open = true;
 
-  const dialogView =
-    state.status === "published" || state.status === "link" ? "share-link" : "share-creator";
-
-  const linkUrl = Match.value(state).pipe(
-    Match.when({ status: "published" }, (published) => published.receipt.url),
-    Match.when({ status: "link" }, (link) => link.url),
-    Match.orElse(() => undefined),
-  );
-
   const targetName = state.preview.kind;
+  const dismissible = state.status !== "publishing" && !stopping;
 
   const closeDialog = () => {
-    setCopyStatus("idle");
     setConfirmStop(false);
     setStopError(null);
     setStopping(false);
-
-    if (copyTimerRef.current !== null) {
-      clearTimeout(copyTimerRef.current);
-      copyTimerRef.current = null;
-    }
-
     onClose();
-  };
-
-  useEffect(
-    () => () => {
-      if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
-    },
-    [],
-  );
-
-  const cover = state.preview.cover;
-  const [coverUrl, setCoverUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!cover) {
-      setCoverUrl(null);
-
-      return;
-    }
-
-    const url = URL.createObjectURL(cover.blob);
-    setCoverUrl(url);
-
-    return () => URL.revokeObjectURL(url);
-  }, [cover]);
-
-  const copyLink = async () => {
-    if (!linkUrl) return;
-
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
-      await navigator.clipboard.writeText(linkUrl);
-      setCopyStatus("copied");
-    } catch {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-      setCopyStatus("manual");
-    }
-
-    if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
-    copyTimerRef.current = setTimeout(() => {
-      setCopyStatus("idle");
-      copyTimerRef.current = null;
-    }, 3_000);
   };
 
   const stopSharing = async () => {
@@ -150,14 +89,16 @@ function ShareAlbumDialogSession({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && state.status !== "publishing" && !stopping) closeDialog();
+        if (!nextOpen && dismissible) closeDialog();
       }}
     >
       <DialogContent
-        contentKey={dialogView}
+        contentKey={
+          state.status === "published" || state.status === "link" ? "share-link" : "share-creator"
+        }
         aria-describedby={undefined}
         className="max-h-[calc(100dvh-2rem)] max-w-lg gap-0 overflow-y-auto p-0"
-        showCloseButton={state.status !== "publishing" && !stopping}
+        showCloseButton={dismissible}
       >
         <>
           <DialogHeader className="min-w-0 border-b px-5 py-4 pr-12">
@@ -166,74 +107,20 @@ function ShareAlbumDialogSession({
             </DialogTitle>
           </DialogHeader>
 
-          <SharePreview preview={state.preview} coverUrl={coverUrl} />
+          <SharePreview preview={state.preview} />
 
           {state.status === "published" || state.status === "link" ? (
-            <div className="space-y-2 px-5 py-4">
-              <div className="flex min-h-5 items-center justify-between gap-3">
-                <label htmlFor="share-link" className="text-sm font-medium">
-                  share link
-                </label>
-                <span role="status" aria-live="polite" className="text-xs text-muted-foreground">
-                  {copyStatus === "manual" ? "select and copy the link" : null}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  id="share-link"
-                  ref={inputRef}
-                  readOnly
-                  value={linkUrl}
-                  onFocus={(event) => event.currentTarget.select()}
-                  className="min-w-0 font-mono text-xs"
-                />
-                <Button type="button" onClick={copyLink} className="h-9 w-32 shrink-0">
-                  {copyStatus === "copied" ? (
-                    <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} aria-hidden="true" />
-                  ) : (
-                    <HugeiconsIcon icon={Copy01Icon} strokeWidth={2} aria-hidden="true" />
-                  )}
-                  {copyStatus === "copied" ? "copied" : "copy link"}
-                </Button>
-              </div>
-            </div>
+            <ShareLinkField url={state.status === "published" ? state.receipt.url : state.url} />
           ) : (
-            <div className="space-y-2 px-5 pb-4 pt-1">
-              <p className="text-sm leading-6 text-foreground">
-                {state.preview.kind === "album"
-                  ? "anyone with the link can add this album. tracks are added from their original sources with these shared tags."
-                  : "anyone with the link can add this track. it is downloaded from its original source with these shared tags."}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {state.intent === "update"
-                  ? "the link keeps its current expiration."
-                  : "expires in 90 days."}
-              </p>
-              {state.status === "error" && (
-                <p role="alert" className="text-sm text-destructive">
-                  {state.message}
-                </p>
-              )}
-            </div>
+            <ShareCreatorDetails state={state} />
           )}
 
           {state.status === "published" && (
-            <div className="px-5 pb-4 text-left text-sm text-muted-foreground">
-              {confirmStop ? (
-                <>
-                  the link will stop working immediately.
-                  {stopError && (
-                    <span role="alert" className="mt-1 block text-destructive">
-                      {stopError}
-                    </span>
-                  )}
-                </>
-              ) : (
-                `expires ${formatExpiry(
-                  state.receipt.expiresAt,
-                )} · stop sharing to turn the link off at any time`
-              )}
-            </div>
+            <PublishedShareNote
+              expiresAt={state.receipt.expiresAt}
+              confirmStop={confirmStop}
+              stopError={stopError}
+            />
           )}
 
           <DialogFooter className="border-t p-4">
@@ -254,6 +141,121 @@ function ShareAlbumDialogSession({
   );
 }
 
+function ShareLinkField({ url }: { url: string }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "manual">("idle");
+
+  useEffect(
+    () => () => {
+      if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
+    },
+    [],
+  );
+
+  const copyLink = async () => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(url);
+      setCopyStatus("copied");
+    } catch {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+      setCopyStatus("manual");
+    }
+
+    if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => {
+      setCopyStatus("idle");
+      copyTimerRef.current = null;
+    }, 3_000);
+  };
+
+  return (
+    <div className="space-y-2 px-5 py-4">
+      <div className="flex min-h-5 items-center justify-between gap-3">
+        <label htmlFor="share-link" className="text-sm font-medium">
+          share link
+        </label>
+        <span role="status" aria-live="polite" className="text-xs text-muted-foreground">
+          {copyStatus === "manual" ? "select and copy the link" : null}
+        </span>
+      </div>
+      <div className="flex gap-2">
+        <Input
+          id="share-link"
+          ref={inputRef}
+          readOnly
+          value={url}
+          onFocus={(event) => event.currentTarget.select()}
+          className="min-w-0 font-mono text-xs"
+        />
+        <Button type="button" onClick={copyLink} className="h-9 w-32 shrink-0">
+          {copyStatus === "copied" ? (
+            <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} aria-hidden="true" />
+          ) : (
+            <HugeiconsIcon icon={Copy01Icon} strokeWidth={2} aria-hidden="true" />
+          )}
+          {copyStatus === "copied" ? "copied" : "copy link"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ShareCreatorDetails({
+  state,
+}: {
+  state: Extract<ShareDialogState, { status: "confirm" | "publishing" | "error" }>;
+}) {
+  return (
+    <div className="space-y-2 px-5 pb-4 pt-1">
+      <p className="text-sm leading-6 text-foreground">
+        {state.preview.kind === "album"
+          ? "anyone with the link can add this album. tracks are added from their original sources with these shared tags."
+          : "anyone with the link can add this track. it is downloaded from its original source with these shared tags."}
+      </p>
+      <p className="text-sm text-muted-foreground">
+        {state.intent === "update"
+          ? "the link keeps its current expiration."
+          : "expires in 90 days."}
+      </p>
+      {state.status === "error" && (
+        <p role="alert" className="text-sm text-destructive">
+          {state.message}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PublishedShareNote({
+  expiresAt,
+  confirmStop,
+  stopError,
+}: {
+  expiresAt: string;
+  confirmStop: boolean;
+  stopError: string | null;
+}) {
+  return (
+    <div className="px-5 pb-4 text-left text-sm text-muted-foreground">
+      {confirmStop ? (
+        <>
+          the link will stop working immediately.
+          {stopError && (
+            <span role="alert" className="mt-1 block text-destructive">
+              {stopError}
+            </span>
+          )}
+        </>
+      ) : (
+        `expires ${formatExpiry(expiresAt)} · stop sharing to turn the link off at any time`
+      )}
+    </div>
+  );
+}
+
 const formatExpiry = (expiresAt: string) => {
   const date = new Date(expiresAt);
 
@@ -266,7 +268,23 @@ const formatExpiry = (expiresAt: string) => {
       });
 };
 
-function SharePreview({ preview, coverUrl }: { preview: SharePreview; coverUrl: string | null }) {
+function SharePreview({ preview }: { preview: SharePreview }) {
+  const cover = preview.cover;
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!cover) {
+      setCoverUrl(null);
+
+      return;
+    }
+
+    const url = URL.createObjectURL(cover.blob);
+    setCoverUrl(url);
+
+    return () => URL.revokeObjectURL(url);
+  }, [cover]);
+
   return (
     <div className="flex min-w-0 gap-4 px-5 py-4">
       <div
