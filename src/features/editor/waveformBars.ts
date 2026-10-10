@@ -40,16 +40,102 @@ const barPaths = (bars: number[]) => {
   return { upper, lower };
 };
 
-const loadingWave = (count: number, seconds: number) => {
-  const center = 0.5 - 0.45 * Math.cos((2 * Math.PI * seconds) / 3.2);
+const GROOVE_STEP = 60 / 116 / 4;
 
-  return Array.from({ length: count }, (_, index) => {
-    const x = (index + 0.5) / count;
-    const envelope = Math.exp(-0.5 * ((x - center) / 0.18) ** 2);
-    const pulse = 0.5 + 0.5 * Math.sin(2 * Math.PI * (3 * x - seconds / 1.2));
+const GROOVE_ATTACK = 0.05;
 
-    return 0.12 + 0.2 * pulse + 0.5 * envelope * (0.35 + 0.65 * pulse);
-  });
+const GROOVE_FLOOR = 0.08;
+
+const GROOVE_CEILING = 0.9;
+
+const GROOVE_LOOKBACK = 12;
+
+const GROOVE = "k-hgs-h-k-hgs-hgk-hgs-h-k-k-sfff";
+
+const DECAY = new Map([
+  ["k", 0.24],
+  ["s", 0.18],
+  ["h", 0.13],
+  ["g", 0.08],
+  ["f", 0.14],
+]);
+
+const random = (seed: number) => {
+  let value = Math.imul(seed, 0x6d2b79f5);
+  value = Math.imul(value ^ (value >>> 15), value | 1);
+  value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+
+  return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+};
+
+const clumps = (seed: number, points: number, x: number) => {
+  const position = x * (points - 1);
+  const left = Math.floor(position);
+  const t = position - left;
+
+  return (
+    random(seed + left) + (random(seed + left + 1) - random(seed + left)) * t * t * (3 - 2 * t)
+  );
+};
+
+const band = (x: number, center: number, width: number) =>
+  Math.exp(-0.5 * ((x - center) / width) ** 2);
+
+const hitHeight = (hit: string, step: number, x: number, grain: number) => {
+  const seed = step * 4096;
+  const texture = clumps(seed + 2048, grain, x);
+
+  if (hit === "k") return 0.25 + 0.55 * clumps(seed, 7, x) + 0.15 * texture;
+
+  if (hit === "h") return 0.14 + 0.32 * texture;
+
+  if (hit === "g") return 0.1 + 0.16 * texture;
+
+  if (hit === "s") {
+    const center = 0.15 + 0.7 * random(seed + 4095);
+
+    return 0.2 + 0.15 * texture + 0.55 * band(x, center, 0.06);
+  }
+
+  const roll = (step % GROOVE.length) - (GROOVE.length - 4);
+  const forward = random(Math.floor(step / GROOVE.length) * 4096 + 4094) < 0.5;
+  const center = forward ? 0.05 + 0.25 * roll : 0.95 - 0.25 * roll;
+
+  return 0.2 + 0.1 * texture + (0.5 + 0.1 * roll) * band(x, center, 0.07);
+};
+
+const envelope = (age: number, decay: number) =>
+  age < GROOVE_ATTACK
+    ? 1 - (1 - age / GROOVE_ATTACK) ** 2
+    : Math.exp(-(age - GROOVE_ATTACK) / decay);
+
+const loadingGroove = (count: number, seconds: number) => {
+  const grain = Math.max(8, Math.round(count / 5));
+
+  const floors = Array.from(
+    { length: count },
+    (_, index) => GROOVE_FLOOR + 0.06 * clumps(-4096, grain, (index + 0.5) / count),
+  );
+
+  const bars = [...floors];
+  const current = Math.floor(seconds / GROOVE_STEP);
+
+  for (let step = Math.max(0, current - GROOVE_LOOKBACK); step <= current; step += 1) {
+    const hit = GROOVE[step % GROOVE.length]!;
+    const decay = DECAY.get(hit);
+
+    if (!decay) continue;
+    const level = envelope(seconds - step * GROOVE_STEP, decay);
+
+    if (level < 0.01) continue;
+
+    for (let index = 0; index < count; index += 1) {
+      const height = hitHeight(hit, step, (index + 0.5) / count, grain);
+      bars[index] = Math.max(bars[index]!, floors[index]! + (height - floors[index]!) * level);
+    }
+  }
+
+  return bars.map((bar) => Math.min(GROOVE_CEILING, bar));
 };
 
 const resampleLinear = (values: number[], count: number) => {
@@ -106,7 +192,7 @@ function createBarsController() {
     for (const svg of svgs) write(svg);
   };
 
-  const target = () => (goal.kind === "wave" ? loadingWave(count, clock) : goalBars);
+  const target = () => (goal.kind === "wave" ? loadingGroove(count, clock) : goalBars);
 
   const step = (now: number) => {
     const elapsed = previous === null ? 0 : Math.max(0, now - previous);

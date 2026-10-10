@@ -106,6 +106,17 @@ const distinctPaths = async (page: Page, samples: number) => {
 const sameHeights = (a: number[], b: number[]) =>
   a.length === b.length && a.every((value, index) => Math.abs(value - b[index]!) < 0.01);
 
+const meanHeight = (frame: Frame) =>
+  frame.heights.reduce((total, height) => total + height, 0) / frame.heights.length;
+
+const expectGroove = (frames: Frame[]) => {
+  const means = frames.map(meanHeight);
+  const heights = frames.flatMap((frame) => frame.heights);
+  expect(Math.max(...means) - Math.min(...means)).toBeGreaterThan(4);
+  expect(Math.max(...heights)).toBeLessThanOrEqual(0.9 * 21.5 + 0.01);
+  expect(Math.min(...heights)).toBeGreaterThanOrEqual(1);
+};
+
 const expectTween = (frames: Frame[]) => {
   const handoff = frames.findIndex((frame) => frame.status === "ready");
   expect(handoff).toBeGreaterThan(0);
@@ -127,7 +138,7 @@ const expectTween = (frames: Frame[]) => {
   expect(tween.some((frame) => !sameHeights(frame.heights, end.heights))).toBe(true);
 };
 
-test("the waveform oscillates while a track downloads and decodes, then tweens into its peaks", async ({
+test("the waveform bounces to a beat while a track downloads and decodes, then tweens into its peaks", async ({
   page,
   upstreams,
 }) => {
@@ -142,7 +153,9 @@ test("the waveform oscillates while a track downloads and decodes, then tweens i
   await importUrl(page, first.url);
   await expect(preview).toHaveAttribute("data-waveform-status", "waiting");
   await expect(preview).toHaveAttribute("data-waveform-loading", "true");
-  expect(await distinctPaths(page, 5)).toBeGreaterThan(3);
+  await takeFrames(page);
+  expect(await distinctPaths(page, 10)).toBeGreaterThan(3);
+  expectGroove(await takeFrames(page));
 
   releaseTunnel();
   await expect(preview).toHaveAttribute("data-waveform-status", "loading");
