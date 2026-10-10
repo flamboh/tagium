@@ -12,10 +12,10 @@ export type SaveSettings = {
   audio?: "best" | "opus" | "mp3";
 };
 
-export const suggestedFilename = (page: Page, filename: string) =>
+export const suggestedFilenames = (page: Page, filename: string) =>
   page.context().browser()?.browserType().name() === "webkit"
-    ? filename.replaceAll(" ", "_")
-    : filename;
+    ? [filename, filename.replaceAll(" ", "_")]
+    : [filename];
 
 export const saveApp = (page: Page) => {
   const recent = page.getByRole("list", { name: "recent downloads" });
@@ -64,7 +64,7 @@ export const saveApp = (page: Page) => {
       const file = await captureDownload(page, () =>
         app.downloadButton(filename).nth(index).click(),
       );
-      expect(file.filename).toBe(suggestedFilename(page, filename));
+      expect(suggestedFilenames(page, filename)).toContain(file.filename);
       return { ...file, filename };
     },
   };

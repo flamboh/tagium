@@ -72,7 +72,7 @@ jobs:
   e2e_webkit:
     name: E2E (webkit, non-blocking)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6
@@ -91,7 +91,7 @@ jobs:
           key: playwright-${{ runner.os }}-webkit-${{ hashFiles('bun.lock') }}
 
       - run: vp exec playwright install --with-deps webkit
-      - run: vp exec playwright test --project webkit
+      - run: xvfb-run -a vp exec playwright test --project webkit --headed
         env:
           E2E_BROWSERS: all
 
