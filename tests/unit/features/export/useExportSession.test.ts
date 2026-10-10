@@ -16,6 +16,7 @@ vi.mock("@/shared/systemFailure", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/shared/systemFailure")>()),
   reportSystemFailure: exportMocks.reportFailure,
 }));
+vi.mock("@/lib/download", () => ({ downloadBlob: exportMocks.downloadBlob }));
 vi.mock("@/features/export/downloadLibrary", () => {
   const ready = (file: TagiumFile): file is TagiumFile & { file: File; metadata: AudioMetadata } =>
     Boolean(file.file && file.metadata && file.metadata.filename.trim());
@@ -23,7 +24,6 @@ vi.mock("@/features/export/downloadLibrary", () => {
     allTracksReadyForDownload: (files: TagiumFile[]) => files.every(ready),
     createLibraryDownloadFilename: () => "tagium.zip",
     createZipBlob: exportMocks.createZipBlob,
-    downloadBlob: exportMocks.downloadBlob,
     getAlbumCoverDownload: () => null,
     getLibraryDownloadEntries: ({ files }: { files: TagiumFile[] }) =>
       files.filter(ready).map((file) => ({ path: file.filename, file: file.file })),

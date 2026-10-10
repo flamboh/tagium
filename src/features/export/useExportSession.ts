@@ -4,11 +4,11 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { SubmitHandler } from "react-hook-form";
 import { analytics } from "@/analytics";
 import { applyTrackClips, clipAudioFile } from "@/features/audio/audioClip";
+import { downloadBlob } from "@/lib/download";
 import {
   allTracksReadyForDownload,
   createLibraryDownloadFilename,
   createZipBlob,
-  downloadBlob,
   getLibraryDownloadEntries,
   isTrackReadyForDownload,
 } from "@/features/export/downloadLibrary";
