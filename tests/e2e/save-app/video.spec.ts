@@ -37,6 +37,8 @@ test("saves a youtube video with audio as a tagged mp4", async ({ page, upstream
 
   const media = await probeMedia(await save.download(filename));
   expect(media.container).toContain("mp4");
+  expect(media.boxes).toContain("moov");
+  expect(media.boxes).not.toContain("moof");
   expect(media.streams).toEqual([
     expect.objectContaining({ type: "video", codec: "h264", width: 1920, height: 1080 }),
     expect.objectContaining({ type: "audio", codec: "aac" }),

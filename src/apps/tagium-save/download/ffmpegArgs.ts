@@ -56,17 +56,6 @@ export const outputFormatFromFilename = (filename: string) => {
 const mediaInputCount = (plan: CobaltLocalProcessingPlan, inputNames: readonly string[]) =>
   plan.output.subtitles ? inputNames.length - 1 : inputNames.length;
 
-const appendMp4Flags = (args: string[], format: string) => {
-  if (format === "mp4") {
-    args.push("-movflags", "faststart+frag_keyframe+empty_moov");
-  }
-};
-
-const appendVideoOutputFlags = (args: string[], format: string) => {
-  args.push("-c:v", "copy");
-  appendMp4Flags(args, format);
-};
-
 const appendMappedVideoAndAudio = (
   args: string[],
   plan: CobaltLocalProcessingPlan,
@@ -170,15 +159,12 @@ export const makeLocalProcessingFfmpegArgs = (
     case "merge":
     case "remux":
       appendMappedVideoAndAudio(args, plan, inputNames);
-      appendVideoOutputFlags(args, format);
-      args.push("-c:a", "copy");
+      args.push("-c:v", "copy", "-c:a", "copy");
       appendSubtitleFlags(args, plan, inputNames, format);
       args.push(...makeMetadataFfmpegArgs(plan.output.metadata));
       break;
     case "mute":
-      args.push("-map", "0:v:0");
-      appendVideoOutputFlags(args, format);
-      args.push("-an");
+      args.push("-map", "0:v:0", "-c:v", "copy", "-an");
       appendSubtitleFlags(args, plan, inputNames, format);
       args.push(...makeMetadataFfmpegArgs(plan.output.metadata));
       break;
@@ -187,7 +173,6 @@ export const makeLocalProcessingFfmpegArgs = (
         appendAudioFlags(args, { ...plan.audio, copy: true }, inputNames);
       } else {
         args.push("-map", "0:v?", "-map", "0:a?", "-c", "copy");
-        appendMp4Flags(args, format);
         appendSubtitleFlags(args, plan, inputNames, format);
       }
       args.push(...makeMetadataFfmpegArgs(plan.output.metadata));

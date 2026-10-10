@@ -15,6 +15,8 @@ export type MediaProbe = {
   duration: number;
   streams: ProbedStream[];
   tags: Record<string, string>;
+  /** Top-level iso bmff box types, only read for mp4 files. */
+  boxes?: string[];
 };
 
 type FfprobeJson = {
@@ -38,6 +40,21 @@ const lowerKeys = (tags: Record<string, string> | undefined) =>
 
 const count = (value: string | undefined) =>
   value === undefined || !/^\d+$/u.test(value) ? null : Number(value);
+
+const topLevelBoxes = (bytes: Uint8Array) => {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const boxes: string[] = [];
+  let offset = 0;
+  while (offset + 8 <= bytes.byteLength) {
+    let size = view.getUint32(offset);
+    if (size === 1) size = Number(view.getBigUint64(offset + 8));
+    else if (size === 0) size = bytes.byteLength - offset;
+    boxes.push(new TextDecoder().decode(bytes.subarray(offset + 4, offset + 8)));
+    if (size < 8) break;
+    offset += size;
+  }
+  return boxes;
+};
 
 const probe = async (file: DownloadedFile): Promise<MediaProbe> => {
   libav ??= LibAVWrapper.LibAV({ noworker: true, nothreads: true });
@@ -86,6 +103,7 @@ const probe = async (file: DownloadedFile): Promise<MediaProbe> => {
       duration: Number(result.format?.duration ?? Number.NaN),
       streams,
       tags,
+      ...(file.filename.endsWith(".mp4") ? { boxes: topLevelBoxes(file.bytes) } : {}),
     };
   } finally {
     await instance.unlink(input).catch(() => {});
