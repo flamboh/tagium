@@ -18,7 +18,14 @@ const userInputErrorCodes = new Set([
   "error.api.service.unsupported",
   "error.api.service.audio_not_supported",
   "error.api.rate_exceeded",
+  "error.api.content.too_long",
+  "error.api.content.video.age",
+  "error.api.content.video.live",
+  "error.api.content.video.private",
+  "error.api.content.video.region",
 ]);
+
+const warningErrorCodes = new Set(["error.api.content.video.unavailable"]);
 
 export const downloadServiceFromUrl = (sourceUrl: string | undefined) =>
   sourceUrl ? parseMediaLink(sourceUrl).provider : "unknown";
@@ -45,6 +52,9 @@ export const reportDownloadFailure = (failure: DownloadFailure) => {
       request_id: failure.requestId,
     });
     scope.setFingerprint(["download-failure", failure.route, service, reason]);
-    Sentry.captureMessage(`${service} ${failure.route} failed: ${reason}`, "error");
+    Sentry.captureMessage(
+      `${service} ${failure.route} failed: ${reason}`,
+      warningErrorCodes.has(reason) ? "warning" : "error",
+    );
   });
 };

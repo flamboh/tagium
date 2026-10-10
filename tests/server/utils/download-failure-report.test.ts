@@ -6,7 +6,7 @@ import {
 import { captureSentryEvents } from "../sentry-events";
 
 describe("download failure report", () => {
-  it("reports a youtube resolve failure grouped by service and code", async () => {
+  it("reports unavailable youtube content as a warning grouped by service and code", async () => {
     const events = await captureSentryEvents(() =>
       reportDownloadFailure({
         route: "download",
@@ -22,7 +22,7 @@ describe("download failure report", () => {
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
       message: "youtube download failed: error.api.content.video.unavailable",
-      level: "error",
+      level: "warning",
       fingerprint: [
         "download-failure",
         "download",
@@ -55,6 +55,26 @@ describe("download failure report", () => {
     expect(events).toEqual([]);
   });
 
+  it.each([
+    "error.api.content.too_long",
+    "error.api.content.video.age",
+    "error.api.content.video.live",
+    "error.api.content.video.private",
+    "error.api.content.video.region",
+  ])("skips %s because the content cannot be saved", async (errorCode) => {
+    const events = await captureSentryEvents(() =>
+      reportDownloadFailure({
+        route: "audio",
+        stage: "cobalt.resolve_error",
+        requestId: "request-test",
+        errorCode,
+        sourceUrl: "https://youtu.be/dQw4w9WgXcQ",
+      }),
+    );
+
+    expect(events).toEqual([]);
+  });
+
   it("skips missing SoundCloud content", async () => {
     const events = await captureSentryEvents(() =>
       reportDownloadFailure({
@@ -81,6 +101,7 @@ describe("download failure report", () => {
     );
 
     expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe("error");
   });
 
   it("reports policy failures even when the code looks like user input", async () => {
