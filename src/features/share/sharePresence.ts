@@ -1,6 +1,7 @@
 import { Option, Schema } from "effect";
 
 const CHANNEL_NAME = "tagium-workspace-presence-v1";
+
 const TAB_ID = crypto.randomUUID();
 
 const presenceMessageSchema = Schema.Struct({
@@ -17,12 +18,16 @@ export const watchForAnotherTagiumTab = (onFound: () => void) => {
   const channel = new globalThis.BroadcastChannel(CHANNEL_NAME);
   channel.onmessage = (event) => {
     const message = decodePresenceMessage(event);
+
     if (message?.type !== "present" || !message.from || message.from === TAB_ID) return;
+
     if (message.to !== undefined && message.to !== TAB_ID) return;
     channel.close();
     onFound();
   };
+
   channel.postMessage({ type: "presence?", from: TAB_ID });
+
   return () => channel.close();
 };
 
@@ -31,10 +36,13 @@ export const listenForTagiumPresence = () => {
   const channel = new globalThis.BroadcastChannel(CHANNEL_NAME);
   channel.onmessage = (event) => {
     const message = decodePresenceMessage(event);
+
     if (message?.type === "presence?" && message.from && message.from !== TAB_ID) {
       channel.postMessage({ type: "present", from: TAB_ID, to: message.from });
     }
   };
+
   channel.postMessage({ type: "present", from: TAB_ID });
+
   return () => channel.close();
 };

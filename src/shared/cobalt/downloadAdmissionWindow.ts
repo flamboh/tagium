@@ -1,5 +1,7 @@
 export const DOWNLOAD_ADMISSION_MAX_COST = 40;
+
 export const DOWNLOAD_ADMISSION_WINDOW_MS = 60_000;
+
 export const DEFAULT_DOWNLOAD_ADMISSION_COST = 2;
 
 type DownloadAdmissionResult = { status: "admitted" } | { status: "waiting"; waitMs: number };
@@ -18,6 +20,7 @@ export const createDownloadAdmissionWindow = ({
   if (!Number.isFinite(maxCost) || maxCost <= 0) {
     throw new Error("download admission max cost must be positive.");
   }
+
   if (!Number.isFinite(windowMs) || windowMs <= 0) {
     throw new Error("download admission window must be positive.");
   }
@@ -37,15 +40,19 @@ export const createDownloadAdmissionWindow = ({
 
       if (usedCost + cost <= maxCost) {
         reservations.push({ cost, reservedAtMs: nowMs });
+
         return { status: "admitted" };
       }
 
       let releasedCost = 0;
+
       const orderedReservations = reservations.toSorted(
         (left, right) => left.reservedAtMs - right.reservedAtMs,
       );
+
       for (const reservation of orderedReservations) {
         releasedCost += reservation.cost;
+
         if (usedCost - releasedCost + cost <= maxCost) {
           return {
             status: "waiting",

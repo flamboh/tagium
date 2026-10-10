@@ -159,6 +159,7 @@ export function SortableTrackRow({
   const filename = useTrackFilenamePreview(filenamePreviewStore, track.id, track.filename);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const showSavedCheck = useSavedCheck(track.status);
+
   const {
     attributes,
     listeners,
@@ -239,6 +240,7 @@ export function SortableTrackRow({
       >
         {actions.map((action) => {
           const accessibleLabel = [action.label, action.description].filter(Boolean).join(", ");
+
           return (
             <Fragment key={action.id}>
               {action.destructive && <hr className="-mx-1 my-1 h-px border-0 bg-border" />}
@@ -266,7 +268,9 @@ export function SortableTrackRow({
 
 const trackActionIcon = (action: TrackActionItem) => {
   if (action.id === "retry") return Refresh04Icon;
+
   if (action.id === "remove") return Delete02Icon;
+
   return action.shareVariant === "create" ? Share08Icon : Link02Icon;
 };
 
@@ -323,8 +327,11 @@ const albumActionIcon = (
   shareVariant: AlbumActionItem["shareVariant"],
 ) => {
   if (actionId === "edit") return Edit03Icon;
+
   if (actionId === "cleanup") return BrushCleaningIcon;
+
   if (actionId === "delete") return Delete02Icon;
+
   return shareVariant === "create" ? Share08Icon : Link02Icon;
 };
 
@@ -372,6 +379,7 @@ export function SortableAlbumCard({
   onFileDrop,
 }: AlbumCardProps) {
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
+
   const {
     attributes,
     listeners,
@@ -463,6 +471,7 @@ export function SortableAlbumCard({
             const accessibleLabel = [action.label, action.trailingText, action.description]
               .filter(Boolean)
               .join(", ");
+
             return (
               <Fragment key={action.id}>
                 {action.destructive && <hr className="-mx-1 my-1 h-px border-0 bg-border" />}

@@ -13,6 +13,7 @@ import {
 } from "./catalog.ts";
 
 const ffmpeg = process.env.FFMPEG ?? "ffmpeg";
+
 const outputDir = dirname(fileURLToPath(import.meta.url));
 
 const run = (...args: string[]) =>
@@ -36,11 +37,13 @@ for (const image of Object.values(imageFixtures)) {
 }
 
 const cover = imageFixtures.cover;
+
 const coverPath = join(outputDir, cover.file);
 
 const u32 = (value: number) => {
   const bytes = Buffer.alloc(4);
   bytes.writeUInt32BE(value);
+
   return bytes;
 };
 
@@ -96,6 +99,7 @@ for (const fixture of Object.values(audioFixtures)) {
 
   const output = join(outputDir, fixture.file);
   const titleArgs = ["-metadata", `title=${audioFixtureTags.title} (${fixture.format})`];
+
   if (fixture.format === "opus") {
     const picture = flacPictureBlock(
       readFileSync(coverPath),
@@ -103,6 +107,7 @@ for (const fixture of Object.values(audioFixtures)) {
       cover.width,
       cover.height,
     ).toString("base64");
+
     run(
       ...tone(fixture.frequency),
       "-ac",
@@ -123,6 +128,7 @@ for (const fixture of Object.values(audioFixtures)) {
     "-metadata:s:v",
     "comment=Cover (front)",
   ];
+
   run(
     ...tone(fixture.frequency),
     "-i",

@@ -53,6 +53,7 @@ const SHAREABLE_TRACK_METADATA_FIELDS = [
   "trackNumber",
   "picture",
 ] as const;
+
 const SHARE_FINGERPRINT_DELAY_MS = 150;
 
 const safelyGetRevocationReceipt = (slug: string) => {
@@ -65,11 +66,13 @@ const safelyGetRevocationReceipt = (slug: string) => {
 
 const sharedContentAddedDescription = (manifest: Manifest) => {
   const count = manifestTrackCount(manifest);
+
   return `downloading ${count} ${count === 1 ? "track" : "tracks"} — watch progress in the sidebar.`;
 };
 
 const manifestContentTitle = (manifest: Manifest) => {
   const title = manifest.kind === "album" ? manifest.album.title : manifest.track.metadata.title;
+
   return title.trim() || `untitled ${manifest.kind}`;
 };
 
@@ -108,6 +111,7 @@ export const useShareWorkflow = ({
   enabled: boolean;
 }) => {
   const initialSlug = shareSlugFromPathname(location.pathname);
+
   const [page, setPage] = useState<SharedContentPageState | null>(() =>
     enabled && initialSlug
       ? { status: "loading", slug: initialSlug }
@@ -115,26 +119,33 @@ export const useShareWorkflow = ({
         ? { status: "unavailable", slug: "", reason: "unavailable" }
         : null,
   );
+
   const [dialog, setDialog] = useState<ShareDialogState>({ status: "closed" });
   const [creatorTarget, setCreatorTarget] = useState<ShareTarget | null>(null);
+
   const [albumFingerprints, setAlbumFingerprints] = useState<Record<string, string | undefined>>(
     {},
   );
+
   const [trackFingerprints, setTrackFingerprints] = useState<Record<string, string | undefined>>(
     {},
   );
+
   const [adding, setAdding] = useState(false);
   const [anotherTabSlug, setAnotherTabSlug] = useState<string | null>(null);
   const [, setExpiryTick] = useState(0);
   const loadingSlugRef = useRef<string | null>(null);
   const pageLoadIdRef = useRef(0);
   const importingSlugRef = useRef<string | null>(null);
+
   const publicationReceiptsRef = useRef(
     new Map<string, { slug: string; expiresAt: string; token: string }>(),
   );
+
   const publicationActionInFlightRef = useRef(false);
   const projectFilesRef = useRef(editor.commands.projectFiles);
   const [projectedFiles, setProjectedFiles] = useState(() => library.state.files);
+
   const getPublicationCapability = useCallback(
     (slug: string) => publicationReceiptsRef.current.get(slug) ?? safelyGetRevocationReceipt(slug),
     [],
@@ -150,6 +161,7 @@ export const useShareWorkflow = ({
   }, [library.state.files]);
 
   const selectedFileId = library.state.selectedFileId;
+
   const selectedFileNeedsFingerprint = Boolean(
     selectedFileId &&
     (isActiveSharePublication(
@@ -161,10 +173,12 @@ export const useShareWorkflow = ({
           isActiveSharePublication(album.sharePublication),
       )),
   );
+
   const subscribeToEditorForm = editor.form.subscribe;
   useEffect(() => {
     if (!enabled || !selectedFileNeedsFingerprint) return;
     let timer: ReturnType<typeof globalThis.setTimeout> | undefined;
+
     const unsubscribe = subscribeToEditorForm({
       name: SHAREABLE_TRACK_METADATA_FIELDS,
       formState: { values: true },
@@ -176,6 +190,7 @@ export const useShareWorkflow = ({
         );
       },
     });
+
     return () => {
       if (timer !== undefined) globalThis.clearTimeout(timer);
       unsubscribe();
@@ -185,34 +200,44 @@ export const useShareWorkflow = ({
   useEffect(() => {
     const expiries: number[] = [];
     const now = Date.now();
+
     const publications = [
       ...library.state.albums.map((album) => album.sharePublication),
       ...library.state.files.map((file) => file.sharePublication),
     ];
+
     for (const publication of publications) {
       if (publication?.status !== "active") continue;
       const expiry = Date.parse(publication.expiresAt);
+
       if (Number.isFinite(expiry) && expiry > now) expiries.push(expiry);
     }
+
     if (!expiries.length) return;
+
     const timer = globalThis.setTimeout(
       () => setExpiryTick((tick) => tick + 1),
       Math.min(2_147_483_647, Math.max(0, Math.min(...expiries) - now + 1)),
     );
+
     return () => globalThis.clearTimeout(timer);
   }, [library.state.albums, library.state.files]);
 
   useEffect(() => {
     let canceled = false;
+
     const publishedAlbums = library.state.albums.filter(
       (album) => album.sharePublication?.status === "active",
     );
+
     if (!publishedAlbums.length) {
       setAlbumFingerprints({});
+
       return () => {
         canceled = true;
       };
     }
+
     setAlbumFingerprints((current) =>
       Object.fromEntries(publishedAlbums.map((album) => [album.id, current[album.id]])),
     );
@@ -221,13 +246,16 @@ export const useShareWorkflow = ({
         const files = album.trackIds.map((trackId) =>
           projectedFiles.find((file) => file.id === trackId),
         );
+
         if (files.some((file) => !file)) return [album.id, undefined] as const;
+
         try {
           const snapshot = await projectAlbumShareSnapshot(
             album,
             // SAFETY: the preceding guard rejects every missing file entry.
             files as NonNullable<(typeof files)[number]>[],
           );
+
           return [album.id, snapshot.fingerprint] as const;
         } catch {
           return [album.id, undefined] as const;
@@ -236,6 +264,7 @@ export const useShareWorkflow = ({
     ).then((entries) => {
       if (!canceled) setAlbumFingerprints(Object.fromEntries(entries));
     });
+
     return () => {
       canceled = true;
     };
@@ -243,15 +272,19 @@ export const useShareWorkflow = ({
 
   useEffect(() => {
     let canceled = false;
+
     const publishedTracks = projectedFiles.filter(
       (file) => file.sharePublication?.status === "active",
     );
+
     if (!publishedTracks.length) {
       setTrackFingerprints({});
+
       return () => {
         canceled = true;
       };
     }
+
     setTrackFingerprints((current) =>
       Object.fromEntries(publishedTracks.map((file) => [file.id, current[file.id]])),
     );
@@ -259,6 +292,7 @@ export const useShareWorkflow = ({
       publishedTracks.map(async (file) => {
         try {
           const snapshot = await projectTrackShareSnapshot(file);
+
           return [file.id, snapshot.fingerprint] as const;
         } catch {
           return [file.id, undefined] as const;
@@ -267,21 +301,26 @@ export const useShareWorkflow = ({
     ).then((entries) => {
       if (!canceled) setTrackFingerprints(Object.fromEntries(entries));
     });
+
     return () => {
       canceled = true;
     };
   }, [projectedFiles]);
 
   const currentLibrary = library.getSnapshot();
+
   const shareActions = Object.fromEntries(
     currentLibrary.albums.map((album): [string, ShareActionState] => {
       if (album.sourceManifestSlug) {
         return [album.id, shareAlbumActionState(album, undefined, false)];
       }
+
       const files = album.trackIds.map((trackId) =>
         currentLibrary.files.find((file) => file.id === trackId),
       );
+
       const eligibilityReason = shareEligibility(album, files);
+
       if (eligibilityReason) {
         return [
           album.id,
@@ -293,7 +332,9 @@ export const useShareWorkflow = ({
           },
         ];
       }
+
       const publication = album.sharePublication;
+
       return [
         album.id,
         shareAlbumActionState(
@@ -310,7 +351,9 @@ export const useShareWorkflow = ({
       if (file.sourceManifestSlug) {
         return [file.id, shareTrackActionState(file, undefined, false)];
       }
+
       const eligibilityReason = shareTrackEligibility(file);
+
       if (eligibilityReason) {
         return [
           file.id,
@@ -322,7 +365,9 @@ export const useShareWorkflow = ({
           },
         ];
       }
+
       const publication = file.sharePublication;
+
       return [
         file.id,
         shareTrackActionState(
@@ -339,8 +384,10 @@ export const useShareWorkflow = ({
       const loadId = ++pageLoadIdRef.current;
       loadingSlugRef.current = slug;
       setPage({ status: "loading", slug });
+
       try {
         const fetched = await fetchSharedContent(slug);
+
         if (loadingSlugRef.current !== slug || pageLoadIdRef.current !== loadId) return fetched;
         setPage({ status: "ready", slug, ...fetched });
         analytics.capture({
@@ -350,6 +397,7 @@ export const useShareWorkflow = ({
           trackCount: manifestTrackCount(fetched.manifest),
           viewer: getPublicationCapability(slug) ? "creator" : "recipient",
         });
+
         return fetched;
       } catch (error) {
         if (loadingSlugRef.current !== slug || pageLoadIdRef.current !== loadId) throw error;
@@ -369,6 +417,7 @@ export const useShareWorkflow = ({
   const readySlug = page?.status === "ready" ? page.slug : null;
   useEffect(() => {
     if (!readySlug) return;
+
     return watchForAnotherTagiumTab(() => setAnotherTabSlug(readySlug));
   }, [readySlug]);
 
@@ -384,43 +433,56 @@ export const useShareWorkflow = ({
   useEffect(() => {
     const handlePopState = () => {
       const slug = enabled ? shareSlugFromPathname(location.pathname) : null;
+
       if (!slug) {
         loadingSlugRef.current = null;
         setPage(null);
+
         return;
       }
+
       void loadSlug(slug).catch(() => undefined);
     };
+
     window.addEventListener("popstate", handlePopState);
+
     return () => window.removeEventListener("popstate", handlePopState);
   }, [enabled, loadSlug]);
 
   const importFromInput = useCallback(
     async (slug: string) => {
       if (!enabled) throw new SharedContentUnavailableError();
+
       if (importingSlugRef.current) return;
 
       const snapshot = library.getSnapshot();
       const existingAlbum = snapshot.albums.find((album) => album.sourceManifestSlug === slug);
       const existingFile = snapshot.files.find((file) => file.sourceManifestSlug === slug);
+
       if (existingAlbum || existingFile) {
         editor.commands.flush();
+
         if (existingAlbum) {
           library.dispatch({ type: "album-selected", albumId: existingAlbum.id, mode: "replace" });
         } else if (existingFile) {
           selectTrack(library, existingFile.id);
         }
+
         return;
       }
 
       importingSlugRef.current = slug;
+
       try {
         const fresh = await fetchSharedContent(slug);
         const artworkFile = manifestArtwork(fresh.manifest) ? await fetchSharedArtwork(slug) : null;
+
         const convertedPicture = artworkFile
           ? await coverArtFileToPicture(artworkFile, "shared artwork")
           : undefined;
+
         const artwork = manifestArtwork(fresh.manifest);
+
         const picture = convertedPicture?.map((entry, index) =>
           index === 0 && artwork
             ? {
@@ -431,6 +493,7 @@ export const useShareWorkflow = ({
               }
             : entry,
         );
+
         await importing.commands.importSharedContent(fresh.manifest, slug, picture);
         analytics.capture({
           type: "share_added",
@@ -454,6 +517,7 @@ export const useShareWorkflow = ({
   const closePage = useCallback((replace = false) => {
     loadingSlugRef.current = null;
     setPage(null);
+
     if (replace || !history.state?.shareSlug) history.replaceState({}, "", "/");
     else if (location.pathname.startsWith("/share/")) history.back();
   }, []);
@@ -462,22 +526,28 @@ export const useShareWorkflow = ({
     async (target: ShareTarget) => {
       editor.commands.flush();
       const snapshot = library.getSnapshot();
+
       const album =
         target.kind === "album"
           ? snapshot.albums.find((entry) => entry.id === target.id)
           : undefined;
+
       const file =
         target.kind === "track"
           ? snapshot.files.find((entry) => entry.id === target.id)
           : undefined;
+
       if (target.kind === "album" && !album) return;
+
       if (target.kind === "track" && !file) return;
 
       const albumFiles = album
         ? album.trackIds.map((trackId) => snapshot.files.find((entry) => entry.id === trackId))
         : [];
+
       const sourceManifestSlug =
         target.kind === "album" ? album?.sourceManifestSlug : file?.sourceManifestSlug;
+
       const preview = album
         ? buildShareAlbumPreview(album, albumFiles)
         : buildShareTrackPreview(file!);
@@ -485,19 +555,23 @@ export const useShareWorkflow = ({
       if (sourceManifestSlug) {
         setCreatorTarget(null);
         setDialog({ status: "link", preview, url: shareLinkForSlug(sourceManifestSlug) });
+
         return;
       }
 
       const ineligibleReason = album
         ? shareEligibility(album, albumFiles)
         : shareTrackEligibility(file!);
+
       if (ineligibleReason) {
         toast.error(`this ${target.kind} cannot be shared`, { description: ineligibleReason });
+
         return;
       }
 
       const publication = album?.sharePublication ?? file?.sharePublication;
       let currentFingerprint: string;
+
       try {
         currentFingerprint = album
           ? (
@@ -515,8 +589,10 @@ export const useShareWorkflow = ({
             target.kind,
           ),
         });
+
         return;
       }
+
       const action = album
         ? shareAlbumActionState(
             album,
@@ -528,20 +604,26 @@ export const useShareWorkflow = ({
             currentFingerprint,
             Boolean(publication && getPublicationCapability(publication.slug)),
           );
+
       if (!action.enabled) {
         toast.error(action.reason);
+
         return;
       }
 
       setCreatorTarget(target);
+
       if (publication && action.variant === "view") {
         const capability = getPublicationCapability(publication.slug);
+
         if (!capability) {
           toast.error("share link permission unavailable", {
             description: "try the browser that created this link",
           });
+
           return;
         }
+
         setDialog({
           status: "published",
           preview,
@@ -552,8 +634,10 @@ export const useShareWorkflow = ({
             revocationToken: capability.token,
           },
         });
+
         return;
       }
+
       setDialog({
         status: "confirm",
         preview,
@@ -588,6 +672,7 @@ export const useShareWorkflow = ({
     const currentDialog = dialog;
     let attemptedIntent = currentDialog.intent;
     setDialog({ ...currentDialog, status: "publishing" });
+
     try {
       editor.commands.flush();
       const snapshot = library.getSnapshot();
@@ -597,13 +682,19 @@ export const useShareWorkflow = ({
 
       if (target.kind === "album") {
         const album = snapshot.albums.find((entry) => entry.id === target.id);
+
         if (!album) throw new Error("the album is no longer in your library");
+
         const files = album.trackIds.map((trackId) => {
           const file = snapshot.files.find((entry) => entry.id === trackId);
+
           if (!file) throw new Error("the album has a missing track");
+
           return file;
         });
+
         const ineligibleReason = shareEligibility(album, files);
+
         if (ineligibleReason) throw new ShareIneligibleError(ineligibleReason);
         existingPublication = album.sharePublication;
         shareSnapshot = await projectAlbumShareSnapshot(album, files);
@@ -614,8 +705,10 @@ export const useShareWorkflow = ({
         );
       } else {
         const file = snapshot.files.find((entry) => entry.id === target.id);
+
         if (!file) throw new Error("the track is no longer in your library");
         const ineligibleReason = shareTrackEligibility(file);
+
         if (ineligibleReason) throw new ShareIneligibleError(ineligibleReason);
         existingPublication = file.sharePublication;
         shareSnapshot = await projectTrackShareSnapshot(file);
@@ -628,23 +721,29 @@ export const useShareWorkflow = ({
 
       const updating = latestAction.variant === "update";
       const creating = latestAction.variant === "create";
+
       if (!latestAction.enabled || (!updating && !creating)) throw new Error(latestAction.reason);
       attemptedIntent = updating ? "update" : "create";
 
       let receipt;
       let publicationAnalytics;
+
       if (updating) {
         if (!existingPublication || !isActiveSharePublication(existingPublication)) {
           throw new Error(`the shared ${target.kind} can no longer be updated`);
         }
+
         const capability = getPublicationCapability(existingPublication.slug);
+
         if (!capability) throw new Error(`this browser cannot update the shared ${target.kind}`);
+
         const updatedReceipt = await updateShare(
           existingPublication.slug,
           capability.token,
           shareSnapshot.manifest,
           shareSnapshot.cover,
         );
+
         publicationAnalytics = {
           type: "share_updated",
           shareId: updatedReceipt.analyticsId,
@@ -661,11 +760,13 @@ export const useShareWorkflow = ({
           type: "share_created",
           shareId: receipt.analyticsId,
         } as const;
+
         const capability = {
           slug: receipt.slug,
           expiresAt: receipt.expiresAt,
           token: receipt.revocationToken,
         };
+
         publicationReceiptsRef.current.set(receipt.slug, capability);
         setTargetPublication(target, {
           slug: receipt.slug,
@@ -674,6 +775,7 @@ export const useShareWorkflow = ({
           publishedFingerprint: shareSnapshot.fingerprint,
           status: "active",
         });
+
         try {
           storeRevocationReceipt(capability);
         } catch {
@@ -690,9 +792,11 @@ export const useShareWorkflow = ({
           } catch {
             throw new Error("your browser did not allow tagium to save the sharing permission");
           }
+
           throw new Error("your browser did not allow tagium to save the sharing permission");
         }
       }
+
       setTargetPublication(target, {
         slug: receipt.slug,
         url: receipt.url,
@@ -713,10 +817,12 @@ export const useShareWorkflow = ({
         error instanceof Error ? error : new Error("unknown share publication failure"),
         target.kind,
       ).replace(/[.!?]+$/, "");
+
       const updateError =
         error instanceof ShareIneligibleError
           ? createError
           : `the shared ${target.kind} could not be updated`;
+
       setDialog({
         status: "error",
         preview: currentDialog.preview,
@@ -746,12 +852,15 @@ export const useShareWorkflow = ({
     await revokeShare(receipt.slug, receipt.revocationToken);
     publicationReceiptsRef.current.delete(receipt.slug);
     removeRevocationReceipt(receipt.slug);
+
     if (creatorTarget) {
       const publication = publicationForTarget(library.getSnapshot(), creatorTarget);
+
       if (publication?.slug === receipt.slug) {
         setTargetPublication(creatorTarget, { ...publication, status: "stopped" });
       }
     }
+
     setDialog({ status: "closed" });
     toast.success("sharing stopped", { description: "the link no longer works." });
   }, [creatorTarget, dialog, library, setTargetPublication]);
@@ -759,6 +868,7 @@ export const useShareWorkflow = ({
   const stopPageShare = useCallback(async () => {
     if (page?.status !== "ready") return;
     const receipt = getPublicationCapability(page.slug);
+
     if (!receipt) return;
     await revokeShare(page.slug, receipt.token);
     publicationReceiptsRef.current.delete(page.slug);
@@ -766,6 +876,7 @@ export const useShareWorkflow = ({
     const snapshot = library.getSnapshot();
     const album = snapshot.albums.find((entry) => entry.sharePublication?.slug === page.slug);
     const file = snapshot.files.find((entry) => entry.sharePublication?.slug === page.slug);
+
     if (album?.sharePublication) {
       setTargetPublication(
         { kind: "album", id: album.id },
@@ -777,6 +888,7 @@ export const useShareWorkflow = ({
         { ...file.sharePublication, status: "stopped" },
       );
     }
+
     setPage({ status: "unavailable", slug: page.slug, reason: "unavailable" });
     toast.success("sharing stopped", { description: "the link no longer works." });
   }, [getPublicationCapability, library, page, setTargetPublication]);
@@ -785,19 +897,24 @@ export const useShareWorkflow = ({
     async (allowDuplicate = false) => {
       if (page?.status !== "ready" || adding) return;
       const snapshot = library.getSnapshot();
+
       const existing =
         page.manifest.kind === "album"
           ? snapshot.albums.find((album) => album.sourceManifestSlug === page.slug)
           : snapshot.files.find((file) => file.sourceManifestSlug === page.slug);
+
       if (existing && !allowDuplicate) return;
       setAdding(true);
+
       try {
         const fresh = await fetchSharedContent(page.slug);
         const freshArtwork = manifestArtwork(fresh.manifest);
         const artworkFile = freshArtwork ? await fetchSharedArtwork(page.slug) : null;
+
         const convertedPicture = artworkFile
           ? await coverArtFileToPicture(artworkFile, "shared artwork")
           : undefined;
+
         const picture = convertedPicture?.map((entry, index) =>
           index === 0 && freshArtwork
             ? {
@@ -808,6 +925,7 @@ export const useShareWorkflow = ({
               }
             : entry,
         );
+
         await importing.commands.importSharedContent(fresh.manifest, page.slug, picture);
         analytics.capture({
           type: "share_added",
@@ -845,11 +963,13 @@ export const useShareWorkflow = ({
 
   const viewAlreadyAdded = useCallback(() => {
     if (!alreadyAddedTargetId || page?.status !== "ready") return;
+
     if (page.manifest.kind === "album") {
       library.dispatch({ type: "album-selected", albumId: alreadyAddedTargetId, mode: "replace" });
     } else {
       selectTrack(library, alreadyAddedTargetId);
     }
+
     history.replaceState({}, "", "/");
     setPage(null);
   }, [alreadyAddedTargetId, library, page]);

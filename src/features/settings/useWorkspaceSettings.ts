@@ -24,6 +24,7 @@ export const useWorkspaceSettings = ({
   const onChange = useCallback(
     (nextSettings: AppSettings) => {
       const previous = settingsRef.current;
+
       const changed =
         previous.syncTrackNumbers !== nextSettings.syncTrackNumbers ||
         previous.syncFilenames !== nextSettings.syncFilenames ||
@@ -36,12 +37,15 @@ export const useWorkspaceSettings = ({
         Object.values(previous.metadataLinks).some(
           (enabled, index) => enabled !== Object.values(nextSettings.metadataLinks)[index],
         );
+
       const saved = saveAppSettings(nextSettings);
       setSettings(nextSettings);
       settingsRef.current = nextSettings;
+
       if (!saved && changed) {
         reportSystemFailure(new Error("settings storage unavailable"), "storage");
       }
+
       if (saved && changed) {
         analytics.capture({
           type: "settings_changed",

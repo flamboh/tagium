@@ -6,6 +6,7 @@ const urlStringSchema = Schema.String.pipe(
   Schema.refine((value): value is string => {
     try {
       new URL(value);
+
       return true;
     } catch {
       return false;

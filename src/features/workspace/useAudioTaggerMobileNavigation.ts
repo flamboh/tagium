@@ -20,15 +20,18 @@ export const useAudioTaggerMobileNavigation = ({
     activeView: workspaceNavigation.activeView,
     setActiveView: workspaceNavigation.syncView,
   });
+
   const drawerRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const wasDrawerOpenRef = useRef(false);
+
   const runPrimaryAction = (action: () => void) => {
     navigation.runAfterDrawerClose(() => {
       if (workspace.sidebarProps.settingsOpen) navigation.backWorkspace(action);
       else action();
     });
   };
+
   const sidebarProps = {
     ...workspace.sidebarProps,
     onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => {
@@ -57,6 +60,7 @@ export const useAudioTaggerMobileNavigation = ({
         else navigation.navigateToView("settings");
       }),
   };
+
   const settingsPageProps = {
     ...workspace.settingsPageProps,
     onBack: () => navigation.runAfterDrawerClose(navigation.backWorkspace),
@@ -66,25 +70,34 @@ export const useAudioTaggerMobileNavigation = ({
     if (!navigation.drawerOpen) {
       if (wasDrawerOpenRef.current) {
         const opener = navigation.openerRef.current ?? menuButtonRef.current;
+
         const restore = () => {
           if (document.querySelector("[data-slot='dialog-content'][data-state='open']")) return;
+
           if (opener?.isConnected) opener.focus();
         };
+
         restore();
         const timer = window.setTimeout(restore, 120);
         navigation.openerRef.current = null;
         wasDrawerOpenRef.current = false;
+
         return () => window.clearTimeout(timer);
       }
+
       wasDrawerOpenRef.current = false;
+
       return;
     }
+
     wasDrawerOpenRef.current = true;
     const drawer = drawerRef.current;
     const selector = "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])";
+
     const getItems = () =>
       Array.from(drawer?.querySelectorAll<HTMLElement>(selector) ?? []).filter((item) => {
         const style = window.getComputedStyle(item);
+
         return (
           !item.hasAttribute("disabled") &&
           item.getAttribute("aria-hidden") !== "true" &&
@@ -92,44 +105,60 @@ export const useAudioTaggerMobileNavigation = ({
           style.visibility !== "hidden"
         );
       });
+
     drawer?.focus();
+
     const trap = (event: KeyboardEvent) => {
       const target = event.target;
+
       const outsideDrawer =
         target instanceof Node && target !== document.body && !drawer?.contains(target);
+
       if (event.defaultPrevented || outsideDrawer) return;
+
       if (event.key === "Escape") {
         event.preventDefault();
         navigation.closeDrawer();
+
         return;
       }
+
       if (event.key !== "Tab" || !drawer) return;
       const items = getItems();
+
       if (!items.length) return;
+
       const index =
         document.activeElement instanceof HTMLElement ? items.indexOf(document.activeElement) : -1;
+
       const next = event.shiftKey
         ? index <= 0
           ? items.length - 1
           : index - 1
         : (index + 1) % items.length;
+
       event.preventDefault();
       items[next]?.focus();
     };
+
     document.addEventListener("keydown", trap);
+
     return () => document.removeEventListener("keydown", trap);
   }, [navigation]);
 
   useEffect(() => {
     if (!navigation.isMobile) return;
+
     let start: {
       clientX: number;
       clientY: number;
       pointerType?: string;
       pointerId?: number;
     } | null = null;
+
     let direction: SwipeDirection | null = null;
     let locked = false;
+
     const down = (event: PointerEvent) => {
       direction = getDrawerSwipeDirection(
         event,
@@ -137,13 +166,16 @@ export const useAudioTaggerMobileNavigation = ({
         navigation.drawerOpen,
         event.target,
       );
+
       if (!direction) return;
       start = event;
       locked = false;
     };
+
     const move = (event: PointerEvent) => {
       if (!start || !direction || event.pointerId !== start.pointerId || locked) return;
       const decision = decideDrawerSwipe(start, event, direction);
+
       if (decision === "open") {
         navigation.openDrawer();
         locked = true;
@@ -154,15 +186,18 @@ export const useAudioTaggerMobileNavigation = ({
         locked = true;
       }
     };
+
     const clear = () => {
       start = null;
       direction = null;
       locked = false;
     };
+
     window.addEventListener("pointerdown", down);
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", clear);
     window.addEventListener("pointercancel", clear);
+
     return () => {
       window.removeEventListener("pointerdown", down);
       window.removeEventListener("pointermove", move);
@@ -175,6 +210,7 @@ export const useAudioTaggerMobileNavigation = ({
     if (!navigation.isMobile || !navigation.drawerOpen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
     return () => {
       document.body.style.overflow = previous;
     };

@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import type { TagiumAppId } from "@/runtime/resolveApp";
 
 const TagiumApp = lazy(() => import("@/apps/tagium/TagiumApp"));
+
 const TagiumSaveApp = lazy(() => import("@/apps/tagium-save/TagiumSaveApp"));
 
 export default function AppRoot({ appId }: { appId: TagiumAppId }) {

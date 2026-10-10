@@ -17,6 +17,7 @@ export default defineMiddleware((event, next) => {
   // SAFETY: Nitro's Cloudflare adapter supplies this request shape in the Cloudflare runtime.
   const cloudflare = (event.req as SentryRuntimeRequest).runtime?.cloudflare;
   const dsn = cloudflare?.env?.SENTRY_DSN;
+
   if (!dsn) return next();
 
   return wrapRequestHandler(

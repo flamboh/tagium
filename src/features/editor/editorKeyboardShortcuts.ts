@@ -15,6 +15,7 @@ type KeyboardTarget = {
 const isEditableTarget = (target: EventTarget | null) => {
   if (target === null) return false;
   const tagName = "tagName" in target ? target.tagName : undefined;
+
   return (
     tagName === "INPUT" ||
     tagName === "TEXTAREA" ||
@@ -23,6 +24,7 @@ const isEditableTarget = (target: EventTarget | null) => {
 };
 
 const LAYER_SELECTOR = "[role='dialog'], [role='alertdialog'], [role='menu']";
+
 const MODAL_LAYER_SELECTOR =
   "[aria-modal='true'], [role='alertdialog'], [data-slot='dialog-content'], [data-slot='dropdown-menu-content']";
 
@@ -36,19 +38,24 @@ const handleEditorKeyboardShortcut = (
   actions: EditorKeyboardShortcutActions,
 ) => {
   if (actions.enabled === false) return;
+
   if (isEditableTarget(event.target) || isLayerEvent(event)) return;
 
   if ((event.ctrlKey || event.metaKey) && event.key === "a") {
     event.preventDefault();
+
     if (!actions.isTrackCoverProcessing) actions.selectAllFiles();
+
     return;
   }
 
   if (event.key === "Delete" || event.key === "Backspace") {
     if (actions.selectedFileCount > 0) {
       event.preventDefault();
+
       if (!actions.isTrackCoverProcessing) actions.requestRemoveSelectedFiles();
     }
+
     return;
   }
 
@@ -63,5 +70,6 @@ export const subscribeToEditorKeyboardShortcuts = (
 ) => {
   const listener = (event: KeyboardEvent) => handleEditorKeyboardShortcut(event, getActions());
   target.addEventListener("keydown", listener);
+
   return () => target.removeEventListener("keydown", listener);
 };

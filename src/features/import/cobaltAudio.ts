@@ -10,6 +10,7 @@ import type { CobaltTunnelElapsedBucket, CobaltTunnelOutcome } from "@/analytics
 import { ImportStageError } from "@/features/import/importLifecycle";
 
 export type AudioDownloadBitrate = "320" | "256" | "128" | "96" | "64";
+
 export type AudioDownloadFormat = "best" | "mp3";
 
 interface CobaltAudioRequestBody {
@@ -59,8 +60,11 @@ const getStableLastModified = (sourceUrl: string) =>
 
 const tunnelElapsedBucket = (elapsedMs: number): CobaltTunnelElapsedBucket => {
   if (elapsedMs < 1_000) return "under_1_second";
+
   if (elapsedMs < 5_000) return "1_to_5_seconds";
+
   if (elapsedMs < 15_000) return "5_to_15_seconds";
+
   return "15_seconds_or_more";
 };
 
@@ -70,6 +74,7 @@ const tunnelReadinessFromResponse = (
 ): Extract<CobaltAudioDownloadLifecycleEvent, { type: "tunnel-readiness" }> | undefined => {
   const outcome = response.headers.get("X-Tagium-Tunnel-Outcome");
   const rawAttempts = response.headers.get("X-Tagium-Tunnel-Attempts");
+
   if (
     outcome !== "ready" &&
     outcome !== "recovered" &&
@@ -78,9 +83,11 @@ const tunnelReadinessFromResponse = (
   ) {
     return undefined;
   }
+
   if (!rawAttempts || !/^\d+$/.test(rawAttempts)) return undefined;
 
   const attempts = Number(rawAttempts);
+
   if (!Number.isInteger(attempts) || attempts < 1 || attempts > MAX_TUNNEL_ATTEMPTS) {
     return undefined;
   }
@@ -115,20 +122,27 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
           Accept: "application/json",
           "Content-Type": "application/json",
         });
+
         headers.set("X-Tagium-Request-Id", crypto.randomUUID());
+
         if (request.importId) {
           headers.set("X-Tagium-Import-Id", request.importId);
         }
+
         if (request.trackIndex !== undefined) {
           headers.set("X-Tagium-Track-Index", String(request.trackIndex));
         }
+
         const body: CobaltAudioRequestBody = {
           url: request.sourceUrl,
           audioBitrate: request.audioBitrate,
           audioFormat: request.audioFormat,
         };
+
         if (request.year !== undefined) body.year = request.year;
+
         if (request.fallbackYear !== undefined) body.fallbackYear = request.fallbackYear;
+
         const response = await fetch("/api/cobalt/audio", {
           method: "POST",
           headers,
@@ -169,18 +183,23 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
         const startedAt = Date.now();
         const response = await fetch(url, { signal });
         const readiness = tunnelReadinessFromResponse(response, Date.now() - startedAt);
+
         if (readiness) {
           onLifecycle?.(readiness);
         }
+
         if (!response.ok) {
           throw new Error(await response.text());
         }
 
         let contentType = response.headers.get("Content-Type");
+
         if (!contentType) {
           contentType = "application/octet-stream";
         }
+
         const blob = await response.blob();
+
         if (blob.size === 0) {
           throw new Error("cobalt tunnel response was empty.");
         }

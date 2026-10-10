@@ -14,11 +14,13 @@ const decodeAudioMetadata = Schema.decodeUnknownSync(audioMetadataSchema);
 const parseUploadedTrack = (file: File) =>
   Effect.gen(function* () {
     const id = crypto.randomUUID();
+
     return yield* inspectAudioFile(file).pipe(
       Effect.flatMap(({ inspection, metadata }) =>
         Effect.try({
           try: () => {
             const decoded = decodeAudioMetadata(metadata);
+
             return {
               file: {
                 id,
@@ -49,6 +51,7 @@ const parseUploadedTrack = (file: File) =>
       Effect.catch((cause) => {
         const error = toPublicAudioError(cause);
         console.error(`error parsing metadata for ${file.name}:`, error);
+
         return Effect.succeed({
           file: {
             id,
@@ -76,11 +79,13 @@ const writeMetadata = (fileToUpdate: TagiumFile, newTags: AudioMetadata) =>
         }),
       );
     }
+
     const metadata = yield* Effect.try({
       try: () => decodeAudioMetadata(newTags),
       catch: (cause) =>
         new AudioMetadataWriteError({ message: "unable to decode metadata changes.", cause }),
     });
+
     return yield* patchAudioFile(fileToUpdate.file, metadata);
   });
 

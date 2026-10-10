@@ -61,6 +61,7 @@ export const createOpenAlbumDialogAction = (
 ): AlbumDialogAction => {
   const uniqueSeedTrackIds = [...new Set(seedTrackIds)];
   const seedTrack = files.find((file) => file.id === uniqueSeedTrackIds[0]);
+
   return {
     type: "create-opened",
     seedTrackIds: uniqueSeedTrackIds,
@@ -77,6 +78,7 @@ export const albumDialogReducer = (
     case "create-opened": {
       const hasSeeds = action.seedTrackIds.length > 0;
       const metadata = action.seedTrack?.metadata;
+
       return {
         open: true,
         mode: "create",
@@ -92,6 +94,7 @@ export const albumDialogReducer = (
         createSeedTrackIds: action.seedTrackIds,
       };
     }
+
     case "edit-opened":
       return {
         open: true,
@@ -128,8 +131,10 @@ export const getAlbumDialogSubmission = (state: AlbumDialogState): AlbumDialogSu
     cover: state.draft.cover,
     year: state.draft.year,
   };
+
   if (state.mode === "edit") {
     return state.editingAlbumId ? { mode: "edit", albumId: state.editingAlbumId, metadata } : null;
   }
+
   return { mode: "create", seedTrackIds: state.createSeedTrackIds, metadata };
 };

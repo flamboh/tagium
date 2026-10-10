@@ -19,9 +19,11 @@ test("dialogs and menus open without animation when reduced motion is requested"
   const downloadAll = page.getByRole("button", { name: "download all", exact: true });
   const dialog = page.getByRole("dialog", { name: "download 1 track" });
   const overlay = page.locator("[data-slot='dialog-overlay']");
+
   const menuButton = page.getByRole("button", {
     name: `track actions for ${fixtureTitle("mp3")}.mp3`,
   });
+
   const menu = page.getByRole("menu");
 
   await downloadAll.click();

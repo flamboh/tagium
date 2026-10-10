@@ -67,6 +67,7 @@ export const useAudioWorkspace = ({
   busy: boolean;
 }): AudioWorkspace => {
   const cleanup = useWorkspaceCleanup({ library, editor, settings, busy });
+
   const selection = useWorkspaceSelection({
     library,
     editor,
@@ -74,7 +75,9 @@ export const useAudioWorkspace = ({
     navigation,
     removeDownloads,
   });
+
   const album = useWorkspaceAlbumDialog({ library, editor, settings, removeDownloads });
+
   const settingsPageProps = useWorkspaceSettings({
     settings,
     setSettings,

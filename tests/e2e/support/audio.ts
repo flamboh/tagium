@@ -28,6 +28,7 @@ export const audioFixture = (
   filename: string = audioFixtures[name].file,
 ) => {
   const bytes = fixtureBytes(audioFixtures[name].file);
+
   return {
     upload: { name: filename, mimeType: audioFixtures[name].mime, buffer: Buffer.from(bytes) },
     file: { filename, bytes } satisfies DownloadedFile,
@@ -43,6 +44,7 @@ export const retaggedAudioFixture = async (
   const { metadata } = await Effect.runPromise(inspectAudioFile(source));
   const patched = await Effect.runPromise(patchAudioFile(source, { ...metadata, ...changes }));
   const bytes = new Uint8Array(await patched.arrayBuffer());
+
   return {
     upload: { name: filename, mimeType: audioFixtures[name].mime, buffer: Buffer.from(bytes) },
     file: { filename, bytes } satisfies DownloadedFile,
@@ -51,6 +53,7 @@ export const retaggedAudioFixture = async (
 
 export const imageFixture = (name: ImageFixtureName) => {
   const bytes = fixtureBytes(imageFixtures[name].file);
+
   return {
     upload: {
       name: imageFixtures[name].file,
@@ -67,6 +70,7 @@ export const captureDownload = async (
 ): Promise<DownloadedFile> => {
   const [download] = await Promise.all([page.waitForEvent("download"), trigger()]);
   const path = await download.path();
+
   return { filename: download.suggestedFilename(), bytes: new Uint8Array(await readFile(path)) };
 };
 
@@ -79,6 +83,7 @@ export const inspectAudio = async (file: DownloadedFile) => {
   const { inspection, metadata } = await Effect.runPromise(
     inspectAudioFile(new File([Buffer.from(file.bytes)], file.filename)),
   );
+
   return { format: inspection.format.kind, metadata };
 };
 
@@ -90,6 +95,7 @@ export const expectLosslessAudio = async (exported: DownloadedFile, original: Do
     inspectAudio(exported).then(({ format }) => format),
     inspectAudio(original).then(({ format }) => format),
   ]);
+
   expect(exportedFormat, `${exported.filename} format`).toBe(originalFormat);
   expect(
     audioPayloadSha256(exportedFormat, exported.bytes),

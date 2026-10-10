@@ -18,6 +18,7 @@ export const audioFilename = (base: string, format: AudioFormat) =>
 
 export const replaceAudioExtension = (filename: string, format: AudioFormat) => {
   const base = filename.replace(/\.[^.]+$/u, "") || "track";
+
   return audioFilename(base, format);
 };
 

@@ -5,6 +5,7 @@ const unavailableHeading = "this share is no longer available";
 
 const pngSize = (bytes: Uint8Array) => {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
   return { width: view.getUint32(16), height: view.getUint32(20) };
 };
 
@@ -17,14 +18,17 @@ test("every share path is noindex and dead or malformed links show the unavailab
   upstreams,
 }) => {
   const video = await upstreams.youtube.video({ title: "Live One" });
+
   const live = await createShare(
     request,
     albumManifest({ title: "Live Album", artist: "Someone", tracks: [{ video }] }),
   );
+
   const revoked = await createShare(
     request,
     albumManifest({ title: "Gone Album", artist: "Someone", tracks: [{ video }] }),
   );
+
   expect(
     (
       await request.delete(`/api/manifests/${revoked.slug}`, {
@@ -47,6 +51,7 @@ test("every share path is noindex and dead or malformed links show the unavailab
     const response = await request.get(path);
     expect(response.headers()["x-robots-tag"], path).toBe("noindex, nofollow");
   }
+
   expect((await request.get("/")).headers()["x-robots-tag"]).toBeUndefined();
 
   for (const slug of ["zzzzzz", revoked.slug]) {
@@ -72,6 +77,7 @@ test("every share path is noindex and dead or malformed links show the unavailab
     await expect(page.getByRole("button", { name: "add to library" })).not.toBeAttached();
     await expect(page.getByRole("button", { name: "stop sharing" })).not.toBeAttached();
   }
+
   await page.getByRole("link", { name: "tagium" }).click();
   await expect(page).toHaveURL(/\/$/u);
   await expect(page.getByRole("textbox", { name: "media url" })).toBeVisible();
@@ -82,6 +88,7 @@ test("link previews carry escaped open graph tags and real preview images", asyn
   upstreams,
 }) => {
   const video = await upstreams.youtube.video({ title: "Preview Track" });
+
   const covered = await createShare(
     request,
     albumManifest({
@@ -131,6 +138,7 @@ test("link previews carry escaped open graph tags and real preview images", asyn
     request,
     albumManifest({ title: "No Cover", artist: "", tracks: [{ video }] }),
   );
+
   const plainHtml = await (await request.get(`/share/${plain.slug}`)).text();
   expect(metaContent(plainHtml, "name", "description")).toBe(
     "unknown artist · 1 track · shared on tagium",
@@ -149,6 +157,7 @@ test("link previews carry escaped open graph tags and real preview images", asyn
       metadata: { filename: "x", title: "Lone Track", artist: "Solo", album: "", genre: "" },
     },
   });
+
   const trackHtml = await (await request.get(`/share/${track.slug}`)).text();
   expect(trackHtml).toContain("<title>Lone Track · tagium</title>");
   expect(metaContent(trackHtml, "name", "description")).toBe("Solo · shared track on tagium");

@@ -164,18 +164,22 @@ const prefersReducedMotion = () =>
 
 const validateSourceUrl = (value: string) => {
   if (!value) return "enter a media url";
+
   try {
     const url = new URL(value);
+
     if (url.protocol === "http:" || url.protocol === "https:") return null;
   } catch {
     // The shared media entry shows this message beside the field.
   }
+
   return "enter a complete http or https url";
 };
 
 const normaliseProgress = (progress: VideoDownloadProgress["progress"]) => {
   if (progress === undefined || !Number.isFinite(progress)) return undefined;
   const fraction = progress > 1 ? progress / 100 : progress;
+
   return Math.round(Math.max(0, Math.min(1, fraction)) * 100);
 };
 
@@ -204,6 +208,7 @@ function SelectField<Value extends string>({
         value={value}
         onChange={(event) => {
           const option = options.find((candidate) => candidate.value === event.currentTarget.value);
+
           if (option) onChange(option.value);
         }}
         className="h-9 w-full cursor-pointer appearance-none rounded-md border border-input bg-background px-2.5 text-sm text-foreground outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
@@ -437,12 +442,14 @@ function RecentDownloadRow({
   useLayoutEffect(() => {
     const item = itemRef.current;
     const content = contentRef.current;
+
     if (!item || !content || prefersReducedMotion()) return;
 
     // Grow the row from zero height so earlier downloads slide down with it
     // instead of jumping when a new row is prepended.
     const timing = { duration: 300, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
     const grow = item.animate([{ height: "0px" }, { height: "2.5rem" }], timing);
+
     const reveal = content.animate(
       [
         { opacity: 0, transform: "translateY(-28px)" },
@@ -469,9 +476,11 @@ function RecentDownloadRow({
   const handleDownload = () => {
     onDownload(download);
     setShowConfirmation(true);
+
     if (confirmationTimeoutRef.current !== null) {
       clearTimeout(confirmationTimeoutRef.current);
     }
+
     confirmationTimeoutRef.current = setTimeout(
       () => {
         setShowConfirmation(false);
@@ -656,8 +665,10 @@ const useDownloadLifecycle = ({
   setSourceUrl: Dispatch<SetStateAction<string>>;
 }) => {
   const [recentDownloads, setRecentDownloads] = useState<ReadonlyArray<RecentDownload>>([]);
+
   const [completionAnnouncement, setCompletionAnnouncement] =
     useState<CompletionAnnouncement | null>(null);
+
   const operationRef = useRef(0);
   const nextDownloadIdRef = useRef(0);
   const activeTaskRef = useRef<ActiveDownloadTask | null>(null);
@@ -672,6 +683,7 @@ const useDownloadLifecycle = ({
   useEffect(
     () => () => {
       const lifecycle = activeLifecycleRef.current;
+
       if (lifecycle && !lifecycle.finished) {
         lifecycle.finished = true;
         captureRef.current({
@@ -681,12 +693,14 @@ const useDownloadLifecycle = ({
           durationMs: Math.max(0, Date.now() - lifecycle.startedAt),
         });
       }
+
       operationRef.current += 1;
       activeTaskRef.current?.abort();
       activeTaskRef.current = null;
       activeLifecycleRef.current = null;
       const downloads = recentDownloadsRef.current;
       recentDownloadsRef.current = [];
+
       for (const download of downloads) void download.release();
     },
     [],
@@ -756,8 +770,10 @@ const useDownloadLifecycle = ({
       lifecycle.finished
     ) {
       void result.release();
+
       return;
     }
+
     const outputFormat = analyticsOutputFormatFromFilename(result.file.name);
     finishLifecycle(lifecycle, {
       outcome: "completed",
@@ -765,6 +781,7 @@ const useDownloadLifecycle = ({
       sizeBytes: result.file.size,
     });
     nextDownloadIdRef.current += 1;
+
     const download = {
       id: nextDownloadIdRef.current,
       file: result.file,
@@ -772,18 +789,23 @@ const useDownloadLifecycle = ({
       outputFormat,
       release: result.release,
     };
+
     const nextDownloads = [download, ...recentDownloadsRef.current];
     const retainedDownloads = nextDownloads.slice(0, maxRecentDownloads);
     recentDownloadsRef.current = retainedDownloads;
     setRecentDownloads(retainedDownloads);
+
     for (const removed of nextDownloads.slice(maxRecentDownloads)) void removed.release();
     void lifecycle.coverUrl.then((coverUrl) => {
       if (!coverUrl) return;
       const currentDownloads = recentDownloadsRef.current;
+
       if (!currentDownloads.some((entry) => entry.id === download.id)) return;
+
       const updatedDownloads = currentDownloads.map((entry) =>
         entry.id === download.id ? { ...entry, coverUrl } : entry,
       );
+
       recentDownloadsRef.current = updatedDownloads;
       setRecentDownloads(updatedDownloads);
     });
@@ -939,6 +961,7 @@ export default function TagiumSaveApp({
   const [settings, setSettings] = useState(initialSettings);
   const [state, setState] = useState<DownloadState>({ kind: "idle" });
   const lastSourceUrlRef = useRef<string | null>(null);
+
   const {
     activeLifecycleRef,
     activeTaskRef,
@@ -960,6 +983,7 @@ export default function TagiumSaveApp({
     operationRef.current = operation;
     activeTaskRef.current?.abort();
     lastSourceUrlRef.current = source;
+
     const lifecycle: DownloadLifecycle = {
       sourceUrl: source,
       startedAt: Date.now(),
@@ -969,6 +993,7 @@ export default function TagiumSaveApp({
         .then((metadata) => metadata?.coverUrl)
         .catch(() => undefined),
     };
+
     activeLifecycleRef.current = lifecycle;
     setValidationError(null);
     setState({ kind: "working", phase: "planning", progress: undefined });
@@ -984,18 +1009,24 @@ export default function TagiumSaveApp({
         requestedAudioFormat: requestedSettings.audioFormat,
         isRetry,
       });
+
       const task = startDownload(
         buildVideoDownloadRequest(source, requestedSettings),
         callbacksFor(operation),
       );
+
       activeTaskRef.current = task;
       const result = await task.promise;
+
       if (operationRef.current !== operation || activeLifecycleRef.current !== lifecycle) {
         if (result.status === "file") void result.release();
+
         return;
       }
+
       if (result.status === "picker") {
         const resourceCount = result.picker.length + (result.downloadAudio ? 1 : 0);
+
         if (resourceCount === 0) {
           failLifecycle(
             operation,
@@ -1003,8 +1034,10 @@ export default function TagiumSaveApp({
             new VideoDownloadError("planning", "invalid download plan: picker has no resources."),
             "planning",
           );
+
           return;
         }
+
         capture({
           type: "download_resolved",
           sourceUrl: source,
@@ -1012,8 +1045,10 @@ export default function TagiumSaveApp({
           resourceCount,
         });
         setState({ kind: "picker", result });
+
         return;
       }
+
       capture({
         type: "download_resolved",
         sourceUrl: source,
@@ -1053,13 +1088,17 @@ export default function TagiumSaveApp({
 
   const runPickerItem = (picker: VideoPickerDownloadResult, item: CobaltPickerItem) => {
     const lifecycle = activeLifecycleRef.current;
+
     if (!lifecycle) return Promise.resolve();
+
     return runPickerDownload(lifecycle, (callbacks) => picker.download(item, callbacks));
   };
 
   const runPickerAudio = (picker: VideoPickerDownloadResult) => {
     const lifecycle = activeLifecycleRef.current;
+
     if (!picker.downloadAudio || !lifecycle) return Promise.resolve();
+
     return runPickerDownload(lifecycle, picker.downloadAudio);
   };
 
@@ -1067,6 +1106,7 @@ export default function TagiumSaveApp({
     if (activeTaskRef.current || state.kind === "picker") return true;
     const trimmedUrl = sourceUrl.trim();
     const localError = validateSourceUrl(trimmedUrl);
+
     if (localError) {
       capture({
         type: "media_link_processed",
@@ -1079,6 +1119,7 @@ export default function TagiumSaveApp({
         failureReason: "invalid",
       });
       setValidationError(localError);
+
       return false;
     }
 
@@ -1092,6 +1133,7 @@ export default function TagiumSaveApp({
       outcome: "accepted",
     });
     await runRequest(trimmedUrl, settings, false);
+
     return true;
   };
 
@@ -1109,6 +1151,7 @@ export default function TagiumSaveApp({
   const cancel = () => {
     if (state.kind !== "working") return;
     const lifecycle = activeLifecycleRef.current;
+
     if (lifecycle) finishLifecycle(lifecycle, { outcome: "canceled" });
     operationRef.current += 1;
     activeTaskRef.current?.abort();
@@ -1119,8 +1162,10 @@ export default function TagiumSaveApp({
   const reset = () => {
     if (state.kind === "working" || state.kind === "picker") {
       const lifecycle = activeLifecycleRef.current;
+
       if (lifecycle) finishLifecycle(lifecycle, { outcome: "canceled" });
     }
+
     operationRef.current += 1;
     activeTaskRef.current?.abort();
     activeTaskRef.current = null;
@@ -1131,6 +1176,7 @@ export default function TagiumSaveApp({
 
   const retry = () => {
     const lastSourceUrl = lastSourceUrlRef.current;
+
     if (!lastSourceUrl || activeTaskRef.current) return;
     setSourceUrl(lastSourceUrl);
     setValidationError(null);

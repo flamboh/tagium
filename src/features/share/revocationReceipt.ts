@@ -13,19 +13,25 @@ const localRevocationReceiptSchema = Schema.Struct({
   expiresAt: Schema.String,
   token: Schema.String,
 });
+
 const storedReceiptListSchema = Schema.Array(Schema.Unknown);
 
 const parseReceipts = (value: string | null): LocalRevocationReceipt[] => {
   if (!value) return [];
+
   try {
     const storedEntries = Schema.decodeUnknownOption(storedReceiptListSchema)(JSON.parse(value));
+
     if (Option.isNone(storedEntries)) return [];
 
     const receipts: LocalRevocationReceipt[] = [];
+
     for (const entry of storedEntries.value) {
       const receipt = Schema.decodeUnknownOption(localRevocationReceiptSchema)(entry);
+
       if (Option.isSome(receipt)) receipts.push(receipt.value);
     }
+
     return receipts;
   } catch {
     return [];

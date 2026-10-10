@@ -48,7 +48,9 @@ export interface ExportSession {
 }
 
 type ExportEditor = Pick<TrackEditorSession["commands"], "projectFiles" | "flush" | "updateTags">;
+
 type ExecutionResult = "success" | "unavailable" | "error";
+
 type ConfirmationFocusTarget = {
   focus: () => void;
   isConnected?: boolean;
@@ -75,9 +77,11 @@ export const useExportSession = ({
 }): ExportSession => {
   const [exporting, setExporting] = useState(false);
   const [confirmation, setConfirmation] = useState<ExportPlan | null>(null);
+
   const [confirmationStatus, setConfirmationStatus] = useState<"ready" | "changed" | "unavailable">(
     "ready",
   );
+
   const confirmingRef = useRef(false);
   const confirmationTriggerRef = useRef<ConfirmationFocusTarget | null>(null);
   const settingsRef = useRef(settings);
@@ -89,12 +93,15 @@ export const useExportSession = ({
   const targetContext = useCallback(
     (target: ExportTarget) => {
       const snapshot = library.getSnapshot();
+
       const album =
         target.kind === "album"
           ? snapshot.albums.find((entry) => entry.id === target.albumId)
           : undefined;
+
       if (target.kind === "album" && !album) return null;
       const albums = album ? [album] : snapshot.albums;
+
       return {
         snapshot,
         album,
@@ -115,9 +122,11 @@ export const useExportSession = ({
       trackIds?: string[],
     ) => {
       let projectedFiles = files;
+
       for (const album of albums) {
         projectedFiles = applyAlbumSharedTagsToFiles(projectedFiles, album, settingsRef.current);
       }
+
       projectedFiles = applySingleAlbumTitlesToFiles(
         projectedFiles,
         singleTrackIds,
@@ -128,6 +137,7 @@ export const useExportSession = ({
         trackIds,
         settingsRef.current,
       );
+
       if (settingsRef.current.syncTrackNumbers) {
         projectedFiles = applyTrackOrderNumbersToFiles(
           projectedFiles,
@@ -136,9 +146,11 @@ export const useExportSession = ({
           settingsRef.current,
         );
       }
+
       if (settingsRef.current.syncFilenames) {
         projectedFiles = applySyncedFilenamesToFiles(projectedFiles, trackIds);
       }
+
       return projectedFiles;
     },
     [],
@@ -147,7 +159,9 @@ export const useExportSession = ({
   const projectExportFiles = useCallback(
     (target: ExportTarget) => {
       const context = targetContext(target);
+
       if (!context) return null;
+
       return {
         context,
         files: applyExportProjection(
@@ -165,7 +179,9 @@ export const useExportSession = ({
   const prepareFiles = useCallback(
     (target: ExportTarget) => {
       const context = targetContext(target);
+
       if (!context) return null;
+
       const files = applyExportProjection(
         editor.flush(context.trackIds),
         context.albums,
@@ -173,7 +189,9 @@ export const useExportSession = ({
         context.singleTrackIds,
         context.trackIds,
       );
+
       library.dispatch({ type: "content-replaced", files });
+
       return { context, files };
     },
     [applyExportProjection, editor, library, targetContext],
@@ -182,7 +200,9 @@ export const useExportSession = ({
   const derivePlan = useCallback(
     (target: ExportTarget) => {
       const projection = projectExportFiles(target);
+
       if (!projection) return null;
+
       return planExport(
         { ...projection.context.snapshot, files: projection.files },
         target,
@@ -202,24 +222,31 @@ export const useExportSession = ({
       const target = plan.target;
       const expectedTrackIds = planTrackIds(plan);
       setExporting(true);
+
       try {
         const prepared = prepareFiles(target);
+
         if (!prepared) return "unavailable";
         const filesById = new Map(prepared.files.map((file) => [file.id, file]));
+
         const filesToWrite = expectedTrackIds
           .map((id) => filesById.get(id))
           .filter((file): file is TagiumFile => Boolean(file));
+
         if (
           filesToWrite.length !== expectedTrackIds.length ||
           !allTracksReadyForDownload(filesToWrite)
         ) {
           return "unavailable";
         }
+
         const frozenState = {
           ...prepared.context.snapshot,
           files: prepared.files,
         };
+
         const frozenPlan = planExport(frozenState, target, settingsRef.current);
+
         if (!frozenPlan || !samePlan(plan, frozenPlan)) return "unavailable";
 
         const albumCount = target.kind === "album" ? 1 : prepared.context.albums.length;
@@ -232,16 +259,20 @@ export const useExportSession = ({
         await writeFiles(filesToWrite);
 
         const currentProjection = projectExportFiles(target);
+
         if (!currentProjection) return "unavailable";
         const snapshot = currentProjection.context.snapshot;
         const frozenFilesById = new Map(prepared.files.map((file) => [file.id, file]));
         const currentFilesById = new Map(currentProjection.files.map((file) => [file.id, file]));
         const rewrittenFiles = expectedTrackIds.map((id) => currentFilesById.get(id));
+
         if (rewrittenFiles.some((file) => !file || !isTrackReadyForDownload(file))) {
           return "unavailable";
         }
+
         const validationFiles = currentProjection.files.map((file) => {
           const frozenFile = frozenFilesById.get(file.id);
+
           return frozenFile
             ? {
                 ...file,
@@ -250,28 +281,35 @@ export const useExportSession = ({
               }
             : file;
         });
+
         const validationPlan = planExport(
           { ...snapshot, files: validationFiles },
           target,
           settingsRef.current,
         );
+
         if (!validationPlan || !samePlan(frozenPlan, validationPlan)) return "unavailable";
 
         const exportFiles = await Effect.runPromise(
           applyTrackClips(
             prepared.files.map((file) => {
               const rewrittenFile = currentFilesById.get(file.id);
+
               return rewrittenFile?.file ? { ...file, file: rewrittenFile.file } : file;
             }),
             new Set(expectedTrackIds),
           ),
         );
+
         const exportState = { ...frozenState, files: exportFiles };
+
         const album =
           target.kind === "album"
             ? exportState.albums.find((entry) => entry.id === target.albumId)
             : undefined;
+
         if (target.kind === "album" && !album) return "unavailable";
+
         const entries = album
           ? getLibraryDownloadEntries({
               albums: [album],
@@ -281,15 +319,18 @@ export const useExportSession = ({
               includeUnassignedFiles: false,
             })
           : getLibraryDownloadEntries(exportState);
+
         if (entries.length === 0) return "unavailable";
 
         const blob = await createZipBlob(entries);
         const albumFilename = album && filenamify(album.title, { replacement: "-" });
+
         const filename = album
           ? albumFilename
             ? `${albumFilename}.zip`
             : "album.zip"
           : createLibraryDownloadFilename();
+
         downloadBlob(blob, filename);
         analytics.capture({
           type: "export_prepared",
@@ -298,6 +339,7 @@ export const useExportSession = ({
           albumCount,
           sizeBytes: blob.size,
         });
+
         return "success";
       } catch (error) {
         analytics.capture({
@@ -306,6 +348,7 @@ export const useExportSession = ({
           error: error instanceof Error ? error : new Error(),
         });
         reportSystemFailure(error, "export");
+
         return "error";
       } finally {
         setExporting(false);
@@ -317,6 +360,7 @@ export const useExportSession = ({
   const rememberConfirmationTrigger = useCallback(() => {
     if (typeof document === "undefined") return;
     const activeElement = document.activeElement;
+
     if (canReceiveFocus(activeElement)) {
       confirmationTriggerRef.current = activeElement;
     }
@@ -325,14 +369,18 @@ export const useExportSession = ({
   const restoreConfirmationFocus = useCallback(() => {
     const trigger = confirmationTriggerRef.current;
     confirmationTriggerRef.current = null;
+
     if (trigger && canRestoreFocus(trigger)) {
       trigger.focus();
+
       return;
     }
+
     if (typeof document !== "undefined") {
       const fallback = Array.from(
         document.querySelectorAll<HTMLElement>("[data-export-focus-fallback]"),
       ).find(canRestoreFocus);
+
       fallback?.focus();
     }
   }, []);
@@ -341,6 +389,7 @@ export const useExportSession = ({
     (target: ExportTarget) => {
       if (exporting || confirmingRef.current) return;
       const nextPlan = derivePlan(target);
+
       if (!nextPlan) return;
       rememberConfirmationTrigger();
       setConfirmationStatus("ready");
@@ -368,19 +417,25 @@ export const useExportSession = ({
   const confirmDownload = useCallback(async () => {
     if (!confirmation || confirmingRef.current) return;
     const latestPlan = derivePlan(confirmation.target);
+
     if (!latestPlan) {
       setConfirmationStatus("unavailable");
+
       return;
     }
+
     if (!samePlan(confirmation, latestPlan)) {
       setConfirmation(latestPlan);
       setConfirmationStatus("changed");
+
       return;
     }
 
     confirmingRef.current = true;
+
     try {
       const result = await executeConfirmedExport(latestPlan);
+
       if (result === "success") {
         setConfirmationStatus("ready");
         setConfirmation(null);
@@ -397,10 +452,13 @@ export const useExportSession = ({
       const fileId = file.id;
       analytics.capture({ type: "export_started", exportKind: "track", trackCount: 1 });
       setExporting(true);
+
       try {
         await updateTags(file, metadata);
         const updatedFile = library.getSnapshot().files.find((entry) => entry.id === fileId);
+
         if (!updatedFile?.file) throw new Error("track export was not ready.");
+
         const exportFile =
           updatedFile.clip && updatedFile.metadata
             ? await Effect.runPromise(
@@ -412,6 +470,7 @@ export const useExportSession = ({
                 ),
               )
             : updatedFile.file;
+
         downloadBlob(exportFile, updatedFile.filename);
         analytics.capture({
           type: "export_prepared",
@@ -438,8 +497,10 @@ export const useExportSession = ({
       const selectedFile = library
         .getSnapshot()
         .files.find((file) => file.id === library.getSnapshot().selectedFileId);
+
       if (!selectedFile) return;
       const submittedData = getSubmittedAudioMetadata(data, settingsRef.current.syncFilenames);
+
       if (!isValidFilenameBase(submittedData.filename)) return;
       await writeAndDownloadTrack(selectedFile, submittedData);
     },
@@ -450,6 +511,7 @@ export const useExportSession = ({
   const exportAlbum = useCallback(
     async (albumId: string) => {
       const plan = derivePlan({ kind: "album", albumId });
+
       if (plan) await executeConfirmedExport(plan);
     },
     [derivePlan, executeConfirmedExport],
@@ -459,6 +521,7 @@ export const useExportSession = ({
     async (trackId: string) => {
       const snapshot = library.getSnapshot();
       const singleTrackIds = snapshot.looseTrackIds.includes(trackId) ? [trackId] : [];
+
       const files = applyExportProjection(
         editor.flush([trackId]),
         [],
@@ -466,8 +529,10 @@ export const useExportSession = ({
         singleTrackIds,
         [trackId],
       );
+
       library.dispatch({ type: "content-replaced", files });
       const file = files.find((entry) => entry.id === trackId);
+
       if (!file?.metadata || !isTrackReadyForDownload(file)) return;
       await writeAndDownloadTrack(file, file.metadata);
     },

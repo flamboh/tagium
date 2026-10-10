@@ -36,12 +36,16 @@ import {
 import { createRegistry, ScenarioConflictError } from "./registry.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
+
 const outputDir = join(root, ".output");
+
 const serverDir = join(outputDir, "server");
+
 const logPath = join(tmpdir(), `tagium-e2e-harness-${E2E_PORT}.log`);
 
 if (process.env.E2E_SKIP_BUILD !== "1") {
   console.log("[e2e] building app with vp build");
+
   const build = spawnSync(join(root, "node_modules/.bin/vp"), ["build"], {
     cwd: root,
     stdio: "inherit",
@@ -54,6 +58,7 @@ if (process.env.E2E_SKIP_BUILD !== "1") {
       VITE_PUBLIC_POSTHOG_HOST: FAKE_POSTHOG_ORIGIN,
     },
   });
+
   if (build.status !== 0) process.exit(build.status ?? 1);
 }
 
@@ -61,15 +66,20 @@ const wrangler = configureShareDeploymentBindings(
   decodeWranglerConfig(JSON.parse(readFileSync(join(serverDir, "wrangler.json"), "utf8"))),
   "production",
 );
+
 const { SENTRY_DSN: _sentryDsn, ...productionVars } = wrangler.vars ?? {};
+
 const rateLimiterNames = (wrangler.ratelimits ?? []).flatMap((binding) =>
   binding.name ? [binding.name] : [],
 );
+
 const decodeBinding = Schema.decodeUnknownSync(Schema.Struct({ binding: Schema.String }));
+
 const localResources = (bindings: readonly unknown[] | undefined) =>
   Object.fromEntries(
     (bindings ?? []).map((entry) => {
       const { binding } = decodeBinding(entry);
+
       return [binding, `${binding.toLowerCase()}-e2e`];
     }),
   );
@@ -77,10 +87,14 @@ const localResources = (bindings: readonly unknown[] | undefined) =>
 const listModules = (directory: string): string[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
+
     if (entry.isDirectory()) return listModules(path);
+
     return [".mjs", ".js", ".wasm"].includes(extname(entry.name)) ? [path] : [];
   });
+
 const entrypoint = join(serverDir, typeof wrangler.main === "string" ? wrangler.main : "index.mjs");
+
 const modules = [entrypoint, ...listModules(serverDir).filter((path) => path !== entrypoint)].map(
   (path) => ({
     type: extname(path) === ".wasm" ? ("CompiledWasm" as const) : ("ESModule" as const),
@@ -89,6 +103,7 @@ const modules = [entrypoint, ...listModules(serverDir).filter((path) => path !==
 );
 
 const registry = createRegistry();
+
 const log = createWriteStream(logPath, { flags: "w" });
 
 const toFetchRequest = async (request: MiniflareRequest) =>
@@ -103,9 +118,11 @@ const toFetchRequest = async (request: MiniflareRequest) =>
 
 async function* streamBody(body: ReadableStream<Uint8Array>) {
   const reader = body.getReader();
+
   try {
     while (true) {
       const chunk = await reader.read();
+
       if (chunk.done) return;
       yield chunk.value;
     }
@@ -183,6 +200,7 @@ const miniflare = new Miniflare({
         CONTROL: async (request: MiniflareRequest) => {
           const { binding, key } = (await request.json()) as { binding: string; key: string };
           const result = registry.consumeRateLimit(binding, key);
+
           return result === "unavailable"
             ? new MiniflareResponse("unavailable", { status: 503 })
             : MiniflareResponse.json({ success: result });
@@ -195,7 +213,9 @@ const miniflare = new Miniflare({
 await miniflare.ready;
 
 const database = await miniflare.getD1Database("SHARE_MANIFESTS");
+
 const migrationsDir = join(root, "migrations");
+
 for (const file of readdirSync(migrationsDir)
   .filter((name) => name.endsWith(".sql"))
   .sort()) {
@@ -204,12 +224,15 @@ for (const file of readdirSync(migrationsDir)
     .split(/;\s*$/mu)
     .map((statement) => statement.trim())
     .filter(Boolean);
+
   for (const statement of statements) await database.prepare(statement).run();
 }
 
 const readBody = async (request: IncomingMessage) => {
   const chunks: Buffer[] = [];
+
   for await (const chunk of request) chunks.push(chunk as Buffer);
+
   return Buffer.concat(chunks);
 };
 
@@ -229,13 +252,16 @@ type ControlBody = {
 
 const control = async (request: IncomingMessage, raw: Buffer): Promise<Response> => {
   const url = new URL(request.url ?? "/", E2E_CONTROL_URL);
+
   if (request.method === "GET" && url.pathname === "/health") return Response.json({ ok: true });
 
   if (request.method === "POST" && url.pathname === "/browser-upstream") {
     const target = request.headers["x-e2e-url"];
     const method = String(request.headers["x-e2e-method"] ?? "GET");
+
     if (typeof target !== "string") return new Response("missing x-e2e-url", { status: 400 });
     const owner = request.headers["x-e2e-owner"];
+
     return handleUpstream(
       registry,
       "browser",
@@ -250,6 +276,7 @@ const control = async (request: IncomingMessage, raw: Buffer): Promise<Response>
   if (request.method === "GET" && url.pathname === "/calls") {
     const since = url.searchParams.get("since");
     const unexpected = url.searchParams.get("unexpected");
+
     return Response.json(
       registry.calls({
         owner: url.searchParams.get("owner") ?? undefined,
@@ -261,10 +288,12 @@ const control = async (request: IncomingMessage, raw: Buffer): Promise<Response>
   }
 
   const body = JSON.parse(raw.toString() || "{}") as ControlBody;
+
   if (request.method === "POST" && url.pathname === "/scenarios") {
     registry.register(body.owner, body.scenarios ?? []);
   } else if (request.method === "POST" && url.pathname === "/overrides" && body.key) {
     if (body.cobalt) registry.overrideCobalt(body.owner, body.key, body.cobalt);
+
     if (body.tunnel) registry.overrideTunnel(body.owner, body.key, body.tunnel);
   } else if (request.method === "POST" && url.pathname === "/rate-limits" && body.rule) {
     registry.limitRate(body.owner, body.rule);
@@ -273,6 +302,7 @@ const control = async (request: IncomingMessage, raw: Buffer): Promise<Response>
   } else {
     return new Response("not found", { status: 404 });
   }
+
   return new Response(null, { status: 204 });
 };
 
@@ -287,6 +317,7 @@ const controlServer = createServer(async (request, response) => {
     );
   }
 });
+
 controlServer.listen(E2E_CONTROL_PORT, "127.0.0.1");
 
 console.log(`[e2e] app ${E2E_BASE_URL}  control ${E2E_CONTROL_URL}  worker log ${logPath}`);
@@ -296,5 +327,7 @@ const shutdown = async () => {
   await miniflare.dispose();
   process.exit(0);
 };
+
 process.on("SIGINT", shutdown);
+
 process.on("SIGTERM", shutdown);

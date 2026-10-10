@@ -27,6 +27,7 @@ test("sharing is suggested for a ready album rather than local files, and show m
     author: "Finder",
     videos: [{ title: "Lit" }, { title: "Bright" }],
   });
+
   const video = await upstreams.youtube.video({ title: "Loose Video" });
   await page.clock.install();
   await page.goto("/");
@@ -49,6 +50,7 @@ test("sharing is suggested for a ready album rather than local files, and show m
   await expect
     .poll(async () => {
       await skipAhead(page, 2_500);
+
       return prompt(page).isVisible();
     }, IMPORT_TIMEOUT)
     .toBe(true);

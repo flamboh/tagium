@@ -2,7 +2,7 @@ import EncodeLibAV, { type LibAV as LibAVInstance } from "@imput/libav.js-encode
 import type { CobaltLocalProcessingPlan } from "./cobaltDownloadSchemas";
 import { createTemporaryFileStore, joinTemporaryStorageSession } from "./storage";
 import {
-  makeLocalProcessingFfmpegArgs,
+  localProcessingFfmpegArgs,
   outputFormatFromFilename,
   VIDEO_PROGRESS_FILENAME,
 } from "./ffmpegArgs";
@@ -47,6 +47,7 @@ const outputName = (plan: CobaltLocalProcessingPlan) =>
   `tagium-video-output.${outputFormatFromFilename(plan.output.filename)}`;
 
 let activeLibAV: LibAVLike | undefined;
+
 let cancellationRequested = false;
 
 /**
@@ -64,19 +65,24 @@ export const createProgressSink = (postProgress: (progress: VideoWorkerProgress)
     pending = lines.pop() ?? "";
 
     const values = new Map<string, string>();
+
     for (const line of lines) {
       const separator = line.indexOf("=");
+
       if (separator < 0) continue;
       values.set(line.slice(0, separator), line.slice(separator + 1));
     }
 
     const rawSize = values.get("total_size");
     const parsedSize = rawSize === undefined ? undefined : Number(rawSize);
+
     const bytesWritten =
       parsedSize !== undefined && Number.isFinite(parsedSize) && parsedSize >= 0
         ? parsedSize
         : undefined;
+
     const status = values.get("progress");
+
     if (bytesWritten !== undefined || status === "end") {
       postProgress({
         ...(bytesWritten !== undefined ? { bytesWritten } : {}),
@@ -122,8 +128,10 @@ export const encodeWithLibAV = async (
   libav.onwrite = (name, position, data) => {
     if (name === VIDEO_PROGRESS_FILENAME) {
       progressSink(data);
+
       return;
     }
+
     if (name !== output) return;
 
     const copy = Uint8Array.from(data);
@@ -134,16 +142,20 @@ export const encodeWithLibAV = async (
     await Promise.all(
       request.files.map((file, index) => {
         const inputName = inputNames[index];
+
         if (!inputName) throw new Error("local video processing input names are out of sync.");
+
         return libav.mkreadaheadfile(inputName, file);
       }),
     );
 
     await libav.mkwriterdev(output);
     await libav.mkwriterdev(VIDEO_PROGRESS_FILENAME);
+
     const exitStatus = await libav.ffmpeg(
-      makeLocalProcessingFfmpegArgs(request.plan, inputNames, output),
+      localProcessingFfmpegArgs(request.plan, inputNames, output),
     );
+
     await pendingWrites;
 
     if (typeof exitStatus === "number" && exitStatus !== 0) {
@@ -157,10 +169,12 @@ export const encodeWithLibAV = async (
     postProgress({ bytesWritten: outputStore.size, progress: 1, status: "complete" });
     const outputLease = await outputStore.toBlob(request.plan.output.type);
     outputLeased = true;
+
     return outputLease;
   } finally {
     await pendingWrites.catch(() => undefined);
     await unlinkCreatedFiles(libav, inputNames, output);
+
     if (!outputLeased) await outputStore.cleanup();
   }
 };
@@ -170,32 +184,42 @@ const createLibAV = async (): Promise<LibAVLike> => {
     base: "/_libav",
     noworker: true,
   });
+
   return libav;
 };
 
 const errorMessage = (error: unknown) => {
   if (error instanceof Error && error.message.trim()) return error.message;
+
   return "local video processing failed.";
 };
 
 export const processLocalVideo = async (request: VideoWorkerProcessingRequest) => {
   let libav: LibAVLike | undefined;
+
   try {
     libav = await createLibAV();
+
     if (cancellationRequested) {
       libav.terminate();
       throw new Error("download cancelled.");
     }
+
     activeLibAV = libav;
+
     const outputLease = await encodeWithLibAV(libav, request, (progress) => {
       postVideoWorkerMessage({ progress });
     });
+
     let transferred = false;
+
     try {
       if (cancellationRequested) throw new Error("download cancelled.");
+
       const outputMessage: VideoWorkerMessage = outputLease.opfsEntryName
         ? { blob: outputLease.value, opfsEntryName: outputLease.opfsEntryName }
         : { blob: outputLease.value };
+
       transferred = postVideoWorkerMessage(outputMessage);
     } finally {
       if (!transferred || !outputLease.opfsEntryName) await outputLease.release();
@@ -216,6 +240,7 @@ const cancelLocalVideo = () => {
 const postVideoWorkerMessage = (message: VideoWorkerMessage) => {
   if (typeof self === "undefined") return false;
   self.postMessage({ cobaltVideoProcessing: message });
+
   return true;
 };
 
@@ -224,8 +249,11 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const isVideoWorkerJob = (value: unknown): value is VideoWorkerJob => {
   if (!isRecord(value) || !Array.isArray(value.files) || !isRecord(value.plan)) return false;
+
   if (!value.files.every((file) => file instanceof Blob)) return false;
+
   if (typeof value.temporaryStorageSession !== "string") return false;
+
   return (
     value.plan.status === "local-processing" &&
     typeof value.plan.type === "string" &&
@@ -241,10 +269,13 @@ if (typeof self !== "undefined") {
   self.onmessage = async (event: MessageEvent<unknown>) => {
     if (!isRecord(event.data)) return;
     const requestData = event.data.cobaltVideoProcessing;
+
     if (isVideoWorkerCancelRequest(requestData)) {
       cancelLocalVideo();
+
       return;
     }
+
     if (!isVideoWorkerJob(requestData)) return;
     cancellationRequested = false;
     joinTemporaryStorageSession(requestData.temporaryStorageSession);

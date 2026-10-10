@@ -5,6 +5,7 @@ import { urlStringSchema } from "./schema";
 const httpUrlSchema = urlStringSchema.check(
   Schema.makeFilter((value) => {
     const protocol = new URL(value).protocol;
+
     return protocol === "http:" || protocol === "https:" || "Expected an HTTP(S) URL";
   }),
 );
@@ -129,6 +130,7 @@ export type CobaltDownloadProxyContext = {
 
 export const decodeCobaltDownloadResponse = async (response: Response) => {
   const contentType = response.headers.get("content-type") ?? "";
+
   if (!contentType.includes("application/json")) {
     throw new Error(`Cobalt API returned non-JSON (${response.status}).`);
   }
@@ -147,6 +149,7 @@ const isCobaltTunnelUrl = (value: string, runtimeEnv: CobaltDownloadRuntimeEnv) 
   try {
     const candidate = new URL(value);
     const cobalt = new URL(runtimeEnv.COBALT_API_URL);
+
     return candidate.origin === cobalt.origin && candidate.pathname === "/tunnel";
   } catch {
     return false;
@@ -159,6 +162,7 @@ const toCobaltTunnelProxyUrl = (value: string, context: CobaltDownloadProxyConte
   const proxyUrl = new URL("/api/cobalt/tunnel", context.request.url);
   proxyUrl.searchParams.set("url", value);
   proxyUrl.searchParams.set("kind", "video");
+
   if (context.machineId) {
     proxyUrl.searchParams.set("machine", context.machineId);
     proxyUrl.searchParams.set(
@@ -166,12 +170,16 @@ const toCobaltTunnelProxyUrl = (value: string, context: CobaltDownloadProxyConte
       signCobaltMachine(context.runtimeEnv, value, context.machineId),
     );
   }
+
   proxyUrl.searchParams.set("parentRequestId", context.parentRequestId);
   proxyUrl.searchParams.set("sourceFingerprint", context.sourceFingerprint);
+
   if (context.importId) proxyUrl.searchParams.set("importId", context.importId);
+
   if (context.trackIndex !== undefined) {
     proxyUrl.searchParams.set("trackIndex", String(context.trackIndex));
   }
+
   return `${proxyUrl.pathname}${proxyUrl.search}`;
 };
 
@@ -189,10 +197,13 @@ const toCobaltPickerResourceProxyUrl = (value: string, context: CobaltDownloadPr
   proxyUrl.searchParams.set("signature", signCobaltResource(context.runtimeEnv, value, expiresAt));
   proxyUrl.searchParams.set("parentRequestId", context.parentRequestId);
   proxyUrl.searchParams.set("sourceFingerprint", context.sourceFingerprint);
+
   if (context.importId) proxyUrl.searchParams.set("importId", context.importId);
+
   if (context.trackIndex !== undefined) {
     proxyUrl.searchParams.set("trackIndex", String(context.trackIndex));
   }
+
   return `${proxyUrl.pathname}${proxyUrl.search}`;
 };
 
@@ -221,15 +232,21 @@ export const proxyCobaltDownloadResponse = (
           ...item,
           url: toCobaltPickerResourceProxyUrl(item.url, context),
         };
+
         if (item.thumb) rewritten.thumb = toCobaltTunnelProxyUrl(item.thumb, context);
+
         return rewritten;
       });
+
       const rewritten = { ...response, picker };
+
       if (response.audio) {
         rewritten.audio = toCobaltPickerResourceProxyUrl(response.audio, context);
       }
+
       return rewritten;
     }
+
     case "error":
     case "redirect":
       return response;

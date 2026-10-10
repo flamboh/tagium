@@ -8,6 +8,7 @@ export const admitShareRequest = async (
   limiter: ShareRateLimitBinding | undefined,
 ): Promise<boolean> => {
   if (!limiter) return true; // local development and tests have no binding.
+
   try {
     return (
       await limiter.limit({ key: request.headers.get("cf-connecting-ip") ?? "unknown-client" })

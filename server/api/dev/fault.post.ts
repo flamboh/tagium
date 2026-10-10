@@ -25,11 +25,13 @@ const getRuntimeEnv = (request: Request): CobaltRuntimeEnv => ({
 
 export default defineHandler(async (event) => {
   const runtimeEnv = getRuntimeEnv(event.req);
+
   if (!isDevToolsEnabled(event.req, runtimeEnv)) {
     return new Response("Not found.", { status: 404 });
   }
 
   const body = await decodeRequestBody(event.req, devFaultUpdateSchema);
   setDevFault(body);
+
   return Response.json(getDevControlSnapshot(event.req, runtimeEnv));
 });

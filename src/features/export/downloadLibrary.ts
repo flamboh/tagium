@@ -29,18 +29,23 @@ export async function createZipBlob(entries: DownloadZipEntry[]) {
   return new Promise<Blob>((resolve, reject) => {
     const chunks: Uint8Array<ArrayBuffer>[] = [];
     let settled = false;
+
     const settleWithError = (error: Error) => {
       if (settled) return;
       settled = true;
       archive.terminate();
       reject(error);
     };
+
     const archive = new Zip((error, chunk, final) => {
       if (error) {
         settleWithError(toPublicAudioError(error));
+
         return;
       }
+
       if (chunk.length > 0) chunks.push(Uint8Array.from(chunk));
+
       if (final && !settled) {
         settled = true;
         resolve(new Blob(chunks, { type: "application/zip" }));
@@ -57,16 +62,19 @@ export async function createZipBlob(entries: DownloadZipEntry[]) {
           try {
             while (true) {
               const { done, value } = await reader.read();
+
               if (done) {
                 zipEntry.push(new Uint8Array(), true);
                 break;
               }
+
               zipEntry.push(value);
             }
           } finally {
             reader.releaseLock();
           }
         }
+
         archive.end();
       } catch (error) {
         settleWithError(toPublicAudioError(error));
@@ -77,13 +85,16 @@ export async function createZipBlob(entries: DownloadZipEntry[]) {
 
 const cleanPathPart = (value: string, fallback: string) => {
   const cleaned = filenamify(value.trim(), { replacement: "-" });
+
   if (cleaned) return cleaned;
+
   return fallback;
 };
 
 const uniquePath = (path: string, usedPaths: Set<string>) => {
   if (!usedPaths.has(path)) {
     usedPaths.add(path);
+
     return path;
   }
 
@@ -102,19 +113,24 @@ const uniquePath = (path: string, usedPaths: Set<string>) => {
   }
 
   usedPaths.add(nextPath);
+
   return nextPath;
 };
 
 export const getAlbumCoverDownload = (album: AlbumGroup) => {
   const cover = album.cover?.[0];
+
   if (!cover) return null;
   const format = cover.format.split(";")[0]?.trim().toLowerCase();
+
   if (format === "image/jpeg" || format === "image/jpg") {
     return { filename: "cover.jpg", format, data: cover.data };
   }
+
   if (format === "image/png") {
     return { filename: "cover.png", format, data: cover.data };
   }
+
   return null;
 };
 
@@ -125,10 +141,12 @@ const addTrackEntry = (
   track: TagiumFile | undefined,
 ) => {
   if (!track || !isTrackReadyForDownload(track) || !track.file) return;
+
   const filename = replaceAudioExtension(
     cleanPathPart(track.filename, `track.${getAudioFormat(track).extension}`),
     getAudioFormat(track),
   );
+
   entries.push({
     path: uniquePath(`${folderPath}/${filename}`, usedPaths),
     file: track.file,
@@ -162,6 +180,7 @@ export function getLibraryDownloadEntries({
       );
 
     album.trackIds.forEach((trackId) => includedTrackIds.add(trackId));
+
     if (albumTracks.length === 0) continue;
 
     const albumFolder = uniquePath(
@@ -174,6 +193,7 @@ export function getLibraryDownloadEntries({
     }
 
     const albumCover = getAlbumCoverDownload(album);
+
     if (albumCover) {
       entries.push({
         path: uniquePath(`${albumFolder}/${albumCover.filename}`, usedPaths),

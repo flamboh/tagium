@@ -12,14 +12,18 @@ export const classifyShareLink = (
   currentOrigin = globalThis.location?.origin ?? "",
 ): ShareLinkClassification => {
   let url: URL;
+
   try {
     url = new URL(value);
   } catch {
     return { kind: "media" };
   }
+
   const isTagiumOrigin = PRODUCTION_ORIGINS.has(url.origin) || url.origin === currentOrigin;
+
   if (!isTagiumOrigin) return { kind: "media" };
   const match = url.pathname.match(/^\/share\/([^/]+)\/?$/);
+
   if (
     !match ||
     !SHARE_SLUG_PATTERN.test(match[1] ?? "") ||
@@ -28,12 +32,14 @@ export const classifyShareLink = (
   ) {
     return { kind: "invalid-share" };
   }
+
   return { kind: "share", slug: match[1]! };
 };
 
 export const shareSlugFromPathname = (pathname: string) => {
   const match = pathname.match(/^\/share\/([^/]+)\/?$/);
   const slug = match?.[1] ?? "";
+
   return SHARE_SLUG_PATTERN.test(slug) ? slug : null;
 };
 

@@ -1,6 +1,7 @@
 import type { AlbumGroup, AppSettings, MetadataLinks } from "@/features/library/types";
 
 export type MetadataLinkId = keyof MetadataLinks | "trackNumber" | "filename";
+
 export type MetadataLinkState = Record<MetadataLinkId, boolean>;
 
 export type MetadataLinkGroup = "fromAlbum" | "fromTrack";
@@ -154,6 +155,7 @@ export const getMetadataLinkState = (
   album?: Pick<AlbumGroup, "metadataLinks">,
 ) => {
   const metadataLinks = getAlbumMetadataLinks(settings, album);
+
   return {
     artist: metadataLinks.artist,
     year: metadataLinks.year,

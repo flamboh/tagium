@@ -25,12 +25,15 @@ const restoreSharedTrack = (
 ) => {
   const metadata = track.metadata;
   const picture = hasSharedArtwork && cover?.length ? cover : [];
+
   const downloadRequest: SingleUrlDownloadPlan["pendingFiles"][number]["downloadRequest"] = {
     sourceUrl: track.sourceUrl,
     audioBitrate: track.audioBitrate,
     audioFormat: "mp3",
   };
+
   if (metadata.year !== undefined) downloadRequest.year = metadata.year;
+
   return {
     ...file,
     filename: `${metadata.filename}.mp3`,
@@ -62,14 +65,17 @@ export const createSharedAlbumDownloadPlan = (
   cover?: AudioMetadata["picture"],
 ): PlaylistDownloadPlan => {
   const replay = toManifestReplayInput(manifest, { sourceManifestSlug });
+
   const plan = createPlaylistDownloadPlan({
     playlist: replay.playlist,
     audioBitrate: replay.tracks[0]!.audioBitrate,
     audioFormat: "mp3",
     createId,
   });
+
   const pendingFiles = plan.pendingFiles.map((file, index) => {
     const track = replay.tracks[index]!;
+
     return restoreSharedTrack(
       file,
       track,
@@ -78,6 +84,7 @@ export const createSharedAlbumDownloadPlan = (
       cover,
     );
   });
+
   const album = {
     ...plan.album,
     title: manifest.album.title,
@@ -85,8 +92,11 @@ export const createSharedAlbumDownloadPlan = (
     genre: manifest.album.genre,
     sourceManifestSlug,
   };
+
   if (manifest.album.year !== undefined) album.year = manifest.album.year;
+
   if (manifest.album.sourceUrl !== undefined) album.sourceUrl = manifest.album.sourceUrl;
+
   if (cover?.length) album.cover = cover;
 
   return {
@@ -117,6 +127,7 @@ export const createSharedTrackDownloadPlan = (
     audioFormat: "mp3",
     createId,
   });
+
   const pendingFiles = plan.pendingFiles.map((file) =>
     restoreSharedTrack(
       file,

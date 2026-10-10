@@ -33,9 +33,11 @@ const suggestionsForScope = (
   scope: CleanupDialogScope | null,
 ) => {
   if (!scope) return [];
+
   if (scope.type === "album") {
     return findAlbumMetadataCleanupSuggestions(files, albums, scope.albumId);
   }
+
   return findMetadataCleanupSuggestions(files, albums, scope.trackIds);
 };
 
@@ -73,11 +75,14 @@ export const useWorkspaceCleanup = ({
         album.trackIds.map((trackId) => [trackId, album.id] as const),
       ),
     );
+
     const counts = new Map<string, number>();
     availableSuggestions.forEach((suggestion) => {
       const albumId = albumIdByTrackId.get(suggestion.trackId);
+
       if (albumId) counts.set(albumId, (counts.get(albumId) ?? 0) + 1);
     });
+
     return counts;
   }, [availableSuggestions, library.state.albums]);
 
@@ -99,12 +104,16 @@ export const useWorkspaceCleanup = ({
 
   useEffect(() => {
     if (busy) return;
+
     const newSuggestions = availableSuggestions.filter((suggestion) => {
       const key = `${suggestion.trackId}:${suggestion.beforeTitle}:${suggestion.afterTitle}`;
+
       if (offeredKeysRef.current.has(key)) return false;
       offeredKeysRef.current.add(key);
+
       return true;
     });
+
     if (newSuggestions.length === 0) return;
     const noun = newSuggestions.length === 1 ? "track" : "tracks";
     toast(`we found ${newSuggestions.length} ${noun} that could be cleaned up`, {
@@ -125,6 +134,7 @@ export const useWorkspaceCleanup = ({
     (selectedSuggestions: MetadataCleanupSuggestion[]) => {
       const snapshot = library.getSnapshot();
       const selectedTrackIds = new Set(selectedSuggestions.map((suggestion) => suggestion.trackId));
+
       const currentSelectedSuggestions = suggestionsForScope(
         snapshot.files,
         snapshot.albums,
@@ -133,6 +143,7 @@ export const useWorkspaceCleanup = ({
 
       if (currentSelectedSuggestions.length === 0) {
         setOpen(false);
+
         return;
       }
 
@@ -141,11 +152,14 @@ export const useWorkspaceCleanup = ({
         currentSelectedSuggestions,
         settingsRef.current.syncFilenames,
       );
+
       library.dispatch({ type: "content-replaced", files: result.files });
       setOpen(false);
+
       const selected = result.files.find(
         (file) => file.id === library.getSnapshot().selectedFileId,
       );
+
       if (selected?.metadata) editorRef.current.form.reset(selected.metadata);
       const noun = currentSelectedSuggestions.length === 1 ? "track" : "tracks";
       toast.success(`cleaned up ${currentSelectedSuggestions.length} ${noun}`, {
@@ -159,10 +173,13 @@ export const useWorkspaceCleanup = ({
               library.getSnapshot().files,
               result.undoEntries,
             );
+
             library.dispatch({ type: "content-replaced", files: restoredFiles });
+
             const restored = restoredFiles.find(
               (file) => file.id === library.getSnapshot().selectedFileId,
             );
+
             if (restored?.metadata) editorRef.current.form.reset(restored.metadata);
           },
         },
@@ -174,6 +191,7 @@ export const useWorkspaceCleanup = ({
   const onReviewAlbum = useCallback(
     (albumId: string, focusTarget: HTMLButtonElement | null) => {
       const album = library.getSnapshot().albums.find((candidate) => candidate.id === albumId);
+
       if (!album) return;
       openDialog({ type: "album", albumId, albumTitle: album.title }, focusTarget);
     },

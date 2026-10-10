@@ -11,6 +11,7 @@ export type AudioClipRequest = {
 export type AudioClipMessage = { blob: Blob } | { error: string };
 
 const inputName = "tagium-clip-input";
+
 const outputName = "tagium-clip-output";
 
 const muxers = {
@@ -65,9 +66,12 @@ const clipAudio = async (request: AudioClipRequest) => {
     await libav.mkreadaheadfile(inputName, request.file);
     await libav.mkwriterdev(outputName);
     await libav.ffmpeg(makeAudioClipArgs(request));
+
     if (size === 0) throw new Error("clipping produced an empty file.");
     const bytes = new Uint8Array(size);
+
     for (const patch of patches) bytes.set(patch.data, patch.position);
+
     return new Blob([bytes], { type: request.file.type });
   } finally {
     await Promise.allSettled([libav.unlink(outputName), libav.unlinkreadaheadfile(inputName)]);
@@ -78,11 +82,13 @@ const clipAudio = async (request: AudioClipRequest) => {
 if (globalThis.self) {
   globalThis.self.onmessage = async (event: MessageEvent<AudioClipRequest>) => {
     let message: AudioClipMessage;
+
     try {
       message = { blob: await clipAudio(event.data) };
     } catch (error) {
       message = { error: error instanceof Error ? error.message : "audio clipping failed." };
     }
+
     globalThis.self.postMessage(message);
   };
 }

@@ -5,6 +5,7 @@ import {
 } from "../../src/features/share/shareManifest";
 
 export const SHARE_LINK_PREVIEW_START = "<!-- tagium:link-preview:start -->";
+
 export const SHARE_LINK_PREVIEW_END = "<!-- tagium:link-preview:end -->";
 
 export interface ShareLinkPreviewMetadata {
@@ -43,10 +44,12 @@ export const buildShareLinkPreviewMetadata = (
   const canonicalUrl = new URL(`/share/${encodeURIComponent(slug)}`, requestUrl);
   const artwork = manifestArtwork(manifest);
   const trackCount = manifestTrackCount(manifest);
+
   const description =
     manifest.kind === "album"
       ? `${content.artist} · ${trackCount} ${trackCount === 1 ? "track" : "tracks"} · shared on tagium`
       : `${content.artist} · shared track on tagium`;
+
   const image = artwork
     ? {
         url: new URL(`/api/manifests/${encodeURIComponent(slug)}/preview-artwork`, canonicalUrl)
@@ -108,6 +111,7 @@ export const renderShareLinkPreviewTags = (metadata: ShareLinkPreviewMetadata) =
   );
 
   tags.push(`<link rel="canonical" href="${escapeHtml(metadata.url)}" />`);
+
   return `${SHARE_LINK_PREVIEW_START}\n    ${tags.join("\n    ")}\n    ${SHARE_LINK_PREVIEW_END}`;
 };
 
@@ -115,7 +119,9 @@ export const renderShareLinkPreviewTags = (metadata: ShareLinkPreviewMetadata) =
 export const injectShareLinkPreview = (html: string, metadata: ShareLinkPreviewMetadata) => {
   const start = html.indexOf(SHARE_LINK_PREVIEW_START);
   const end = html.indexOf(SHARE_LINK_PREVIEW_END, start);
+
   if (start === -1 || end === -1) return html;
+
   return `${html.slice(0, start)}${renderShareLinkPreviewTags(metadata)}${html.slice(
     end + SHARE_LINK_PREVIEW_END.length,
   )}`;

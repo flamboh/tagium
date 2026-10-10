@@ -13,13 +13,16 @@ import type {
 const HANG_LIMIT_MS = 10 * 60_000;
 
 type Owned<T> = { value: T; owner: string };
+
 type Cursor = { cobalt: number; tunnel: number };
+
 export type CallFilter = {
   owner?: string;
   includeUnowned?: boolean;
   since?: number;
   unexpected?: boolean;
 };
+
 export type Tunnel = {
   key: string;
   part: "audio" | "cover" | "video" | "post";
@@ -30,6 +33,7 @@ export type Tunnel = {
 
 const pick = <T>(sequence: Sequence<T>, index: number): T => {
   if (!Array.isArray(sequence)) return sequence as T;
+
   return sequence[Math.min(index, sequence.length - 1)]!;
 };
 
@@ -50,18 +54,22 @@ export const createRegistry = () => {
 
   const cursor = (key: string) => {
     let value = cursors.get(key);
+
     if (!value) {
       value = { cobalt: 0, tunnel: 0 };
       cursors.set(key, value);
     }
+
     return value;
   };
 
   const claim = <T>(map: Map<string, Owned<T>>, key: string, owner: string, value: T) => {
     const existing = map.get(key);
+
     if (existing && existing.owner !== owner) {
       throw new ScenarioConflictError(`${key} is already registered by another test`);
     }
+
     map.set(key, { value, owner });
   };
 
@@ -71,6 +79,7 @@ export const createRegistry = () => {
     register(owner: string, entries: readonly Scenario[]) {
       for (const scenario of entries) {
         claim(scenarios, scenario.key, owner, scenario);
+
         if (scenario.type === "media" && scenario.soundcloudId !== undefined) {
           soundcloudIds.set(scenario.soundcloudId, scenario.key);
         }
@@ -94,11 +103,14 @@ export const createRegistry = () => {
           releasedOwners.set(key, owner);
           map.delete(key);
           cursors.delete(key);
+
           for (const resolve of hangs.get(key) ?? []) resolve();
           hangs.delete(key);
         }
       }
+
       for (const [id, key] of soundcloudIds) if (!scenarios.has(key)) soundcloudIds.delete(id);
+
       for (const [id, tunnel] of tunnels) {
         if (scenarios.has(tunnel.key)) continue;
         releasedTunnels.set(id, tunnel.key);
@@ -110,10 +122,12 @@ export const createRegistry = () => {
     },
     media(key: string | null): MediaScenario | undefined {
       const scenario = key ? scenarios.get(key)?.value : undefined;
+
       return scenario?.type === "media" ? scenario : undefined;
     },
     post(key: string | null): PostScenario | undefined {
       const scenario = key ? scenarios.get(key)?.value : undefined;
+
       return scenario?.type === "post" ? scenario : undefined;
     },
     mediaBySoundCloudId(id: number) {
@@ -121,6 +135,7 @@ export const createRegistry = () => {
     },
     ownerOf(key: string | null) {
       if (!key) return null;
+
       return (
         scenarios.get(key)?.owner ??
         cobaltOverrides.get(key)?.owner ??
@@ -132,18 +147,23 @@ export const createRegistry = () => {
     nextCobalt(key: string) {
       const sequence =
         cobaltOverrides.get(key)?.value ?? (this.media(key) ?? this.post(key))?.cobalt;
+
       if (!sequence) return undefined;
+
       return pick(sequence, cursor(key).cobalt++);
     },
     nextTunnel(key: string) {
       const sequence =
         tunnelOverrides.get(key)?.value ?? (this.media(key) ?? this.post(key))?.tunnel;
+
       if (!sequence) return undefined;
+
       return pick(sequence, cursor(key).tunnel++);
     },
     createTunnel(tunnel: Tunnel) {
       const id = crypto.randomUUID().replaceAll("-", "").slice(0, 21);
       tunnels.set(id, tunnel);
+
       return id;
     },
     tunnel(id: string | null) {
@@ -156,24 +176,30 @@ export const createRegistry = () => {
       return new Promise<void>((resolve) => {
         const set = hangs.get(key) ?? new Set();
         hangs.set(key, set);
+
         const done = () => {
           clearTimeout(timer);
           set.delete(done);
           resolve();
         };
+
         const timer = setTimeout(done, HANG_LIMIT_MS);
         set.add(done);
       });
     },
     consumeRateLimit(binding: string, key: string): boolean | "unavailable" {
       const entry = rateLimits.get(rateLimitKey(binding, key))?.value;
+
       if (!entry) return true;
+
       if (entry.rule.limit === "unavailable") return "unavailable";
       entry.used += 1;
+
       return entry.used <= entry.rule.limit;
     },
     record(call: UpstreamCall) {
       calls.push(call);
+
       if (call.unexpected) {
         console.error(`[e2e] unexpected upstream call ${call.method} ${call.url} (${call.route})`);
       }

@@ -63,6 +63,7 @@ export interface ImportLifecycleTracker {
 
 const errorMessage = (cause: unknown) => {
   if (cause instanceof Error) return cause.message;
+
   if (
     typeof cause === "object" &&
     cause !== null &&
@@ -71,12 +72,15 @@ const errorMessage = (cause: unknown) => {
   ) {
     return cause.message;
   }
+
   return "";
 };
 
 export const importFailureCodeFrom = (error: Error): ImportFailureCode => {
   const message = errorMessage(error).toLowerCase();
+
   if (message.includes("error.api.capacity_exceeded")) return "capacity";
+
   if (
     message.includes("error.api.rate_exceeded") ||
     message.includes("rate limit") ||
@@ -84,6 +88,7 @@ export const importFailureCodeFrom = (error: Error): ImportFailureCode => {
   ) {
     return "rate_limited";
   }
+
   if (
     message.includes("error.api.unreachable") ||
     message.includes("cobalt_api_url is not configured") ||
@@ -92,16 +97,22 @@ export const importFailureCodeFrom = (error: Error): ImportFailureCode => {
   ) {
     return "service_unavailable";
   }
+
   if (message.includes("error.api.timed_out") || /\btimed?\s*out\b/.test(message)) {
     return "timeout";
   }
+
   if (message.includes("error.api.fetch.empty") || message.includes("response was empty")) {
     return "empty_response";
   }
+
   if (message.includes("error.api.fetch.fail")) return "fetch_failed";
+
   if (/metadata.*(?:write|appl)|write.*metadata/.test(message)) return "metadata_write_failed";
+
   if (/could not be parsed|decode|malformed|metadata read/.test(message)) return "parse_failed";
   const classified = getSystemFailurePresentation(error, "import").code;
+
   if (
     classified === "unsupported_source" ||
     classified === "private_or_missing" ||
@@ -109,6 +120,7 @@ export const importFailureCodeFrom = (error: Error): ImportFailureCode => {
   ) {
     return classified;
   }
+
   return "unknown";
 };
 
@@ -121,8 +133,11 @@ const deriveOutcome = (counts: {
   canceled: number;
 }): ImportOutcome => {
   if (counts.canceled > 0) return "canceled";
+
   if (counts.failed === 0) return "completed";
+
   if (counts.completed > 0) return "partial";
+
   return "failed";
 };
 
@@ -143,12 +158,15 @@ export const createImportLifecycleTracker = (
         settledTracks: new Map(),
       });
       dependencies.capture({ type: "import_started", sourceUrl, importKind, requestedFormat });
+
       return operationId;
     },
     resolve: (operationId, { trackIds, hasCover }) => {
       const operation = operations.get(operationId);
+
       if (!operation) return;
       operation.trackIds = new Set(trackIds);
+
       if (operation.importKind === "set") {
         dependencies.capture({
           type: "import_resolved",
@@ -162,6 +180,7 @@ export const createImportLifecycleTracker = (
     },
     fail: (operationId, error) => {
       const operation = operations.get(operationId);
+
       if (!operation) return;
       operations.delete(operationId);
       dependencies.capture({
@@ -186,33 +205,44 @@ export const createImportLifecycleTracker = (
     },
     settle: (operationId, settlement) => {
       const operation = operations.get(operationId);
+
       if (!operation) return;
+
       if (!operation.trackIds.has(settlement.trackId)) return;
+
       if (operation.settledTracks.has(settlement.trackId)) return;
       operation.settledTracks.set(settlement.trackId, settlement);
+
       if (operation.settledTracks.size !== operation.trackIds.size) return;
 
       let completed = 0;
       let failed = 0;
       let canceled = 0;
+
       const failures = new Map<
         string,
         { stage: ImportFailureStage; code: ImportFailureCode; count: number }
       >();
+
       for (const result of operation.settledTracks.values()) {
         if (result.outcome === "completed") completed += 1;
+
         if (result.outcome === "failed") {
           failed += 1;
           const stage = result.failureStage ?? "plan";
           const code = result.error ? importFailureCodeFrom(result.error) : "unknown";
           const key = `${stage}:${code}`;
           const aggregate = failures.get(key);
+
           if (aggregate) aggregate.count += 1;
           else failures.set(key, { stage, code, count: 1 });
         }
+
         if (result.outcome === "canceled") canceled += 1;
       }
+
       operations.delete(operationId);
+
       for (const failure of failures.values()) {
         dependencies.capture({
           type: "import_failure_category",
@@ -224,6 +254,7 @@ export const createImportLifecycleTracker = (
           trackCount: failure.count,
         });
       }
+
       dependencies.capture({
         type: "import_finished",
         sourceUrl: operation.sourceUrl,

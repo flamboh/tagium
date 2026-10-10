@@ -1,3 +1,4 @@
+import { Match } from "effect";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,6 +24,7 @@ export type DestructiveActionDialogProps = DestructiveActionDialogBaseProps &
 
 export default function DestructiveActionDialog(props: DestructiveActionDialogProps) {
   const { open, returnFocusTarget, onCancel, onConfirm } = props;
+
   const copy =
     props.kind === "remove-tracks"
       ? {
@@ -33,13 +35,11 @@ export default function DestructiveActionDialog(props: DestructiveActionDialogPr
         }
       : {
           title: `delete ${props.albumTitle}?`,
-          description: `this deletes the album${
-            props.trackCount === 0
-              ? ""
-              : props.trackCount === 1
-                ? " and its track"
-                : ` and all ${props.trackCount} tracks`
-          } from the current session. this cannot be undone.`,
+          description: `this deletes the album${Match.value(props.trackCount).pipe(
+            Match.when(0, () => ""),
+            Match.when(1, () => " and its track"),
+            Match.orElse((count) => ` and all ${count} tracks`),
+          )} from the current session. this cannot be undone.`,
           cancelLabel: "keep album",
           confirmLabel: "delete album",
         };

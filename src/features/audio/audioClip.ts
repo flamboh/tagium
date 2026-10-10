@@ -20,6 +20,7 @@ const runAudioClipWorker = (request: AudioClipRequest) =>
               : Effect.fail(new AudioWorkerError({ message: message.error, cause: message })),
           );
         };
+
         worker.onerror = (event) => {
           resume(
             Effect.fail(
@@ -30,6 +31,7 @@ const runAudioClipWorker = (request: AudioClipRequest) =>
             ),
           );
         };
+
         worker.postMessage(request);
       }),
     (worker) => Effect.sync(() => worker.terminate()),
@@ -52,14 +54,17 @@ export const clipAudioFile = (
       start: clip.start,
       end: clip.end,
     });
+
     const clipped = new File([blob], file.name, {
       type: file.type,
       lastModified: file.lastModified,
     });
+
     // Raw artwork frames belong to the source tag (an ID3v2.3 frame copied into ffmpeg's
     // ID3v2.4 output is misread), so re-encode artwork for the new container.
     const picture = metadata.picture.map(({ opaqueData: _opaqueData, ...entry }) => entry);
     const tagged = yield* patchAudioFile(clipped, { ...metadata, picture });
+
     return new File([tagged], file.name, { type: tagged.type, lastModified: file.lastModified });
   }).pipe(Effect.mapError(toPublicAudioError));
 

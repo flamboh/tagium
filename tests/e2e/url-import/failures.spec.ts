@@ -43,6 +43,7 @@ test("rejects incomplete and unsupported links beside the url field", async ({
     await expect(page.getByText("try a public soundcloud or youtube track url")).toBeVisible();
     await expect(urlField(page)).toHaveValue(url);
   }
+
   await expect(page.getByText("no tracks yet")).toBeVisible();
   expect(await upstreams.calls({ route: /^(cobalt|youtube|soundcloud)/u })).toHaveLength(0);
 });
@@ -78,6 +79,7 @@ test("server link lookups refuse foreign hosts and endless short-link chains", a
     const response = await request.get(`/api/youtube-cover?url=${encodeURIComponent(url)}`);
     expect(response.status(), url).toBe(400);
   }
+
   for (const url of ["https://soundcloud.com.evil/x", "https://example.com/x"]) {
     const response = await request.get(`/api/soundcloud-link?url=${encodeURIComponent(url)}`);
     expect(response.ok(), url).toBe(false);
@@ -85,6 +87,7 @@ test("server link lookups refuse foreign hosts and endless short-link chains", a
 
   const track = await upstreams.soundcloud.track({ cover: null });
   let link = track.url;
+
   for (let hop = 0; hop < 6; hop += 1) link = await upstreams.soundcloud.shortLink(link);
   const endless = await request.get(`/api/soundcloud-link?url=${encodeURIComponent(link)}`);
   expect(endless.ok()).toBe(false);
@@ -100,6 +103,7 @@ test("explains a missing soundcloud set or youtube playlist beside the url field
   const playlist = await upstreams.youtube.playlist({ videos: [{}], missing: true });
 
   await page.goto("/");
+
   for (const url of [set.url, playlist.url]) {
     await importUrl(page, url);
     await expect(
@@ -107,6 +111,7 @@ test("explains a missing soundcloud set or youtube playlist beside the url field
     ).toBeVisible();
     await expect(urlField(page)).toHaveValue(url);
   }
+
   await expect(notifications(page).getByText("import failed")).toHaveCount(0);
   await expect(page.getByText("no tracks yet")).toBeVisible();
   expect(await upstreams.calls({ route: "soundcloud.resolve.set" })).toHaveLength(1);
@@ -132,6 +137,7 @@ test("reports a soundcloud set or youtube playlist outage as an import failure",
       page.getByText("check that the link is public and still available, then try again"),
     ).toHaveCount(0);
   }
+
   await expect(page.getByText("no tracks yet")).toBeVisible();
   expect(await upstreams.calls({ route: "cobalt.resolve" })).toHaveLength(0);
 });
@@ -149,6 +155,7 @@ type FailureCase = {
 const youtubeFailing = (code: string) => async (upstreams: Upstreams) => {
   const video = await upstreams.youtube.video({ title: "Failing Song" });
   await upstreams.cobalt.fail(video.url, code);
+
   return video;
 };
 
@@ -167,7 +174,9 @@ const failureCases: FailureCase[] = [
       const track = await upstreams.soundcloud.track({
         metadata: { kind: "status", status: 404 },
       });
+
       await upstreams.cobalt.fail(track.url, "error.api.fetch.soundcloud.resolve_fetch.404");
+
       return track;
     },
     title: "we could not access this media",
@@ -212,6 +221,7 @@ const failureCases: FailureCase[] = [
     arrange: async (upstreams) => {
       const track = await upstreams.soundcloud.track();
       await upstreams.cobalt.fail(track.url, "error.api.fetch.soundcloud.stream_parse");
+
       return track;
     },
     title: "we could not read this media",
@@ -224,6 +234,7 @@ const failureCases: FailureCase[] = [
     arrange: async (upstreams) => {
       const video = await upstreams.youtube.video({ title: "Failing Song" });
       await upstreams.cobalt.respond(video.url, { kind: "non-json" });
+
       return video;
     },
     title: "we could not read this media",
@@ -237,6 +248,7 @@ const failureCases: FailureCase[] = [
       const ip = `203.0.113.${randomInt(1, 255)}`;
       await context.setExtraHTTPHeaders({ "cf-connecting-ip": ip });
       await upstreams.rateLimits.limit("COBALT_CLIENT_RATE_LIMITER", ip, 0);
+
       return upstreams.youtube.video({ title: "Failing Song" });
     },
     title: "too many download requests",
@@ -250,6 +262,7 @@ const failureCases: FailureCase[] = [
     arrange: async (upstreams) => {
       const video = await upstreams.youtube.video({ title: "Failing Song" });
       await upstreams.cobalt.respond(video.url, { kind: "invalid-machine-id" });
+
       return video;
     },
     title: "we could not read this media",
@@ -296,7 +309,9 @@ test("recovers from a busy download service when the track is retried", async ({
     author: "Crowd",
     cover: null,
   });
+
   await upstreams.cobalt.capacity(video.url, { retryAfter: "7", times: 1 });
+
   const capacityResponse = page.waitForResponse(
     (response) => response.url().endsWith("/api/cobalt/audio") && response.status() === 503,
   );

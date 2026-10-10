@@ -65,14 +65,19 @@ const thumbnailSchema = Schema.Struct({
 });
 
 const decodeTextOption = Schema.decodeUnknownOption(textSchema);
+
 const decodeLegacyVideoOption = Schema.decodeUnknownOption(legacyVideoSchema);
+
 const decodeLockupVideoOption = Schema.decodeUnknownOption(lockupVideoSchema);
+
 const decodeThumbnailOption = Schema.decodeUnknownOption(thumbnailSchema);
 
 interface JsonRecord {
   [key: string]: JsonValue;
 }
+
 type JsonValue = string | number | boolean | null | JsonRecord | readonly JsonValue[];
+
 const jsonValueSchema: Schema.Codec<JsonValue> = Schema.suspend(() =>
   Schema.Union([
     Schema.String,
@@ -83,6 +88,7 @@ const jsonValueSchema: Schema.Codec<JsonValue> = Schema.suspend(() =>
     Schema.Record(Schema.String, jsonValueSchema),
   ]),
 );
+
 const jsonRecordSchema = Schema.Record(Schema.String, jsonValueSchema);
 
 interface YouTubeTrack {
@@ -92,6 +98,7 @@ interface YouTubeTrack {
   duration?: number;
   trackNumber: number;
 }
+
 interface YouTubePlaylist {
   title: string;
   artist: string;
@@ -103,14 +110,19 @@ interface YouTubePlaylist {
 }
 
 const isRecord = Schema.is(jsonRecordSchema);
+
 const isString = Schema.is(Schema.String);
 
 const getText = (value: JsonValue | undefined) => {
   const parsed = decodeTextOption(value);
+
   if (Option.isNone(parsed)) return undefined;
+
   if (parsed.value.simpleText) return parsed.value.simpleText;
+
   if (parsed.value.content) return parsed.value.content;
   const runs = parsed.value.runs?.map((run) => run.text).join("");
+
   return runs || undefined;
 };
 
@@ -118,24 +130,32 @@ const findFirstValue = (value: JsonValue, key: string): JsonValue | undefined =>
   if (Array.isArray(value)) {
     for (const entry of value) {
       const found = findFirstValue(entry, key);
+
       if (found !== undefined) return found;
     }
+
     return undefined;
   }
+
   if (!isRecord(value)) return undefined;
+
   if (value[key] !== undefined) return value[key];
 
   for (const entry of Object.values(value)) {
     const found = findFirstValue(entry, key);
+
     if (found !== undefined) return found;
   }
+
   return undefined;
 };
 
 const parseDuration = (value: string | undefined) => {
   if (!value) return undefined;
   const parts = value.trim().split(":");
+
   if (parts.length < 2 || parts.some((part) => !/^\d+$/.test(part))) return undefined;
+
   return parts.reduce((seconds, part) => seconds * 60 + Number(part), 0);
 };
 
@@ -143,33 +163,43 @@ const findDuration = (value: JsonValue): number | undefined => {
   if (Array.isArray(value)) {
     for (const entry of value) {
       const duration = findDuration(entry);
+
       if (duration !== undefined) return duration;
     }
+
     return undefined;
   }
+
   if (!isRecord(value)) return undefined;
 
   const directText = isString(value.text) ? value.text : undefined;
   const parsedDuration = parseDuration(directText);
+
   if (parsedDuration !== undefined) return parsedDuration;
 
   for (const entry of Object.values(value)) {
     const duration = findDuration(entry);
+
     if (duration !== undefined) return duration;
   }
+
   return undefined;
 };
 
 const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouTubeTrack[]) => {
   if (Array.isArray(value)) {
     for (const entry of value) collectTracks(entry, seenVideoIds, tracks);
+
     return;
   }
+
   if (!isRecord(value)) return;
 
   const legacyVideo = decodeLegacyVideoOption(value.playlistVideoRenderer);
+
   if (Option.isSome(legacyVideo) && !seenVideoIds.has(legacyVideo.value.videoId)) {
     const title = getText(legacyVideo.value.title)?.trim();
+
     if (title) {
       const durationFromSeconds = Number(legacyVideo.value.lengthSeconds);
       seenVideoIds.add(legacyVideo.value.videoId);
@@ -186,6 +216,7 @@ const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouT
   }
 
   const lockupVideo = decodeLockupVideoOption(value.lockupViewModel);
+
   if (
     Option.isSome(lockupVideo) &&
     (!lockupVideo.value.contentType ||
@@ -193,6 +224,7 @@ const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouT
     !seenVideoIds.has(lockupVideo.value.contentId)
   ) {
     const title = getText(lockupVideo.value.metadata.lockupMetadataViewModel.title)?.trim();
+
     if (title) {
       seenVideoIds.add(lockupVideo.value.contentId);
       tracks.push({
@@ -216,11 +248,14 @@ const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouT
 const collectContinuationTokens = (value: JsonValue, tokens: string[]) => {
   if (Array.isArray(value)) {
     for (const entry of value) collectContinuationTokens(entry, tokens);
+
     return;
   }
+
   if (!isRecord(value)) return;
 
   const continuationCommand = value.continuationCommand;
+
   if (isRecord(continuationCommand) && isString(continuationCommand.token)) {
     tokens.push(continuationCommand.token);
   }
@@ -230,6 +265,7 @@ const collectContinuationTokens = (value: JsonValue, tokens: string[]) => {
 
 const getPlaylistTitle = (initialData: JsonValue) => {
   const metadata = findFirstValue(initialData, "playlistMetadataRenderer");
+
   return metadata !== undefined && isRecord(metadata) && isString(metadata.title)
     ? metadata.title.trim()
     : "";
@@ -237,6 +273,7 @@ const getPlaylistTitle = (initialData: JsonValue) => {
 
 const hasErrorAlert = (initialData: JsonValue) => {
   const alert = findFirstValue(initialData, "alertRenderer");
+
   return alert !== undefined && isRecord(alert) && alert.type === "ERROR";
 };
 
@@ -247,28 +284,38 @@ const getPlaylistCover = (initialData: JsonValue) => {
   const parsed = decodeThumbnailOption(
     findFirstValue(initialData, "playlistVideoThumbnailRenderer"),
   );
+
   if (Option.isNone(parsed) || parsed.value.thumbnail.thumbnails.length === 0) return undefined;
+
   const coverUrl = parsed.value.thumbnail.thumbnails.reduce((largest, thumbnail) => {
     const largestArea = (largest.width ?? 0) * (largest.height ?? 0);
     const thumbnailArea = (thumbnail.width ?? 0) * (thumbnail.height ?? 0);
+
     return thumbnailArea >= largestArea ? thumbnail : largest;
   }).url;
+
   const proxyUrl = new URL("/api/youtube-cover", "http://tagium.local");
   proxyUrl.searchParams.set("url", coverUrl);
+
   return `${proxyUrl.pathname}${proxyUrl.search}`;
 };
 
 const getDeclaredTrackCount = (initialData: JsonValue) => {
   const primaryInfo = findFirstValue(initialData, "playlistSidebarPrimaryInfoRenderer");
+
   if (primaryInfo === undefined || !isRecord(primaryInfo) || !Array.isArray(primaryInfo.stats)) {
     return undefined;
   }
+
   for (const stat of primaryInfo.stats) {
     const match = getText(stat)?.match(/([\d,]+)\s+videos?/i);
+
     if (!match) continue;
     const count = Number(match[1]?.replaceAll(",", ""));
+
     if (Number.isFinite(count)) return count;
   }
+
   return undefined;
 };
 
@@ -276,12 +323,14 @@ const fetchContinuation = async (token: string, config: JsonRecord, signal: Abor
   const apiKey = config.INNERTUBE_API_KEY;
   const context = config.INNERTUBE_CONTEXT;
   const clientVersion = config.INNERTUBE_CLIENT_VERSION;
+
   if (!isString(apiKey) || !isRecord(context) || !isString(clientVersion)) {
     return undefined;
   }
 
   const endpoint = new URL("/youtubei/v1/browse", YOUTUBE_ORIGIN);
   endpoint.searchParams.set("key", apiKey);
+
   const response = await fetchYouTubeWithRetry(
     endpoint,
     {
@@ -297,15 +346,19 @@ const fetchContinuation = async (token: string, config: JsonRecord, signal: Abor
     },
     { stage: "continuation" },
   );
+
   if (!response.ok) throw new Error(`youtube.continuation_failed (${response.status})`);
+
   return Schema.decodeUnknownSync(jsonValueSchema)(await response.json());
 };
 
 const parseSourceUrl = (sourceUrl: string) => {
   const parsed = parseMediaLink(sourceUrl);
+
   if (parsed.provider !== "youtube" || parsed.kind !== "playlist") {
     throw new Error("youtube.playlist_url_required");
   }
+
   return parsed.playlistId;
 };
 
@@ -326,15 +379,20 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
     },
     { stage: "playlist" },
   );
+
   if (response.status === 404) throw playlistNotFound();
+
   if (!response.ok) throw new Error(`youtube.playlist_failed (${response.status})`);
   const html = await response.text();
   const initialData = extractYouTubeJsonObject(html, "var ytInitialData =")?.value;
+
   if (!initialData) throw new Error("youtube.initial_data");
   const config = getYouTubeConfig(html);
 
   const title = getPlaylistTitle(initialData);
+
   if (!title && hasErrorAlert(initialData)) throw playlistNotFound();
+
   if (!title) throw new Error("youtube.playlist_title");
 
   const tracks: YouTubeTrack[] = [];
@@ -342,24 +400,30 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
   collectTracks(initialData, seenVideoIds, tracks);
 
   const declaredTrackCount = getDeclaredTrackCount(initialData);
+
   if (declaredTrackCount === undefined || tracks.length < declaredTrackCount) {
     const pendingTokens: string[] = [];
     const visitedTokens = new Set<string>();
     collectContinuationTokens(initialData, pendingTokens);
+
     while (pendingTokens.length > 0 && visitedTokens.size < MAX_CONTINUATION_REQUESTS) {
       const token = pendingTokens.shift();
+
       if (!token || visitedTokens.has(token)) continue;
       visitedTokens.add(token);
 
       const continuation = await fetchContinuation(token, config, signal);
+
       if (!continuation) break;
       collectTracks(continuation, seenVideoIds, tracks);
+
       if (declaredTrackCount !== undefined && tracks.length >= declaredTrackCount) break;
       collectContinuationTokens(continuation, pendingTokens);
     }
   }
 
   if (tracks.length === 0) throw new Error("youtube.no_resolvable_tracks");
+
   const year = await Effect.runPromise(
     Effect.tryPromise({
       try: () => resolveYouTubeUploadYear(tracks[0]!.url, { config, signal }),
@@ -374,11 +438,13 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
               errorType: error instanceof Error ? error.name : "UnknownError",
             }),
           );
+
           return undefined;
         }),
       ),
     ),
   );
+
   const artist = tracks[0]!.artist;
 
   const playlist: YouTubePlaylist = {
@@ -389,6 +455,8 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
     coverUrl: getPlaylistCover(initialData),
     tracks,
   };
+
   if (year !== undefined) playlist.year = year;
+
   return playlist;
 };

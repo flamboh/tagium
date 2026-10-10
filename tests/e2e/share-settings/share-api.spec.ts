@@ -28,6 +28,7 @@ const uploadUntilAnswered = (headers: Record<string, string>, body: Uint8Array) 
       method: "POST",
       headers,
     });
+
     outgoing.on("response", (response) => {
       response.resume();
       resolve(response.statusCode ?? 0);
@@ -62,6 +63,7 @@ test("a playlist url becomes an album share without downloading any audio", asyn
     source: playlist.url,
     album: JSON.stringify({ title: "Renamed Album", artist: "Renamed Artist" }),
   });
+
   expect(response.status()).toBe(201);
   expect(response.headers()["cache-control"]).toBe("no-store");
   const share = (await response.json()) as CreatedShare;
@@ -150,6 +152,7 @@ test("a soundcloud set shares indefinitely with its genre, release year and an u
   const covered = await request.post("/api/shares", {
     multipart: { source: set.url, lifetime: "indefinite", cover: coverUpload("artwork") },
   });
+
   expect(covered.status()).toBe(201);
   const coveredShare = (await covered.json()) as CreatedShare;
   expect(
@@ -181,6 +184,7 @@ test("playlist shares reject bad sources, overrides, origins and fields", async 
     { source: playlist.url, lifetime: "forever" },
     { source: playlist.url, extra: "field" },
   ];
+
   for (const fields of invalidFields) {
     const response = await shareSource(request, fields);
     expect(noStoreStatus(response), JSON.stringify(fields)).toEqual({
@@ -188,20 +192,24 @@ test("playlist shares reject bad sources, overrides, origins and fields", async 
       cacheControl: "no-store",
     });
   }
+
   const crossSite = await request.post("/api/shares", {
     headers: { Origin: "https://evil.example" },
     multipart: { source: playlist.url },
   });
+
   expect(crossSite.status()).toBe(400);
   const json = await request.post("/api/shares", { data: { source: playlist.url } });
   expect(json.status()).toBe(400);
 
   const ip = randomIp();
   await upstreams.rateLimits.limit("SHARE_CREATE_RATE_LIMITER", ip, 0);
+
   const limited = await request.post("/api/shares", {
     headers: { "cf-connecting-ip": ip },
     multipart: { source: playlist.url },
   });
+
   expect(noStoreStatus(limited)).toEqual({ status: 429, cacheControl: "no-store" });
   expect(limited.headers()["retry-after"]).toBeUndefined();
   expect(
@@ -227,11 +235,13 @@ test("playlist shares reject an album override out of the manifest's range befor
       source: playlist.url,
       album: JSON.stringify(album),
     });
+
     expect(noStoreStatus(response), JSON.stringify(album).slice(0, 40)).toEqual({
       status: 400,
       cacheControl: "no-store",
     });
   }
+
   expect(await upstreams.calls({ route: /^(youtube|cobalt)/u })).toHaveLength(0);
 });
 
@@ -240,12 +250,14 @@ test("manifest updates keep the link and expiry, and only the permission holder 
   upstreams,
 }) => {
   const video = await upstreams.youtube.video();
+
   const manifest = albumManifest({
     title: "Original",
     artist: "A",
     artwork: "image/png",
     tracks: [{ video }],
   });
+
   const share = await createShare(request, manifest, "artwork");
   const before = await (await request.get(`/api/manifests/${share.slug}`)).json();
   expect(before.manifest.album.artwork).toMatchObject({ kind: "stored", format: "image/png" });
@@ -256,12 +268,14 @@ test("manifest updates keep the link and expiry, and only the permission holder 
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       multipart: fields,
     });
+
   const renamed = albumManifest({
     title: "Renamed",
     artist: "A",
     artwork: "image/png",
     tracks: [{ video }],
   });
+
   expect((await patch(undefined, { manifest: JSON.stringify(renamed) })).status()).toBe(404);
   expect((await patch("wrong", { manifest: JSON.stringify(renamed) })).status()).toBe(404);
   expect(
@@ -291,9 +305,11 @@ test("manifest updates keep the link and expiry, and only the permission holder 
     ).status(),
   ).toBe(200);
   expect((await request.get(`/api/manifests/${share.slug}/artwork`)).status()).toBe(404);
+
   const preview = await request.get(`/api/manifests/${share.slug}/preview-artwork`, {
     maxRedirects: 0,
   });
+
   expect(preview.status()).toBe(302);
   expect(preview.headers()["location"]).toBe(new URL("/icon-512.png", E2E_BASE_URL).href);
 
@@ -301,6 +317,7 @@ test("manifest updates keep the link and expiry, and only the permission holder 
     request.delete(`/api/manifests/${share.slug}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+
   expect((await revoke("wrong")).status()).toBe(404);
   expect((await revoke(share.revocationToken)).status()).toBe(204);
   expect((await revoke(share.revocationToken)).status()).toBe(204);
@@ -316,10 +333,12 @@ test("manifest publication validates its contract and origin before storing anyt
 }) => {
   const video = await upstreams.youtube.video();
   const valid = albumManifest({ title: "Valid", artist: "A", tracks: [{ video }] });
+
   const withTrack = (change: (track: (typeof valid)["tracks"][number]) => object) => ({
     ...valid,
     tracks: [change(valid.tracks[0]!)],
   });
+
   const post = (
     fields: Record<string, string | { name: string; mimeType: string; buffer: Buffer }>,
     headers = {},
@@ -342,6 +361,7 @@ test("manifest publication validates its contract and origin before storing anyt
       cacheControl: "no-store",
     });
   }
+
   expect((await post({ manifest: "{not json" })).status()).toBe(400);
   expect((await post({ manifest: JSON.stringify(valid), extra: "x" })).status()).toBe(400);
   const duplicate = new FormData();
@@ -356,6 +376,7 @@ test("manifest publication validates its contract and origin before storing anyt
   ).toBe(400);
   expect((await request.post("/api/manifests", { data: valid })).status()).toBe(400);
   const artwork = coverUpload("artwork");
+
   for (const buffer of [Buffer.from("not an image"), artwork.buffer.subarray(0, 64)]) {
     expect(
       (
@@ -395,6 +416,7 @@ test("share reads, creates, updates and revocations are rate limited per client"
   const share = await createShare(request, manifest);
   const ip = randomIp();
   const headers = { "cf-connecting-ip": ip };
+
   for (const binding of [
     "SHARE_CREATE_RATE_LIMITER",
     "SHARE_READ_RATE_LIMITER",
@@ -413,6 +435,7 @@ test("share reads, creates, updates and revocations are rate limited per client"
 
   const create = () =>
     request.post("/api/manifests", { headers, multipart: { manifest: JSON.stringify(manifest) } });
+
   expect((await create()).status()).toBe(201);
   expect(noStoreStatus(await create())).toEqual({ status: 429, cacheControl: "no-store" });
 
@@ -421,6 +444,7 @@ test("share reads, creates, updates and revocations are rate limited per client"
       headers: { ...headers, Authorization: `Bearer ${share.revocationToken}` },
       multipart: { manifest: JSON.stringify(manifest) },
     });
+
   expect((await update()).status()).toBe(200);
   expect((await update()).status()).toBe(429);
 
@@ -428,6 +452,7 @@ test("share reads, creates, updates and revocations are rate limited per client"
     request.delete(`/api/manifests/${share.slug}`, {
       headers: { ...headers, Authorization: `Bearer ${token}` },
     });
+
   expect((await revoke("wrong")).status()).toBe(404);
   expect((await revoke(share.revocationToken)).status()).toBe(429);
   expect((await request.get(`/api/manifests/${share.slug}`)).status()).toBe(200);

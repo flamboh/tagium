@@ -17,21 +17,27 @@ type RenderShareSocialCard = typeof renderShareSocialCardPng;
 export const createShareSocialCardHandler = (renderSocialCard: RenderShareSocialCard) =>
   defineHandler(async (event) => {
     const request = event.req;
+
     if (!(await admitShareRead(request))) {
       return new Response(null, { status: 429, headers: noStore });
     }
+
     const store = getShareStore(request);
+
     if (!store) return infrastructureFailure();
 
     try {
       const slug = event.context.params?.slug ?? "";
       const manifestResult = await store.load(slug);
+
       if (manifestResult.kind !== "available") return unavailable();
 
       let artwork: ShareSocialCardArtwork | undefined;
+
       if (manifestArtwork(manifestResult.manifest)) {
         try {
           const artworkResult = await store.loadArtwork(slug);
+
           if (
             artworkResult.kind === "available" &&
             (artworkResult.artwork.type === "image/jpeg" ||
@@ -46,7 +52,9 @@ export const createShareSocialCardHandler = (renderSocialCard: RenderShareSocial
           // Artwork is optional for the social card; the renderer supplies the favicon fallback.
         }
       }
+
       const png = await renderSocialCard(manifestResult.manifest, artwork);
+
       return new Response(Uint8Array.from(png).buffer, {
         headers: {
           ...noStore,

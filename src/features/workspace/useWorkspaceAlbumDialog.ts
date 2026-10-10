@@ -55,11 +55,13 @@ export const useWorkspaceAlbumDialog = ({
     undefined,
     createAlbumDialogState,
   );
+
   const [deletionDialog, setDeletionDialog] = useState<{
     open: boolean;
     albumId: string | null;
     returnFocusTarget: HTMLButtonElement | null;
   }>({ open: false, albumId: null, returnFocusTarget: null });
+
   const editorRef = useRef(editor);
   const settingsRef = useRef(settings);
   const removeDownloadsRef = useRef(removeDownloads);
@@ -85,6 +87,7 @@ export const useWorkspaceAlbumDialog = ({
   const removeAlbum = useCallback(
     (albumId: string) => {
       const album = library.getSnapshot().albums.find((entry) => entry.id === albumId);
+
       if (!album) return;
       removeDownloadsRef.current(album.trackIds);
       library.dispatch({ type: "album-removed", albumId });
@@ -94,30 +97,39 @@ export const useWorkspaceAlbumDialog = ({
 
   const save = useCallback(() => {
     const submission = getAlbumDialogSubmission(dialog);
+
     if (!submission) return;
     const snapshot = library.getSnapshot();
+
     if (submission.mode === "edit") {
       const currentAlbum = snapshot.albums.find((album) => album.id === submission.albumId);
+
       const updatedAlbums = updateAlbumMetadata(
         snapshot.albums,
         submission.albumId,
         submission.metadata,
       );
+
       const updatedAlbum = updatedAlbums.find((album) => album.id === submission.albumId) ?? null;
       let finalFiles = snapshot.files;
+
       if (updatedAlbum) {
         const bufferedFiles = editorRef.current.commands.flush(updatedAlbum.trackIds);
+
         const shouldSyncCover =
           Boolean(updatedAlbum.cover?.length) &&
           areAlbumTrackCoversSynced(bufferedFiles, updatedAlbum.trackIds, currentAlbum?.cover);
+
         let taggedFiles = applyAlbumSharedTagsToFiles(
           bufferedFiles,
           updatedAlbum,
           settingsRef.current,
         );
+
         if (settingsRef.current.syncFilenames) {
           taggedFiles = applySyncedFilenamesToFiles(taggedFiles, updatedAlbum.trackIds);
         }
+
         if (shouldSyncCover && updatedAlbum.cover) {
           const covered = applyAlbumCoverToFilesWithSelectedMetadata(
             taggedFiles,
@@ -126,14 +138,18 @@ export const useWorkspaceAlbumDialog = ({
             library.getSnapshot().selectedFileId,
             settingsRef.current,
           );
+
           taggedFiles = covered.files;
+
           if (covered.selectedMetadata) {
             editorRef.current.form.reset(covered.selectedMetadata);
           }
         }
+
         const selectedMetadata = taggedFiles.find(
           (file) => file.id === library.getSnapshot().selectedFileId,
         )?.metadata;
+
         if (selectedMetadata) editorRef.current.form.reset(selectedMetadata);
         finalFiles = taggedFiles;
         analytics.capture({
@@ -142,8 +158,10 @@ export const useWorkspaceAlbumDialog = ({
           hasCover: Boolean(updatedAlbum.cover?.length),
         });
       }
+
       library.dispatch({ type: "content-replaced", files: finalFiles, albums: updatedAlbums });
       dispatchDialog({ type: "saved" });
+
       return;
     }
 
@@ -154,7 +172,9 @@ export const useWorkspaceAlbumDialog = ({
       submission.metadata,
       settingsRef.current,
     );
+
     let finalFiles = snapshot.files;
+
     if (created.syncAlbums.length > 0) {
       finalFiles = applyTrackOrderNumbersToFiles(
         finalFiles,
@@ -163,14 +183,17 @@ export const useWorkspaceAlbumDialog = ({
         settingsRef.current,
       );
     }
+
     if (created.newAlbumId) {
       const createdAlbum = created.albums.find((album) => album.id === created.newAlbumId);
+
       if (createdAlbum) {
         const taggedFiles = applyAlbumSharedTagsToFiles(
           finalFiles,
           createdAlbum,
           settingsRef.current,
         );
+
         finalFiles = settingsRef.current.syncFilenames
           ? applySyncedFilenamesToFiles(taggedFiles, createdAlbum.trackIds)
           : taggedFiles;
@@ -181,18 +204,21 @@ export const useWorkspaceAlbumDialog = ({
         });
       }
     }
+
     const replacement: Extract<LibraryAction, { type: "content-replaced" }> = {
       type: "content-replaced",
       files: finalFiles,
       albums: created.albums,
       looseTrackIds: created.looseTrackIds,
     };
+
     if (created.newAlbumId) {
       replacement.selection = {
         selectedAlbumId: created.newAlbumId,
         selectedFileId: submission.seedTrackIds[0] ?? null,
       };
     }
+
     library.dispatch(replacement);
     dispatchDialog({ type: "saved" });
   }, [dialog, library]);
@@ -200,8 +226,10 @@ export const useWorkspaceAlbumDialog = ({
   const syncCover = useCallback(() => {
     if (dialog.mode !== "edit" || !dialog.editingAlbumId || !dialog.draft.cover?.length) return;
     const album = library.getSnapshot().albums.find((entry) => entry.id === dialog.editingAlbumId);
+
     if (!album) return;
     const bufferedFiles = editorRef.current.commands.flush(album.trackIds);
+
     const covered = applyAlbumCoverToFilesWithSelectedMetadata(
       bufferedFiles,
       album.trackIds,
@@ -209,16 +237,20 @@ export const useWorkspaceAlbumDialog = ({
       library.getSnapshot().selectedFileId,
       settingsRef.current,
     );
+
     library.dispatch({ type: "content-replaced", files: covered.files });
+
     if (covered.selectedMetadata) {
       editorRef.current.form.reset(covered.selectedMetadata);
     }
   }, [dialog, library]);
 
   const editingAlbumId = dialog.mode === "edit" ? dialog.editingAlbumId : null;
+
   const deletingAlbum = deletionDialog.albumId
     ? library.state.albums.find((album) => album.id === deletionDialog.albumId)
     : undefined;
+
   return {
     dialogProps: {
       instanceKey: dialog.open ? (editingAlbumId ?? `create:${dialog.placeholderSeed}`) : "closed",
@@ -241,6 +273,7 @@ export const useWorkspaceAlbumDialog = ({
       onConfirm: () => {
         const albumId = deletionDialog.albumId;
         setDeletionDialog((current) => ({ ...current, open: false }));
+
         if (albumId) removeAlbum(albumId);
       },
     },
@@ -251,19 +284,23 @@ export const useWorkspaceAlbumDialog = ({
       },
       onEditAlbum: (albumId) => {
         const album = library.getSnapshot().albums.find((entry) => entry.id === albumId);
+
         if (album) dispatchDialog({ type: "edit-opened", album });
       },
       onDeleteAlbum: (albumId, returnFocusTarget) => {
         const album = library.getSnapshot().albums.find((entry) => entry.id === albumId);
+
         if (album) setDeletionDialog({ open: true, albumId, returnFocusTarget });
       },
       onPromptCreateAlbumFromLooseTracks: (sourceTrackId, targetTrackId) => {
         if (sourceTrackId === targetTrackId) return;
         editorRef.current.commands.flush();
         const idSet = new Set([sourceTrackId, targetTrackId]);
+
         const orderedIds = library
           .getSnapshot()
           .looseTrackIds.filter((trackId) => idSet.has(trackId));
+
         if (orderedIds.length >= 2) openCreate(orderedIds);
       },
     },
