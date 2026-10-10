@@ -49,8 +49,20 @@ URL imports need a Cobalt instance. Point `COBALT_API_URL` at one, or run a loca
 with `bun run dev:cobalt`. Share links stay off unless `VITE_PUBLIC_SHARE_LINKS_ENABLED=true`
 and their Cloudflare bindings are present.
 
-Deploys go through Cloudflare Workers Builds; `bun run deploy:preview` and
-`deploy:production` exist for manual uploads.
+### CI and deploys
+
+- Every pull request runs **Verify Build** (`vp check`, `vp test`, `vp build`). The chromium e2e
+  suite only runs on pull requests labeled `e2e`, and reruns on each push while the label stays.
+- Production deploys only from **Test and deploy production** (`.github/workflows/deploy.yaml`).
+  On every push to `main` it runs `vp check`, `vp test` and the e2e suite on chromium and firefox,
+  then deploys the `tagium` Worker with `bun run deploy:production`. WebKit runs alongside but
+  doesn't block the deploy. A newer push to `main` cancels the in-flight run, so only the newest
+  commit deploys.
+- Cloudflare Workers Builds only uploads branch preview versions.
+- **Live smoke** (`tests/live`) hits real YouTube and SoundCloud through tagium.app. It runs after
+  each Cobalt deploy to Fly.io, and on demand from the Actions tab with an optional `base_url`.
+  It never runs on pull requests.
+- `bun run deploy:preview` and `deploy:production` still work for manual uploads.
 
 Isolated preview stages are declared in `alchemy.run.ts`. Each stage gets its own Worker, D1
 database, and R2 bucket on a workers.dev URL, plus its own Cobalt Fly app,

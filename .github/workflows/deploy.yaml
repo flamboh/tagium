@@ -1,0 +1,145 @@
+name: Test and deploy production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tagium-production
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
+
+      - run: vp install
+      - run: vp check
+      - run: vp test
+
+  e2e:
+    name: E2E (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: true
+      matrix:
+        browser:
+          - chromium
+          - firefox
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
+
+      - run: vp install
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('bun.lock') }}
+
+      - run: vp exec playwright install --with-deps ${{ matrix.browser }}
+      - run: vp exec playwright test --project ${{ matrix.browser }}
+        env:
+          E2E_BROWSERS: all
+
+      - name: Upload e2e diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: e2e-${{ matrix.browser }}-results
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e_webkit:
+    name: E2E (webkit, non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
+
+      - run: vp install
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-webkit-${{ hashFiles('bun.lock') }}
+
+      - run: vp exec playwright install --with-deps webkit
+      - run: vp exec playwright test --project webkit
+        env:
+          E2E_BROWSERS: all
+
+      - name: Upload e2e diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: e2e-webkit-results
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  deploy:
+    name: Deploy production Worker
+    needs:
+      - verify
+      - e2e
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://tagium.app
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
+
+      - run: vp install
+
+      - name: Build production Worker
+        env:
+          VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
+          VITE_PUBLIC_POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+        run: |
+          test -n "$VITE_PUBLIC_POSTHOG_KEY" || { echo "::error::POSTHOG_PROJECT_KEY is not set on the production environment"; exit 1; }
+          test -n "$VITE_PUBLIC_POSTHOG_HOST" || { echo "::error::POSTHOG_HOST is not set on the production environment"; exit 1; }
+          bun run build:cloudflare
+
+      - name: Deploy Worker
+        run: bun run deploy:production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
