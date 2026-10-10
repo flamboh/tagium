@@ -9,7 +9,7 @@ import {
   type CobaltPickerItem,
   type CobaltVideoDownloadRequest,
 } from "./cobaltDownloadSchemas";
-import { outputFormatFromFilename } from "./ffmpegArgs";
+import { makeMetadataFfmpegArgs, outputFormatFromFilename } from "./ffmpegArgs";
 
 /** The browser-facing Cobalt request accepted by the downloader. */
 export type VideoDownloadRequest = CobaltVideoDownloadRequest;
@@ -19,12 +19,13 @@ export type VideoDownloadPlan = CobaltDownloadPlan;
 import {
   adoptTemporaryFileLease,
   createTemporaryFileStore,
+  startTemporaryStorageSession,
   type TemporaryFileLease,
 } from "./storage";
 import type {
   VideoWorkerMessage,
   VideoWorkerCancelRequest,
-  VideoWorkerProcessingRequest,
+  VideoWorkerJob,
   VideoWorkerProgress,
 } from "./cobaltVideoProcessingWorker";
 
@@ -362,6 +363,12 @@ const fetchTunnelFile = async (
 const localPlanMediaInputCount = (plan: CobaltLocalProcessingPlan) =>
   plan.output.subtitles ? plan.tunnel.length - 1 : plan.tunnel.length;
 
+const copiesTunnelDirectly = (plan: CobaltLocalProcessingPlan) =>
+  plan.type === "proxy" &&
+  !plan.audio &&
+  (plan.output.type.startsWith("image/") ||
+    makeMetadataFfmpegArgs(plan.output.metadata).length === 0);
+
 const pickerTypeDefaults: Record<
   CobaltPickerItem["type"],
   { extension: string; contentType: string }
@@ -452,6 +459,7 @@ const decodeWorkerMessage = (value: unknown): VideoWorkerMessage | undefined => 
 const runLocalProcessingWorker = (
   plan: CobaltLocalProcessingPlan,
   files: File[],
+  temporaryStorageSession: string,
   sourceUrl: string,
   callbacks: VideoDownloadCallbacks | undefined,
   signal: AbortSignal,
@@ -552,7 +560,7 @@ const runLocalProcessingWorker = (
       );
     };
 
-    const request: VideoWorkerProcessingRequest = { files, plan };
+    const request: VideoWorkerJob = { files, plan, temporaryStorageSession };
     try {
       worker.postMessage({ cobaltVideoProcessing: request });
     } catch (error) {
@@ -611,7 +619,7 @@ const executePlan = async (
   }
 
   validateLocalPlan(plan);
-  if (plan.type === "proxy") {
+  if (copiesTunnelDirectly(plan)) {
     const tunnel = plan.tunnel[0];
     if (!tunnel) {
       throw new VideoDownloadError("processing", "cobalt proxy response is missing its tunnel.");
@@ -654,6 +662,7 @@ const executePlan = async (
     const outputLease = await runLocalProcessingWorker(
       plan,
       inputLeases.map((lease) => lease.value),
+      await startTemporaryStorageSession(),
       request.sourceUrl,
       callbacks,
       signal,

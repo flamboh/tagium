@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { resetCobaltDownloadSchedulerForTests } from "@/shared/cobalt/cobaltDownloadScheduler";
+import { resetTemporaryStorageSessionForTests } from "@/apps/tagium-save/download/storage";
 import {
   downloadVideoPickerItem,
   executeVideoDownload,
@@ -26,7 +27,7 @@ const workerOutputEntryName = "tagium-video-output-worker";
 const installFakeOpfs = () => {
   const removedEntries: string[] = [];
   const entries = new Map<string, Uint8Array>();
-  const root = {
+  const sessionDirectory = {
     getFileHandle: async (name: string) => ({
       createWritable: async () => ({
         write: async (write: { position?: number; data?: BufferSource }) => {
@@ -56,8 +57,10 @@ const installFakeOpfs = () => {
       entries.delete(name);
     }),
   };
+  const temporaryDirectory = { getDirectoryHandle: async () => sessionDirectory };
+  const root = { getDirectoryHandle: async () => temporaryDirectory };
   vi.stubGlobal("navigator", { storage: { getDirectory: async () => root } });
-  return { entries, removedEntries, root };
+  return { entries, removedEntries, sessionDirectory };
 };
 
 const installControllableWorker = () => {
@@ -100,6 +103,7 @@ const installControllableWorker = () => {
 
 afterEach(() => {
   resetCobaltDownloadSchedulerForTests();
+  resetTemporaryStorageSessionForTests();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -349,6 +353,55 @@ describe("video download routing", () => {
     expect(removedEntries).toHaveLength(3);
     expect(removedEntries.filter((name) => name === workerOutputEntryName)).toHaveLength(1);
     expect(entries.has(workerOutputEntryName)).toBe(false);
+  });
+
+  it("tags proxied source audio through local processing", async () => {
+    vi.useFakeTimers();
+    const { entries } = installFakeOpfs();
+    const WorkerFake = installControllableWorker();
+    const fetchMock = vi.fn(
+      async () => new Response("input", { headers: { "Content-Type": "audio/webm" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const download = executeVideoDownload({
+      status: "local-processing",
+      type: "proxy",
+      tunnel: ["/api/cobalt/tunnel?id=audio", "/api/cobalt/tunnel?id=cover"],
+      output: { type: "audio/ogg", filename: "clip.opus", metadata: { title: "title" } },
+      audio: { copy: false, format: "opus", bitrate: "128", cover: true },
+    });
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(WorkerFake.instance?.postMessage).toHaveBeenCalledWith({
+      cobaltVideoProcessing: expect.objectContaining({
+        plan: expect.objectContaining({ type: "proxy" }),
+        temporaryStorageSession: expect.any(String),
+      }),
+    });
+    entries.set(workerOutputEntryName, new TextEncoder().encode("processed"));
+    WorkerFake.instance?.complete();
+    const result = await download;
+    expect(result.status === "file" && result.file.name).toBe("clip.opus");
+  });
+
+  it("copies untagged proxied media without local processing", async () => {
+    const WorkerFake = installControllableWorker();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("photo", { headers: { "Content-Type": "image/jpeg" } })),
+    );
+
+    const result = await executeVideoDownload({
+      status: "local-processing",
+      type: "proxy",
+      tunnel: ["/api/cobalt/tunnel?id=photo"],
+      output: { type: "image/jpeg", filename: "photo.jpg" },
+    });
+
+    expect(WorkerFake.instance).toBeUndefined();
+    expect(result.status === "file" && (await result.file.text())).toBe("photo");
   });
 
   it("releases local-processing inputs when the worker fails", async () => {

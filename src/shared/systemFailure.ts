@@ -75,6 +75,14 @@ const KNOWN_FAILURES = {
     retryable: false,
     dedupeKey: "system-download-unsupported-source",
   },
+  drm_protected: {
+    code: "unsupported_source",
+    title: "this media is drm-protected",
+    description: "tagium can't download drm-protected media. try another link.",
+    trackDescription: "this media is drm-protected and can't be downloaded.",
+    retryable: false,
+    dedupeKey: "system-download-drm-protected",
+  },
   private_or_missing: {
     code: "private_or_missing",
     title: "we could not access this media",
@@ -154,10 +162,13 @@ const errorMessage = (cause: unknown) => {
 };
 
 const COBALT_UNSUPPORTED_CODES = [
+  "error.api.link.invalid",
   "error.api.link.unsupported",
   "error.api.service.unsupported",
   "error.api.service.audio_not_supported",
 ] as const;
+
+const COBALT_DRM_CODES = ["error.api.soundcloud.maybe_drm", "error.api.youtube.drm"] as const;
 
 const COBALT_PRIVATE_OR_MISSING_CODES = [
   "error.api.content.post.private",
@@ -192,6 +203,7 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
   ) {
     return KNOWN_FAILURES.service_unavailable;
   }
+  if (COBALT_DRM_CODES.some((code) => lower.includes(code))) return KNOWN_FAILURES.drm_protected;
   if (
     COBALT_UNSUPPORTED_CODES.some((code) => lower.includes(code)) ||
     lower.includes("unsupported url") ||

@@ -70,8 +70,8 @@ import { mediaLinkKindFromUrl } from "@/lib/media-link";
  * settings, select an item when needed, then download it from the short recent list. FIRST VIEWPORT:
  * the wordmark sits above the standalone URL form in the same narrow centered column, with settings
  * beside the URL field, while the theme toggle and quiet attribution mirror each other at the top
- * and bottom; flex spacers center the column while reserving room below for the recent list and
- * pinned attribution, easing the column upward as the viewport shrinks. FORM: a direct landing
+ * and bottom; a flex spacer and the downloads region center the column while reserving room below
+ * for the recent list above the attribution, easing the column upward as the viewport shrinks. FORM: a direct landing
  * form with one compact popover and inline state rows.
  */
 
@@ -841,7 +841,7 @@ function TagiumSaveView({
   state,
 }: TagiumSaveViewProps) {
   return (
-    <main className="relative flex h-svh min-h-0 flex-col items-center overflow-y-auto p-8 max-lg:[@media(max-height:700px)]:p-4">
+    <main className="relative flex h-svh min-h-0 flex-col items-center overflow-y-auto p-8 max-sm:pb-4 max-lg:[@media(max-height:700px)]:p-4">
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {completionAnnouncement && (
           <span key={completionAnnouncement.id}>
@@ -850,83 +850,81 @@ function TagiumSaveView({
         )}
       </span>
       <SaveThemeToggle />
-      {/* Spacers center the column when there is room; the bottom one reserves space for the
-          recent list and pinned attribution so the layout shifts up continuously as the
-          viewport shrinks, and the top cap keeps phones anchored high. */}
+      {/* The top spacer and the downloads region share the free height to center the column; the
+          region reserves room for the recent list so the layout shifts up continuously as the
+          viewport shrinks, grows past that when its content needs more room, and keeps the
+          attribution below it. The top cap keeps phones anchored high. */}
       <div aria-hidden className="pointer-events-none min-h-12 w-full flex-1 max-sm:max-h-28" />
       <div className="page-enter [--page-enter-delay:60ms] flex w-full max-w-md flex-col items-center gap-10 max-lg:[@media(max-height:700px)]:gap-6">
         <TagiumBrand product="save" />
 
-        <div className="h-14 w-full shrink-0" data-save-download-stage>
-          <div className="w-full">
-            <div className="relative z-10 bg-background">
-              <MediaUrlEntry
-                layout="standalone"
-                controller={controller}
-                leadingAction={
-                  <DownloadSettings
-                    settings={settings}
-                    disabled={state.kind === "working" || state.kind === "picker"}
-                    onChange={onSettingsChange}
-                  />
-                }
-                placeholder="paste a media link"
-                submitAriaLabel="start video download"
-                animateSubmitIcon
+        <div className="relative z-10 h-14 w-full shrink-0 bg-background" data-save-download-stage>
+          <MediaUrlEntry
+            layout="standalone"
+            controller={controller}
+            leadingAction={
+              <DownloadSettings
+                settings={settings}
+                disabled={state.kind === "working" || state.kind === "picker"}
+                onChange={onSettingsChange}
               />
-            </div>
-
-            <div className="flow-root h-9" data-save-download-progress-slot>
-              {state.kind === "working" && (
-                <ProgressRow phase={state.phase} progress={state.progress} onCancel={onCancel} />
-              )}
-              {state.kind === "error" && (
-                <ErrorRow
-                  message={state.message}
-                  onRetry={state.retryable ? onRetry : undefined}
-                  onReset={onReset}
-                />
-              )}
-            </div>
-
-            {state.kind === "picker" && (
-              <PickerChoices
-                result={state.result}
-                onSelect={(item) => void onPickerItem(state.result, item)}
-                onSelectAudio={() => void onPickerAudio(state.result)}
+            }
+            placeholder="paste a media link"
+            submitAriaLabel="start video download"
+            animateSubmitIcon
+          />
+        </div>
+      </div>
+      <div className="page-enter [--page-enter-delay:60ms] flex w-full max-w-md flex-1 flex-col">
+        <div className="min-h-[17.25rem] w-full pb-5">
+          <div className="flow-root h-9" data-save-download-progress-slot>
+            {state.kind === "working" && (
+              <ProgressRow phase={state.phase} progress={state.progress} onCancel={onCancel} />
+            )}
+            {state.kind === "error" && (
+              <ErrorRow
+                message={state.message}
+                onRetry={state.retryable ? onRetry : undefined}
                 onReset={onReset}
               />
             )}
-
-            <RecentDownloads downloads={recentDownloads} onDownload={onDownload} />
-
-            <footer
-              data-save-attribution
-              className="absolute inset-x-4 bottom-4 text-center text-xs leading-5 text-muted-foreground sm:inset-x-8 sm:bottom-8"
-            >
-              made by{" "}
-              <a
-                href="https://x.com/flambohh"
-                target="_blank"
-                rel="noreferrer"
-                className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                flamboh
-              </a>
-              , powered by{" "}
-              <a
-                href="https://cobalt.tools/"
-                target="_blank"
-                rel="noreferrer"
-                className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                cobalt
-              </a>
-            </footer>
           </div>
+
+          {state.kind === "picker" && (
+            <PickerChoices
+              result={state.result}
+              onSelect={(item) => void onPickerItem(state.result, item)}
+              onSelectAudio={() => void onPickerAudio(state.result)}
+              onReset={onReset}
+            />
+          )}
+
+          <RecentDownloads downloads={recentDownloads} onDownload={onDownload} />
         </div>
       </div>
-      <div aria-hidden className="pointer-events-none min-h-[18.5rem] w-full flex-1" />
+      <footer
+        data-save-attribution
+        className="page-enter [--page-enter-delay:60ms] w-full shrink-0 text-center text-xs leading-5 text-muted-foreground"
+      >
+        made by{" "}
+        <a
+          href="https://x.com/flambohh"
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          flamboh
+        </a>
+        , powered by{" "}
+        <a
+          href="https://cobalt.tools/"
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          cobalt
+        </a>
+      </footer>
     </main>
   );
 }
