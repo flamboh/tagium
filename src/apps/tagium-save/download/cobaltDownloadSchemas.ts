@@ -48,13 +48,13 @@ export interface CobaltVideoDownloadRequest {
 
 export type CobaltVideoDownloadRequestBody = {
   url: string;
-  audioBitrate: CobaltAudioBitrate;
-  audioFormat: CobaltAudioFormat;
+  audioBitrate?: CobaltAudioBitrate;
+  audioFormat?: CobaltAudioFormat;
   downloadMode: CobaltDownloadMode;
   filenameStyle: CobaltFilenameStyle;
-  youtubeVideoCodec: CobaltVideoCodec;
-  youtubeVideoContainer: CobaltVideoContainer;
-  videoQuality: CobaltVideoQuality;
+  youtubeVideoCodec?: CobaltVideoCodec;
+  youtubeVideoContainer?: CobaltVideoContainer;
+  videoQuality?: CobaltVideoQuality;
   localProcessing: "forced";
   alwaysProxy: true;
   youtubeDubLang?: string;
@@ -71,16 +71,21 @@ export const makeCobaltVideoDownloadRequestBody = (
 ): CobaltVideoDownloadRequestBody => {
   const body: CobaltVideoDownloadRequestBody = {
     url: request.sourceUrl,
-    audioBitrate: request.audioBitrate ?? "128",
-    audioFormat: request.audioFormat ?? "best",
     downloadMode: request.downloadMode ?? "auto",
     filenameStyle: request.filenameStyle ?? "pretty",
-    youtubeVideoCodec: request.youtubeVideoCodec ?? "h264",
-    youtubeVideoContainer: request.youtubeVideoContainer ?? "auto",
-    videoQuality: request.videoQuality ?? "1080",
     localProcessing: "forced",
     alwaysProxy: true,
   };
+
+  if (body.downloadMode !== "audio") {
+    body.youtubeVideoCodec = request.youtubeVideoCodec ?? "h264";
+    body.youtubeVideoContainer = request.youtubeVideoContainer ?? "auto";
+    body.videoQuality = request.videoQuality ?? "1080";
+  }
+  if (body.downloadMode !== "mute") {
+    body.audioBitrate = request.audioBitrate ?? "128";
+    body.audioFormat = request.audioFormat ?? "best";
+  }
 
   if (request.youtubeDubLang !== undefined) body.youtubeDubLang = request.youtubeDubLang;
   if (request.subtitleLang !== undefined) body.subtitleLang = request.subtitleLang;

@@ -194,9 +194,21 @@ const removeAbandonedSessions = async (currentSessionId: string) => {
   );
 };
 
+const removeLooseRootEntries = async () => {
+  const root = await getOpfsRoot();
+  if (!root) return;
+
+  const names: string[] = [];
+  for await (const name of root.keys()) {
+    if (name !== temporaryDirectoryName) names.push(name);
+  }
+  await Promise.allSettled(names.map((name) => root.removeEntry(name, { recursive: true })));
+};
+
 const openOwnedSession = async (): Promise<TemporaryStorageSession> => {
   const id = randomIdentifier();
   const { directory, locked } = await claimSessionDirectory(id);
+  await removeLooseRootEntries().catch(() => undefined);
   if (locked) await removeAbandonedSessions(id).catch(() => undefined);
   return { id, directory };
 };

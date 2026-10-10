@@ -1,3 +1,4 @@
+import { inspectAudio } from "../support/audio";
 import type { Page } from "@playwright/test";
 import { FAKE_COBALT_ORIGIN } from "../harness/protocol.ts";
 import type { Upstreams } from "../support/upstreams";
@@ -207,6 +208,37 @@ test("retries a busy download after the advertised wait and saves it", async ({
     IMPORT_TIMEOUT,
   );
   await expect(save.alert).toHaveCount(0);
+});
+
+test("retries a failed save using the current download settings", async ({ page, upstreams }) => {
+  const video = await upstreams.youtube.video({ title: "New Settings", author: "Queue" });
+  await upstreams.cobalt.capacity(video.url, { times: 1 });
+  const save = saveApp(page);
+
+  await save.open();
+  await save.start(video.url);
+  await expect(save.retry).toBeVisible(IMPORT_TIMEOUT);
+  await save.configure({ mode: "audio", audio: "mp3" });
+  await save.retry.click();
+
+  await expect
+    .poll(async () => (await upstreams.calls({ route: "cobalt.resolve" })).length)
+    .toBe(2);
+  const requests = (await upstreams.calls({ route: "cobalt.resolve" })).map((call) =>
+    JSON.parse(call.requestBody!),
+  );
+  expect(requests[0]).toMatchObject({ url: video.url, downloadMode: "auto" });
+  expect.soft(requests[1]).toMatchObject({
+    url: video.url,
+    downloadMode: "audio",
+    audioFormat: "mp3",
+  });
+
+  const filename = "New Settings - Queue (youtube).mp3";
+  await expect(save.downloadButton(filename)).toBeVisible(IMPORT_TIMEOUT);
+  const { format, metadata } = await inspectAudio(await save.download(filename));
+  expect(format).toBe("mp3");
+  expect(metadata).toMatchObject({ title: "New Settings", artist: "Queue" });
 });
 
 test("retries media that was busy to fetch and saves it", async ({ page, upstreams }) => {

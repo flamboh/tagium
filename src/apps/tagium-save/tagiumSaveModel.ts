@@ -76,12 +76,17 @@ export const presentVideoDownloadFailure = (error: Error): SystemFailurePresenta
 export const buildVideoDownloadRequest = (
   sourceUrl: string,
   settings: VideoDownloadSettings,
-): CobaltVideoDownloadRequest => ({
-  sourceUrl,
-  downloadMode: settings.mode,
-  videoQuality: settings.quality,
-  youtubeVideoContainer: settings.container,
-  youtubeVideoCodec: settings.codec,
-  audioFormat: settings.audioFormat,
-  filenameStyle: "pretty",
-});
+): CobaltVideoDownloadRequest => {
+  const request: CobaltVideoDownloadRequest = {
+    sourceUrl,
+    downloadMode: settings.mode,
+    filenameStyle: "pretty",
+  };
+  if (settings.mode !== "audio") {
+    request.videoQuality = settings.quality;
+    request.youtubeVideoContainer = settings.container;
+    request.youtubeVideoCodec = settings.codec;
+  }
+  if (settings.mode !== "mute") request.audioFormat = settings.audioFormat;
+  return request;
+};
