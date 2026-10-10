@@ -22,12 +22,21 @@ const isEditableTarget = (target: EventTarget | null) => {
   );
 };
 
+const LAYER_SELECTOR = "[role='dialog'], [role='alertdialog'], [role='menu']";
+const MODAL_LAYER_SELECTOR =
+  "[aria-modal='true'], [role='alertdialog'], [data-slot='dialog-content'], [data-slot='dropdown-menu-content']";
+
+const isLayerEvent = (event: KeyboardEvent) =>
+  event.defaultPrevented ||
+  (event.target instanceof Element && event.target.closest(LAYER_SELECTOR) !== null) ||
+  document.querySelector(MODAL_LAYER_SELECTOR) !== null;
+
 const handleEditorKeyboardShortcut = (
   event: KeyboardEvent,
   actions: EditorKeyboardShortcutActions,
 ) => {
   if (actions.enabled === false) return;
-  if (isEditableTarget(event.target)) return;
+  if (isEditableTarget(event.target) || isLayerEvent(event)) return;
 
   if ((event.ctrlKey || event.metaKey) && event.key === "a") {
     event.preventDefault();

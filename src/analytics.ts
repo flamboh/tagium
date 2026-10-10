@@ -46,6 +46,9 @@ export type ImportFailureCode =
   | "empty_response"
   | "parse_failed"
   | "metadata_write_failed"
+  | "unsupported_source"
+  | "private_or_missing"
+  | "invalid_response"
   | "unknown";
 export type CobaltTunnelOutcome = "ready" | "recovered" | "exhausted" | "non_retryable";
 export type CobaltTunnelElapsedBucket =

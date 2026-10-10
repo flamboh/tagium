@@ -1,0 +1,45 @@
+name: Live smoke
+
+on:
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Site to test
+        required: false
+        default: https://tagium.app
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tagium-live-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Real youtube and soundcloud imports
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: .node-version
+          cache: true
+
+      - run: vp install
+      - run: vp exec playwright install --with-deps chromium
+      - run: vp exec playwright test -c playwright.live.config.ts
+        env:
+          LIVE_BASE_URL: ${{ inputs.base_url || 'https://tagium.app' }}
+
+      - name: Upload live smoke diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: live-smoke-results
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 14

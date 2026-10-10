@@ -224,6 +224,7 @@ export default function TagSidebarPanel({
 
       <TagSidebarFooter
         files={files}
+        filenamePreviewStore={filenamePreviewStore}
         loading={loading}
         settingsOpen={settingsOpen}
         onDownloadAll={onDownloadAll}

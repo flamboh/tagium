@@ -3,6 +3,7 @@ import type { AudioMetadata } from "@/features/library/types";
 export const MAX_COVER_ART_EDGE = 1_600;
 export const MAX_COVER_ART_PIXELS = 16_000_000;
 export const MAX_COVER_ART_UPLOAD_BYTES = 25 * 1024 * 1024;
+const CROPPED_COVER_ART_EDGE = 720;
 const COVER_ART_REENCODE_THRESHOLD_BYTES = 2 * 1024 * 1024;
 const COVER_ART_HEADER_BYTES = 1024 * 1024;
 const supportedCoverArtTypes = new Set(["image/jpeg", "image/jpg", "image/png"]);
@@ -140,6 +141,35 @@ export const optimizeCoverArt = async (file: File) => {
     return new File([blob], outputType === "image/png" ? "cover.png" : "cover.jpg", {
       type: outputType,
     });
+  } finally {
+    image.close();
+  }
+};
+
+export const cropCoverArtToSquare = async (file: File, edge = CROPPED_COVER_ART_EDGE) => {
+  const image = await createImageBitmap(file);
+
+  try {
+    const side = Math.min(image.width, image.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = edge;
+    canvas.height = edge;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("could not crop cover art.");
+    context.drawImage(
+      image,
+      (image.width - side) / 2,
+      (image.height - side) / 2,
+      side,
+      side,
+      0,
+      0,
+      edge,
+      edge,
+    );
+
+    const blob = await canvasToBlob(canvas, "image/jpeg");
+    return new File([blob], "cover.jpg", { type: "image/jpeg" });
   } finally {
     image.close();
   }

@@ -198,7 +198,7 @@ export const useTrackEditorSession = ({
         const filenameBase = sanitizeFilenameBase(value);
         filenamePreviewStore.set(
           selectedId,
-          filenameBase ? audioFilename(filenameBase, getAudioFormat(currentFile)) : undefined,
+          filenameBase ? audioFilename(filenameBase, getAudioFormat(currentFile)) : "",
         );
       }
     }
@@ -254,8 +254,10 @@ export const useTrackEditorSession = ({
         settingsRef.current.syncFilenames,
         settingsRef.current.metadataLinks.albumArtist,
         isSingleAlbumLinkedForFile(fileId),
+        library.getSnapshot().albums.some((album) => album.trackIds.includes(fileId ?? "")),
+        library.getSnapshot().files.find((file) => file.id === fileId)?.metadata?.artist ?? null,
       ),
-    [isSingleAlbumLinkedForFile],
+    [isSingleAlbumLinkedForFile, library],
   );
 
   const createCurrentMetadataPatch = useCallback(
@@ -360,7 +362,7 @@ export const useTrackEditorSession = ({
       const filenameBase = sanitizeFilenameBase(value);
       filenamePreviewStore.set(
         selectedId,
-        filenameBase ? audioFilename(filenameBase, getAudioFormat(currentFile)) : undefined,
+        filenameBase ? audioFilename(filenameBase, getAudioFormat(currentFile)) : "",
       );
     },
     [filenamePreviewStore, library],

@@ -9,17 +9,20 @@ import type { AudioTaggerController } from "@/features/workspace/useAudioTaggerC
 
 type ColumnProps = {
   controller: AudioTaggerController;
-  menuInTrackHeader: boolean;
+  menuInViewHeader: boolean;
   mobileMenuButton: ReactNode;
 };
 
-function AudioTaggerViews({ controller, menuInTrackHeader, mobileMenuButton }: ColumnProps) {
+function AudioTaggerViews({ controller, menuInViewHeader, mobileMenuButton }: ColumnProps) {
   const { library, editor, settings, activeView, importing, exporting, mobile, libraryIsEmpty } =
     controller;
   const { selectedFileId } = library.state;
+  const headerLeadingAction = menuInViewHeader ? mobileMenuButton : undefined;
 
   if (libraryIsEmpty) {
-    return activeView === "settings" ? <SettingsPage {...mobile.settingsPageProps} /> : null;
+    return activeView === "settings" ? (
+      <SettingsPage {...mobile.settingsPageProps} headerLeadingAction={headerLeadingAction} />
+    ) : null;
   }
 
   return (
@@ -35,7 +38,8 @@ function AudioTaggerViews({ controller, menuInTrackHeader, mobileMenuButton }: C
       >
         <TrackMetadataEditor
           viewActive={activeView === "editor"}
-          headerLeadingAction={menuInTrackHeader ? mobileMenuButton : undefined}
+          autoFocusTitle={library.state.selectedFileIds.size <= 1}
+          headerLeadingAction={activeView === "editor" ? headerLeadingAction : undefined}
           selectedFile={editor.selectedFile}
           selectedFileId={selectedFileId}
           register={editor.form.register}
@@ -51,7 +55,7 @@ function AudioTaggerViews({ controller, menuInTrackHeader, mobileMenuButton }: C
           selectedFileAlbum={editor.selectedFileAlbum}
           syncFilenames={settings.syncFilenames}
           advancedMetadata={settings.advancedMetadata}
-          metadataLinks={getMetadataLinkState(settings)}
+          metadataLinks={getMetadataLinkState(settings, editor.selectedFileAlbum)}
           onPreviewMetadataChange={(field, event) =>
             editor.commands.preview(field, event.target.value)
           }
@@ -70,7 +74,10 @@ function AudioTaggerViews({ controller, menuInTrackHeader, mobileMenuButton }: C
           activeView === "settings" ? "z-10 opacity-100" : "pointer-events-none z-0 opacity-0",
         )}
       >
-        <SettingsPage {...mobile.settingsPageProps} />
+        <SettingsPage
+          {...mobile.settingsPageProps}
+          headerLeadingAction={activeView === "settings" ? headerLeadingAction : undefined}
+        />
       </div>
     </div>
   );

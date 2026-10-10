@@ -21,7 +21,6 @@ import {
   trackItemId,
 } from "@/features/library/sidebarDnd";
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
-import { isTrackReadyForDownload } from "@/features/export/downloadLibrary";
 import { useAlbumSidebarDragController } from "@/features/library/useAlbumSidebarDragController";
 import type { ShareActionState } from "@/features/share/sharePublication";
 import {
@@ -30,7 +29,11 @@ import {
 } from "@/features/share/useShareLinkSpotlight";
 import { createAlbumActionItems } from "@/features/library/albumActionItems";
 import { createTrackActionItems } from "@/features/library/trackActionItems";
-import type { TrackFilenamePreviewStore } from "@/features/library/trackFilenamePreview";
+import {
+  type TrackFilenamePreviewStore,
+  useLiveTrackFilenameValidity,
+} from "@/features/library/trackFilenamePreview";
+import { getTrackFailureDisplay } from "@/shared/systemFailure";
 
 interface AlbumSidebarProps {
   albums: AlbumGroup[];
@@ -77,9 +80,9 @@ interface AlbumSidebarProps {
 
 const isRetryableError = (track: TagiumFile) =>
   Boolean(track.downloadRequest) &&
-  (track.downloadStatus === "error" ||
-    track.downloadStatus === "canceled" ||
-    track.status === "error");
+  (track.downloadStatus === "canceled" ||
+    ((track.downloadStatus === "error" || track.status === "error") &&
+      (!track.downloadError || getTrackFailureDisplay(track.downloadError).retryable)));
 
 export default function AlbumSidebar({
   albums,
@@ -115,6 +118,7 @@ export default function AlbumSidebar({
   onAudioUpload,
 }: AlbumSidebarProps) {
   const filesById = new Map(files.map((file) => [file.id, file]));
+  const hasValidFilename = useLiveTrackFilenameValidity(filenamePreviewStore);
   const looseTracks = looseTrackIds
     .map((trackId) => filesById.get(trackId))
     .filter((track): track is TagiumFile => Boolean(track));
@@ -238,7 +242,7 @@ export default function AlbumSidebar({
                 album.trackIds.length > 0 &&
                 album.trackIds.every((trackId) => {
                   const file = filesById.get(trackId);
-                  return file ? isTrackReadyForDownload(file) : false;
+                  return file ? Boolean(file.file) && hasValidFilename(file) : false;
                 });
               const shareableTracks = album.trackIds.map((trackId) => filesById.get(trackId));
               const contentCanShare =

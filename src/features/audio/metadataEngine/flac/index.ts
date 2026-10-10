@@ -320,7 +320,7 @@ const inspect = (source: ByteSource) =>
       trackNumber: positiveInteger(trackText),
       trackTotal: trackTotalMatch ? Number.parseInt(trackTotalMatch[1]!, 10) : null,
       composer: firstValue(comments, "COMPOSER") ?? "",
-      comment: firstValue(comments, "COMMENT") ?? "",
+      comment: firstValue(comments, "COMMENT") ?? firstValue(comments, "DESCRIPTION") ?? "",
       discNumber: canonicalInteger(firstValue(comments, "DISCNUMBER")),
       bpm: canonicalInteger(firstValue(comments, "BPM")),
     };
@@ -333,6 +333,7 @@ const encodeVorbis = (
   block: VorbisBlock,
   changes: MetadataChanges,
   includeReplacementValues = true,
+  descriptionIsComment = false,
 ) => {
   const replacements = new Map<string, Uint8Array<ArrayBuffer>[]>();
   const replaceText = (key: string, value: string | undefined) => {
@@ -359,6 +360,7 @@ const encodeVorbis = (
   }
   if (changes.comment !== undefined) {
     replaceText("COMMENT", changes.comment);
+    if (descriptionIsComment) replacements.set("DESCRIPTION", []);
   }
   if (changes.year !== undefined) {
     replacements.set(
@@ -508,6 +510,21 @@ const patch = (source: ByteSource, changes: MetadataChanges) => {
       changes.trackText !== undefined ||
       changes.discNumber !== undefined ||
       changes.bpm !== undefined;
+    const vorbisBlocks = new Map<number, VorbisBlock>();
+    if (editsComments) {
+      for (const block of parsed.blocks) {
+        if (block.type !== 4) continue;
+        const vorbis = yield* parseReadableBlock(
+          readChunked(source, block.dataOffset, block.length),
+          parseVorbis,
+        );
+        vorbisBlocks.set(block.dataOffset, vorbis);
+      }
+    }
+    const comments = Array.from(vorbisBlocks.values()).flatMap((block) => block.comments);
+    const descriptionIsComment =
+      firstValue(comments, "COMMENT") === undefined &&
+      firstValue(comments, "DESCRIPTION") !== undefined;
     const replacementPictures = changes.picture?.map(
       (picture) => picture.opaqueData ?? encodePicture(picture),
     );
@@ -516,12 +533,9 @@ const patch = (source: ByteSource, changes: MetadataChanges) => {
     let picturesInserted = false;
 
     for (const block of parsed.blocks) {
-      if (block.type === 4 && editsComments) {
-        const vorbis = yield* parseReadableBlock(
-          readChunked(source, block.dataOffset, block.length),
-          parseVorbis,
-        );
-        const payload = encodeVorbis(vorbis, changes, !commentsEdited);
+      const vorbis = vorbisBlocks.get(block.dataOffset);
+      if (vorbis) {
+        const payload = encodeVorbis(vorbis, changes, !commentsEdited, descriptionIsComment);
         entries.push({ type: 4, payload, length: payload.length });
         commentsEdited = true;
       } else if (block.type === 6 && replacementPictures !== undefined) {

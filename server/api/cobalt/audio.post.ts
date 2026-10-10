@@ -24,6 +24,8 @@ import {
   type CobaltRuntimeEnv as DevControlRuntimeEnv,
 } from "../../utils/dev-controls";
 import { decodeRequestBody, urlStringSchema } from "../../utils/schema";
+import { publicCobaltErrorCode } from "../../utils/cobalt-error-code";
+import { reportDownloadFailure } from "../../utils/download-failure-report";
 import { getYouTubeVideoId, resolveYouTubeUploadYear } from "../../utils/youtube";
 import { isSoundCloudHost } from "../../../src/lib/media-link";
 
@@ -35,13 +37,17 @@ enum CobaltResponseType {
   LocalProcessing = "local-processing",
 }
 
+const yearSchema = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isBetween({ minimum: 1_000, maximum: 9_999 }),
+);
+
 const audioRequestSchema = Schema.Struct({
   url: urlStringSchema,
   audioBitrate: Schema.Literals(["320", "256", "128", "96", "64"]),
   audioFormat: Schema.Literals(["best", "mp3"]),
-  year: Schema.optionalKey(
-    Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1_000, maximum: 9_999 })),
-  ),
+  year: Schema.optionalKey(yearSchema),
+  fallbackYear: Schema.optionalKey(yearSchema),
 });
 
 const cobaltResponseSchema = Schema.Union([
@@ -268,7 +274,6 @@ const requestCobaltAudio = async (
         alwaysProxy: true,
         localProcessing: "forced",
         filenameStyle: "pretty",
-        youtubeVideoCodec: "h264",
         youtubeHLS: false,
       }),
     });
@@ -357,16 +362,6 @@ const cobaltErrorResponse = (message: string) =>
       "Content-Type": "text/plain;charset=UTF-8",
     },
   });
-
-const publicCobaltErrorCode = (code: string) => {
-  if (
-    code.startsWith("error.api.fetch.soundcloud.stream_fetch") ||
-    code.startsWith("error.api.fetch.soundcloud.stream_parse")
-  ) {
-    return "error.api.fetch.empty";
-  }
-  return code.startsWith("error.api.fetch.soundcloud.") ? "error.api.fetch.fail" : code;
-};
 
 const cobaltCapacityErrorResponse = (response: CobaltResponse, retryAfter: string | undefined) => {
   const headers = new Headers({ "Content-Type": "application/json" });
@@ -503,6 +498,7 @@ export default defineHandler(async (event) => {
   const startedAt = Date.now();
   let context = getRequestLogContext(event.req);
   let sourceFingerprint: string | undefined;
+  let sourceUrl: string | undefined;
   try {
     const runtimeEnv = getRuntimeEnv(event.req);
     const forbidden = enforceSameOrigin(event.req, runtimeEnv);
@@ -517,6 +513,7 @@ export default defineHandler(async (event) => {
     }
 
     const body = await decodeRequestBody(event.req, audioRequestSchema);
+    sourceUrl = body.url;
     context = getRequestLogContext(event.req, body.url);
     const requestSourceFingerprint = await fingerprintUrl(body.url);
     if (!requestSourceFingerprint) throw new Error("Download URL fingerprint is unavailable.");
@@ -555,8 +552,9 @@ export default defineHandler(async (event) => {
     const cobaltResponse = cobaltResult.response;
 
     if (cobaltResponse.status === CobaltResponseType.Error) {
+      const stage = cobaltResult.failureStage ?? "cobalt.resolve_error";
       const failureDetails: CobaltAudioLogDetails = {
-        stage: cobaltResult.failureStage ?? "cobalt.resolve_error",
+        stage,
         elapsedMs: Date.now() - startedAt,
         errorCode: cobaltResponse.error.code,
       };
@@ -567,6 +565,15 @@ export default defineHandler(async (event) => {
       if (cobaltResult.retryAfter) failureDetails.retryAfter = cobaltResult.retryAfter;
       if (cobaltResult.machineId) failureDetails.machineId = cobaltResult.machineId;
       if (cobaltResult.failureReason) failureDetails.failureReason = cobaltResult.failureReason;
+      reportDownloadFailure({
+        route: "audio",
+        stage,
+        requestId: context.requestId,
+        errorCode: cobaltResponse.error.code,
+        sourceUrl: body.url,
+        upstreamStatus: cobaltResult.upstreamStatus,
+        machineId: cobaltResult.machineId,
+      });
       logCobaltAudioEvent(
         "cobalt_audio_failure",
         context,
@@ -599,7 +606,10 @@ export default defineHandler(async (event) => {
     }
 
     if (cobaltResponse.status === CobaltResponseType.LocalProcessing) {
-      const responseWithYear = withYearMetadata(cobaltResponse, await yearPromise);
+      const responseWithYear = withYearMetadata(
+        cobaltResponse,
+        (await yearPromise) ?? body.fallbackYear,
+      );
       return respond(
         localProcessingResponse(
           event.req,
@@ -649,6 +659,13 @@ export default defineHandler(async (event) => {
     if (HTTPError.isError(error)) throw error;
 
     if (sourceFingerprint) {
+      reportDownloadFailure({
+        route: "audio",
+        stage: "tagium.audio_handler",
+        requestId: context.requestId,
+        errorCode: "error.api.handler_failure",
+        sourceUrl,
+      });
       logCobaltAudioEvent("cobalt_audio_failure", context, sourceFingerprint, {
         stage: "tagium.audio_handler",
         elapsedMs: Date.now() - startedAt,

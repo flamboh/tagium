@@ -1,4 +1,4 @@
-import type { AppSettings, MetadataLinks } from "@/features/library/types";
+import type { AlbumGroup, AppSettings, MetadataLinks } from "@/features/library/types";
 
 export type MetadataLinkId = keyof MetadataLinks | "trackNumber" | "filename";
 export type MetadataLinkState = Record<MetadataLinkId, boolean>;
@@ -140,19 +140,31 @@ export const withMetadataLinkEnabled = (
   }
 };
 
+export const getAlbumMetadataLinks = (
+  settings: Pick<AppSettings, "metadataLinks">,
+  album?: Pick<AlbumGroup, "metadataLinks">,
+) => ({
+  ...settings.metadataLinks,
+  artist: settings.metadataLinks.artist && album?.metadataLinks?.artist !== false,
+  year: settings.metadataLinks.year && album?.metadataLinks?.year !== false,
+});
+
 export const getMetadataLinkState = (
   settings: Pick<AppSettings, "metadataLinks" | "syncTrackNumbers" | "syncFilenames">,
-) =>
-  ({
-    artist: isMetadataLinkEnabled(settings, descriptorById.artist),
-    year: isMetadataLinkEnabled(settings, descriptorById.year),
+  album?: Pick<AlbumGroup, "metadataLinks">,
+) => {
+  const metadataLinks = getAlbumMetadataLinks(settings, album);
+  return {
+    artist: metadataLinks.artist,
+    year: metadataLinks.year,
     genre: isMetadataLinkEnabled(settings, descriptorById.genre),
     artwork: isMetadataLinkEnabled(settings, descriptorById.artwork),
     trackNumber: isMetadataLinkEnabled(settings, descriptorById.trackNumber),
     filename: isMetadataLinkEnabled(settings, descriptorById.filename),
     singleAlbum: isMetadataLinkEnabled(settings, descriptorById.singleAlbum),
     albumArtist: isMetadataLinkEnabled(settings, descriptorById.albumArtist),
-  }) satisfies MetadataLinkState;
+  } satisfies MetadataLinkState;
+};
 
 export const serializeMetadataLinkAnalytics = (state: MetadataLinkState) => ({
   link_artist: state.artist,

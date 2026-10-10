@@ -1,4 +1,5 @@
-import { Option, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
+import { HTTPError } from "nitro";
 import {
   extractYouTubeJsonObject,
   fetchYouTubeWithRetry,
@@ -23,6 +24,7 @@ const nonEmptyStringSchema = Schema.String.check(Schema.isNonEmpty());
 const legacyVideoSchema = Schema.Struct({
   videoId: nonEmptyStringSchema,
   title: textSchema,
+  shortBylineText: Schema.optionalKey(textSchema),
   lengthSeconds: Schema.optionalKey(Schema.String),
   lengthText: Schema.optionalKey(textSchema),
 });
@@ -33,6 +35,19 @@ const lockupVideoSchema = Schema.Struct({
   metadata: Schema.Struct({
     lockupMetadataViewModel: Schema.Struct({
       title: textSchema,
+      metadata: Schema.optionalKey(
+        Schema.Struct({
+          contentMetadataViewModel: Schema.Struct({
+            metadataRows: Schema.Array(
+              Schema.Struct({
+                metadataParts: Schema.Array(
+                  Schema.Struct({ text: Schema.optionalKey(textSchema) }),
+                ),
+              }),
+            ),
+          }),
+        }),
+      ),
     }),
   }),
 });
@@ -72,6 +87,7 @@ const jsonRecordSchema = Schema.Record(Schema.String, jsonValueSchema);
 
 interface YouTubeTrack {
   title: string;
+  artist: string;
   url: string;
   duration?: number;
   trackNumber: number;
@@ -159,6 +175,7 @@ const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouT
       seenVideoIds.add(legacyVideo.value.videoId);
       tracks.push({
         title,
+        artist: (getText(legacyVideo.value.shortBylineText)?.trim() ?? "").replace(/ - Topic$/, ""),
         url: `${YOUTUBE_ORIGIN}/watch?v=${encodeURIComponent(legacyVideo.value.videoId)}`,
         duration: Number.isFinite(durationFromSeconds)
           ? durationFromSeconds
@@ -180,6 +197,12 @@ const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouT
       seenVideoIds.add(lockupVideo.value.contentId);
       tracks.push({
         title,
+        artist: (
+          getText(
+            lockupVideo.value.metadata.lockupMetadataViewModel.metadata?.contentMetadataViewModel
+              .metadataRows[0]?.metadataParts[0]?.text,
+          )?.trim() ?? ""
+        ).replace(/ - Topic$/, ""),
         url: `${YOUTUBE_ORIGIN}/watch?v=${encodeURIComponent(lockupVideo.value.contentId)}`,
         duration: findDuration(value.lockupViewModel),
         trackNumber: tracks.length + 1,
@@ -212,10 +235,13 @@ const getPlaylistTitle = (initialData: JsonValue) => {
     : "";
 };
 
-const getPlaylistArtist = (initialData: JsonValue) => {
-  const owner = findFirstValue(initialData, "videoOwnerRenderer");
-  return owner !== undefined && isRecord(owner) ? (getText(owner.title)?.trim() ?? "") : "";
+const hasErrorAlert = (initialData: JsonValue) => {
+  const alert = findFirstValue(initialData, "alertRenderer");
+  return alert !== undefined && isRecord(alert) && alert.type === "ERROR";
 };
+
+const playlistNotFound = () =>
+  new HTTPError({ status: 404, message: "youtube.playlist_not_found" });
 
 const getPlaylistCover = (initialData: JsonValue) => {
   const parsed = decodeThumbnailOption(
@@ -300,6 +326,7 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
     },
     { stage: "playlist" },
   );
+  if (response.status === 404) throw playlistNotFound();
   if (!response.ok) throw new Error(`youtube.playlist_failed (${response.status})`);
   const html = await response.text();
   const initialData = extractYouTubeJsonObject(html, "var ytInitialData =")?.value;
@@ -307,6 +334,7 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
   const config = getYouTubeConfig(html);
 
   const title = getPlaylistTitle(initialData);
+  if (!title && hasErrorAlert(initialData)) throw playlistNotFound();
   if (!title) throw new Error("youtube.playlist_title");
 
   const tracks: YouTubeTrack[] = [];
@@ -332,25 +360,30 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
   }
 
   if (tracks.length === 0) throw new Error("youtube.no_resolvable_tracks");
-  let year: number | undefined;
-  try {
-    year = await resolveYouTubeUploadYear(tracks[0]!.url, {
-      config,
-      signal,
-    });
-  } catch (error) {
-    console.warn(
-      JSON.stringify({
-        event: "youtube_playlist_enrichment_skipped",
-        stage: "upload_year",
-        errorType: error instanceof Error ? error.name : "UnknownError",
-      }),
-    );
-  }
+  const year = await Effect.runPromise(
+    Effect.tryPromise({
+      try: () => resolveYouTubeUploadYear(tracks[0]!.url, { config, signal }),
+      catch: (error) => error,
+    }).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          console.warn(
+            JSON.stringify({
+              event: "youtube_playlist_enrichment_skipped",
+              stage: "upload_year",
+              errorType: error instanceof Error ? error.name : "UnknownError",
+            }),
+          );
+          return undefined;
+        }),
+      ),
+    ),
+  );
+  const artist = tracks[0]!.artist;
 
   const playlist: YouTubePlaylist = {
     title,
-    artist: getPlaylistArtist(initialData),
+    artist: tracks.every((track) => track.artist === artist) ? artist : "",
     genre: "",
     isAlbum: false,
     coverUrl: getPlaylistCover(initialData),

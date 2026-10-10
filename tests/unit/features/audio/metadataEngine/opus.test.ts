@@ -317,6 +317,83 @@ describe("Opus metadata driver", () => {
     ).toEqual(audioBodies);
   });
 
+  it.each([
+    [
+      "an FFmpeg DESCRIPTION field",
+      ["DESCRIPTION=first line\nsecond line"],
+      "first line\nsecond line",
+    ],
+    ["a lowercase comment field", ["comment=lowercase key"], "lowercase key"],
+    ["COMMENT ahead of a DESCRIPTION alias", ["DESCRIPTION=alias", "Comment=primary"], "primary"],
+  ])("reads the user comment from %s", async (_case, comments, expected) => {
+    const inspected = await Effect.runPromise(
+      opusDriver.inspect(makeBlobByteSource(new Blob([validOpusBytes({ comments })]))),
+    );
+    expect(inspected.metadata.comment).toBe(expected);
+  });
+
+  it.each(["Updated", ""])(
+    "preserves a separate DESCRIPTION when writing comment %j",
+    async (comment) => {
+      const original = validOpusBytes({
+        comments: ["dEsCrIpTiOn=Separate description", "comment=Primary comment"],
+      });
+      const inspected = await Effect.runPromise(
+        opusDriver.inspect(makeBlobByteSource(new Blob([original]))),
+      );
+      expect(inspected.metadata.comment).toBe("Primary comment");
+      const plan = await Effect.runPromise(
+        opusDriver.patch(makeBlobByteSource(new Blob([original])), { comment }),
+      );
+      const patched = await outputBytes(plan.parts);
+      expect(new TextDecoder().decode(patched)).toContain("dEsCrIpTiOn=Separate description");
+      expect(new TextDecoder().decode(patched)).not.toContain("Primary comment");
+      const updated = await Effect.runPromise(
+        opusDriver.inspect(makeBlobByteSource(new Blob([patched]))),
+      );
+      expect(updated.metadata.comment).toBe(comment || "Separate description");
+    },
+  );
+
+  it("preserves DESCRIPTION when an empty COMMENT was displayed", async () => {
+    const original = validOpusBytes({ comments: ["DESCRIPTION=Separate description", "COMMENT="] });
+    const inspected = await Effect.runPromise(
+      opusDriver.inspect(makeBlobByteSource(new Blob([original]))),
+    );
+    expect(inspected.metadata.comment).toBe("");
+    const plan = await Effect.runPromise(
+      opusDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "Updated" }),
+    );
+    expect(new TextDecoder().decode(await outputBytes(plan.parts))).toContain(
+      "DESCRIPTION=Separate description",
+    );
+  });
+
+  it("replaces a displayed DESCRIPTION alias with one COMMENT field", async () => {
+    const original = validOpusBytes({
+      comments: ["DESCRIPTION=FFmpeg comment", "X-private=opaque value"],
+    });
+    const patchedPlan = await Effect.runPromise(
+      opusDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "Updated" }),
+    );
+    const patched = await outputBytes(patchedPlan.parts);
+    const patchedText = new TextDecoder().decode(patched);
+    expect(patchedText).toContain("COMMENT=Updated");
+    expect(patchedText).not.toContain("FFmpeg comment");
+    expect(patchedText).toContain("X-private=opaque value");
+    const inspected = await Effect.runPromise(
+      opusDriver.inspect(makeBlobByteSource(new Blob([patched]))),
+    );
+    expect(inspected.metadata.comment).toBe("Updated");
+
+    const clearedPlan = await Effect.runPromise(
+      opusDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "" }),
+    );
+    const clearedText = new TextDecoder().decode(await outputBytes(clearedPlan.parts));
+    expect(clearedText).not.toMatch(/COMMENT=|DESCRIPTION=/iu);
+    expect(clearedText).toContain("X-private=opaque value");
+  });
+
   it("repaginates growing tags and updates downstream sequences and checksums", async () => {
     const audioBodies = [Uint8Array.of(1, 2, 3), Uint8Array.of(4, 5, 6, 7)];
     const original = validOpusBytes({ comments: ["TITLE=small"], audioBodies });

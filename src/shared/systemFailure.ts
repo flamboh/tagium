@@ -29,7 +29,10 @@ export type SystemFailurePresentation = {
   dedupeKey: string;
 };
 
-export type TrackFailureDisplay = Pick<SystemFailurePresentation, "title" | "description">;
+export type TrackFailureDisplay = Pick<
+  SystemFailurePresentation,
+  "title" | "description" | "retryable"
+>;
 
 const DOWNLOAD_DEBOUNCE_MS = 15_000;
 const lastDownloadNotificationAt = new Map<string, number>();
@@ -74,6 +77,14 @@ const KNOWN_FAILURES = {
     trackDescription: "this link is not supported.",
     retryable: false,
     dedupeKey: "system-download-unsupported-source",
+  },
+  drm_protected: {
+    code: "unsupported_source",
+    title: "this media is drm-protected",
+    description: "tagium can't download drm-protected media. try another link.",
+    trackDescription: "this media is drm-protected and can't be downloaded.",
+    retryable: false,
+    dedupeKey: "system-download-drm-protected",
   },
   private_or_missing: {
     code: "private_or_missing",
@@ -154,10 +165,13 @@ const errorMessage = (cause: unknown) => {
 };
 
 const COBALT_UNSUPPORTED_CODES = [
+  "error.api.link.invalid",
   "error.api.link.unsupported",
   "error.api.service.unsupported",
   "error.api.service.audio_not_supported",
 ] as const;
+
+const COBALT_DRM_CODES = ["error.api.soundcloud.maybe_drm", "error.api.youtube.drm"] as const;
 
 const COBALT_PRIVATE_OR_MISSING_CODES = [
   "error.api.content.post.private",
@@ -192,6 +206,7 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
   ) {
     return KNOWN_FAILURES.service_unavailable;
   }
+  if (COBALT_DRM_CODES.some((code) => lower.includes(code))) return KNOWN_FAILURES.drm_protected;
   if (
     COBALT_UNSUPPORTED_CODES.some((code) => lower.includes(code)) ||
     lower.includes("unsupported url") ||
@@ -215,8 +230,10 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
   }
   if (
     lower.includes("error.api.fetch.empty") ||
+    lower.includes("error.api.invalid_response") ||
     lower.includes("malformed") ||
     lower.includes("invalid response") ||
+    lower.includes("invalid machine id") ||
     lower.includes("invalid download plan") ||
     lower.includes("non-json") ||
     lower.includes("response was empty") ||
@@ -276,21 +293,32 @@ export const getTrackFailureDisplay = (message: string): TrackFailureDisplay => 
     (presentation) => presentation.trackDescription === message,
   );
   if (storedPresentation) {
-    return { title: storedPresentation.title, description: storedPresentation.trackDescription };
+    return {
+      title: storedPresentation.title,
+      description: storedPresentation.trackDescription,
+      retryable: storedPresentation.retryable,
+    };
   }
   const storedFallback = Object.values(FALLBACKS).find(
     (presentation) => presentation.trackDescription === message,
   );
   if (storedFallback) {
-    return { title: storedFallback.title, description: storedFallback.trackDescription };
+    return {
+      title: storedFallback.title,
+      description: storedFallback.trackDescription,
+      retryable: true,
+    };
   }
 
   const known = knownDownloadFailureFrom(message);
-  if (known) return { title: known.title, description: known.trackDescription };
+  if (known) {
+    return { title: known.title, description: known.trackDescription, retryable: known.retryable };
+  }
 
   return {
     title: "track error",
     description: "this track needs attention before it can be exported.",
+    retryable: true,
   };
 };
 

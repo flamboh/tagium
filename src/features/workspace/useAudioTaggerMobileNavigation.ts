@@ -94,6 +94,10 @@ export const useAudioTaggerMobileNavigation = ({
       });
     drawer?.focus();
     const trap = (event: KeyboardEvent) => {
+      const target = event.target;
+      const outsideDrawer =
+        target instanceof Node && target !== document.body && !drawer?.contains(target);
+      if (event.defaultPrevented || outsideDrawer) return;
       if (event.key === "Escape") {
         event.preventDefault();
         navigation.closeDrawer();

@@ -1,16 +1,17 @@
 /**
+ * @stability unstable
  * @since 4.0.0
  */
 
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
+import * as HttpClient from "effect/http/HttpClient"
+import * as HttpClientError from "effect/http/HttpClientError"
+import * as HttpClientRequest from "effect/http/HttpClientRequest"
+import * as HttpClientResponse from "effect/http/HttpClientResponse"
 import type { SchemaError } from "effect/Schema"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
-import * as HttpClient from "effect/unstable/http/HttpClient"
-import * as HttpClientError from "effect/unstable/http/HttpClientError"
-import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest"
-import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse"
 // non-recursive definitions
 export type APIError = { readonly "message": string; readonly "type": "api_error" }
 export const APIError = Schema.Struct({
@@ -2872,55 +2873,47 @@ export const BetaStopReason = Schema.Literals([
   "model_context_window_exceeded"
 ])
 export type Model =
+  | string
+  | "claude-sonnet-5"
+  | "claude-fable-5"
+  | "claude-mythos-5"
+  | "claude-opus-4-8"
+  | "claude-opus-4-7"
+  | "claude-mythos-preview"
   | "claude-opus-4-6"
   | "claude-sonnet-4-6"
-  | "claude-opus-4-5-20251101"
-  | "claude-opus-4-5"
-  | "claude-3-7-sonnet-latest"
-  | "claude-3-7-sonnet-20250219"
-  | "claude-3-5-haiku-latest"
-  | "claude-3-5-haiku-20241022"
   | "claude-haiku-4-5"
   | "claude-haiku-4-5-20251001"
-  | "claude-sonnet-4-20250514"
-  | "claude-sonnet-4-0"
-  | "claude-4-sonnet-20250514"
+  | "claude-opus-4-5"
+  | "claude-opus-4-5-20251101"
   | "claude-sonnet-4-5"
   | "claude-sonnet-4-5-20250929"
-  | "claude-opus-4-0"
-  | "claude-opus-4-20250514"
-  | "claude-4-opus-20250514"
+  | "claude-opus-4-1"
   | "claude-opus-4-1-20250805"
-  | "claude-3-opus-latest"
-  | "claude-3-opus-20240229"
-  | "claude-3-haiku-20240307"
-export const Model = Schema.Literals([
-  "claude-opus-4-6",
-  "claude-sonnet-4-6",
-  "claude-opus-4-5-20251101",
-  "claude-opus-4-5",
-  "claude-3-7-sonnet-latest",
-  "claude-3-7-sonnet-20250219",
-  "claude-3-5-haiku-latest",
-  "claude-3-5-haiku-20241022",
-  "claude-haiku-4-5",
-  "claude-haiku-4-5-20251001",
-  "claude-sonnet-4-20250514",
-  "claude-sonnet-4-0",
-  "claude-4-sonnet-20250514",
-  "claude-sonnet-4-5",
-  "claude-sonnet-4-5-20250929",
-  "claude-opus-4-0",
-  "claude-opus-4-20250514",
-  "claude-4-opus-20250514",
-  "claude-opus-4-1-20250805",
-  "claude-3-opus-latest",
-  "claude-3-opus-20240229",
-  "claude-3-haiku-20240307"
+export const Model = Schema.Union([
+  Schema.String,
+  Schema.Literals([
+    "claude-sonnet-5",
+    "claude-fable-5",
+    "claude-mythos-5",
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-mythos-preview",
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5",
+    "claude-haiku-4-5-20251001",
+    "claude-opus-4-5",
+    "claude-opus-4-5-20251101",
+    "claude-sonnet-4-5",
+    "claude-sonnet-4-5-20250929",
+    "claude-opus-4-1",
+    "claude-opus-4-1-20250805"
+  ])
 ]).annotate({
   "title": "Model",
   "description":
-    "The model that will complete your prompt.\\n\\nSee [models](https://docs.anthropic.com/en/docs/models-overview) for additional details and options."
+    "The model that will complete your prompt.\n\nSee [models](https://docs.anthropic.com/en/docs/models-overview) for additional details and options."
 })
 export type BetaMemoryTool_20250818_ViewCommand = {
   readonly "command": "view"
@@ -7726,7 +7719,7 @@ export type BetaMessage = {
     readonly "cache_creation": BetaCacheCreation | null
     readonly "cache_creation_input_tokens": number | null
     readonly "cache_read_input_tokens": number | null
-    readonly "inference_geo": string | null
+    readonly "inference_geo"?: string | null
     readonly "input_tokens": number
     readonly "iterations"?: BetaIterationsUsage
     readonly "output_tokens": number
@@ -7790,11 +7783,13 @@ export const BetaMessage = Schema.Struct({
       "description": "The number of input tokens read from the cache.",
       "default": null
     }),
-    "inference_geo": Schema.Union([Schema.String, Schema.Null]).annotate({
-      "title": "Inference Geo",
-      "description": "The geographic region where inference was performed for this request.",
-      "default": null
-    }),
+    "inference_geo": Schema.optionalKey(
+      Schema.Union([Schema.String, Schema.Null]).annotate({
+        "title": "Inference Geo",
+        "description": "The geographic region where inference was performed for this request.",
+        "default": null
+      })
+    ),
     "input_tokens": Schema.Number.annotate({
       "title": "Input Tokens",
       "description": "The number of input tokens which were used."
@@ -7880,7 +7875,7 @@ export type Message = {
     readonly "cache_creation": CacheCreation | null
     readonly "cache_creation_input_tokens": number | null
     readonly "cache_read_input_tokens": number | null
-    readonly "inference_geo": string | null
+    readonly "inference_geo"?: string | null
     readonly "input_tokens": number
     readonly "output_tokens": number
     readonly "server_tool_use"?: ServerToolUsage | null
@@ -7941,11 +7936,13 @@ export const Message = Schema.Struct({
       "description": "The number of input tokens read from the cache.",
       "default": null
     }),
-    "inference_geo": Schema.Union([Schema.String, Schema.Null]).annotate({
-      "title": "Inference Geo",
-      "description": "The geographic region where inference was performed for this request.",
-      "default": null
-    }),
+    "inference_geo": Schema.optionalKey(
+      Schema.Union([Schema.String, Schema.Null]).annotate({
+        "title": "Inference Geo",
+        "description": "The geographic region where inference was performed for this request.",
+        "default": null
+      })
+    ),
     "input_tokens": Schema.Number.annotate({
       "title": "Input Tokens",
       "description": "The number of input tokens which were used."

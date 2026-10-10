@@ -4,6 +4,11 @@
  * OPFS keeps the encoded output out of the JavaScript heap on browsers that
  * support it. The patch store is intentionally small and only acts as a
  * fallback for browsers without OPFS (and for tests).
+ *
+ * Each page keeps its OPFS media in its own session directory and holds a web
+ * lock named after that session for as long as it is open. A starting page
+ * removes every session directory whose lock is free, so media from closed or
+ * reloaded pages is reclaimed without touching media other open tabs still use.
  */
 
 export type TemporaryFileStoreBackend = "opfs" | "memory";
@@ -25,19 +30,23 @@ export interface TemporaryFileStore {
   cleanup: () => Promise<void>;
 }
 
-type OpfsRoot = FileSystemDirectoryHandle & {
-  getFileHandle: FileSystemDirectoryHandle["getFileHandle"];
+type TemporaryStorageSession = {
+  readonly id: string;
+  readonly directory: FileSystemDirectoryHandle | undefined;
 };
+
+const temporaryDirectoryName = "tagium-save-temporary";
 
 const isValidPosition = (position: number) => Number.isSafeInteger(position) && position >= 0;
 
-const temporaryName = (prefix: string) => {
-  const identifier =
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-  return `${prefix}-${identifier}`;
-};
+const randomIdentifier = () =>
+  typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
+const temporaryName = (prefix: string) => `${prefix}-${randomIdentifier()}`;
+
+const sessionLockName = (sessionId: string) => `${temporaryDirectoryName}:${sessionId}`;
 
 const makeTemporaryFileLease = <Value extends Blob>(
   value: Value,
@@ -115,7 +124,7 @@ const makeMemoryFileStore = (): TemporaryFileStore => {
   return store;
 };
 
-const getOpfsRoot = async (): Promise<OpfsRoot | undefined> => {
+const getOpfsRoot = async (): Promise<FileSystemDirectoryHandle | undefined> => {
   if (typeof navigator === "undefined") return undefined;
 
   const storage = navigator.storage;
@@ -128,6 +137,97 @@ const getOpfsRoot = async (): Promise<OpfsRoot | undefined> => {
   }
 };
 
+const getLockManager = () =>
+  typeof navigator === "undefined" ? undefined : (navigator.locks ?? undefined);
+
+const getTemporaryDirectory = async (create: boolean) => {
+  const root = await getOpfsRoot();
+  try {
+    return await root?.getDirectoryHandle(temporaryDirectoryName, { create });
+  } catch {
+    return undefined;
+  }
+};
+
+const openSessionDirectory = async (sessionId: string) => {
+  const temporaryDirectory = await getTemporaryDirectory(true);
+  try {
+    return await temporaryDirectory?.getDirectoryHandle(sessionId, { create: true });
+  } catch {
+    return undefined;
+  }
+};
+
+const claimSessionDirectory = (sessionId: string) =>
+  new Promise<{ directory: FileSystemDirectoryHandle | undefined; locked: boolean }>((resolve) => {
+    const resolveUnlocked = async () =>
+      resolve({ directory: await openSessionDirectory(sessionId), locked: false });
+    const locks = getLockManager();
+    if (!locks) {
+      void resolveUnlocked();
+      return;
+    }
+    locks
+      .request(sessionLockName(sessionId), async () => {
+        resolve({ directory: await openSessionDirectory(sessionId), locked: true });
+        return new Promise<never>(() => undefined);
+      })
+      .catch(resolveUnlocked);
+  });
+
+const removeAbandonedSessions = async (currentSessionId: string) => {
+  const locks = getLockManager();
+  const temporaryDirectory = await getTemporaryDirectory(false);
+  if (!locks || !temporaryDirectory) return;
+
+  const sessionIds: string[] = [];
+  for await (const name of temporaryDirectory.keys()) {
+    if (name !== currentSessionId) sessionIds.push(name);
+  }
+  await Promise.allSettled(
+    sessionIds.map((sessionId) =>
+      locks.request(sessionLockName(sessionId), { ifAvailable: true }, async (lock) => {
+        if (!lock) return;
+        await temporaryDirectory.removeEntry(sessionId, { recursive: true });
+      }),
+    ),
+  );
+};
+
+const removeLooseRootEntries = async () => {
+  const root = await getOpfsRoot();
+  if (!root) return;
+
+  const names: string[] = [];
+  for await (const name of root.keys()) {
+    if (name !== temporaryDirectoryName) names.push(name);
+  }
+  await Promise.allSettled(names.map((name) => root.removeEntry(name, { recursive: true })));
+};
+
+const openOwnedSession = async (): Promise<TemporaryStorageSession> => {
+  const id = randomIdentifier();
+  const { directory, locked } = await claimSessionDirectory(id);
+  await removeLooseRootEntries().catch(() => undefined);
+  if (locked) await removeAbandonedSessions(id).catch(() => undefined);
+  return { id, directory };
+};
+
+let activeSession: Promise<TemporaryStorageSession> | undefined;
+
+const getSession = () => (activeSession ??= openOwnedSession());
+
+const getSessionDirectory = async () => (await getSession()).directory;
+
+export const startTemporaryStorageSession = async () => (await getSession()).id;
+
+export const joinTemporaryStorageSession = (sessionId: string) => {
+  activeSession = openSessionDirectory(sessionId).then((directory) => ({
+    id: sessionId,
+    directory,
+  }));
+};
+
 /** Reclaims an OPFS-backed value transferred from the processing worker. */
 export const adoptTemporaryFileLease = <Value extends Blob>(
   value: Value,
@@ -137,14 +237,14 @@ export const adoptTemporaryFileLease = <Value extends Blob>(
     value,
     async () => {
       if (!opfsEntryName) return;
-      const root = await getOpfsRoot();
-      await root?.removeEntry(opfsEntryName).catch(() => undefined);
+      const directory = await getSessionDirectory();
+      await directory?.removeEntry(opfsEntryName).catch(() => undefined);
     },
     opfsEntryName,
   );
 
 const makeOpfsFileStore = async (
-  root: OpfsRoot,
+  directory: FileSystemDirectoryHandle,
   prefix: string,
 ): Promise<TemporaryFileStore | undefined> => {
   const entryName = temporaryName(prefix);
@@ -155,11 +255,11 @@ const makeOpfsFileStore = async (
   let cleaned = false;
 
   try {
-    handle = await root.getFileHandle(entryName, { create: true });
+    handle = await directory.getFileHandle(entryName, { create: true });
     writable = await handle.createWritable();
   } catch {
     if (handle) {
-      await root.removeEntry(entryName).catch(() => undefined);
+      await directory.removeEntry(entryName).catch(() => undefined);
     }
     return undefined;
   }
@@ -233,7 +333,7 @@ const makeOpfsFileStore = async (
       if (cleaned) return;
       cleaned = true;
       await closeWriter().catch(() => undefined);
-      await root.removeEntry(entryName).catch(() => undefined);
+      await directory.removeEntry(entryName).catch(() => undefined);
     },
   };
 
@@ -247,8 +347,12 @@ const makeOpfsFileStore = async (
 export const createTemporaryFileStore = async (
   prefix = "tagium-video",
 ): Promise<TemporaryFileStore> => {
-  const root = await getOpfsRoot();
-  if (!root) return makeMemoryFileStore();
+  const directory = await getSessionDirectory();
+  if (!directory) return makeMemoryFileStore();
 
-  return (await makeOpfsFileStore(root, prefix)) ?? makeMemoryFileStore();
+  return (await makeOpfsFileStore(directory, prefix)) ?? makeMemoryFileStore();
+};
+
+export const resetTemporaryStorageSessionForTests = () => {
+  activeSession = undefined;
 };

@@ -22,7 +22,7 @@ const audioFormatLabels = {
 } as const satisfies Record<AppSettings["audioFormat"], string>;
 
 const audioFormatDescriptions = {
-  best: "keeps youtube's m4a and soundcloud's opus when available.",
+  best: "keeps the original audio without converting it, usually opus from youtube and mp3 from soundcloud.",
   mp3: "converts every download to mp3 at the selected bitrate.",
 } as const satisfies Record<AppSettings["audioFormat"], string>;
 
