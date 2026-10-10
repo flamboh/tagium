@@ -38,7 +38,9 @@ const setJson = (request: FakeRequest, set: SoundCloudSetScenario) => ({
   user: { username: set.author },
   tracks: set.tracks.flatMap(({ key, stub }) => {
     const track = request.registry.media(key);
+
     if (!track) return [];
+
     return [stub ? { id: track.soundcloudId, kind: "track" } : trackJson(track)];
   }),
 });
@@ -47,14 +49,18 @@ const homeHtml = `<!doctype html><html><head><script>window.__sc_version="170000
 
 export const fakeSoundCloudWeb = (request: FakeRequest): FakeResult => {
   if (request.method !== "GET") return unexpected("soundcloud.web.unknown_route");
+
   if (request.url.pathname === "/") {
     return { route: "soundcloud.home", key: null, response: html(homeHtml) };
   }
+
   const key = mediaKeyFromUrl(request.url.toString());
   const scenario = request.registry.get(key);
+
   if (scenario?.type !== "media" && scenario?.type !== "soundcloud-set") {
     return unexpected("soundcloud.page", key);
   }
+
   return {
     route: "soundcloud.page",
     key,
@@ -64,7 +70,9 @@ export const fakeSoundCloudWeb = (request: FakeRequest): FakeResult => {
 
 export const fakeSoundCloudApi = (request: FakeRequest): FakeResult => {
   const { url, registry } = request;
+
   if (request.method !== "GET") return unexpected("soundcloud.api.unknown_route");
+
   if (url.searchParams.get("client_id") !== FAKE_SOUNDCLOUD_CLIENT_ID) {
     return unexpected("soundcloud.api.client_id");
   }
@@ -72,6 +80,7 @@ export const fakeSoundCloudApi = (request: FakeRequest): FakeResult => {
   if (url.pathname === "/resolve") {
     const key = mediaKeyFromUrl(url.searchParams.get("url") ?? "");
     const scenario = registry.get(key);
+
     if (scenario?.type === "media") {
       return {
         route: "soundcloud.resolve.track",
@@ -82,6 +91,7 @@ export const fakeSoundCloudApi = (request: FakeRequest): FakeResult => {
             : json(trackJson(scenario)),
       };
     }
+
     if (scenario?.type === "soundcloud-set") {
       return {
         route: "soundcloud.resolve.set",
@@ -91,13 +101,17 @@ export const fakeSoundCloudApi = (request: FakeRequest): FakeResult => {
           : json(setJson(request, scenario)),
       };
     }
+
     return unexpected("soundcloud.resolve", key);
   }
 
   const trackId = url.pathname.match(/^\/tracks\/(\d+)$/u)?.[1];
+
   if (trackId) {
     const scenario = registry.mediaBySoundCloudId(Number(trackId));
+
     if (!scenario) return unexpected("soundcloud.track");
+
     return { route: "soundcloud.track", key: scenario.key, response: json(trackJson(scenario)) };
   }
 
@@ -108,20 +122,25 @@ export const fakeSoundCloudArtwork = (request: FakeRequest): FakeResult => {
   const token = request.url.pathname.match(/^\/artworks-([a-f0-9]+)-/u)?.[1];
   const key = token ? Buffer.from(token, "hex").toString() : null;
   const scenario = request.registry.get(key);
+
   const image =
     scenario?.type === "media"
       ? scenario.cover
       : scenario?.type === "soundcloud-set"
         ? scenario.artwork
         : null;
+
   if (!image) return unexpected("sndcdn.artwork", key);
+
   return { route: "sndcdn.artwork", key, response: imageResponse(image) };
 };
 
 export const fakeSoundCloudShortLink = (request: FakeRequest): FakeResult => {
   const key = shortLinkKey(request.url);
   const scenario = request.registry.get(key);
+
   if (scenario?.type !== "short-link") return unexpected("soundcloud.short_link", key);
+
   return {
     route: "soundcloud.short_link",
     key,

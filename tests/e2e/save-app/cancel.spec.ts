@@ -7,11 +7,13 @@ test("cancels a save while it is being prepared and saves another link", async (
   upstreams,
 }) => {
   const stuck = await upstreams.soundcloud.track({ title: "Stuck Plan", cover: null });
+
   const next = await upstreams.soundcloud.track({
     title: "Next Track",
     author: "Coast",
     cover: null,
   });
+
   await upstreams.cobalt.hang(stuck.url);
   const save = saveApp(page);
 
@@ -39,11 +41,13 @@ test("cancels a save while it is being prepared and saves another link", async (
 
 test("cancels a save whose media stalls halfway through", async ({ page, upstreams }) => {
   const stalled = await upstreams.soundcloud.track({ title: "Half Way", cover: null });
+
   const next = await upstreams.soundcloud.track({
     title: "Whole Way",
     author: "Coast",
     cover: null,
   });
+
   await upstreams.cobalt.stallTunnel(stalled.url);
   const save = saveApp(page);
 
@@ -75,12 +79,15 @@ test("cancels a save while its media is being processed", async ({
     author: "Studio",
     cover: null,
   });
+
   const second = await upstreams.youtube.video({ title: "Short Encode", author: "Studio" });
   const save = saveApp(page);
   let releaseLibAV = () => {};
+
   const libavHeld = new Promise<void>((resolve) => {
     releaseLibAV = resolve;
   });
+
   await page.route("**/_libav/**", async (route) => {
     await libavHeld;
     await route.fallback();
@@ -99,5 +106,6 @@ test("cancels a save while its media is being processed", async ({
   await expect(save.rows).toHaveCount(1);
   const file = await save.download("Short Encode - Studio (youtube).mp3");
   expect((await inspectAudio(file)).metadata).toMatchObject({ title: "Short Encode" });
+
   if (browserName !== "webkit") await expect.poll(() => storedFileCount(page)).toBe(1);
 });

@@ -14,21 +14,28 @@ export const parseTrackTagNumber = (value: string | undefined) => {
   if (!value) return undefined;
   const [head] = value.split("/");
   const trimmed = head?.trim();
+
   if (!trimmed) return undefined;
+
   if (!/^\d+$/.test(trimmed)) return undefined;
   const parsed = Number.parseInt(trimmed, 10);
+
   return parsed < 1 ? undefined : parsed;
 };
 
 export const toGenreString = (genre: AudioMetadata["genre"] | undefined) => {
   if (!genre) return "";
+
   return Array.isArray(genre) ? genre.join(", ") : genre;
 };
 
 const getValidTrackNumber = (trackNumber: AudioMetadata["trackNumber"] | undefined) => {
   if (!trackNumber) return undefined;
+
   if (!Number.isInteger(trackNumber)) return undefined;
+
   if (trackNumber < 1) return undefined;
+
   return trackNumber;
 };
 
@@ -42,8 +49,11 @@ const compareTrackNumbers = (
   if (leftValidTrackNumber !== undefined && rightValidTrackNumber !== undefined) {
     return leftValidTrackNumber - rightValidTrackNumber;
   }
+
   if (leftValidTrackNumber !== undefined) return -1;
+
   if (rightValidTrackNumber !== undefined) return 1;
+
   return 0;
 };
 
@@ -54,6 +64,7 @@ export const sortUploadedTracksByTrackNumber = (uploads: UploadedTrack[]) =>
 
 export const sortTrackIdsByTrackNumber = (trackIds: string[], files: TagiumFile[]) => {
   const filesById = new Map(files.map((file) => [file.id, file]));
+
   return trackIds.toSorted((leftId, rightId) => {
     return compareTrackNumbers(
       filesById.get(leftId)?.metadata?.trackNumber,

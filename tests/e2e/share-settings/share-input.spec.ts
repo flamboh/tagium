@@ -9,10 +9,12 @@ test("pasted share links add the album in place, then select it instead of addin
   upstreams,
 }) => {
   const video = await upstreams.youtube.video({ title: "Pasted Song" });
+
   const share = await createShare(
     request,
     albumManifest({ title: "Pasted Album", artist: "Sharer", tracks: [{ video }] }),
   );
+
   const albumButton = page.getByRole("button", { name: "Pasted Album Sharer · 1 track" });
 
   await page.goto("/");
@@ -72,6 +74,7 @@ test("pasted tagium links that can't be shares are rejected with a reason", asyn
   baseURL,
 }) => {
   await page.goto("/");
+
   for (const [link, reason] of [
     [`${baseURL}/share/not-valid`, "that isn’t a tagium share link"],
     [`https://tagium.app/share/abcdef?utm=1`, "that isn’t a tagium share link"],
@@ -81,5 +84,6 @@ test("pasted tagium links that can't be shares are rejected with a reason", asyn
     await expect(page.getByText(reason, { exact: true }), link).toBeVisible();
     await expect(page.getByRole("textbox", { name: "media url" })).toHaveValue(link);
   }
+
   await expect(page.getByText(/^library/u)).not.toBeAttached();
 });

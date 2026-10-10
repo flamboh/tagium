@@ -21,6 +21,7 @@ const stripMetadataControlCharacters = (value: string) =>
   Array.from(value)
     .filter((character) => {
       const code = character.charCodeAt(0);
+
       return code > 31 && code !== 127;
     })
     .join("");
@@ -34,22 +35,28 @@ export const makeMetadataFfmpegArgs = (
     if (!metadataKeys.has(name) || !value) return [];
 
     const sanitized = stripMetadataControlCharacters(value);
+
     if (!sanitized) return [];
+
     if (name === "sublanguage") {
       return ["-metadata:s:s:0", `language=${sanitized}`];
     }
+
     return ["-metadata", `${name}=${sanitized}`];
   });
 };
 
 export const outputFormatFromFilename = (filename: string) => {
   const extension = filename.slice(filename.lastIndexOf(".") + 1).toLowerCase();
+
   if (!extension || extension === filename.toLowerCase()) {
     throw new Error("cobalt local processing response is missing an output format.");
   }
+
   if (!/^[a-z0-9]{1,12}$/.test(extension)) {
     throw new Error("cobalt local processing response has an invalid output format.");
   }
+
   return extension;
 };
 
@@ -62,14 +69,19 @@ const appendMappedVideoAndAudio = (
   inputNames: readonly string[],
 ) => {
   const mediaCount = mediaInputCount(plan, inputNames);
+
   if (mediaCount === 2) {
     args.push("-map", "0:v:0", "-map", "1:a:0");
+
     return;
   }
+
   if (mediaCount === 1) {
     args.push("-map", "0:v:0", "-map", "0:a:0");
+
     return;
   }
+
   throw new Error("cobalt local processing response has an unexpected media tunnel count.");
 };
 
@@ -81,6 +93,7 @@ const appendSubtitleFlags = (
 ) => {
   if (!plan.output.subtitles) return;
   const subtitleInputIndex = mediaInputCount(plan, inputNames);
+
   if (subtitleInputIndex < 0 || !inputNames[subtitleInputIndex]) {
     throw new Error("cobalt local processing response is missing its subtitle tunnel.");
   }
@@ -96,30 +109,36 @@ const requireAudioSettings = (plan: CobaltLocalProcessingPlan): AudioSettings =>
   if (!plan.audio) {
     throw new Error("cobalt local processing response is missing audio settings.");
   }
+
   return plan.audio;
 };
 
 const appendAudioFlags = (args: string[], audio: AudioSettings, inputNames: readonly string[]) => {
   if (audio.cover && coverFormats.has(audio.format) && inputNames.length > 1) {
     args.push("-map", "0", "-map", "1");
+
     if (audio.cropCover) {
       args.push("-c:v", "mjpeg", "-vf", "scale=-1:720,crop=720:720");
     } else {
       args.push("-c:v", "copy");
     }
+
     if (audio.format === "m4a") {
       args.push("-disposition:v", "attached_pic");
     }
   } else {
     args.push("-vn");
   }
+
   if (audio.copy) {
     args.push("-c:a", "copy");
   } else {
     args.push("-b:a", `${audio.bitrate}k`);
+
     if (audio.format === "mp3" && audio.bitrate === "8") {
       args.push("-ar", "12000");
     }
+
     if (audio.format === "opus") {
       args.push("-vbr", "off");
     }
@@ -145,6 +164,7 @@ export const makeLocalProcessingFfmpegArgs = (
   }
 
   const format = outputFormatFromFilename(plan.output.filename);
+
   const args = [
     "-nostdin",
     "-y",
@@ -175,6 +195,7 @@ export const makeLocalProcessingFfmpegArgs = (
         args.push("-map", "0:v?", "-map", "0:a?", "-c", "copy");
         appendSubtitleFlags(args, plan, inputNames, format);
       }
+
       args.push(...makeMetadataFfmpegArgs(plan.output.metadata));
       break;
     case "audio":
@@ -199,7 +220,9 @@ export const makeLocalProcessingFfmpegArgs = (
         : format === "mkv"
           ? "matroska"
           : format;
+
   args.push("-f", outputContainer);
   args.push(outputName);
+
   return args;
 };

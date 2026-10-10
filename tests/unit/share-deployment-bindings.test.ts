@@ -16,6 +16,7 @@ describe("share deployment config contract", () => {
         { name: "COBALT_CLIENT_RATE_LIMITER", namespace_id: "1042702" },
       ],
     };
+
     configureShareDeploymentBindings(config, environment);
     const target = SHARE_DEPLOYMENT_RESOURCES[environment];
     expect(config.name).toBe("tagium");

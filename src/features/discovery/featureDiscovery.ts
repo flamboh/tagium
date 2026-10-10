@@ -18,6 +18,7 @@ const notify = () => {
 const loadSeenFlags = (storage?: Pick<Storage, "getItem">) => {
   try {
     const stored = (storage ?? localStorage).getItem(FEATURE_DISCOVERY_STORAGE_KEY);
+
     return stored === null ? {} : decodeSeenFlags(JSON.parse(stored));
   } catch {
     return {};
@@ -41,6 +42,7 @@ export const setFeatureSeen = (
   } catch {
     return;
   }
+
   notify();
 };
 
@@ -55,6 +57,7 @@ export const resetFeatureDiscovery = (storage?: Pick<Storage, "removeItem">) => 
   } catch {
     return;
   }
+
   notify();
 };
 
@@ -62,8 +65,10 @@ const subscribe = (listener: () => void) => {
   const onStorage = (event: StorageEvent) => {
     if (event.key === null || event.key === FEATURE_DISCOVERY_STORAGE_KEY) listener();
   };
+
   listeners.add(listener);
   globalThis.addEventListener?.("storage", onStorage);
+
   return () => {
     listeners.delete(listener);
     globalThis.removeEventListener?.("storage", onStorage);

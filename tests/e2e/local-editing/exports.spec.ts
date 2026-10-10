@@ -55,6 +55,7 @@ test("exports a loose track and an album on the first confirmation with unique n
     "albums/Fixture Album/cover.jpg",
     `singles/${fixtureTitle("mp3")}.mp3`,
   ]);
+
   for (const entry of entries.filter((file) => file.filename.endsWith(".mp3"))) {
     expect((await inspectAudio(entry)).metadata).toMatchObject({
       title: fixtureTitle("mp3"),
@@ -62,6 +63,7 @@ test("exports a loose track and an album on the first confirmation with unique n
     });
     await expectLosslessAudio(entry, tone.file);
   }
+
   const single = entries.find((entry) => entry.filename.startsWith("singles/"))!;
   expect((await inspectAudio(single)).metadata.albumArtist).toBe(audioFixtureTags.albumArtist);
 
@@ -113,9 +115,11 @@ for (const existingAlbumArtist of ["Various Artists", ""]) {
     page,
   }) => {
     await seedSettings(page, { advancedMetadata: true });
+
     const source = await retaggedAudioFixture("mp3", "single.mp3", {
       albumArtist: existingAlbumArtist,
     });
+
     await page.goto("/");
     await pickFiles(page, [source.upload]);
     await expect(field(page, "title")).toHaveValue(fixtureTitle("mp3"));

@@ -29,6 +29,7 @@ const metadataGenreSchema = Schema.Union([
 ]);
 
 const metadataPictureArraySchema = Schema.mutable(Schema.Array(metadataPictureSchema));
+
 const advancedNumberSchema = Schema.Number.check(
   Schema.isInt(),
   Schema.isBetween({ minimum: 1, maximum: 999 }),
@@ -71,7 +72,9 @@ const metadataPatchSchema = Schema.Struct({
 });
 
 export const audioMetadataSchema = metadataSnapshotSchema;
+
 export const audioMetadataPatchSchema = metadataPatchSchema;
 
 export type MetadataPatch = Schema.Schema.Type<typeof metadataPatchSchema>;
+
 export type AudioMetadata = Schema.Schema.Type<typeof metadataSnapshotSchema>;

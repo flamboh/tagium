@@ -97,6 +97,7 @@ const cobaltResponseSchema = Schema.Union([
 ]);
 
 type CobaltResponse = Schema.Schema.Type<typeof cobaltResponseSchema>;
+
 type CobaltAudioResult = {
   response: CobaltResponse;
   machineId: string | undefined;
@@ -114,16 +115,19 @@ type AudioDownloadFormat = Schema.Schema.Type<typeof audioRequestSchema>["audioF
  */
 const cobaltAudioFormat = (url: string, requestedFormat: AudioDownloadFormat) => {
   let isSoundCloud = false;
+
   try {
     const source = new URL(url);
     isSoundCloud = source.protocol === "https:" && isSoundCloudHost(source.hostname);
   } catch {
     // The request schema reports invalid URLs before this policy is reached.
   }
+
   return requestedFormat === "best" && (Boolean(getYouTubeVideoId(url)) || isSoundCloud)
     ? "best"
     : "mp3";
 };
+
 interface CobaltAudioLogDetails {
   stage?: string;
   elapsedMs: number;
@@ -136,6 +140,7 @@ interface CobaltAudioLogDetails {
   failureReason?: string;
   errorType?: string;
 }
+
 interface CobaltAudioLogEntry extends CobaltAudioLogDetails {
   event: "cobalt_audio_completion" | "cobalt_audio_failure";
   requestId: string;
@@ -143,6 +148,7 @@ interface CobaltAudioLogEntry extends CobaltAudioLogDetails {
   importId?: string;
   trackIndex?: number;
 }
+
 type CobaltRuntimeEnv = {
   COBALT_ALLOWED_ORIGIN?: string;
   COBALT_API_KEY?: string;
@@ -151,6 +157,7 @@ type CobaltRuntimeEnv = {
   COBALT_MACHINE_AFFINITY_SECRET?: string;
   COBALT_SESSION_RATE_LIMITER?: CloudflareRateLimitBinding;
 } & DevControlRuntimeEnv;
+
 type CloudflareRequest = Request & {
   runtime?: {
     cloudflare?: {
@@ -188,9 +195,11 @@ const getCobaltHeaders = (
   });
 
   if (context.importId) headers.set("X-Tagium-Import-Id", context.importId);
+
   if (context.trackIndex !== undefined) {
     headers.set("X-Tagium-Track-Index", String(context.trackIndex));
   }
+
   if (runtimeEnv.COBALT_API_KEY) {
     headers.set("Authorization", `Api-Key ${runtimeEnv.COBALT_API_KEY}`);
   }
@@ -222,11 +231,13 @@ const getAllowedOrigin = (
 
 const enforceSameOrigin = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
   const requestOrigin = getRequestOrigin(request);
+
   if (!requestOrigin) {
     return new Response("Download requests require an Origin header.", { status: 403 });
   }
 
   const allowedOrigin = getAllowedOrigin(request, requestOrigin, runtimeEnv);
+
   if (requestOrigin !== allowedOrigin) {
     return new Response("Download origin is not allowed.", { status: 403 });
   }
@@ -279,6 +290,7 @@ const requestCobaltAudio = async (
     });
   } catch (error) {
     let code = "error.api.unreachable";
+
     if (error instanceof Error && error.message.includes("timed out")) {
       code = "error.api.timed_out";
     }
@@ -297,6 +309,7 @@ const requestCobaltAudio = async (
 
   const upstreamStatus = response.status;
   const contentType = response.headers.get("content-type") ?? undefined;
+
   try {
     return {
       response: await parseCobaltJson(response),
@@ -308,6 +321,7 @@ const requestCobaltAudio = async (
   } catch (error) {
     const invalidMachineId =
       error instanceof Error && error.message === "Cobalt returned invalid machine id.";
+
     const failureReason = invalidMachineId
       ? "invalid_machine_id"
       : error instanceof Error && error.message.startsWith("Cobalt API returned non-JSON")
@@ -345,9 +359,12 @@ const logCobaltAudioEvent = (
     sourceFingerprint,
     ...details,
   };
+
   if (context.importId) entry.importId = context.importId;
+
   if (context.trackIndex !== undefined) entry.trackIndex = context.trackIndex;
   const serialized = JSON.stringify(entry);
+
   if (event === "cobalt_audio_failure") {
     console.warn(serialized);
   } else {
@@ -365,6 +382,7 @@ const cobaltErrorResponse = (message: string) =>
 
 const cobaltCapacityErrorResponse = (response: CobaltResponse, retryAfter: string | undefined) => {
   const headers = new Headers({ "Content-Type": "application/json" });
+
   if (retryAfter) {
     headers.set("Retry-After", retryAfter);
   }
@@ -418,16 +436,21 @@ const toTunnelProxyUrl = (
 ) => {
   const proxyUrl = new URL("/api/cobalt/tunnel", request.url);
   proxyUrl.searchParams.set("url", tunnelUrl);
+
   if (machineId) {
     proxyUrl.searchParams.set("machine", machineId);
     proxyUrl.searchParams.set("signature", signCobaltMachine(runtimeEnv, tunnelUrl, machineId));
   }
+
   proxyUrl.searchParams.set("parentRequestId", context.requestId);
   proxyUrl.searchParams.set("sourceFingerprint", sourceFingerprint);
+
   if (context.importId) proxyUrl.searchParams.set("importId", context.importId);
+
   if (context.trackIndex !== undefined) {
     proxyUrl.searchParams.set("trackIndex", String(context.trackIndex));
   }
+
   return `${proxyUrl.pathname}${proxyUrl.search}`;
 };
 
@@ -465,6 +488,7 @@ const withYearMetadata = (
   year: number | undefined,
 ) => {
   if (year === undefined) return response;
+
   return {
     ...response,
     output: {
@@ -491,6 +515,7 @@ const admissionLimitedResponse = () =>
 
 const withAdmissionCookie = (response: Response, setCookie: string | undefined) => {
   if (setCookie) response.headers.append("Set-Cookie", setCookie);
+
   return response;
 };
 
@@ -499,15 +524,18 @@ export default defineHandler(async (event) => {
   let context = getRequestLogContext(event.req);
   let sourceFingerprint: string | undefined;
   let sourceUrl: string | undefined;
+
   try {
     const runtimeEnv = getRuntimeEnv(event.req);
     const forbidden = enforceSameOrigin(event.req, runtimeEnv);
+
     if (forbidden) {
       return forbidden;
     }
 
     const devFault = consumeAudioDevFault(event.req, runtimeEnv);
     const devFaultResponse = cobaltDevFaultResponse(devFault);
+
     if (devFaultResponse) {
       return devFaultResponse;
     }
@@ -516,20 +544,26 @@ export default defineHandler(async (event) => {
     sourceUrl = body.url;
     context = getRequestLogContext(event.req, body.url);
     const requestSourceFingerprint = await fingerprintUrl(body.url);
+
     if (!requestSourceFingerprint) throw new Error("Download URL fingerprint is unavailable.");
     sourceFingerprint = requestSourceFingerprint;
 
     const admission = getCobaltRequestAdmission(event.req, runtimeEnv);
+
     if (!admission) return admissionUnavailableResponse();
 
     const admissionDecision = await admission.admit(event.req);
+
     const respond = (response: Response) => {
       response.headers.set("X-Tagium-Request-Id", context.requestId);
+
       return withAdmissionCookie(response, admissionDecision.setCookie);
     };
+
     if (admissionDecision.status === "unavailable") {
       return respond(admissionUnavailableResponse());
     }
+
     if (admissionDecision.status === "limited") {
       return respond(admissionLimitedResponse());
     }
@@ -540,6 +574,7 @@ export default defineHandler(async (event) => {
         : getYouTubeVideoId(body.url)
           ? resolveYouTubeUploadYear(body.url, { signal: event.req.signal }).catch(() => undefined)
           : Promise.resolve(undefined);
+
     const cobaltResult = await requestCobaltAudio(
       runtimeEnv,
       body.url,
@@ -549,21 +584,28 @@ export default defineHandler(async (event) => {
       context,
       requestSourceFingerprint,
     );
+
     const cobaltResponse = cobaltResult.response;
 
     if (cobaltResponse.status === CobaltResponseType.Error) {
       const stage = cobaltResult.failureStage ?? "cobalt.resolve_error";
+
       const failureDetails: CobaltAudioLogDetails = {
         stage,
         elapsedMs: Date.now() - startedAt,
         errorCode: cobaltResponse.error.code,
       };
+
       if (cobaltResult.upstreamStatus !== undefined) {
         failureDetails.upstreamStatus = cobaltResult.upstreamStatus;
       }
+
       if (cobaltResult.contentType) failureDetails.contentType = cobaltResult.contentType;
+
       if (cobaltResult.retryAfter) failureDetails.retryAfter = cobaltResult.retryAfter;
+
       if (cobaltResult.machineId) failureDetails.machineId = cobaltResult.machineId;
+
       if (cobaltResult.failureReason) failureDetails.failureReason = cobaltResult.failureReason;
       reportDownloadFailure({
         route: "audio",
@@ -585,9 +627,11 @@ export default defineHandler(async (event) => {
         elapsedMs: Date.now() - startedAt,
         outcome: cobaltResponse.status,
       };
+
       if (cobaltResult.upstreamStatus !== undefined) {
         completionDetails.upstreamStatus = cobaltResult.upstreamStatus;
       }
+
       if (cobaltResult.machineId) completionDetails.machineId = cobaltResult.machineId;
       logCobaltAudioEvent(
         "cobalt_audio_completion",
@@ -610,6 +654,7 @@ export default defineHandler(async (event) => {
         cobaltResponse,
         (await yearPromise) ?? body.fallbackYear,
       );
+
       return respond(
         localProcessingResponse(
           event.req,
@@ -673,6 +718,7 @@ export default defineHandler(async (event) => {
         errorCode: "error.api.handler_failure",
       });
     }
+
     if (error instanceof Error) {
       return cobaltErrorResponse(error.message);
     }

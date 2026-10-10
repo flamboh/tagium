@@ -1,19 +1,24 @@
 const encoder = new TextEncoder();
+
 const CRC_POLYNOMIAL = 0x04c1_1db7;
 
 export const concatOpusFixtureBytes = (...parts: Uint8Array[]) => {
   const output = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));
   let offset = 0;
+
   for (const part of parts) {
     output.set(part, offset);
     offset += part.length;
   }
+
   return output;
 };
 
 const le16 = (value: number) => Uint8Array.of(value, value >>> 8);
+
 const le32 = (value: number) =>
   Uint8Array.of(value, value >>> 8, value >>> 16, value >>> 24).map((byte) => byte & 0xff);
+
 const be32 = (value: number) =>
   Uint8Array.of(value >>> 24, value >>> 16, value >>> 8, value).map((byte) => byte & 0xff);
 
@@ -23,6 +28,7 @@ const writeLe32 = (bytes: Uint8Array, offset: number, value: number) => {
 
 const writeLe64 = (bytes: Uint8Array, offset: number, value: bigint) => {
   let remaining = value < 0 ? 0xffff_ffff_ffff_ffffn : value;
+
   for (let index = 0; index < 8; index++) {
     bytes[offset + index] = Number(remaining & 0xffn);
     remaining >>= 8n;
@@ -31,13 +37,16 @@ const writeLe64 = (bytes: Uint8Array, offset: number, value: bigint) => {
 
 export const opusFixtureCrc = (bytes: Uint8Array, clearStoredChecksum = false) => {
   let crc = 0;
+
   for (let index = 0; index < bytes.length; index++) {
     const byte = clearStoredChecksum && index >= 22 && index < 26 ? 0 : bytes[index]!;
     crc = (crc ^ (byte << 24)) >>> 0;
+
     for (let bit = 0; bit < 8; bit++) {
       crc = ((crc & 0x8000_0000) !== 0 ? (crc << 1) ^ CRC_POLYNOMIAL : crc << 1) >>> 0;
     }
   }
+
   return crc;
 };
 
@@ -66,6 +75,7 @@ export const opusOggPage = ({
   page.set(segments, 27);
   page.set(body, 27 + segments.length);
   writeLe32(page, 22, opusFixtureCrc(page));
+
   return page;
 };
 
@@ -98,6 +108,7 @@ export const opusTagsPacket = (
 ) => {
   const vendorBytes = encoder.encode(vendor);
   const commentBytes = comments.map((comment) => encoder.encode(comment));
+
   return concatOpusFixtureBytes(
     encoder.encode("OpusTags"),
     le32(vendorBytes.length),
@@ -121,6 +132,7 @@ export const opusPictureBlock = ({
 } = {}) => {
   const mime = encoder.encode(format);
   const descriptionBytes = encoder.encode(description);
+
   return concatOpusFixtureBytes(
     be32(type),
     be32(mime.length),
@@ -139,6 +151,7 @@ export const opusPictureBlock = ({
 export const opusFixtureBase64 = (bytes: Uint8Array) => {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   let output = "";
+
   for (let offset = 0; offset < bytes.length; offset += 3) {
     const first = bytes[offset]!;
     const hasSecond = offset + 1 < bytes.length;
@@ -150,6 +163,7 @@ export const opusFixtureBase64 = (bytes: Uint8Array) => {
     output += hasSecond ? alphabet[((second & 15) << 2) | (third >>> 6)] : "=";
     output += hasThird ? alphabet[third & 63] : "=";
   }
+
   return output;
 };
 
@@ -166,14 +180,17 @@ export const paginateOpusFixturePacket = ({
 }) => {
   const lacing: number[] = [];
   let remaining = packet.length;
+
   while (remaining >= 255) {
     lacing.push(255);
     remaining -= 255;
   }
+
   lacing.push(remaining);
   const pages: Uint8Array[] = [];
   let laceOffset = 0;
   let bodyOffset = 0;
+
   while (laceOffset < lacing.length) {
     const pageLacing = lacing.slice(laceOffset, laceOffset + maxSegments);
     const bodyLength = pageLacing.reduce((total, length) => total + length, 0);
@@ -191,6 +208,7 @@ export const paginateOpusFixturePacket = ({
     laceOffset += pageLacing.length;
     bodyOffset += bodyLength;
   }
+
   return pages;
 };
 
@@ -225,12 +243,14 @@ export const validOpusBytes = ({
     headerType: 2,
     granulePosition: 0n,
   });
+
   const tagPages = paginateOpusFixturePacket({
     packet: opusTagsPacket(comments, trailing, vendor),
     serial,
     firstSequence: 1,
     maxSegments: tagMaxSegments,
   });
+
   const audioPages = audioBodies.map((body, index) =>
     opusOggPage({
       body,
@@ -244,5 +264,6 @@ export const validOpusBytes = ({
           : BigInt(preSkip + Math.floor((96_000 * (index + 1)) / audioBodies.length)),
     }),
   );
+
   return concatOpusFixtureBytes(headPage, ...tagPages, ...audioPages);
 };

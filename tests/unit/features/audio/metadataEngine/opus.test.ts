@@ -30,6 +30,7 @@ interface FixturePage {
 const fixturePages = (bytes: Uint8Array) => {
   const pages: FixturePage[] = [];
   let offset = 0;
+
   while (offset < bytes.length) {
     const segmentCount = bytes[offset + 26]!;
     const segments = bytes.slice(offset + 27, offset + 27 + segmentCount);
@@ -45,6 +46,7 @@ const fixturePages = (bytes: Uint8Array) => {
     });
     offset += length;
   }
+
   return pages;
 };
 
@@ -56,8 +58,10 @@ const containsBytes = (haystack: Uint8Array, needle: Uint8Array) => {
     for (let index = 0; index < needle.length; index++) {
       if (haystack[offset + index] !== needle[index]) continue outer;
     }
+
     return true;
   }
+
   return false;
 };
 
@@ -129,10 +133,13 @@ describe("Opus metadata driver", () => {
       headerType: 4,
       granulePosition: 480_312n + 480_000n,
     });
+
     const bytes = validOpusBytes({ audioBodies: [embeddedPage] });
+
     const inspected = await Effect.runPromise(
       opusDriver.inspect(makeBlobByteSource(new Blob([bytes]))),
     );
+
     expect(inspected.metadata.duration).toBe(2);
   });
 
@@ -145,12 +152,14 @@ describe("Opus metadata driver", () => {
     const serial = 0x5566_7788;
     const head = opusHeadPacket();
     const tags = opusTagsPacket(["TITLE=empty page"]);
+
     const zeroSegmentPage = opusOggPage({
       body: new Uint8Array(),
       segments: new Uint8Array(),
       serial,
       sequence: 2,
     });
+
     const audioPage = opusOggPage({
       body: Uint8Array.of(0xf8, 1, 2),
       segments: Uint8Array.of(3),
@@ -159,6 +168,7 @@ describe("Opus metadata driver", () => {
       headerType: 4,
       granulePosition: 96_312n,
     });
+
     const followedByAudio = concatOpusFixtureBytes(
       opusOggPage({
         body: head,
@@ -176,6 +186,7 @@ describe("Opus metadata driver", () => {
       zeroSegmentPage,
       audioPage,
     );
+
     await expect(
       Effect.runPromise(opusDriver.inspect(makeBlobByteSource(new Blob([followedByAudio])))),
     ).rejects.toMatchObject({ _tag: "AudioMetadataReadError" });
@@ -189,6 +200,7 @@ describe("Opus metadata driver", () => {
       coupled: 0,
       indices: [0, 0],
     });
+
     const inspected = await Effect.runPromise(
       opusDriver.inspect(makeBlobByteSource(new Blob([validOpusBytes({ head })]))),
     );
@@ -211,22 +223,27 @@ describe("Opus metadata driver", () => {
     expect(await outputBytes(equivalent.parts)).not.toEqual(original);
 
     const singleTitle = validOpusBytes();
+
     const sameValue = await Effect.runPromise(
       opusDriver.patch(makeBlobByteSource(new Blob([singleTitle])), {
         title: "fixture title",
       }),
     );
+
     expect(sameValue.parts).toHaveLength(1);
     expect(await outputBytes(sameValue.parts)).toEqual(singleTitle);
   });
 
   it("patches all editable fields while preserving unknown comments, trailing data, and audio bodies", async () => {
     const trailing = Uint8Array.of(0x01, 0xff, 0x80, 0, 0xde, 0xad, 0xbe, 0xef);
+
     const audioBodies = [
       Uint8Array.of(0xf8, 0xaa, 0xbb, 0xcc),
       Uint8Array.of(0xf8, 0x10, 0x20, 0x30, 0x40),
     ];
+
     const original = validOpusBytes({ comments, trailing, audioBodies });
+
     const plan = await Effect.runPromise(
       opusDriver.patch(makeBlobByteSource(new Blob([original])), {
         title: "Changed 🦊",
@@ -252,7 +269,9 @@ describe("Opus metadata driver", () => {
         ],
       }),
     );
+
     const patched = await outputBytes(plan.parts);
+
     const inspected = await Effect.runPromise(
       opusDriver.inspect(makeBlobByteSource(new Blob([patched]))),
     );
@@ -296,10 +315,13 @@ describe("Opus metadata driver", () => {
         picture: [],
       }),
     );
+
     const cleared = await outputBytes(clearedPlan.parts);
+
     const clearedInspection = await Effect.runPromise(
       opusDriver.inspect(makeBlobByteSource(new Blob([cleared]))),
     );
+
     expect(clearedInspection.metadata).toMatchObject({
       title: "",
       genre: "",
@@ -329,6 +351,7 @@ describe("Opus metadata driver", () => {
     const inspected = await Effect.runPromise(
       opusDriver.inspect(makeBlobByteSource(new Blob([validOpusBytes({ comments })]))),
     );
+
     expect(inspected.metadata.comment).toBe(expected);
   });
 
@@ -338,32 +361,42 @@ describe("Opus metadata driver", () => {
       const original = validOpusBytes({
         comments: ["dEsCrIpTiOn=Separate description", "comment=Primary comment"],
       });
+
       const inspected = await Effect.runPromise(
         opusDriver.inspect(makeBlobByteSource(new Blob([original]))),
       );
+
       expect(inspected.metadata.comment).toBe("Primary comment");
+
       const plan = await Effect.runPromise(
         opusDriver.patch(makeBlobByteSource(new Blob([original])), { comment }),
       );
+
       const patched = await outputBytes(plan.parts);
       expect(new TextDecoder().decode(patched)).toContain("dEsCrIpTiOn=Separate description");
       expect(new TextDecoder().decode(patched)).not.toContain("Primary comment");
+
       const updated = await Effect.runPromise(
         opusDriver.inspect(makeBlobByteSource(new Blob([patched]))),
       );
+
       expect(updated.metadata.comment).toBe(comment || "Separate description");
     },
   );
 
   it("preserves DESCRIPTION when an empty COMMENT was displayed", async () => {
     const original = validOpusBytes({ comments: ["DESCRIPTION=Separate description", "COMMENT="] });
+
     const inspected = await Effect.runPromise(
       opusDriver.inspect(makeBlobByteSource(new Blob([original]))),
     );
+
     expect(inspected.metadata.comment).toBe("");
+
     const plan = await Effect.runPromise(
       opusDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "Updated" }),
     );
+
     expect(new TextDecoder().decode(await outputBytes(plan.parts))).toContain(
       "DESCRIPTION=Separate description",
     );
@@ -373,22 +406,27 @@ describe("Opus metadata driver", () => {
     const original = validOpusBytes({
       comments: ["DESCRIPTION=FFmpeg comment", "X-private=opaque value"],
     });
+
     const patchedPlan = await Effect.runPromise(
       opusDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "Updated" }),
     );
+
     const patched = await outputBytes(patchedPlan.parts);
     const patchedText = new TextDecoder().decode(patched);
     expect(patchedText).toContain("COMMENT=Updated");
     expect(patchedText).not.toContain("FFmpeg comment");
     expect(patchedText).toContain("X-private=opaque value");
+
     const inspected = await Effect.runPromise(
       opusDriver.inspect(makeBlobByteSource(new Blob([patched]))),
     );
+
     expect(inspected.metadata.comment).toBe("Updated");
 
     const clearedPlan = await Effect.runPromise(
       opusDriver.patch(makeBlobByteSource(new Blob([original])), { comment: "" }),
     );
+
     const clearedText = new TextDecoder().decode(await outputBytes(clearedPlan.parts));
     expect(clearedText).not.toMatch(/COMMENT=|DESCRIPTION=/iu);
     expect(clearedText).toContain("X-private=opaque value");
@@ -404,6 +442,7 @@ describe("Opus metadata driver", () => {
         title: "x".repeat(70_000),
       }),
     );
+
     const patched = await outputBytes(plan.parts);
     const pages = fixturePages(patched);
 
@@ -414,12 +453,15 @@ describe("Opus metadata driver", () => {
     expect(pages[2]!.headerType & 1).toBe(1);
     expect(pages[2]!.segments.at(-1)).toBeLessThan(255);
     expect(pages.slice(-2).map((page) => page.body)).toEqual(audioBodies);
+
     for (const page of pages) {
       expect(opusFixtureCrc(page.bytes, true)).toBe(readLe32(page.bytes, 22));
     }
+
     const inspected = await Effect.runPromise(
       opusDriver.inspect(makeBlobByteSource(new Blob([patched]))),
     );
+
     expect(inspected.metadata.title).toBe("x".repeat(70_000));
   });
 
@@ -436,6 +478,7 @@ describe("Opus metadata driver", () => {
     const invalidPicture = validOpusBytes({
       comments: ["METADATA_BLOCK_PICTURE=not base64"],
     });
+
     await expect(
       Effect.runPromise(opusDriver.inspect(makeBlobByteSource(new Blob([invalidPicture])))),
     ).rejects.toMatchObject({ _tag: "AudioMetadataReadError" });
@@ -443,6 +486,7 @@ describe("Opus metadata driver", () => {
     const head = opusHeadPacket();
     const tags = opusTagsPacket(["TITLE=bad framing"]);
     const serial = 0x5566_7788;
+
     const badFraming = concatOpusFixtureBytes(
       opusOggPage({
         body: head,
@@ -466,6 +510,7 @@ describe("Opus metadata driver", () => {
         granulePosition: 96_312n,
       }),
     );
+
     await expect(
       Effect.runPromise(opusDriver.inspect(makeBlobByteSource(new Blob([badFraming])))),
     ).rejects.toMatchObject({ _tag: "AudioMetadataReadError" });
@@ -477,6 +522,7 @@ describe("Opus metadata driver", () => {
       coupled: 4,
       indices: [0, 1, 2, 3, 4, 5, 6, 7, 8],
     });
+
     await expect(
       Effect.runPromise(
         opusDriver.inspect(
@@ -494,6 +540,7 @@ describe("Opus metadata driver", () => {
       sequence: 0,
       headerType: 2 | 4,
     });
+
     const grouped = concatOpusFixtureBytes(validOpusBytes(), groupedPage);
     await expect(
       Effect.runPromise(opusDriver.inspect(makeBlobByteSource(new Blob([grouped])))),
@@ -505,6 +552,7 @@ describe("Opus metadata driver", () => {
       description: "",
       data: Uint8Array.of(1),
     }));
+
     await expect(
       Effect.runPromise(
         opusDriver.patch(makeBlobByteSource(new Blob([validOpusBytes()])), {

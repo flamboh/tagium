@@ -26,5 +26,6 @@ export const unexpected = (route: string, key: string | null = null): FakeResult
 
 export const hangThenFail = async (registry: Registry, key: string) => {
   await registry.hang(key);
+
   return new Response("e2e harness: hung request released", { status: 599 });
 };

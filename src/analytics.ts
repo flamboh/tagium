@@ -5,14 +5,23 @@ import type { MediaLinkKind } from "@/lib/media-link";
 export type { MediaLinkKind } from "@/lib/media-link";
 
 export type AudioUploadTargetKind = "loose" | "album";
+
 export type ImportKind = "single" | "set";
+
 export type ImportOutcome = "completed" | "partial" | "failed" | "canceled";
+
 export type ExportKind = "track" | "album" | "library";
+
 export type TrackSourceMix = "local" | "imported" | "mixed" | "unknown";
+
 export type AnalyticsProvider = "youtube" | "soundcloud" | "other";
+
 export type AnalyticsProviderScope = AnalyticsProvider | "mixed";
+
 export type AnalyticsAppId = "tagium" | "tagium-save";
+
 export type AnalyticsRequestedFormat = "best" | "mp3" | "opus";
+
 export type AnalyticsOutputFormat =
   | "mp3"
   | "m4a"
@@ -30,13 +39,21 @@ export type AnalyticsOutputFormat =
   | "webp"
   | "zip"
   | "other";
+
 export type DownloadMode = "auto" | "audio" | "mute";
+
 export type DownloadVideoQuality = "1080" | "720" | "480";
+
 export type DownloadVideoContainer = "mp4" | "webm" | "mkv";
+
 export type DownloadVideoCodec = "h264" | "av1" | "vp9";
+
 export type DownloadResultKind = "file" | "picker";
+
 export type DownloadFailureStage = "planning" | "tunnel" | "processing" | "finalizing";
+
 export type ImportFailureStage = "plan" | "tunnel" | "processing" | "hydration";
+
 export type ImportFailureCode =
   | "capacity"
   | "rate_limited"
@@ -50,12 +67,15 @@ export type ImportFailureCode =
   | "private_or_missing"
   | "invalid_response"
   | "unknown";
+
 export type CobaltTunnelOutcome = "ready" | "recovered" | "exhausted" | "non_retryable";
+
 export type CobaltTunnelElapsedBucket =
   | "under_1_second"
   | "1_to_5_seconds"
   | "5_to_15_seconds"
   | "15_seconds_or_more";
+
 export type AnalyticsErrorCode =
   | "capacity"
   | "rate_limited"
@@ -289,6 +309,7 @@ export const analyticsProviderFromUrl = (sourceUrl: string): AnalyticsProvider =
   try {
     const url = new URL(sourceUrl);
     const host = url.hostname.toLowerCase();
+
     if (
       [
         "youtube.com",
@@ -301,6 +322,7 @@ export const analyticsProviderFromUrl = (sourceUrl: string): AnalyticsProvider =
       ].includes(host)
     )
       return "youtube";
+
     if (
       [
         "soundcloud.com",
@@ -314,12 +336,15 @@ export const analyticsProviderFromUrl = (sourceUrl: string): AnalyticsProvider =
   } catch {
     // Invalid and non-web URLs are intentionally grouped with other providers.
   }
+
   return "other";
 };
 
 const errorCodeFrom = (error: Error): AnalyticsErrorCode => {
   const message = error.message;
+
   if (message.includes("error.api.capacity_exceeded")) return "capacity";
+
   if (
     message.includes("error.api.rate_exceeded") ||
     message.includes("Cobalt tunnel request failed (429)") ||
@@ -327,26 +352,33 @@ const errorCodeFrom = (error: Error): AnalyticsErrorCode => {
   ) {
     return "rate_limited";
   }
+
   if (
     message.includes("error.api.unreachable") ||
     message.includes("COBALT_API_URL is not configured")
   ) {
     return "service_unavailable";
   }
+
   if (message.includes("error.api.timed_out") || /\btimed?\s*out\b/i.test(message)) {
     return "timeout";
   }
+
   if (/could not be parsed|decode|metadata read/i.test(message)) return "parse_failed";
+
   if (/metadata.*(?:write|appl)|write.*metadata/i.test(message)) return "metadata_write_failed";
+
   return "unknown";
 };
 
 type AnalyticsProperty = string | number | boolean | Date | null | undefined;
+
 interface AnalyticsProperties {
   [key: string]: AnalyticsProperty;
 }
 
 const COMMON_CUSTOM_PROPERTIES = ["event_version", "deploy_env", "release_sha", "app_id"];
+
 const CUSTOM_EVENT_PROPERTIES = {
   media_link_processed: new Set([
     ...COMMON_CUSTOM_PROPERTIES,
@@ -518,11 +550,14 @@ const CUSTOM_EVENT_PROPERTIES = {
     "failure_code",
   ]),
 } satisfies Partial<Record<AnalyticsEvent["type"], ReadonlySet<string>>>;
+
 const SAFE_SDK_EVENTS = new Set(["$pageview", "$pageleave", "$autocapture", "$web_vitals"]);
+
 const FIRST_PARTY_HOST_BY_APP = {
   tagium: "tagium.app",
   "tagium-save": "save.tagium.app",
 } as const satisfies Record<AnalyticsAppId, string>;
+
 const SAFE_SDK_PROPERTIES = new Set([
   "token",
   "distinct_id",
@@ -556,18 +591,27 @@ const SAFE_SDK_PROPERTIES = new Set([
   "$process_person_profile",
   "$geoip_disable",
 ]);
+
 const SENSITIVE_PROPERTY_NAME =
   /(?:url|href|referrer|pathname|host|filename|artist|album|artwork|message|response|body|tunnel|text|elements)/i;
+
 const URL_VALUE = /https?:\/\//i;
+
 const WEB_VITAL_VALUE_PROPERTY = /^\$web_vitals_(?:CLS|FCP|INP|LCP)_value$/;
+
 const isString = Schema.is(Schema.String);
+
 const isNumber = Schema.is(Schema.Number);
+
 const isBoolean = Schema.is(Schema.Boolean);
+
 const normalizeFirstPartyHost = (value: AnalyticsProperty, appId: AnalyticsAppId) => {
   if (!isString(value)) return undefined;
   const normalizedHost = value.toLowerCase();
+
   return normalizedHost === FIRST_PARTY_HOST_BY_APP[appId] ? normalizedHost : undefined;
 };
+
 const normalizeConfiguredAnalyticsHost = (
   value: AnalyticsProperty,
   configuredHost: string | undefined,
@@ -575,20 +619,30 @@ const normalizeConfiguredAnalyticsHost = (
   if (!isString(value) || !configuredHost) return undefined;
   const normalizedValue = value.toLowerCase().replace(/\/+$/, "");
   const normalizedConfiguredHost = configuredHost.toLowerCase().replace(/\/+$/, "");
+
   return normalizedValue === normalizedConfiguredHost ? normalizedConfiguredHost : undefined;
 };
+
 type AnalyticsPropertyValidator = (value: AnalyticsProperty) => boolean;
+
 const isOneOf =
   <Value extends string>(values: readonly Value[]) =>
   (value: AnalyticsProperty): value is Value =>
     isString(value) && values.some((candidate) => candidate === value);
+
 const isBoundedTunnelAttempt = (value: AnalyticsProperty) =>
   isNumber(value) && Number.isInteger(value) && value >= 1 && value <= 7;
+
 const isAnalyticsProvider = isOneOf(["youtube", "soundcloud", "other"] as const);
+
 const isAnalyticsProviderScope = isOneOf(["youtube", "soundcloud", "other", "mixed"] as const);
+
 const isImportKind = isOneOf(["single", "set"] as const);
+
 const isImportOutcome = isOneOf(["completed", "partial", "failed", "canceled"] as const);
+
 const isImportFailureStage = isOneOf(["plan", "tunnel", "processing", "hydration"] as const);
+
 const isImportFailureCode = isOneOf([
   "capacity",
   "rate_limited",
@@ -603,31 +657,44 @@ const isImportFailureCode = isOneOf([
   "invalid_response",
   "unknown",
 ] as const);
+
 const isNonNegativeInteger = (value: AnalyticsProperty) =>
   isNumber(value) && Number.isInteger(value) && value >= 0;
+
 const isPositiveInteger = (value: AnalyticsProperty) =>
   isNumber(value) && Number.isInteger(value) && value > 0;
+
 const isNonNegativeNumber = (value: AnalyticsProperty) =>
   isNumber(value) && Number.isFinite(value) && value >= 0;
+
 const isMediaKind = isOneOf(["media", "track", "playlist", "unsupported"] as const);
+
 const isMediaLinkKind = isOneOf(["canonical", "short", "mobile", "nocookie", "other"] as const);
+
 const isMediaLinkOutcome = isOneOf(["accepted", "rejected"] as const);
+
 const isMediaLinkFailure = isOneOf(["invalid", "unsupported", "resolution_failed"] as const);
+
 const isCobaltTunnelOutcome = isOneOf([
   "ready",
   "recovered",
   "exhausted",
   "non_retryable",
 ] as const);
+
 const isCobaltTunnelElapsedBucket = isOneOf([
   "under_1_second",
   "1_to_5_seconds",
   "5_to_15_seconds",
   "15_seconds_or_more",
 ] as const);
+
 const isShareKind = isOneOf(["album", "track"] as const);
+
 const isShareViewer = isOneOf(["creator", "recipient"] as const);
+
 const isRequestedFormat = isOneOf(["best", "mp3", "opus"] as const);
+
 const isOutputFormat = isOneOf([
   "mp3",
   "m4a",
@@ -646,14 +713,23 @@ const isOutputFormat = isOneOf([
   "zip",
   "other",
 ] as const);
+
 const isDownloadMode = isOneOf(["auto", "audio", "mute"] as const);
+
 const isDownloadVideoQuality = isOneOf(["1080", "720", "480"] as const);
+
 const isDownloadVideoContainer = isOneOf(["mp4", "webm", "mkv"] as const);
+
 const isDownloadVideoCodec = isOneOf(["h264", "av1", "vp9"] as const);
+
 const isDownloadResultKind = isOneOf(["file", "picker"] as const);
+
 const isDownloadOutcome = isOneOf(["completed", "failed", "canceled"] as const);
+
 const isDownloadFailureStage = isOneOf(["planning", "tunnel", "processing", "finalizing"] as const);
+
 const isExportKind = isOneOf(["track", "album", "library"] as const);
+
 const isAnalyticsErrorCode = isOneOf([
   "capacity",
   "rate_limited",
@@ -666,17 +742,22 @@ const isAnalyticsErrorCode = isOneOf([
   "invalid_response",
   "unknown",
 ] as const);
+
 const isSizeBucket = isOneOf([
   "under_10_mb",
   "10_to_100_mb",
   "100_to_500_mb",
   "500_mb_or_more",
 ] as const);
+
 const MAX_CONTENT_TITLE_LENGTH = 200;
+
 const isSafeContentTitleCharacter = (character: string) => {
   const code = character.charCodeAt(0);
+
   return code > 31 && code !== 127;
 };
+
 const isContentTitle = (value: AnalyticsProperty) =>
   isString(value) &&
   value.trim().length > 0 &&
@@ -816,45 +897,63 @@ const redactAndValidateEvent = (
   const customAllowedProperties = Object.entries(CUSTOM_EVENT_PROPERTIES).find(
     ([eventName]) => eventName === event.event,
   )?.[1];
+
   const customPropertyValidators = Object.entries(CUSTOM_PROPERTY_VALIDATORS).find(
     ([eventName]) => eventName === event.event,
   )?.[1];
+
   const isSdkEvent = SAFE_SDK_EVENTS.has(event.event);
+
   if (!customAllowedProperties && !isSdkEvent) return null;
 
   const properties: AnalyticsProperties = {};
   const isCookieless = event.properties?.$cookieless_mode === true;
+
   for (const [property, value] of Object.entries(event.properties ?? {})) {
     const isAllowedCustomProperty = customAllowedProperties?.has(property) ?? false;
     const isAllowedSdkProperty = SAFE_SDK_PROPERTIES.has(property);
+
     const isWebVitalValue =
       event.event === "$web_vitals" &&
       WEB_VITAL_VALUE_PROPERTY.test(property) &&
       isNonNegativeNumber(value);
+
     const isHost = property === "$host";
     const isAnalyticsHost = property === "$lib_custom_api_host";
     const isRawUserAgent = property === "$raw_user_agent";
+
     if (!isAllowedCustomProperty && !isAllowedSdkProperty && !isWebVitalValue) continue;
+
     if ((isHost || isRawUserAgent) && !isCookieless) continue;
+
     if (isHost) {
       const normalizedHost = normalizeFirstPartyHost(value, appId);
+
       if (!normalizedHost) continue;
       properties[property] = normalizedHost;
       continue;
     }
+
     if (isAnalyticsHost) {
       const normalizedHost = normalizeConfiguredAnalyticsHost(value, analyticsHost);
+
       if (!normalizedHost) continue;
       properties[property] = normalizedHost;
       continue;
     }
+
     if (isRawUserAgent && (!isString(value) || value.length > 1_000)) continue;
+
     if (property === "$cookieless_mode" && value !== true) continue;
+
     const customValidator = Object.entries(customPropertyValidators ?? {}).find(
       ([propertyName]) => propertyName === property,
     )?.[1];
+
     if (customValidator && !customValidator(value)) continue;
+
     if (!isAllowedCustomProperty && SENSITIVE_PROPERTY_NAME.test(property)) continue;
+
     if (!isAllowedCustomProperty && !isRawUserAgent && isString(value) && URL_VALUE.test(value))
       continue;
     properties[property] = value;
@@ -863,9 +962,11 @@ const redactAndValidateEvent = (
   if (event.event === "import_retry_finished" || event.event === "import_finished") {
     const expectedCount =
       event.event === "import_retry_finished" ? properties.retry_count : properties.total_count;
+
     const completedCount = properties.completed_count;
     const failedCount = properties.failed_count;
     const canceledCount = properties.canceled_count;
+
     if (
       !isNumber(expectedCount) ||
       !isNumber(completedCount) ||
@@ -886,11 +987,14 @@ const redactAndValidateEvent = (
 
   if (event.event === "download_finished") {
     const outcome = properties.outcome;
+
     const hasOutput =
       isOutputFormat(properties.output_format) && isSizeBucket(properties.size_bucket);
+
     const hasFailure =
       isDownloadFailureStage(properties.failure_stage) &&
       isAnalyticsErrorCode(properties.failure_code);
+
     if (
       !isNonNegativeNumber(properties.duration_ms) ||
       !isAnalyticsProvider(properties.provider) ||
@@ -904,20 +1008,27 @@ const redactAndValidateEvent = (
   }
 
   properties.app_id = appId;
+
   const normalizedEvent: CaptureResult = {
     uuid: event.uuid,
     event: event.event,
     properties,
   };
+
   if (event.timestamp !== undefined) normalizedEvent.timestamp = event.timestamp;
+
   return normalizedEvent;
 };
 
 const sizeBucket = (sizeBytes: number) => {
   const sizeMb = sizeBytes / (1024 * 1024);
+
   if (sizeMb < 10) return "under_10_mb";
+
   if (sizeMb < 100) return "10_to_100_mb";
+
   if (sizeMb < 500) return "100_to_500_mb";
+
   return "500_mb_or_more";
 };
 
@@ -927,6 +1038,7 @@ const normalizeContentTitle = (title: string) => {
   )
     .join("")
     .trim();
+
   return normalized
     ? Array.from(normalized).slice(0, MAX_CONTENT_TITLE_LENGTH).join("")
     : undefined;
@@ -934,8 +1046,10 @@ const normalizeContentTitle = (title: string) => {
 
 export const analyticsOutputFormatFromFilename = (filename: string): AnalyticsOutputFormat => {
   const extensionStart = filename.lastIndexOf(".");
+
   if (extensionStart <= 0 || extensionStart === filename.length - 1) return "other";
   const extension = filename.slice(extensionStart + 1).toLowerCase();
+
   return isOutputFormat(extension) ? extension : "other";
 };
 
@@ -945,6 +1059,7 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
     deploy_env: config.deployEnv,
     app_id: appId,
   };
+
   if (config.releaseSha) commonProperties.release_sha = config.releaseSha;
 
   switch (event.type) {
@@ -958,12 +1073,15 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
         redirected: event.redirected,
         outcome: event.outcome,
       };
+
       if (event.failureReason) properties.failure_reason = event.failureReason;
+
       return {
         name: event.type,
         properties,
       };
     }
+
     case "cobalt_tunnel_readiness": {
       return {
         name: event.type,
@@ -976,6 +1094,7 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
         },
       };
     }
+
     case "audio_upload_completed":
       return {
         name: event.type,
@@ -994,12 +1113,15 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
         provider: analyticsProviderFromUrl(event.sourceUrl),
         import_kind: event.importKind,
       };
+
       if (event.requestedFormat) properties.requested_format = event.requestedFormat;
+
       return {
         name: event.type,
         properties,
       };
     }
+
     case "import_resolved": {
       const properties: AnalyticsProperties = {
         ...commonProperties,
@@ -1008,12 +1130,15 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
         resolved_count: event.resolvedCount,
         has_cover: event.hasCover,
       };
+
       if (event.requestedFormat) properties.requested_format = event.requestedFormat;
+
       return {
         name: event.type,
         properties,
       };
     }
+
     case "import_finished": {
       const properties: AnalyticsProperties = {
         ...commonProperties,
@@ -1026,12 +1151,15 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
         canceled_count: event.canceledCount,
         duration_ms: event.durationMs,
       };
+
       if (event.requestedFormat) properties.requested_format = event.requestedFormat;
+
       return {
         name: event.type,
         properties,
       };
     }
+
     case "import_failure_category": {
       const properties: AnalyticsProperties = {
         ...commonProperties,
@@ -1041,12 +1169,15 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
         code: event.code,
         track_count: event.trackCount,
       };
+
       if (event.requestedFormat) properties.requested_format = event.requestedFormat;
+
       return {
         name: event.type,
         properties,
       };
     }
+
     case "import_resolution_failed": {
       const properties: AnalyticsProperties = {
         ...commonProperties,
@@ -1054,24 +1185,30 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
         import_kind: event.importKind,
         code: event.code,
       };
+
       if (event.requestedFormat) properties.requested_format = event.requestedFormat;
+
       return {
         name: event.type,
         properties,
       };
     }
+
     case "export_started": {
       const properties: AnalyticsProperties = {
         ...commonProperties,
         export_kind: event.exportKind,
         track_count: event.trackCount,
       };
+
       if (event.albumCount !== undefined) properties.album_count = event.albumCount;
+
       return {
         name: event.type,
         properties,
       };
     }
+
     case "export_prepared": {
       const properties: AnalyticsProperties = {
         ...commonProperties,
@@ -1079,16 +1216,21 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
         track_count: event.trackCount,
         size_bucket: sizeBucket(event.sizeBytes),
       };
+
       if (event.albumCount !== undefined) properties.album_count = event.albumCount;
+
       if (event.sourceUrl !== undefined) {
         properties.provider = analyticsProviderFromUrl(event.sourceUrl);
       }
+
       if (event.outputFormat !== undefined) properties.output_format = event.outputFormat;
+
       return {
         name: event.type,
         properties,
       };
     }
+
     case "export_failed":
       return {
         name: event.type,
@@ -1174,13 +1316,17 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
         share_kind: event.shareKind,
         track_count: event.trackCount,
       };
+
       const contentTitle = normalizeContentTitle(event.contentTitle);
+
       if (contentTitle) properties.content_title = contentTitle;
+
       return {
         name: event.type,
         properties,
       };
     }
+
     case "share_added":
       return {
         name: event.type,
@@ -1233,6 +1379,7 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
         outcome: event.outcome,
         duration_ms: event.durationMs,
       };
+
       if (event.outcome === "completed") {
         properties.output_format = event.outputFormat;
         properties.size_bucket = sizeBucket(event.sizeBytes);
@@ -1240,6 +1387,7 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
         properties.failure_stage = event.failureStage;
         properties.failure_code = event.failureCode;
       }
+
       return { name: event.type, properties };
     }
   }
@@ -1258,6 +1406,7 @@ export const createAnalytics = (
   const captureSafely = (event: AnalyticsEvent) => {
     if (!client || !appId) return;
     const serialized = serializeEvent(event, config, appId);
+
     try {
       client.capture(serialized.name, serialized.properties);
     } catch {
@@ -1267,6 +1416,7 @@ export const createAnalytics = (
 
   const flush = () => {
     if (!client) return;
+
     for (const event of queue.splice(0)) {
       captureSafely(event);
     }
@@ -1322,6 +1472,7 @@ export const createAnalytics = (
     capture: (event) => {
       if (!enabled) return;
       queue.push(event);
+
       if (queue.length > MAX_QUEUED_EVENTS) queue.shift();
       flush();
       scheduleLoad();
@@ -1332,13 +1483,16 @@ export const createAnalytics = (
 const scheduleWhenIdle = (load: () => void) => {
   if ("requestIdleCallback" in window) {
     window.requestIdleCallback(load, { timeout: 1_500 });
+
     return;
   }
+
   setTimeout(load, 0);
 };
 
 const loadPostHogClient = async (): Promise<AnalyticsClient> => {
   const { default: posthog } = await import("posthog-js");
+
   return {
     init: (key, options) => {
       posthog.init(key, options);
@@ -1363,6 +1517,7 @@ export const analytics = createAnalytics(
 );
 
 export const initializeAnalytics = analytics.initialize;
+
 import {
   METADATA_LINK_DESCRIPTORS,
   serializeMetadataLinkAnalytics,

@@ -21,8 +21,10 @@ export default function TagSidebarFooter({
 }: FooterProps) {
   const hasValidFilename = useLiveTrackFilenameValidity(filenamePreviewStore);
   const hasInvalidFilename = files.some((file) => file.metadata && !hasValidFilename(file));
+
   const canDownloadAll =
     files.length > 0 && files.every((file) => Boolean(file.file) && hasValidFilename(file));
+
   const downloadAllReason = loading
     ? "download in progress"
     : files.length === 0

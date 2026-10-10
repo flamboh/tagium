@@ -65,18 +65,24 @@ export const imageResponse = (name: ImageFixtureName) =>
 const asset = (name: PostAsset) => {
   if (name in media) {
     const key = name as MediaFixtureName;
+
     return { bytes: media[key], mime: mediaFixtures[key].mime };
   }
+
   if (name in images) {
     const key = name as ImageFixtureName;
+
     return { bytes: images[key], mime: imageFixtures[key].mime };
   }
+
   const key = name as AudioFixtureName;
+
   return { bytes: audio[key], mime: audioFixtures[key].mime };
 };
 
 export const assetResponse = (name: PostAsset) => {
   const { bytes, mime } = asset(name);
+
   return new Response(bytes, {
     headers: {
       "content-type": mime,
@@ -94,14 +100,18 @@ export const stalledAssetResponse = (
   const { bytes, mime } = asset(name);
   const head = bytes.slice(0, Math.min(sent ?? Math.floor(bytes.byteLength / 2), bytes.byteLength));
   let pulls = 0;
+
   return new Response(
     new ReadableStream<Uint8Array>({
       async pull(controller) {
         pulls += 1;
+
         if (pulls === 1) {
           controller.enqueue(head);
+
           return;
         }
+
         await stall();
         controller.error(new Error("e2e harness: stalled tunnel released"));
       },
@@ -120,6 +130,7 @@ export const fontResponse = () => new Response(font, { headers: { "content-type"
 export const json = (body: unknown, init: ResponseInit = {}) => {
   const headers = new Headers(init.headers);
   headers.set("content-type", "application/json; charset=utf-8");
+
   return new Response(JSON.stringify(body), { ...init, headers });
 };
 

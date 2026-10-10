@@ -26,6 +26,7 @@ export const rejectUnsupportedMetadataChanges = (
   const unsupported = (Object.keys(changes) as Array<keyof MetadataChanges>).filter(
     (field) => changes[field] !== undefined && !supported.has(field),
   );
+
   return unsupported.length === 0
     ? undefined
     : new AudioMetadataWriteError({

@@ -52,12 +52,15 @@ export default function AlbumMetadataDialog({
 }: AlbumMetadataDialogProps) {
   const [touchedFields, setTouchedFields] = useState({ title: false, artist: false });
   const [isProcessingCover, setIsProcessingCover] = useState(false);
+
   const coverSync = useAlbumCoverSync({
     disabled: isProcessingCover,
     onSync: onSyncCoverToTracks,
   });
+
   const canSyncCoverToTracks =
     mode === "edit" && draft.cover && draft.cover.length > 0 && onSyncCoverToTracks;
+
   const titleInvalid = !draft.title.trim();
   const artistInvalid = !draft.artist.trim();
   const formInvalid = titleInvalid || artistInvalid;
@@ -89,7 +92,9 @@ export default function AlbumMetadataDialog({
           className="flex flex-col gap-0"
           onSubmit={(event) => {
             event.preventDefault();
+
             if (isProcessingCover) return;
+
             if (formInvalid) return;
             resetTransientState();
             onSave();

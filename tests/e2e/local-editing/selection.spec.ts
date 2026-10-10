@@ -10,9 +10,12 @@ test("selects ranges, toggles tracks, selects all and deletes the selection", as
     formats.map((format) => audioFixture(format).upload),
   );
   await libraryCount(page, 4);
+
   const row = (position: number) =>
     trackRow(page, `${position} ${fixtureTitle(formats[position - 1]!)}.${formats[position - 1]}`);
+
   const title = field(page, "title");
+
   const removeTracks = (count: number) =>
     page.getByRole("dialog", { name: `remove ${count} tracks?` });
 

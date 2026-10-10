@@ -13,6 +13,7 @@ import { makeMetadataFfmpegArgs, outputFormatFromFilename } from "./ffmpegArgs";
 
 /** The browser-facing Cobalt request accepted by the downloader. */
 export type VideoDownloadRequest = CobaltVideoDownloadRequest;
+
 /** A decoded Cobalt response that can be executed or shown to the user. */
 export type VideoDownloadPlan = CobaltDownloadPlan;
 
@@ -96,6 +97,7 @@ const defaultAbortReason = () => {
   if (typeof DOMException !== "undefined") {
     return new DOMException("download cancelled.", "AbortError");
   }
+
   return new Error("download cancelled.");
 };
 
@@ -105,6 +107,7 @@ const createTask = <Result>(
 ): VideoDownloadTask<Result> => {
   const controller = new AbortController();
   const abortFromExternalSignal = () => controller.abort(externalSignal?.reason);
+
   if (externalSignal) {
     if (externalSignal.aborted) {
       abortFromExternalSignal();
@@ -139,12 +142,15 @@ const isAbortError = (error: unknown) => error instanceof Error && error.name ==
 
 const errorText = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message.trim()) return error.message;
+
   if (typeof error === "string" && error.trim()) return error;
+
   return fallback;
 };
 
 const lowerCaseMessage = (message: string) => {
   const firstCharacter = message[0];
+
   return firstCharacter ? `${firstCharacter.toLowerCase()}${message.slice(1)}` : message;
 };
 
@@ -161,14 +167,17 @@ const stableLastModified = (sourceUrl: string) =>
 
 const safeFilename = (filename: string) => {
   const cleaned = filename.replaceAll("/", "_").replaceAll("\\", "_").replaceAll("\0", "_").trim();
+
   return cleaned || `tagium-video.${outputFormatFromFilename(filename)}`;
 };
 
 const parseContentLength = (response: Response) => {
   const raw =
     response.headers.get("Content-Length") ?? response.headers.get("Estimated-Content-Length");
+
   if (!raw || !/^\d+$/.test(raw)) return undefined;
   const length = Number(raw);
+
   return Number.isSafeInteger(length) && length > 0 ? length : undefined;
 };
 
@@ -185,6 +194,7 @@ const fileDownloadResult = (lease: TemporaryFileLease<File>): VideoFileDownloadR
 
 const decodeResponse = async (response: Response): Promise<CobaltDownloadResponse> => {
   const text = await response.text().catch(() => "");
+
   if (!text.trim()) {
     throw new VideoDownloadError(
       "planning",
@@ -193,6 +203,7 @@ const decodeResponse = async (response: Response): Promise<CobaltDownloadRespons
   }
 
   let body: unknown;
+
   try {
     body = JSON.parse(text);
   } catch (error) {
@@ -200,6 +211,7 @@ const decodeResponse = async (response: Response): Promise<CobaltDownloadRespons
       response.status === 429
         ? "too many downloads too quickly. wait a moment, then try again."
         : lowerCaseMessage(text.trim());
+
     const code = response.status === 429 ? "rate_limited" : undefined;
     throw new VideoDownloadError("planning", message, code, error);
   }
@@ -222,16 +234,20 @@ const fetchPlan = async (
   signal: AbortSignal,
 ) => {
   report(callbacks, { phase: "planning", progress: 0 });
+
   const headers = new Headers({
     Accept: "application/json",
     "Content-Type": "application/json",
     "X-Tagium-Request-Id": makeRequestId(),
   });
+
   if (request.importId) headers.set("X-Tagium-Import-Id", request.importId);
+
   if (request.trackIndex !== undefined)
     headers.set("X-Tagium-Track-Index", String(request.trackIndex));
 
   let response: Response;
+
   try {
     response = await fetch("/api/cobalt/download", {
       method: "POST",
@@ -251,9 +267,11 @@ const fetchPlan = async (
 
   if (!response.ok) {
     const body = await decodeResponse(response);
+
     if (body.status === "error") {
       throw new VideoDownloadError("planning", body.error.code, body.error.code);
     }
+
     throw new VideoDownloadError(
       "planning",
       `cobalt request failed with status ${response.status}.`,
@@ -281,6 +299,7 @@ const fetchTunnelFile = async (
   await cobaltDownloadScheduler.waitForTunnelStart({ signal });
 
   let response: Response;
+
   try {
     response = await fetch(url, { signal });
   } catch (error) {
@@ -303,12 +322,15 @@ const fetchTunnelFile = async (
 
   const contentType =
     response.headers.get("Content-Type") || fallbackContentType || "application/octet-stream";
+
   const totalBytes = parseContentLength(response);
   const inputStore = await createTemporaryFileStore("tagium-video-input");
   let bytesReceived = 0;
   let fileLeased = false;
+
   try {
     const reader = response.body?.getReader();
+
     if (!reader) {
       const blob = await response.blob();
       const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -327,6 +349,7 @@ const fetchTunnelFile = async (
         while (true) {
           signal.throwIfAborted();
           const chunk = await reader.read();
+
           if (chunk.done) break;
           await inputStore.append(chunk.value);
           bytesReceived += chunk.value.byteLength;
@@ -353,7 +376,9 @@ const fetchTunnelFile = async (
       contentType,
       stableLastModified(sourceUrl),
     );
+
     fileLeased = true;
+
     return fileLease;
   } finally {
     if (!fileLeased) await inputStore.cleanup();
@@ -388,16 +413,20 @@ const decodeExtendedFilename = (value: string) => {
 
 const contentDispositionFilename = (response: Response) => {
   const header = response.headers.get("Content-Disposition");
+
   if (!header) return undefined;
   const extended = /(?:^|;)\s*filename\*\s*=\s*utf-8''([^;]+)/i.exec(header)?.[1];
   const decoded = extended ? decodeExtendedFilename(extended.trim()) : undefined;
+
   if (decoded) return decoded;
   const plain = /(?:^|;)\s*filename\s*=\s*(?:"([^"]*)"|([^;]*))/i.exec(header);
+
   return (plain?.[1] ?? plain?.[2])?.trim();
 };
 
 const pickerFilename = (item: CobaltPickerItem, response: Response) => {
   const filename = contentDispositionFilename(response);
+
   return filename && /\.[a-z0-9]{1,12}$/i.test(filename)
     ? filename
     : `tagium-${item.type}.${pickerTypeDefaults[item.type].extension}`;
@@ -411,24 +440,28 @@ const validateLocalPlan = (plan: CobaltLocalProcessingPlan) => {
   }
 
   const mediaCount = localPlanMediaInputCount(plan);
+
   if (mediaCount < 1 || mediaCount > 2) {
     throw new VideoDownloadError(
       "processing",
       "cobalt local processing response has invalid tunnels.",
     );
   }
+
   if (plan.type === "merge" && mediaCount !== 2) {
     throw new VideoDownloadError(
       "processing",
       "cobalt merge response is missing its audio tunnel.",
     );
   }
+
   if (plan.output.subtitles && plan.tunnel.length < 2) {
     throw new VideoDownloadError(
       "processing",
       "cobalt local processing response is missing subtitles.",
     );
   }
+
   if (plan.type === "audio" && !plan.audio) {
     throw new VideoDownloadError("processing", "cobalt audio response is missing audio settings.");
   }
@@ -440,6 +473,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isWorkerProgress = (value: unknown): value is VideoWorkerProgress => {
   if (!isRecord(value)) return false;
   const record = value;
+
   return (
     (record.progress === undefined || typeof record.progress === "number") &&
     (record.bytesWritten === undefined || typeof record.bytesWritten === "number") &&
@@ -450,19 +484,25 @@ const isWorkerProgress = (value: unknown): value is VideoWorkerProgress => {
 const decodeWorkerMessage = (value: unknown): VideoWorkerMessage | undefined => {
   if (typeof value !== "object" || value === null || !("cobaltVideoProcessing" in value)) return;
   const message = value.cobaltVideoProcessing;
+
   if (typeof message !== "object" || message === null) return;
 
   if ("blob" in message && message.blob instanceof Blob) {
     const opfsEntryName = "opfsEntryName" in message ? message.opfsEntryName : undefined;
+
     if (opfsEntryName !== undefined && typeof opfsEntryName !== "string") return;
+
     return opfsEntryName ? { blob: message.blob, opfsEntryName } : { blob: message.blob };
   }
+
   if ("error" in message && typeof message.error === "string") {
     return { error: message.error };
   }
+
   if ("progress" in message && isWorkerProgress(message.progress)) {
     return { progress: message.progress };
   }
+
   return undefined;
 };
 
@@ -482,42 +522,53 @@ const runLocalProcessingWorker = (
           "local video processing is unavailable in this browser.",
         ),
       );
+
       return;
     }
 
     const worker = new Worker(new URL("./cobaltVideoProcessingWorker.ts", import.meta.url), {
       type: "module",
     });
+
     report(callbacks, { phase: "processing", progress: 0 });
     let settled = false;
     let cancelled = false;
     let cancellationTimer: ReturnType<typeof setTimeout> | undefined;
     const cancellationError = () => new VideoDownloadError("processing", "download cancelled.");
+
     const finish = (result: TemporaryFileLease<File> | Error) => {
       if (settled) return;
       settled = true;
       signal.removeEventListener("abort", onAbort);
+
       if (cancellationTimer !== undefined) clearTimeout(cancellationTimer);
       worker.terminate();
+
       if (result instanceof Error) reject(result);
       else resolve(result);
     };
+
     const onAbort = () => {
       if (settled) return;
       cancelled = true;
       const cancelRequest: VideoWorkerCancelRequest = { cancel: true };
+
       try {
         worker.postMessage({ cobaltVideoProcessing: cancelRequest });
       } catch {
         finish(cancellationError());
+
         return;
       }
+
       cancellationTimer = setTimeout(() => finish(cancellationError()), 500);
     };
 
     signal.addEventListener("abort", onAbort, { once: true });
+
     if (signal.aborted) {
       onAbort();
+
       return;
     }
 
@@ -529,7 +580,9 @@ const runLocalProcessingWorker = (
       );
     worker.onmessage = (event: MessageEvent<unknown>) => {
       const message = decodeWorkerMessage(event.data);
+
       if (!message) return;
+
       if ("progress" in message) {
         const progress: VideoWorkerProgress = message.progress;
         report(callbacks, {
@@ -537,12 +590,15 @@ const runLocalProcessingWorker = (
           progress: progress.progress,
           bytesReceived: progress.bytesWritten,
         });
+
         return;
       }
+
       if ("error" in message) {
         finish(
           cancelled ? cancellationError() : new VideoDownloadError("processing", message.error),
         );
+
         return;
       }
 
@@ -554,7 +610,9 @@ const runLocalProcessingWorker = (
           }),
           message.opfsEntryName,
         );
+
         void abandonedOutput.release().finally(() => finish(cancellationError()));
+
         return;
       }
 
@@ -571,6 +629,7 @@ const runLocalProcessingWorker = (
     };
 
     const request: VideoWorkerJob = { files, plan, temporaryStorageSession };
+
     try {
       worker.postMessage({ cobaltVideoProcessing: request });
     } catch (error) {
@@ -599,12 +658,15 @@ const executePlan = async (
         "cobalt returned another picker for the selected item.",
       );
     }
+
     const audio = plan.audio;
+
     const pickerResult: VideoPickerDownloadResult = {
       status: "picker",
       picker: plan.picker,
       download: (item, pickerCallbacks) => downloadVideoPickerItem(request, item, pickerCallbacks),
     };
+
     if (audio) {
       pickerResult.audioFilename = plan.audioFilename ?? "tagium-audio";
       pickerResult.downloadAudio = (pickerCallbacks) =>
@@ -612,8 +674,10 @@ const executePlan = async (
           executePickerAudio(request, audio, plan.audioFilename, pickerCallbacks, signal),
         );
     }
+
     return pickerResult;
   }
+
   if (plan.status === "tunnel" || plan.status === "redirect") {
     const fileLease = await fetchTunnelFile(
       plan.url,
@@ -624,16 +688,21 @@ const executePlan = async (
       0,
       1,
     );
+
     report(callbacks, { phase: "finalizing", progress: 1 });
+
     return fileDownloadResult(fileLease);
   }
 
   validateLocalPlan(plan);
+
   if (copiesTunnelDirectly(plan)) {
     const tunnel = plan.tunnel[0];
+
     if (!tunnel) {
       throw new VideoDownloadError("processing", "cobalt proxy response is missing its tunnel.");
     }
+
     const fileLease = await fetchTunnelFile(
       tunnel,
       plan.output.filename,
@@ -643,9 +712,12 @@ const executePlan = async (
       0,
       1,
     );
+
     report(callbacks, { phase: "finalizing", progress: 1 });
+
     return fileDownloadResult(fileLease);
   }
+
   const inputResults = await Promise.allSettled(
     plan.tunnel.map((url, index) =>
       fetchTunnelFile(
@@ -659,10 +731,13 @@ const executePlan = async (
       ),
     ),
   );
+
   const inputLeases = inputResults.flatMap((result) =>
     result.status === "fulfilled" ? [result.value] : [],
   );
+
   const failedInput = inputResults.find((result) => result.status === "rejected");
+
   if (failedInput?.status === "rejected") {
     await Promise.allSettled(inputLeases.map((lease) => lease.release()));
     throw failedInput.reason;
@@ -677,7 +752,9 @@ const executePlan = async (
       callbacks,
       signal,
     );
+
     report(callbacks, { phase: "finalizing", progress: 1 });
+
     return fileDownloadResult(outputLease);
   } finally {
     await Promise.allSettled(inputLeases.map((lease) => lease.release()));
@@ -700,7 +777,9 @@ const executePickerItem = async (
     1,
     pickerContentType(item),
   );
+
   report(callbacks, { phase: "finalizing", progress: 1 });
+
   return fileDownloadResult(fileLease);
 };
 
@@ -720,7 +799,9 @@ const executePickerAudio = async (
     0,
     1,
   );
+
   report(callbacks, { phase: "finalizing", progress: 1 });
+
   return fileDownloadResult(fileLease);
 };
 
@@ -736,6 +817,7 @@ const startPickerResourceDownload = (
       if (signal.aborted || isAbortError(error)) {
         throw new VideoDownloadError("tunnel", "download cancelled.", undefined, error);
       }
+
       if (error instanceof VideoDownloadError) throw error;
       throw new VideoDownloadError(
         "tunnel",
@@ -753,9 +835,11 @@ const executeDownload = async (
   allowPicker: boolean,
 ): Promise<VideoDownloadResult> => {
   const response = await fetchPlan(request, callbacks, signal);
+
   if (response.status === "error") {
     throw new VideoDownloadError("planning", response.error.code, response.error.code);
   }
+
   return executePlan(response, request, callbacks, signal, allowPicker);
 };
 
@@ -764,14 +848,18 @@ export const resolveVideoDownload = async (
   callbacks?: VideoDownloadCallbacks,
 ): Promise<CobaltDownloadPlan> => {
   const signal = request.signal ?? callbacks?.signal;
+
   const task = createTask(async (taskSignal) => {
     await cobaltDownloadScheduler.waitForAdmission({ signal: taskSignal });
     const response = await fetchPlan(request, callbacks, taskSignal);
+
     if (response.status === "error") {
       throw new VideoDownloadError("planning", response.error.code, response.error.code);
     }
+
     return response;
   }, signal);
+
   return task.promise;
 };
 
@@ -782,6 +870,7 @@ export const startVideoDownload = (
   createTask(async (signal) => {
     try {
       await cobaltDownloadScheduler.waitForAdmission({ signal });
+
       return await cobaltDownloadScheduler.schedule(
         () => executeDownload(request, callbacks, signal, true),
         signal,
@@ -790,6 +879,7 @@ export const startVideoDownload = (
       if (signal.aborted || isAbortError(error)) {
         throw new VideoDownloadError("planning", "download cancelled.", undefined, error);
       }
+
       if (error instanceof VideoDownloadError) throw error;
       throw new VideoDownloadError(
         "planning",
@@ -814,10 +904,12 @@ export const downloadVideoFile = (
   callbacks?: VideoDownloadCallbacks,
 ): VideoDownloadTask<VideoFileDownloadResult> => {
   const task = startVideoDownload(request, callbacks);
+
   return mapTask(task, (result) => {
     if (result.status !== "file") {
       throw new VideoDownloadError("planning", "choose an item before downloading.");
     }
+
     return result;
   });
 };
@@ -826,6 +918,7 @@ export type VideoDownloadSelection = CobaltDownloadPlan | CobaltPickerItem;
 
 const isPickerItemInput = (value: unknown): value is CobaltPickerItem => {
   if (!isRecord(value) || !("type" in value) || !("url" in value)) return false;
+
   return (
     (value.type === "photo" || value.type === "video" || value.type === "gif") &&
     typeof value.url === "string" &&
@@ -858,6 +951,7 @@ export async function executeVideoDownload(
       }
 
       let response: CobaltDownloadResponse;
+
       try {
         response = await Effect.runPromise(decodeCobaltDownloadResponseEffect(planOrPickerItem));
       } catch (error) {
@@ -868,6 +962,7 @@ export async function executeVideoDownload(
           error,
         );
       }
+
       if (response.status === "error") {
         throw new VideoDownloadError("planning", response.error.code, response.error.code);
       }

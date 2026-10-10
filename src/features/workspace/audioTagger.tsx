@@ -15,9 +15,11 @@ export default function AudioTagger() {
   const controller = useAudioTaggerController();
   const { library, editor, activeView, sharing, mobile } = controller;
   const { navigation: mobileNavigation, menuButtonRef } = mobile;
+
   const menuInViewHeader =
     mobileNavigation.isMobile &&
     (activeView === "settings" || (activeView === "editor" && Boolean(editor.selectedFile)));
+
   const mobileMenuButton = mobileNavigation.isMobile ? (
     <Button
       ref={menuButtonRef}

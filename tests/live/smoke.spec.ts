@@ -26,6 +26,7 @@ const decodedDurationSeconds = (page: Page, bytes: Uint8Array) =>
   page.evaluate(async (base64) => {
     const data = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
     const context = new AudioContext();
+
     try {
       return (await context.decodeAudioData(data.buffer)).duration;
     } finally {

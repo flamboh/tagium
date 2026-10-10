@@ -82,6 +82,7 @@ for (const width of [1280, 390]) {
         preview.getByRole("slider", { name: "playback position" }).getAttribute("aria-valuenow"),
       )
       .not.toBe("0");
+
     if (width < 768) await page.getByRole("button", { name: "open library" }).click();
     await page.getByRole("button", { name: "settings", exact: true }).click();
     await expect(page.locator("[data-track-waveform] audio")).toHaveJSProperty("paused", true);

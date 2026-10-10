@@ -23,6 +23,7 @@ export type DestructiveActionDialogProps = DestructiveActionDialogBaseProps &
 
 export default function DestructiveActionDialog(props: DestructiveActionDialogProps) {
   const { open, returnFocusTarget, onCancel, onConfirm } = props;
+
   const copy =
     props.kind === "remove-tracks"
       ? {

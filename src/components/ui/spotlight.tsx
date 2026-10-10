@@ -16,6 +16,7 @@ const SpotlightContext = React.createContext<{
 function Spotlight({ open = false, ...props }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
   const anchorRef = React.useRef<HTMLElement | null>(null);
   const context = React.useMemo(() => ({ open, anchorRef }), [open]);
+
   return (
     <SpotlightContext.Provider value={context}>
       <PopoverPrimitive.Root data-slot="spotlight" open={open} {...props} />
@@ -29,10 +30,12 @@ function SpotlightAnchor({
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Anchor>) {
   const { open, anchorRef } = React.useContext(SpotlightContext);
+
   return (
     <PopoverPrimitive.Anchor
       ref={(node) => {
         anchorRef.current = node;
+
         if (typeof ref === "function") ref(node);
         else if (ref) ref.current = node;
       }}
@@ -55,6 +58,7 @@ function SpotlightContent({
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
   const { anchorRef } = React.useContext(SpotlightContext);
+
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
@@ -65,6 +69,7 @@ function SpotlightContent({
         onCloseAutoFocus={(event) => {
           onCloseAutoFocus?.(event);
           const focused = document.activeElement;
+
           if (focused && focused !== document.body) event.preventDefault();
         }}
         collisionPadding={12}
@@ -72,13 +77,16 @@ function SpotlightContent({
         onOpenAutoFocus={(event) => event.preventDefault()}
         onInteractOutside={(event) => {
           const target = event.target;
+
           if (
             (target instanceof Node && anchorRef.current?.contains(target)) ||
             (target instanceof Element && target.closest("[data-spotlight-ignore]"))
           ) {
             event.preventDefault();
+
             return;
           }
+
           onInteractOutside?.(event);
         }}
         className={cn(

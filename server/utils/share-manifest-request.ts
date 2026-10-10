@@ -32,7 +32,9 @@ export const getShareRuntimeEnv = (request: Request): ShareRuntimeEnv =>
 
 export const getShareStore = (request: Request) => {
   const env = getShareRuntimeEnv(request);
+
   if (!env.SHARE_MANIFESTS || !env.SHARE_ARTWORK) return undefined;
+
   return createShareManifestStore(
     createCloudflareShareManifestPersistence({
       database: env.SHARE_MANIFESTS,
@@ -63,8 +65,11 @@ export const decodePublishedManifest = (value: unknown): ShareManifest => {
 };
 
 export const noStore = { "Cache-Control": "no-store" };
+
 export const unavailable = () => new Response(null, { status: 404, headers: noStore });
+
 export const badRequest = () => new Response(null, { status: 400, headers: noStore });
+
 export const infrastructureFailure = () => new Response(null, { status: 503, headers: noStore });
 
 export const publicationCreated = (
@@ -76,41 +81,52 @@ export const publicationCreated = (
     expiresAt: toShareExpiryIso(published.expiresAt),
     url: new URL(`/share/${published.slug}`, request.url).toString(),
   };
+
   return Response.json(body, { status: 201, headers: noStore });
 };
 
 export const isSameOriginBrowserRequest = (request: Request) => {
   const origin = request.headers.get("origin");
+
   if (origin && origin !== new URL(request.url).origin) return false;
   const fetchSite = request.headers.get("sec-fetch-site");
+
   return fetchSite !== "cross-site" && fetchSite !== "same-site";
 };
 
 export const readRequestBodyWithinLimit = async (request: Request, maximumBytes: number) => {
   const declared = request.headers.get("content-length");
+
   if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > maximumBytes)) {
     throw new Error("share_request_too_large");
   }
+
   if (!request.body) return new Uint8Array();
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let bytes = 0;
+
   try {
     for (;;) {
       const next = await reader.read();
+
       if (next.done) break;
       bytes += next.value.byteLength;
+
       if (bytes > maximumBytes) throw new Error("share_request_too_large");
       chunks.push(next.value);
     }
   } finally {
     reader.releaseLock();
   }
+
   const output = new Uint8Array(bytes);
   let offset = 0;
+
   for (const chunk of chunks) {
     output.set(chunk, offset);
     offset += chunk.byteLength;
   }
+
   return output;
 };

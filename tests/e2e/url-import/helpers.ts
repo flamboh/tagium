@@ -52,6 +52,7 @@ export const useSettings = async (context: BrowserContext, settings: Partial<App
 
 export const streamFixture = (name: AudioFixtureName): DownloadedFile => {
   const file = audioFixtures[name].stream;
+
   return {
     filename: file,
     bytes: new Uint8Array(
@@ -91,9 +92,11 @@ export const holdDownloadPlans = async (page: Page) => {
     const body = route.request().postDataJSON() as { url: string; year?: number };
     const { url } = body;
     requested.push(body);
+
     if (holding) held.push({ url, route });
     else await forward(route);
   });
+
   return {
     requested: () => requested.map(({ url }) => url),
     years: () => requested.map(({ year }) => year),
@@ -108,34 +111,44 @@ const MPEG1_LAYER3_KBPS = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 22
 
 export const mp3BitrateKbps = (bytes: Uint8Array) => {
   let offset = 0;
+
   if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) {
     offset = 10 + ((bytes[6]! << 21) | (bytes[7]! << 14) | (bytes[8]! << 7) | bytes[9]!);
   }
+
   while (offset < bytes.length - 4) {
     if (bytes[offset] === 0xff && (bytes[offset + 1]! & 0xfe) === 0xfa) {
       return MPEG1_LAYER3_KBPS[bytes[offset + 2]! >> 4];
     }
+
     offset += 1;
   }
+
   return undefined;
 };
 
 export const imageSize = (bytes: Uint8Array) => {
   if (bytes[0] === 0x89 && bytes[1] === 0x50) {
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
     return { width: view.getUint32(16), height: view.getUint32(20) };
   }
+
   let offset = 2;
+
   while (offset < bytes.length - 9) {
     const marker = bytes[offset + 1]!;
     const length = (bytes[offset + 2]! << 8) | bytes[offset + 3]!;
+
     if (marker >= 0xc0 && marker <= 0xc3) {
       return {
         height: (bytes[offset + 5]! << 8) | bytes[offset + 6]!,
         width: (bytes[offset + 7]! << 8) | bytes[offset + 8]!,
       };
     }
+
     offset += 2 + length;
   }
+
   return undefined;
 };

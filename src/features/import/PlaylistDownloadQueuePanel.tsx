@@ -48,6 +48,7 @@ export default function PlaylistDownloadQueuePanel({
     if (!queue || queue.status !== "complete") return;
 
     const timeout = window.setTimeout(() => setDismissedQueueId(queue.id), 10_000);
+
     return () => window.clearTimeout(timeout);
   }, [queue]);
 
@@ -59,12 +60,15 @@ export default function PlaylistDownloadQueuePanel({
   const showCancel = Boolean(onCancel && queue.canCancel !== false);
   const showRetry = Boolean(onRetry && queue.canRetry !== false);
   let label = `downloading ${queue.downloadedCount}/${queue.totalCount}`;
+
   if (queue.status === "error") {
     label = `failed ${queue.failedCount}/${queue.totalCount}`;
   }
+
   if (queue.status === "canceled") {
     label = `canceled ${queue.canceledCount}/${queue.totalCount}`;
   }
+
   if (queue.status === "complete") {
     label = `downloaded ${queue.downloadedCount}/${queue.totalCount}`;
   }

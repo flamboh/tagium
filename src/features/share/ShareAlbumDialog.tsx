@@ -44,6 +44,7 @@ interface ShareAlbumDialogProps {
 
 export default function ShareAlbumDialog(props: ShareAlbumDialogProps) {
   if (props.state.status === "closed") return null;
+
   return <ShareAlbumDialogSession {...props} state={props.state} />;
 }
 
@@ -62,14 +63,17 @@ function ShareAlbumDialogSession({
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const open = true;
+
   const dialogView =
     state.status === "published" || state.status === "link" ? "share-link" : "share-creator";
+
   const linkUrl =
     state.status === "published"
       ? state.receipt.url
       : state.status === "link"
         ? state.url
         : undefined;
+
   const targetName = state.preview.kind;
 
   const closeDialog = () => {
@@ -77,10 +81,12 @@ function ShareAlbumDialogSession({
     setConfirmStop(false);
     setStopError(null);
     setStopping(false);
+
     if (copyTimerRef.current !== null) {
       clearTimeout(copyTimerRef.current);
       copyTimerRef.current = null;
     }
+
     onClose();
   };
 
@@ -96,15 +102,19 @@ function ShareAlbumDialogSession({
   useEffect(() => {
     if (!cover) {
       setCoverUrl(null);
+
       return;
     }
+
     const url = URL.createObjectURL(cover.blob);
     setCoverUrl(url);
+
     return () => URL.revokeObjectURL(url);
   }, [cover]);
 
   const copyLink = async () => {
     if (!linkUrl) return;
+
     try {
       if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
       await navigator.clipboard.writeText(linkUrl);
@@ -114,6 +124,7 @@ function ShareAlbumDialogSession({
       inputRef.current?.select();
       setCopyStatus("manual");
     }
+
     if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
     copyTimerRef.current = setTimeout(() => {
       setCopyStatus("idle");
@@ -124,6 +135,7 @@ function ShareAlbumDialogSession({
   const stopSharing = async () => {
     setStopping(true);
     setStopError(null);
+
     try {
       await onStopSharing();
       setConfirmStop(false);
@@ -320,6 +332,7 @@ function ShareAlbumDialogSession({
 
 const formatExpiry = (expiresAt: string) => {
   const date = new Date(expiresAt);
+
   return Number.isNaN(date.getTime())
     ? "in 90 days"
     : date.toLocaleDateString(undefined, {

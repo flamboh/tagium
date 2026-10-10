@@ -76,6 +76,7 @@ export default function CoverArt({
   disabledReason,
 }: CoverArtProps) {
   const [state, dispatch] = useReducer(coverArtReducer, initialCoverArtState);
+
   const {
     uploadedCover,
     cropSource,
@@ -84,6 +85,7 @@ export default function CoverArt({
     error: coverError,
     isErrorOpen: coverErrorOpen,
   } = state;
+
   const disabledReasonId = useId();
   const coverUploadIdRef = useRef(0);
   const processingChangeRef = useRef(onProcessingChange);
@@ -100,6 +102,7 @@ export default function CoverArt({
         isCurrent: () => uploadId === coverUploadIdRef.current,
         commit: (picture) => onCoverUpload?.(picture, resetKey),
       });
+
       if (!optimizedFile || uploadId !== coverUploadIdRef.current) return;
       dispatch({ type: "uploadSucceeded", uploadId, file: optimizedFile });
     } catch (error) {
@@ -117,6 +120,7 @@ export default function CoverArt({
   const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
+
     if (!file) return;
     const uploadId = ++coverUploadIdRef.current;
     void processCover(file, uploadId);
@@ -126,6 +130,7 @@ export default function CoverArt({
     const croppedFile = new File([croppedBlob], "cropped-cover.jpg", {
       type: "image/jpeg",
     });
+
     const uploadId = ++coverUploadIdRef.current;
     void processCover(croppedFile, uploadId, true);
   };
@@ -145,6 +150,7 @@ export default function CoverArt({
 
   useEffect(() => {
     if (!cropSource?.owned) return;
+
     return () => URL.revokeObjectURL(cropSource.url);
   }, [cropSource]);
 
@@ -162,6 +168,7 @@ export default function CoverArt({
       // react-doctor-disable-next-line react-doctor/no-create-object-url-without-revoke
       const url = URL.createObjectURL(uploadedCover);
       setCoverSrc(url);
+
       return () => URL.revokeObjectURL(url);
     }
 
@@ -171,6 +178,7 @@ export default function CoverArt({
       // react-doctor-disable-next-line react-doctor/no-create-object-url-without-revoke
       const url = URL.createObjectURL(blob);
       setCoverSrc(url);
+
       return () => URL.revokeObjectURL(url);
     }
 
@@ -191,11 +199,14 @@ export default function CoverArt({
             onOpenChange={(open) => {
               if (!open) {
                 dispatch({ type: "cropClosed" });
+
                 return;
               }
+
               const source: CropSource = uploadedCover
                 ? { url: URL.createObjectURL(uploadedCover), owned: true }
                 : { url: coverSrc, owned: false };
+
               dispatch({ type: "cropOpened", source });
             }}
           >
@@ -274,9 +285,11 @@ function CoverUploadRow({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const linkedReason = disabled ? disabledReason : undefined;
   const tooltip = coverError ?? linkedReason;
+
   const describedBy = [coverError ? coverErrorId : null, linkedReason ? disabledReasonId : null]
     .filter(Boolean)
     .join(" ");
+
   const label = isProcessing ? "processing cover" : disabled ? "cover linked" : "upload cover";
 
   return (

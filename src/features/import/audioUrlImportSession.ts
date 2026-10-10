@@ -35,9 +35,11 @@ import { createSharedContentDownloadPlan } from "@/features/share/sharedAlbumDow
 import { mediaLinkKindFromUrl, parseMediaLink } from "@/lib/media-link";
 
 type ManagedDownloadTrack = QueuedDownloadTrack & { importOperationId?: string };
+
 const decodeSoundCloudLinkResponse = Schema.decodeUnknownOption(
   Schema.Struct({ canonicalUrl: Schema.String }),
 );
+
 const retryProvider = (
   tracks: readonly ManagedDownloadTrack[],
 ): "youtube" | "soundcloud" | "other" | "mixed" => {
@@ -45,6 +47,7 @@ const retryProvider = (
     tracks.map((track) => {
       try {
         const parsed = parseMediaLink(track.downloadRequest.sourceUrl);
+
         return parsed.provider === "youtube"
           ? "youtube"
           : parsed.provider === "soundcloud"
@@ -55,24 +58,31 @@ const retryProvider = (
       }
     }),
   );
+
   return providers.size === 1 ? providers.values().next().value! : "mixed";
 };
+
 type UrlImportEditor = Pick<
   TrackEditorSession["commands"],
   "flush" | "hydrateDownloadedTrack" | "updateTags"
 >;
 
 const asUniqueTrackIds = (trackIds: string[]) => [...new Set(trackIds)];
+
 const managedDownloadTrackFromFile = (file: TagiumFile): ManagedDownloadTrack | null => {
   if (!file.downloadRequest) return null;
+
   const track: ManagedDownloadTrack = {
     fileId: file.id,
     title: file.metadata?.title || file.filename,
     downloadRequest: file.downloadRequest,
   };
+
   if (file.downloadRequest.importId) track.importOperationId = file.downloadRequest.importId;
+
   return track;
 };
+
 const createPlaylistDownloadModelTrack = (track: ManagedDownloadTrack) => ({
   id: track.fileId,
   title: track.title,
@@ -141,12 +151,15 @@ export const createAudioUrlImportSession = ({
     coverPending = false,
   ) => {
     if (!getSettings().downloadAfterImport || trackIds.length === 0) return null;
+
     const pending: PendingImportDownload = {
       target,
       pendingTrackIds: new Set(trackIds),
       coverPending,
     };
+
     for (const trackId of trackIds) pendingImportDownloads.set(trackId, pending);
+
     return pending;
   };
 
@@ -157,18 +170,24 @@ export const createAudioUrlImportSession = ({
 
   const settleImportDownload = (trackId: string, completed: boolean) => {
     const pending = pendingImportDownloads.get(trackId);
+
     if (!pending) return;
+
     if (!completed) {
       for (const [id, entry] of pendingImportDownloads) {
         if (entry === pending) pendingImportDownloads.delete(id);
       }
+
       return;
     }
+
     pendingImportDownloads.delete(trackId);
     pending.pendingTrackIds.delete(trackId);
     releaseImportDownload(pending);
   };
+
   let controller: PlaylistDownloadController<ManagedDownloadTrack> | null = null;
+
   const importLifecycleTracker = createImportLifecycleTracker({
     capture: analytics.capture,
     createId: () => crypto.randomUUID(),
@@ -177,6 +196,7 @@ export const createAudioUrlImportSession = ({
 
   const markDownloadError = (fileId: string, error: Error) => {
     const message = reportSystemFailure(error, "download").trackDescription;
+
     const nextFiles = library.getSnapshot().files.map((file) =>
       file.id === fileId
         ? {
@@ -187,6 +207,7 @@ export const createAudioUrlImportSession = ({
           }
         : file,
     );
+
     library.dispatch({ type: "content-replaced", files: nextFiles });
   };
 
@@ -196,6 +217,7 @@ export const createAudioUrlImportSession = ({
       createModelTrack: createPlaylistDownloadModelTrack,
       downloadTrack: (track) => {
         const request: CobaltAudioDownloadRequest = track.downloadRequest;
+
         return provideAudioBackend(
           downloadFromCobalt({
             ...request,
@@ -214,13 +236,16 @@ export const createAudioUrlImportSession = ({
       hasTrack: (trackId) => library.getSnapshot().files.some((file) => file.id === trackId),
       getFileErrorTrackIds: () => {
         const errorTrackIds = new Set<string>();
+
         for (const file of library.getSnapshot().files) {
           if (file.status === "error") errorTrackIds.add(file.id);
         }
+
         return errorTrackIds;
       },
       markQueued: (tracks) => {
         const trackIds = new Set(tracks.map((track) => track.fileId));
+
         const nextFiles = library.getSnapshot().files.map((file) =>
           trackIds.has(file.id)
             ? {
@@ -231,10 +256,12 @@ export const createAudioUrlImportSession = ({
               }
             : file,
         );
+
         library.dispatch({ type: "content-replaced", files: nextFiles });
       },
       markCanceled: (trackIds) => {
         const trackIdSet = new Set(trackIds);
+
         const nextFiles = library
           .getSnapshot()
           .files.map((file) =>
@@ -242,21 +269,26 @@ export const createAudioUrlImportSession = ({
               ? { ...file, downloadStatus: "canceled" as const, downloadError: undefined }
               : file,
           );
+
         library.dispatch({ type: "content-replaced", files: nextFiles });
       },
       markFailed: markDownloadError,
       onTrackSettled: (event) => {
         const { track, outcome } = event;
         settleImportDownload(track.fileId, outcome === "completed");
+
         if (!track.importOperationId) return;
+
         const settlement: Parameters<typeof importLifecycleTracker.settle>[1] = {
           trackId: track.fileId,
           outcome,
         };
+
         if (event.outcome === "failed") {
           settlement.error = event.error;
           settlement.failureStage = event.failureStage;
         }
+
         importLifecycleTracker.settle(track.importOperationId, settlement);
       },
       onAction: (event) => {
@@ -268,8 +300,10 @@ export const createAudioUrlImportSession = ({
             activeCount: event.snapshot.active.length,
             pendingCount: event.snapshot.pending,
           });
+
           return;
         }
+
         if (event.type === "retry_started") {
           analytics.capture({
             type: "import_retry_started",
@@ -278,8 +312,10 @@ export const createAudioUrlImportSession = ({
             previousFailedCount: event.previousSnapshot.failed,
             previousCanceledCount: event.previousSnapshot.canceledCount,
           });
+
           return;
         }
+
         analytics.capture({
           type: "import_retry_finished",
           provider: retryProvider(event.tracks),
@@ -296,6 +332,7 @@ export const createAudioUrlImportSession = ({
         emitQueueSnapshot(snapshot);
       },
     });
+
     return controller;
   };
 
@@ -312,6 +349,7 @@ export const createAudioUrlImportSession = ({
     getEditor().flush();
     activateEditor();
     const snapshot = library.getSnapshot();
+
     const plan = createSingleUrlDownloadPlan({
       sourceUrl,
       audioBitrate: getSettings().audioBitrate,
@@ -320,11 +358,13 @@ export const createAudioUrlImportSession = ({
       importId: importOperationId,
       metadata,
     });
+
     const pendingFiles = applySingleAlbumTitlesToFiles(
       plan.pendingFiles,
       plan.looseTrackIds,
       getSettings(),
     );
+
     library.dispatch({
       type: "content-replaced",
       files: [...snapshot.files, ...pendingFiles],
@@ -340,9 +380,11 @@ export const createAudioUrlImportSession = ({
       trackIds: plan.queuedTracks.map((track) => track.fileId),
       hasCover: false,
     });
+
     for (const track of plan.queuedTracks) {
       watchImportDownload({ kind: "track", trackId: track.fileId }, [track.fileId]);
     }
+
     queueDownloadTracks(plan.queuedTracks.map((track) => ({ ...track, importOperationId })));
   };
 
@@ -354,6 +396,7 @@ export const createAudioUrlImportSession = ({
     getEditor().flush();
     activateEditor();
     const snapshot = library.getSnapshot();
+
     const plan = createPlaylistDownloadPlan({
       playlist,
       audioBitrate: getSettings().audioBitrate,
@@ -361,6 +404,7 @@ export const createAudioUrlImportSession = ({
       createId: () => crypto.randomUUID(),
       importId: importOperationId,
     });
+
     library.dispatch({
       type: "content-replaced",
       files: [...snapshot.files, ...plan.pendingFiles],
@@ -386,6 +430,7 @@ export const createAudioUrlImportSession = ({
           const cover = await fetchImportedCover(coverImport.coverUrl);
           getEditor().flush(coverImport.trackIds);
           const current = library.getSnapshot();
+
           const covered = applyPlaylistImportedCover(
             current.files,
             current.albums,
@@ -396,16 +441,19 @@ export const createAudioUrlImportSession = ({
             cover,
             current.selectedFileId,
           );
+
           library.dispatch({
             type: "content-replaced",
             albums: covered.albums,
             files: covered.files,
           });
+
           if (covered.files === current.files) return;
           const trackIdSet = new Set(coverImport.trackIds);
           await Promise.all(
             covered.files.flatMap((file) => {
               if (!trackIdSet.has(file.id) || !file.file || !file.metadata) return [];
+
               return [
                 getEditor()
                   .updateTags(file, file.metadata)
@@ -446,12 +494,14 @@ export const createAudioUrlImportSession = ({
       getEditor().flush();
       activateEditor();
       const snapshot = library.getSnapshot();
+
       const plan = createSharedContentDownloadPlan(
         manifest,
         sourceManifestSlug,
         () => crypto.randomUUID(),
         cover,
       );
+
       library.dispatch({
         type: "content-replaced",
         files: [...snapshot.files, ...plan.pendingFiles],
@@ -467,6 +517,7 @@ export const createAudioUrlImportSession = ({
           rangeAnchorFileId: plan.selection.lastSelectedFileId,
         },
       });
+
       if (plan.source === "playlist") {
         watchImportDownload(
           { kind: "album", albumId: plan.album.id },
@@ -477,28 +528,35 @@ export const createAudioUrlImportSession = ({
           watchImportDownload({ kind: "track", trackId: track.fileId }, [track.fileId]);
         }
       }
+
       queueDownloadTracks(plan.queuedTracks);
     },
     importUrl: async (sourceUrl) => {
       const trimmedUrl = sourceUrl.trim();
+
       if (!trimmedUrl) return;
       let parsed = parseMediaLink(trimmedUrl);
       let shortLinkResolutionAttempted = false;
       let redirected = false;
+
       if (parsed.kind === "unsupported") {
         try {
           const candidate = new URL(trimmedUrl);
+
           if (candidate.hostname === "on.soundcloud.com" || candidate.hostname === "snd.sc") {
             shortLinkResolutionAttempted = true;
             const endpoint = new URL("/api/soundcloud-link", window.location.origin);
             endpoint.searchParams.set("url", trimmedUrl);
             const response = await fetch(endpoint);
+
             if (response.ok) {
               const candidateResult = Option.getOrNull(
                 decodeSoundCloudLinkResponse(await response.json()),
               );
+
               if (candidateResult) {
                 const reparsed = parseMediaLink(candidateResult.canonicalUrl);
+
                 if (reparsed.kind !== "unsupported") {
                   parsed = reparsed;
                   redirected = true;
@@ -510,8 +568,10 @@ export const createAudioUrlImportSession = ({
           /* handled by unsupported guard below */
         }
       }
+
       if (parsed.kind === "unsupported") {
         let isValidHttpsUrl = false;
+
         try {
           const candidate = new URL(trimmedUrl);
           isValidHttpsUrl =
@@ -522,6 +582,7 @@ export const createAudioUrlImportSession = ({
         } catch {
           // Invalid text is reported separately from a valid unsupported provider URL.
         }
+
         analytics.capture({
           type: "media_link_processed",
           sourceUrl: trimmedUrl,
@@ -542,6 +603,7 @@ export const createAudioUrlImportSession = ({
             : "unsupported url",
         );
       }
+
       analytics.capture({
         type: "media_link_processed",
         sourceUrl: trimmedUrl,
@@ -554,12 +616,15 @@ export const createAudioUrlImportSession = ({
       const normalizedUrl = parsed.canonicalUrl;
       const playlistProvider = parsed.kind === "playlist" ? parsed.provider : null;
       const requestedFormat = getSettings().audioFormat;
+
       const importOperationId = importLifecycleTracker.start({
         sourceUrl: normalizedUrl,
         importKind: playlistProvider ? "set" : "single",
         requestedFormat,
       });
+
       setUrlImporting(true);
+
       try {
         if (playlistProvider) {
           try {
@@ -567,6 +632,7 @@ export const createAudioUrlImportSession = ({
               playlistProvider === "soundcloud"
                 ? await resolveSoundCloudSet(normalizedUrl, importOperationId)
                 : await resolveYouTubePlaylist(normalizedUrl);
+
             // Preserve the canonical URL; provider responses intentionally do
             // not carry request provenance.
             handlePlaylistDownload(
@@ -578,14 +644,18 @@ export const createAudioUrlImportSession = ({
             importLifecycleTracker.fail(importOperationId, toPublicAudioError(error));
             throw error;
           }
+
           return;
         }
+
         let trackMetadata: TrackMetadata | undefined;
+
         try {
           trackMetadata = await resolveTrackMetadata(normalizedUrl);
         } catch {
           // Metadata enrichment is optional; URL-derived metadata remains available.
         }
+
         handleAudioDownload(normalizedUrl, importOperationId, requestedFormat, trackMetadata);
       } finally {
         setUrlImporting(false);
@@ -594,18 +664,23 @@ export const createAudioUrlImportSession = ({
     retryTrack: (fileId) => {
       const file = library.getSnapshot().files.find((entry) => entry.id === fileId);
       const track = file && managedDownloadTrackFromFile(file);
+
       if (track) getController().retry([track]);
     },
     cancelQueue: () => getController().cancel(),
     retryQueue: () => {
       if (!queueSnapshot || queueSnapshot.active.length > 0) return;
       const trackIds = new Set(queueSnapshot.trackIds);
+
       const tracks = library.getSnapshot().files.flatMap((file) => {
         if (!trackIds.has(file.id) || file.file) return [];
+
         if (file.downloadError && !getTrackFailureDisplay(file.downloadError).retryable) return [];
         const track = managedDownloadTrackFromFile(file);
+
         return track ? [track] : [];
       });
+
       getController().retry(tracks);
     },
     removeTracks: (trackIds) => {

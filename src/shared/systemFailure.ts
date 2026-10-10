@@ -35,6 +35,7 @@ export type TrackFailureDisplay = Pick<
 >;
 
 const DOWNLOAD_DEBOUNCE_MS = 15_000;
+
 const lastDownloadNotificationAt = new Map<string, number>();
 
 const KNOWN_FAILURES = {
@@ -153,6 +154,7 @@ const FALLBACKS = {
 
 const errorMessage = (cause: unknown) => {
   if (cause instanceof Error) return cause.message;
+
   if (
     typeof cause === "object" &&
     cause !== null &&
@@ -161,6 +163,7 @@ const errorMessage = (cause: unknown) => {
   ) {
     return cause.message;
   }
+
   return "";
 };
 
@@ -186,6 +189,7 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
   const lower = message.toLowerCase();
 
   if (lower.includes("error.api.capacity_exceeded")) return KNOWN_FAILURES.capacity;
+
   if (
     lower.includes("error.api.rate_exceeded") ||
     lower.includes("rate limit") ||
@@ -195,9 +199,11 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
   ) {
     return KNOWN_FAILURES.rate_limited;
   }
+
   if (lower.includes("error.api.timed_out") || /\btimed?\s*out\b/.test(lower)) {
     return KNOWN_FAILURES.timeout;
   }
+
   if (
     lower.includes("error.api.unreachable") ||
     lower.includes("cobalt_api_url is not configured") ||
@@ -206,7 +212,9 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
   ) {
     return KNOWN_FAILURES.service_unavailable;
   }
+
   if (COBALT_DRM_CODES.some((code) => lower.includes(code))) return KNOWN_FAILURES.drm_protected;
+
   if (
     COBALT_UNSUPPORTED_CODES.some((code) => lower.includes(code)) ||
     lower.includes("unsupported url") ||
@@ -214,6 +222,7 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
   ) {
     return KNOWN_FAILURES.unsupported_source;
   }
+
   if (
     COBALT_PRIVATE_OR_MISSING_CODES.some((code) => lower.includes(code)) ||
     lower.includes("error.api.content_unavailable") ||
@@ -228,6 +237,7 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
   ) {
     return KNOWN_FAILURES.private_or_missing;
   }
+
   if (
     lower.includes("error.api.fetch.empty") ||
     lower.includes("error.api.invalid_response") ||
@@ -242,6 +252,7 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
   ) {
     return KNOWN_FAILURES.invalid_response;
   }
+
   return null;
 };
 
@@ -253,9 +264,11 @@ export const getSystemFailurePresentation = (
     context === "download" || context === "import"
       ? knownDownloadFailureFrom(errorMessage(cause))
       : null;
+
   if (known) return known;
 
   const fallback = FALLBACKS[context];
+
   return {
     code: "unknown",
     ...fallback,
@@ -273,18 +286,22 @@ export const reportSystemFailure = (
   if (context === "download") {
     const now = Date.now();
     const lastNotifiedAt = lastDownloadNotificationAt.get(presentation.dedupeKey);
+
     if (lastNotifiedAt !== undefined && now - lastNotifiedAt < DOWNLOAD_DEBOUNCE_MS) {
       return presentation;
     }
+
     lastDownloadNotificationAt.set(presentation.dedupeKey, now);
     toast.error(presentation.title, {
       id: presentation.dedupeKey,
       description: presentation.description,
     });
+
     return presentation;
   }
 
   toast.error(presentation.title, { description: presentation.description });
+
   return presentation;
 };
 
@@ -292,6 +309,7 @@ export const getTrackFailureDisplay = (message: string): TrackFailureDisplay => 
   const storedPresentation = Object.values(KNOWN_FAILURES).find(
     (presentation) => presentation.trackDescription === message,
   );
+
   if (storedPresentation) {
     return {
       title: storedPresentation.title,
@@ -299,9 +317,11 @@ export const getTrackFailureDisplay = (message: string): TrackFailureDisplay => 
       retryable: storedPresentation.retryable,
     };
   }
+
   const storedFallback = Object.values(FALLBACKS).find(
     (presentation) => presentation.trackDescription === message,
   );
+
   if (storedFallback) {
     return {
       title: storedFallback.title,
@@ -311,6 +331,7 @@ export const getTrackFailureDisplay = (message: string): TrackFailureDisplay => 
   }
 
   const known = knownDownloadFailureFrom(message);
+
   if (known) {
     return { title: known.title, description: known.trackDescription, retryable: known.retryable };
   }

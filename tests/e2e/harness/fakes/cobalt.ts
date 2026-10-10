@@ -36,6 +36,7 @@ const mimeTypes = new Map([
   ["webm", "video/webm"],
   ["mkv", "video/x-matroska"],
 ]);
+
 const mimeType = (extension: string) => mimeTypes.get(extension) ?? "application/octet-stream";
 
 type ResolveBody = {
@@ -62,6 +63,7 @@ const tunnelUrl = (id: string) => {
   url.searchParams.set("sig", createHash("sha256").update(`${id},${exp}`).digest("base64url"));
   url.searchParams.set("sec", randomBytes(32).toString("base64url"));
   url.searchParams.set("iv", randomBytes(16).toString("base64url"));
+
   return url.toString();
 };
 
@@ -91,6 +93,7 @@ const localProcessingPlan = (
 ) => {
   const best = requested.audioFormat === "best";
   const youtubeCodec = scenario.service === "youtube" ? youtubeAudioOnlyCodec(scenario) : "h264";
+
   const format = best
     ? scenario.service === "youtube"
       ? youtubeCodec === "h264"
@@ -100,7 +103,9 @@ const localProcessingPlan = (
         ? "opus"
         : "mp3"
     : (requested.audioFormat ?? "mp3");
+
   const type = scenario.service === "youtube" && best ? "proxy" : "audio";
+
   const tunnels = [
     tunnelUrl(
       createTunnel(request, {
@@ -110,9 +115,11 @@ const localProcessingPlan = (
       }),
     ),
   ];
+
   if (scenario.cover) {
     tunnels.push(tunnelUrl(createTunnel(request, { key: scenario.key, part: "cover" })));
   }
+
   const metadata =
     scenario.service === "youtube"
       ? { title: scenario.title, artist: scenario.author }
@@ -124,6 +131,7 @@ const localProcessingPlan = (
           genre: scenario.genre,
           date: scenario.year === undefined ? undefined : `${scenario.year}-01-01`,
         };
+
   return {
     status: "local-processing",
     type,
@@ -156,26 +164,34 @@ const youtubeVideoPlan = (
   let codec: VideoCodec = isVideoCodec(requested.youtubeVideoCodec)
     ? requested.youtubeVideoCodec
     : "h264";
+
   if (youtubeStreams(scenario, codec).length === 0) {
     codec = codec === "av1" ? "vp9" : codec === "vp9" ? "av1" : codec;
   }
+
   if (youtubeStreams(scenario, codec).length === 0) codec = "h264";
   const streams = youtubeStreams(scenario, codec);
   const best = streams[0];
+
   if (!best) return null;
   const quality = Number(requested.videoQuality ?? "1080");
+
   const video =
     quality >= best.height ? best : (streams.find((stream) => stream.height === quality) ?? best);
+
   const container =
     !requested.youtubeVideoContainer || requested.youtubeVideoContainer === "auto"
       ? codec === "h264"
         ? "mp4"
         : "webm"
       : requested.youtubeVideoContainer;
+
   const mute = requested.downloadMode === "mute";
+
   const tunnels = [
     tunnelUrl(createTunnel(request, { key: scenario.key, part: "video", asset: video.name })),
   ];
+
   if (!mute) {
     tunnels.push(
       tunnelUrl(
@@ -183,7 +199,9 @@ const youtubeVideoPlan = (
       ),
     );
   }
+
   const tags = [`${video.height}p`, codec, ...(mute ? ["mute"] : []), "youtube"];
+
   return {
     status: "local-processing",
     type: mute ? "proxy" : "merge",
@@ -211,6 +229,7 @@ const mediaPlan = (request: FakeRequest, scenario: MediaScenario, requested: Res
       }
     );
   }
+
   return localProcessingPlan(request, scenario, requested);
 };
 
@@ -225,14 +244,19 @@ const pickerExtensions = { photo: "jpg", video: "mp4", gif: "gif" } as const;
 
 const postPlan = (request: FakeRequest, scenario: PostScenario) => {
   const postId = new URL(scenario.sourceUrl).pathname.split("/").at(-1);
+
   const resource = (asset: PostAsset, directFilename?: string, filename?: string) => {
     if (directFilename) {
       const id = createTunnel(request, { key: scenario.key, part: "post", asset });
+
       return `${FAKE_DIRECT_MEDIA_ORIGIN}/${id}/${encodeURIComponent(directFilename)}`;
     }
+
     return tunnelUrl(createTunnel(request, { key: scenario.key, part: "post", asset, filename }));
   };
+
   const { media } = scenario;
+
   if (media.kind === "gif") {
     return {
       status: "local-processing",
@@ -243,6 +267,7 @@ const postPlan = (request: FakeRequest, scenario: PostScenario) => {
       isHLS: false,
     };
   }
+
   const plan: PickerPlan = {
     status: "picker",
     picker: media.items.map((item, index) => ({
@@ -254,10 +279,12 @@ const postPlan = (request: FakeRequest, scenario: PostScenario) => {
       ),
     })),
   };
+
   if (media.audio) {
     plan.audio = resource(media.audio.asset, undefined, media.audio.filename);
     plan.audioFilename = media.audio.filename;
   }
+
   return plan;
 };
 
@@ -273,20 +300,26 @@ const resolve = (request: FakeRequest): FakeResult => {
       ),
     };
   }
+
   let body: ResolveBody;
+
   try {
     body = JSON.parse(request.body ?? "");
   } catch {
     return unexpected("cobalt.resolve.invalid_body");
   }
+
   const key = body.url ? mediaKeyFromUrl(body.url) : null;
   const behavior = key ? request.registry.nextCobalt(key) : undefined;
+
   if (!key || !behavior) return unexpected("cobalt.resolve", key);
+
   const respond = (response: Response | Promise<Response>): FakeResult => ({
     route: "cobalt.resolve",
     key,
     response,
   });
+
   const machineHeaders = { "x-cobalt-machine-id": FAKE_COBALT_MACHINE_ID };
 
   switch (behavior.kind) {
@@ -316,12 +349,16 @@ const resolve = (request: FakeRequest): FakeResult => {
     case "ok": {
       const media = request.registry.media(key);
       const post = request.registry.post(key);
+
       if (!media && !post) return unexpected("cobalt.resolve.no_media", key);
       const plan = media ? mediaPlan(request, media, body) : postPlan(request, post!);
+
       const headers = {
         "x-cobalt-machine-id": behavior.kind === "ok" ? FAKE_COBALT_MACHINE_ID : "Invalid Machine!",
       };
+
       const delayMs = behavior.kind === "ok" ? (behavior.delayMs ?? 0) : 0;
+
       return respond(sleep(delayMs).then(() => json(plan, { headers })));
     }
   }
@@ -330,12 +367,15 @@ const resolve = (request: FakeRequest): FakeResult => {
 const serveTunnel = (request: FakeRequest, entry: Tunnel, route: string): FakeResult => {
   const media = request.registry.media(entry.key);
   const post = request.registry.post(entry.key);
+
   if (!media && !post) return unexpected(`${route}.no_media`, entry.key);
+
   const respond = (response: Response | Promise<Response>): FakeResult => ({
     route,
     key: entry.key,
     response,
   });
+
   if (entry.part === "cover") {
     return media?.cover
       ? respond(imageResponse(media.cover))
@@ -343,15 +383,21 @@ const serveTunnel = (request: FakeRequest, entry: Tunnel, route: string): FakeRe
   }
 
   const asset = entry.asset ?? media?.audio;
+
   if (!asset) return unexpected(`${route}.no_asset`, entry.key);
+
   const body = () => {
     const response = entry.asset ? assetResponse(entry.asset) : audioResponse(media!.audio);
+
     if (entry.filename) {
       response.headers.set("content-disposition", `attachment; filename="${entry.filename}"`);
     }
+
     return response;
   };
+
   const behavior = request.registry.nextTunnel(entry.key) ?? { kind: "ok" };
+
   switch (behavior.kind) {
     case "ok":
       return respond(sleep(behavior.delayMs ?? 0).then(body));
@@ -377,24 +423,31 @@ const serveTunnel = (request: FakeRequest, entry: Tunnel, route: string): FakeRe
 const tunnel = (request: FakeRequest): FakeResult => {
   const id = request.url.searchParams.get("id");
   const entry = request.registry.tunnel(id);
+
   if (!entry) return unexpected("cobalt.tunnel.unknown", request.registry.releasedTunnelKey(id));
+
   if (request.headers.get("fly-force-instance-id") !== entry.machineId) {
     return unexpected("cobalt.tunnel.machine_mismatch", entry.key);
   }
+
   return serveTunnel(request, entry, `cobalt.tunnel.${entry.part}`);
 };
 
 export const fakeDirectMedia = (request: FakeRequest): FakeResult => {
   const id = request.url.pathname.split("/")[1] ?? null;
   const entry = request.registry.tunnel(id);
+
   if (request.method !== "GET" || !entry) {
     return unexpected("media.direct.unknown", request.registry.releasedTunnelKey(id));
   }
+
   return serveTunnel(request, entry, "media.direct");
 };
 
 export const fakeCobalt = (request: FakeRequest): FakeResult => {
   if (request.method === "POST" && request.url.pathname === "/") return resolve(request);
+
   if (request.method === "GET" && request.url.pathname === "/tunnel") return tunnel(request);
+
   return unexpected("cobalt.unknown_route");
 };

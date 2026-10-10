@@ -119,9 +119,11 @@ export default function AlbumSidebar({
 }: AlbumSidebarProps) {
   const filesById = new Map(files.map((file) => [file.id, file]));
   const hasValidFilename = useLiveTrackFilenameValidity(filenamePreviewStore);
+
   const looseTracks = looseTrackIds
     .map((trackId) => filesById.get(trackId))
     .filter((track): track is TagiumFile => Boolean(track));
+
   const { activeDrag, dndContextProps, libraryFileDropProps, albumFileDropProps } =
     useAlbumSidebarDragController({
       albums,
@@ -133,7 +135,9 @@ export default function AlbumSidebar({
       onAudioUpload,
       onUploadToAlbum,
     });
+
   const activeTrack = activeDrag?.type === "track" ? filesById.get(activeDrag.trackId) : undefined;
+
   const activeAlbum =
     activeDrag?.type === "album"
       ? albums.find((album) => album.id === activeDrag.albumId)
@@ -141,7 +145,9 @@ export default function AlbumSidebar({
 
   const selectedTone = (trackId: string) => {
     if (selectedFileIds.has(trackId)) return "primary";
+
     if (selectedFileId === trackId) return "secondary";
+
     return null;
   };
 
@@ -158,13 +164,16 @@ export default function AlbumSidebar({
     const shareAction = shareTrackActions[track.id];
     const shareVariant = shareAction?.variant ?? "create";
     const contentCanShare = Boolean(track.downloadRequest && track.metadata);
+
     const canShareTrack =
       Boolean(onShareTrack) &&
       (shareVariant === "view" || contentCanShare) &&
       (shareAction?.enabled ?? true);
+
     const contentDisabledReason = track.downloadRequest
       ? "track metadata is still loading"
       : "local tracks cannot be shared";
+
     const shareDisabledReason =
       shareAction?.reason ??
       (onShareTrack ? contentDisabledReason : "track sharing is unavailable");
@@ -242,24 +251,32 @@ export default function AlbumSidebar({
                 album.trackIds.length > 0 &&
                 album.trackIds.every((trackId) => {
                   const file = filesById.get(trackId);
+
                   return file ? Boolean(file.file) && hasValidFilename(file) : false;
                 });
+
               const shareableTracks = album.trackIds.map((trackId) => filesById.get(trackId));
+
               const contentCanShare =
                 shareableTracks.length > 0 &&
                 shareableTracks.every((file) => Boolean(file?.downloadRequest && file.metadata));
+
               const contentDisabledReason =
                 album.trackIds.length === 0
                   ? "add imported tracks first"
                   : "albums with local tracks cannot be shared";
+
               const shareAction = shareAlbumActions[album.id];
               const retrievesExistingLink = shareAction?.variant === "view";
+
               const canShareAlbum =
                 Boolean(onShareAlbum) &&
                 (retrievesExistingLink || contentCanShare) &&
                 (shareAction?.enabled ?? true);
+
               const shareDisabledReason = shareAction?.reason ?? contentDisabledReason;
               const cleanupSuggestionCount = cleanupSuggestionCountByAlbumId.get(album.id) ?? 0;
+
               const actions = createAlbumActionItems({
                 cleanupSuggestionCount,
                 canShare: canShareAlbum,
@@ -272,7 +289,9 @@ export default function AlbumSidebar({
                 onShare: () => onShareAlbum?.(album.id),
                 onDelete: ({ returnFocusTarget }) => onDeleteAlbum(album.id, returnFocusTarget),
               });
+
               const fileDropProps = albumFileDropProps(album.id);
+
               return (
                 <SortableAlbumCard
                   key={album.id}
@@ -302,6 +321,7 @@ export default function AlbumSidebar({
                       ) : (
                         album.trackIds.map((trackId, index) => {
                           const track = filesById.get(trackId);
+
                           if (!track) return null;
 
                           return (

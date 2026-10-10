@@ -3,6 +3,7 @@ import { getCanonicalRedirectUrl } from "../utils/canonical-origin";
 
 export default defineHandler((event) => {
   const redirectUrl = getCanonicalRedirectUrl(event.req.url);
+
   if (!redirectUrl) return;
 
   return new Response(null, {

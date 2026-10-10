@@ -22,25 +22,33 @@ const MAX_SHARE_REQUEST_BYTES = SHARE_MANIFEST_MAX_BYTES + SHARE_ARTWORK_MAX_BYT
 
 export default defineHandler(async (event) => {
   const request = event.req;
+
   if (!(await admitShareCreate(request)))
     return new Response(null, { status: 429, headers: noStore });
+
   if (!isSameOriginBrowserRequest(request)) return badRequest();
   const store = getShareStore(request);
+
   if (!store) return infrastructureFailure();
   const contentType = request.headers.get("content-type");
+
   if (!contentType?.toLowerCase().startsWith("multipart/form-data;")) return badRequest();
 
   try {
     const body = await readRequestBodyWithinLimit(request, MAX_SHARE_REQUEST_BYTES);
+
     const form = await new Request(request.url, {
       method: "POST",
       headers: { "content-type": contentType },
       body,
     }).formData();
+
     const entries = [...form.entries()];
+
     if (entries.some(([name]) => name !== "manifest" && name !== "cover")) return badRequest();
     const manifests = form.getAll("manifest");
     const covers = form.getAll("cover");
+
     if (
       manifests.length !== 1 ||
       covers.length > 1 ||
@@ -52,6 +60,7 @@ export default defineHandler(async (event) => {
     const cover = covers[0] instanceof File ? covers[0] : undefined;
     const manifest = decodePublishedManifest(JSON.parse(rawManifest));
     const published = await store.publish(manifest, await parseShareArtwork(cover));
+
     return publicationCreated(request, published);
   } catch (error) {
     if (
@@ -62,6 +71,7 @@ export default defineHandler(async (event) => {
         /^share_request_too_large|manifest payload/.test(error.message))
     )
       return badRequest();
+
     // The service deliberately returns no diagnostic payload for binding/storage failures.
     return infrastructureFailure();
   }

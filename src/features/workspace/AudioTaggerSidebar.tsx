@@ -18,8 +18,10 @@ export default function AudioTaggerSidebar({ controller }: { controller: AudioTa
     shareTrackActions,
     shareSpotlight,
   } = controller;
+
   const { files, albums, looseTrackIds, selectedFileId, selectedAlbumId, selectedFileIds } =
     library.state;
+
   const { navigation: mobileNavigation, runPrimaryAction, drawerRef, sidebarProps } = mobile;
 
   return (

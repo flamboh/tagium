@@ -12,7 +12,9 @@ test("saves each piece of media offered by a post, and its audio", async ({ page
     ],
     audio: { asset: "m4a", filename: "post-audio.m4a" },
   });
+
   const save = saveApp(page);
+
   const choose = async (choice: string, filename: string) => {
     await save.start(post.url);
     await expect(page.getByRole("button", { name: "download photo 1" })).toBeVisible();
@@ -25,6 +27,7 @@ test("saves each piece of media offered by a post, and its audio", async ({ page
     await page.getByRole("button", { name: choice, exact: true }).click();
     await expect(save.downloadButton(filename)).toBeVisible(IMPORT_TIMEOUT);
     await expect(page.getByRole("button", { name: "download photo 1" })).toBeHidden();
+
     return save.download(filename);
   };
 
@@ -61,6 +64,7 @@ test("resetting a post's choices leaves nothing saved", async ({ page, upstreams
       { type: "photo", asset: "thumbnail" },
     ],
   });
+
   const save = saveApp(page);
 
   await save.open();

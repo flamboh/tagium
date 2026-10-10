@@ -48,18 +48,23 @@ test("save.tagium.app opens tagium save, and other hosts open tagium", async ({
   baseURL,
 }) => {
   const context = await browser.newContext();
+
   try {
     await context.route("**/*", async (route) => {
       const url = new URL(route.request().url());
+
       if (!["save.tagium.app", "tagium.app", "video.tagium.app"].includes(url.hostname)) {
         await route.abort().catch(() => {});
+
         return;
       }
+
       try {
         const response = await route.fetch({
           url: `${baseURL}${url.pathname}${url.search}`,
           maxRetries: 3,
         });
+
         await route.fulfill({ response });
       } catch {
         await route.abort().catch(() => {});

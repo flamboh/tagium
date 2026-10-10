@@ -39,31 +39,43 @@ export const sanitizePendingMetadataPatch = (
   dropLegacyNumericFields = false,
 ): DownloadedTrackMetadataPatch | undefined => {
   const sanitized: DownloadedTrackMetadataPatch = {};
+
   if (hasOwn(patch, "filename") && patch.filename !== undefined) {
     sanitized.filename = patch.filename;
   }
+
   if (hasOwn(patch, "title") && patch.title !== undefined) sanitized.title = patch.title;
+
   if (hasOwn(patch, "artist") && patch.artist !== undefined) sanitized.artist = patch.artist;
+
   if (hasOwn(patch, "albumArtist") && patch.albumArtist !== undefined) {
     sanitized.albumArtist = patch.albumArtist;
   }
+
   if (hasOwn(patch, "album") && patch.album !== undefined) sanitized.album = patch.album;
+
   if (!dropLegacyNumericFields && hasOwn(patch, "year") && patch.year !== undefined) {
     sanitized.year = patch.year;
   }
+
   if (hasOwn(patch, "genre") && patch.genre !== undefined) sanitized.genre = patch.genre;
+
   if (hasOwn(patch, "picture") && patch.picture !== undefined) {
     sanitized.picture = patch.picture;
   }
+
   if (!dropLegacyNumericFields && hasOwn(patch, "trackNumber") && patch.trackNumber !== undefined) {
     sanitized.trackNumber = patch.trackNumber;
   }
+
   if (hasOwn(patch, "composer") && patch.composer !== undefined) {
     sanitized.composer = patch.composer;
   }
+
   if (hasOwn(patch, "comment") && patch.comment !== undefined) {
     sanitized.comment = patch.comment;
   }
+
   if (
     !dropLegacyNumericFields &&
     hasOwn(patch, "discNumber") &&
@@ -72,6 +84,7 @@ export const sanitizePendingMetadataPatch = (
   ) {
     sanitized.discNumber = patch.discNumber;
   }
+
   if (
     !dropLegacyNumericFields &&
     hasOwn(patch, "bpm") &&
@@ -121,6 +134,7 @@ const mergeLatestMetadataWithHydratedTechnicalFields = (
   hydratedFile: TagiumFile,
 ) => {
   if (!latestFile.metadata) return hydratedFile.metadata;
+
   if (!hydratedFile.metadata) return latestFile.metadata;
 
   return {
@@ -141,7 +155,9 @@ const areGenresEqual = (
 ) => {
   if (Array.isArray(firstGenre) || Array.isArray(secondGenre)) {
     if (!Array.isArray(firstGenre) || !Array.isArray(secondGenre)) return false;
+
     if (firstGenre.length !== secondGenre.length) return false;
+
     return firstGenre.every((genre, index) => genre === secondGenre[index]);
   }
 
@@ -194,6 +210,7 @@ const applyPendingMetadataPatch = (
     if (!hasOwn(pendingPatch, field)) return nextMetadata;
 
     const value = pendingPatch[field];
+
     if (value === undefined) return nextMetadata;
 
     return {
@@ -207,10 +224,12 @@ const normalizePendingMetadataPatch = (
   pendingPatch?: DownloadedTrackMetadataPatch,
 ): DownloadedTrackMetadataPatch | undefined => {
   if (!pendingPatch) return undefined;
+
   const hasNoLegacyTechnicalFields =
     !hasOwn(pendingPatch, "duration") &&
     !hasOwn(pendingPatch, "bitrate") &&
     !hasOwn(pendingPatch, "sampleRate");
+
   return sanitizePendingMetadataPatch(pendingPatch, !hasNoLegacyTechnicalFields);
 };
 
@@ -224,6 +243,7 @@ export function reconcileDownloadedTrackMetadata(
   }
 
   const providerDisplayMetadata = applyProviderDisplayMetadata(parsedMetadata, providerMetadata);
+
   const metadata = applyPendingMetadataPatch(
     providerDisplayMetadata,
     normalizePendingMetadataPatch(pendingPatch),
@@ -245,6 +265,7 @@ export function applyTrackOrderNumbersToFiles(
 ) {
   const albumIds = new Set(albumIdsToSync);
   const trackUpdates = new Map<string, { album: AlbumGroup; trackNumber: number }>();
+
   for (const album of albums) {
     if (!albumIds.has(album.id)) continue;
     album.trackIds.forEach((trackId, index) => {
@@ -254,8 +275,10 @@ export function applyTrackOrderNumbersToFiles(
 
   return files.map((file) => {
     const update = trackUpdates.get(file.id);
+
     if (!update || !file.metadata || !settings.syncTrackNumbers) return file;
     const patch: MetadataPatch = { trackNumber: update.trackNumber };
+
     return markPendingMetadataPatch(
       {
         ...file,
@@ -272,11 +295,14 @@ export function applySyncedFilenamesToFiles(files: TagiumFile[], trackIds?: stri
 
   return files.map((file) => {
     if (trackIdSet && !trackIdSet.has(file.id)) return file;
+
     if (!file.metadata) return file;
 
     const syncedFilename = sanitizeFilenameBase(file.metadata.title);
+
     if (!syncedFilename) return file;
     const nextFilename = audioFilename(syncedFilename, getAudioFormat(file));
+
     if (file.filename === nextFilename && file.metadata.filename === syncedFilename) {
       return file;
     }
@@ -319,12 +345,14 @@ export function applySingleAlbumTitlesToFiles(
   if (!settings.metadataLinks.singleAlbum || trackIds.length === 0) return files;
 
   const trackIdSet = new Set(trackIds);
+
   return files.map((file) => {
     if (!trackIdSet.has(file.id) || !file.metadata || file.metadata.album === file.metadata.title) {
       return file;
     }
 
     const patch: MetadataPatch = { album: file.metadata.title };
+
     return markPendingMetadataPatch(
       {
         ...file,
@@ -344,6 +372,7 @@ export function applyLinkedAlbumArtistsToFiles(
   if (!settings.metadataLinks.albumArtist) return files;
 
   const trackIdSet = trackIds ? new Set(trackIds) : undefined;
+
   return files.map((file) => {
     if (
       (trackIdSet && !trackIdSet.has(file.id)) ||
@@ -355,6 +384,7 @@ export function applyLinkedAlbumArtistsToFiles(
     }
 
     const patch: MetadataPatch = { albumArtist: file.metadata.artist };
+
     return markPendingMetadataPatch(
       {
         ...file,
@@ -382,9 +412,11 @@ export function applyAlbumMetadataPolicyToFiles(
   if (album.trackIds.length === 0) return files;
 
   const trackSet = new Set(album.trackIds);
+
   const trackNumbers = options.trackNumbers
     ? new Map(album.trackIds.map((trackId, index) => [trackId, index + 1]))
     : undefined;
+
   const shared = options.shared ?? true;
   const metadataLinks = getAlbumMetadataLinks(settings, album);
 
@@ -392,26 +424,35 @@ export function applyAlbumMetadataPolicyToFiles(
     if (!trackSet.has(file.id) || !file.metadata) return file;
 
     const patch: MetadataPatch = {};
+
     if (shared) {
       patch.album = album.title;
+
       if (metadataLinks.artist) patch.artist = album.artist;
+
       if (settings.metadataLinks.genre) patch.genre = album.genre;
+
       if (metadataLinks.year && album.year !== undefined) patch.year = album.year;
     }
+
     if (options.artwork && settings.metadataLinks.artwork && album.cover?.length) {
       patch.picture = album.cover;
     }
+
     if (options.trackNumbers && settings.syncTrackNumbers) {
       const trackNumber = trackNumbers?.get(file.id);
+
       if (trackNumber !== undefined) patch.trackNumber = trackNumber;
     }
 
     const linkedArtist = patch.artist ?? file.metadata.artist;
+
     if (shared && settings.metadataLinks.albumArtist) {
       patch.albumArtist = linkedArtist;
     }
 
     if (Object.keys(patch).length === 0) return file;
+
     return markPendingMetadataPatch(
       {
         ...file,
@@ -438,6 +479,7 @@ export function applyAlbumCoverToFiles(
   settings?: MetadataPolicySettings,
 ) {
   if (trackIds.length === 0 || cover.length === 0) return files;
+
   return applyAlbumMetadataPolicyToFiles(
     files,
     { id: "cover-sync", title: "", artist: "", genre: "", trackIds, cover },
@@ -459,14 +501,17 @@ export function applyAlbumCoverToFilesWithSelectedMetadata(
   settings?: MetadataPolicySettings,
 ): AlbumCoverApplication {
   const coveredFiles = applyAlbumCoverToFiles(files, trackIds, cover, settings);
+
   if (!selectedFileId) {
     return { files: coveredFiles };
   }
+
   if (!trackIds.includes(selectedFileId)) {
     return { files: coveredFiles };
   }
 
   const selectedFile = coveredFiles.find((file) => file.id === selectedFileId);
+
   return {
     files: coveredFiles,
     selectedMetadata: selectedFile?.metadata,
@@ -481,7 +526,9 @@ function arePicturesEqual(
   const [secondCover] = secondPicture ?? [];
 
   if (!firstCover || !secondCover) return !firstCover && !secondCover;
+
   if (firstCover.format !== secondCover.format) return false;
+
   if (firstCover.data.length !== secondCover.data.length) return false;
 
   for (let index = 0; index < firstCover.data.length; index += 1) {
@@ -500,6 +547,7 @@ export function areAlbumTrackCoversSynced(
 
   return trackIds.every((trackId) => {
     const file = files.find((currentFile) => currentFile.id === trackId);
+
     if (!file?.metadata) return false;
 
     return arePicturesEqual(file.metadata.picture, albumCover);
@@ -544,13 +592,16 @@ export function prepareDownloadedTrackHydration(
 ): DownloadedTrackHydration {
   const parsedMetadata = parsedFile.metadata;
   const pendingPatch = pendingMetadataPatch ?? currentFile.pendingMetadataPatch;
+
   const shouldApplyProviderDisplayMetadata =
     currentFile.hasBufferedChanges || Boolean(pendingPatch);
+
   const { metadata: nextMetadata, metadataToWrite } = reconcileDownloadedTrackMetadata(
     parsedMetadata,
     shouldApplyProviderDisplayMetadata ? currentFile.metadata : undefined,
     pendingPatch,
   );
+
   const shouldWriteMetadata = Boolean(metadataToWrite);
 
   const hydratedFile: TagiumFile = {

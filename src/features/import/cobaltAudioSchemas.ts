@@ -43,11 +43,13 @@ export const cobaltLocalProcessingMessageSchema = Schema.Struct({
 });
 
 export type CobaltDownloadPlan = Schema.Schema.Type<typeof cobaltDownloadPlanSchema>;
+
 export type CobaltLocalProcessingMessage = Schema.Schema.Type<
   typeof cobaltLocalProcessingMessageSchema
 >;
 
 export const decodeCobaltDownloadPlanEffect = Schema.decodeUnknownEffect(cobaltDownloadPlanSchema);
+
 export const decodeCobaltLocalProcessingMessageEffect = Schema.decodeUnknownEffect(
   cobaltLocalProcessingMessageSchema,
 );

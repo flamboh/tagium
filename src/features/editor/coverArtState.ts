@@ -40,14 +40,18 @@ export const coverArtReducer = (state: CoverArtState, action: CoverArtAction): C
         activeUploadId: action.uploadId,
         isProcessing: true,
       };
+
       if (action.closeCropper) {
         next.cropSource = null;
         next.isCropperOpen = false;
       }
+
       return next;
     }
+
     case "uploadSucceeded":
       if (action.uploadId !== state.activeUploadId) return state;
+
       return {
         ...state,
         uploadedCover: action.file,
@@ -57,6 +61,7 @@ export const coverArtReducer = (state: CoverArtState, action: CoverArtAction): C
       };
     case "uploadFailed":
       if (action.uploadId !== state.activeUploadId) return state;
+
       return {
         ...state,
         isProcessing: false,

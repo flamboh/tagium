@@ -53,9 +53,11 @@ export const useAudioImportSession = ({
 }): AudioImportSession => {
   const [uploading, setUploading] = useState(false);
   const [urlImporting, setUrlImporting] = useState(false);
+
   const [queueSnapshot, setQueueSnapshot] = useState<PlaylistDownloadControllerSnapshot | null>(
     null,
   );
+
   const editorRef = useRef(editor);
   const settingsRef = useRef(settings);
   const activateEditorRef = useRef(activateEditor);
@@ -78,6 +80,7 @@ export const useAudioImportSession = ({
       setUploading,
     }),
   );
+
   const [urlSession] = useState(() =>
     createAudioUrlImportSession({
       library,
@@ -89,6 +92,7 @@ export const useAudioImportSession = ({
       onImportReady: (target) => onImportReadyRef.current(target),
     }),
   );
+
   const queue = useMemo(
     () => getImportQueuePresentation(queueSnapshot, library.state.files),
     [library.state.files, queueSnapshot],

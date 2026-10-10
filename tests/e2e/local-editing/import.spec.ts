@@ -72,6 +72,7 @@ test("drops each supported format on the landing page into one album", async ({ 
   await libraryCount(page, 4);
   await expect(page.getByText("Fixture Album", { exact: true })).toBeVisible();
   await expect(page.getByText("Tagium Fixtures · 4 tracks", { exact: true })).toBeVisible();
+
   for (const format of formats) {
     await expect(
       page.getByRole("button", {
@@ -79,6 +80,7 @@ test("drops each supported format on the landing page into one album", async ({ 
       }),
     ).toBeVisible();
   }
+
   await expect(page.getByRole("img", { name: "album cover" })).toBeVisible();
   await expect(page.getByRole("button", { name: "download track", exact: true })).toBeEnabled();
 });
@@ -101,11 +103,13 @@ test("rejects unreadable files with their reasons and keeps the valid track", as
     invalidUploads.empty,
   ]);
   const rejection = toast(page, "3 files could not be imported");
+
   for (const name of ["notes.txt", "corrupt.mp3", "empty.flac"]) {
     await expect(rejection).toContainText(
       `${name} could not be imported. try a valid mp3, flac, unencrypted m4a/mp4, or opus file.`,
     );
   }
+
   await libraryCount(page, 1);
   await expect(trackRow(page, `${fixtureTitle("mp3")}.mp3`)).toBeVisible();
   await expect(field(page, "title")).toHaveValue(fixtureTitle("mp3"));
@@ -115,6 +119,7 @@ test("rejects unreadable files with their reasons and keeps the valid track", as
 test("skips a file that is already in the library", async ({ page }) => {
   const fixturePath = (file: string) =>
     fileURLToPath(new URL(`../fixtures/${file}`, import.meta.url));
+
   await page.goto("/");
   const chooser = page.waitForEvent("filechooser");
   await dropzone(page).click();
@@ -150,6 +155,7 @@ test("orders a picked album by its track numbers with untracked files last", asy
   await libraryCount(page, 4);
   const rows = page.getByRole("button", { name: /^\d+ \w+\.mp3$/u }).filter({ visible: true });
   await expect(rows).toHaveText([/First/u, /Second/u, /Third/u, /Untracked/u]);
+
   for (const [index, title] of ["First", "Second", "Third", "Untracked"].entries()) {
     await expect(trackRow(page, `${index + 1} ${title}.mp3`)).toBeVisible();
   }

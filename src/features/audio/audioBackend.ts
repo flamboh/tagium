@@ -46,6 +46,7 @@ export const downloadFromCobalt = (request: CobaltAudioDownloadRequest) =>
     Effect.gen(function* () {
       const signal = yield* Effect.abortSignal;
       const backend = yield* AudioBackend;
+
       return yield* backend.downloadFromCobalt({
         ...request,
         signal: request.signal ?? signal,
@@ -56,12 +57,14 @@ export const downloadFromCobalt = (request: CobaltAudioDownloadRequest) =>
 export const parseUploads = (uploadedFiles: File[]) =>
   Effect.gen(function* () {
     const backend = yield* AudioBackend;
+
     return yield* backend.parseUploads(uploadedFiles);
   });
 
 export const writeTags = (fileToUpdate: TagiumFile, newTags: AudioMetadata) =>
   Effect.gen(function* () {
     const backend = yield* AudioBackend;
+
     return yield* backend.writeTags(fileToUpdate, newTags);
   });
 
@@ -71,5 +74,6 @@ export const runAudioBackendEffect = <A, E>(effect: Effect.Effect<A, E, AudioBac
 export const provideAudioBackend = <A, E>(effect: Effect.Effect<A, E, AudioBackend>) =>
   Effect.gen(function* () {
     const context = yield* audioBackendRuntime.contextEffect;
+
     return yield* effect.pipe(Effect.provideContext(context));
   });

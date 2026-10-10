@@ -43,6 +43,7 @@ export const validateAdvancedMetadataNumber = (
   ) {
     return undefined;
   }
+
   return `${advancedNumberLabels[field]} must be a whole number from 1 to 999.`;
 };
 
@@ -52,7 +53,10 @@ export const getAdvancedMetadataValidationErrors = (
   const discNumber = validateAdvancedMetadataNumber("discNumber", metadata.discNumber);
   const bpm = validateAdvancedMetadataNumber("bpm", metadata.bpm);
   const errors: Partial<Record<AdvancedNumericMetadataField, string>> = {};
+
   if (discNumber) errors.discNumber = discNumber;
+
   if (bpm) errors.bpm = bpm;
+
   return errors;
 };
