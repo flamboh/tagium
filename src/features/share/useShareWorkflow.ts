@@ -396,6 +396,7 @@ export const useShareWorkflow = ({
           shareKind: fetched.manifest.kind,
           trackCount: manifestTrackCount(fetched.manifest),
           viewer: getPublicationCapability(slug) ? "creator" : "recipient",
+          contentTitle: manifestContentTitle(fetched.manifest),
         });
 
         return fetched;

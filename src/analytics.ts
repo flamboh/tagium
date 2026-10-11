@@ -241,6 +241,7 @@ export type AnalyticsEvent =
       shareKind: "album" | "track";
       trackCount: number;
       viewer: "creator" | "recipient";
+      contentTitle: string;
     }
   | {
       type: "download_started";
@@ -521,6 +522,7 @@ const CUSTOM_EVENT_PROPERTIES = {
     "share_kind",
     "track_count",
     "viewer",
+    "content_title",
   ]),
   share_added: new Set([...COMMON_CUSTOM_PROPERTIES, "share_id", "share_kind", "track_count"]),
   download_started: new Set([
@@ -856,6 +858,7 @@ const CUSTOM_PROPERTY_VALIDATORS = {
     share_kind: isShareKind,
     track_count: isPositiveInteger,
     viewer: isShareViewer,
+    content_title: isContentTitle,
   },
   share_added: {
     share_id: isShareAnalyticsId,
@@ -1337,17 +1340,25 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
           track_count: event.trackCount,
         },
       };
-    case "share_opened":
+    case "share_opened": {
+      const properties: AnalyticsProperties = {
+        ...commonProperties,
+        share_id: event.shareId,
+        share_kind: event.shareKind,
+        track_count: event.trackCount,
+        viewer: event.viewer,
+      };
+
+      const contentTitle = normalizeContentTitle(event.contentTitle);
+
+      if (contentTitle) properties.content_title = contentTitle;
+
       return {
         name: event.type,
-        properties: {
-          ...commonProperties,
-          share_id: event.shareId,
-          share_kind: event.shareKind,
-          track_count: event.trackCount,
-          viewer: event.viewer,
-        },
+        properties,
       };
+    }
+
     case "download_started":
       return {
         name: event.type,

@@ -6,6 +6,7 @@ import type { AnalyticsEvent, Upstreams } from "../support/upstreams";
 import { saveApp } from "../save-app/save";
 import { libraryCount, pickFiles } from "../local-editing/workspace";
 import { downloadTrackButton, importUrl, waitForTrackReady } from "../url-import/helpers";
+import { albumManifest, createShare } from "../share-settings/helpers";
 
 const SENSITIVE_KEY = /url|href|referrer|pathname|filename|title|artist|album|text|elements/iu;
 
@@ -306,6 +307,30 @@ test("tagium save reports each download outcome with its provider and failure co
     "127.0.0.1",
   ]);
   await expectStorageFree(page);
+});
+
+test("opening a share made outside the editor reports its title", async ({
+  page,
+  request,
+  upstreams,
+}) => {
+  const video = await upstreams.youtube.video({ title: "Club Pick" });
+
+  const share = await createShare(
+    request,
+    albumManifest({ title: "Album Club Pick", artist: "Someone", tracks: [{ video }] }),
+  );
+
+  await page.goto(`/share/${share.slug}`);
+
+  const events = await eventsNamed(upstreams, ["share_opened"]);
+
+  expect(only(events, "share_opened")).toMatchObject({
+    share_kind: "album",
+    track_count: 1,
+    viewer: "recipient",
+    content_title: "Album Club Pick",
+  });
 });
 
 test("each app reports page views under its own app and first-party host only", async ({
