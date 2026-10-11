@@ -1,6 +1,11 @@
 import { Schema } from "effect";
 import type { CaptureResult, PostHogConfig } from "posthog-js";
 import type { MediaLinkKind } from "@/lib/media-link";
+import {
+  isSafeContentTitleCharacter,
+  MAX_CONTENT_TITLE_LENGTH,
+  normalizeContentTitle,
+} from "@/features/share/shareContentTitle";
 
 export type { MediaLinkKind } from "@/lib/media-link";
 
@@ -752,14 +757,6 @@ const isSizeBucket = isOneOf([
   "500_mb_or_more",
 ] as const);
 
-const MAX_CONTENT_TITLE_LENGTH = 200;
-
-const isSafeContentTitleCharacter = (character: string) => {
-  const code = character.charCodeAt(0);
-
-  return code > 31 && code !== 127;
-};
-
 const isContentTitle = (value: AnalyticsProperty) =>
   isString(value) &&
   value.trim().length > 0 &&
@@ -1033,18 +1030,6 @@ const sizeBucket = (sizeBytes: number) => {
   if (sizeMb < 500) return "100_to_500_mb";
 
   return "500_mb_or_more";
-};
-
-const normalizeContentTitle = (title: string) => {
-  const normalized = Array.from(title, (character) =>
-    isSafeContentTitleCharacter(character) ? character : " ",
-  )
-    .join("")
-    .trim();
-
-  return normalized
-    ? Array.from(normalized).slice(0, MAX_CONTENT_TITLE_LENGTH).join("")
-    : undefined;
 };
 
 export const analyticsOutputFormatFromFilename = (filename: string): AnalyticsOutputFormat => {

@@ -16,6 +16,7 @@ import {
   publicationCreated,
   readRequestBodyWithinLimit,
 } from "../../utils/share-manifest-request";
+import { captureShareCreated } from "../../utils/share-analytics";
 import { getSoundCloudLogContext } from "../../utils/soundcloud-observability";
 import { resolveSoundCloudSet } from "../../utils/soundcloud-set";
 import { resolveYouTubePlaylist } from "../../utils/youtube-playlist";
@@ -116,10 +117,13 @@ export default defineHandler(async (event) => {
     const playlist = await resolvePlaylist(request, source.provider, source.canonicalUrl);
     const manifest = projectManifest({ ...playlist, ...album, sourceUrl: source.canonicalUrl });
 
-    return publicationCreated(
-      request,
-      await store.publish(manifest, artwork, { indefinite: lifetimes[0] === "indefinite" }),
-    );
+    const published = await store.publish(manifest, artwork, {
+      indefinite: lifetimes[0] === "indefinite",
+    });
+
+    event.waitUntil(captureShareCreated(published.analyticsId, manifest));
+
+    return publicationCreated(request, published);
   } catch (error) {
     if (
       error instanceof Error &&

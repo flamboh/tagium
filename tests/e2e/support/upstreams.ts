@@ -361,8 +361,10 @@ export const createUpstreams = (owner: string) => {
               : filter.route.test(call.route))),
       );
     },
-    async analyticsEvents() {
+    async analyticsEvents(filter: { includeUnowned?: boolean } = {}) {
       const params = new URLSearchParams({ owner });
+
+      if (filter.includeUnowned) params.set("includeUnowned", "1");
       const response = await fetch(`${E2E_CONTROL_URL}/calls?${params}`);
       const calls = (await response.json()) as UpstreamCall[];
 
