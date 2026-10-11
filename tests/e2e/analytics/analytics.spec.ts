@@ -333,6 +333,49 @@ test("opening a share made outside the editor reports its title", async ({
   });
 });
 
+test("a share made through the share api reports its creation from the server", async ({
+  request,
+  upstreams,
+}) => {
+  const playlist = await upstreams.youtube.playlist({
+    title: "Club Playlist",
+    author: "Curator",
+    videos: [{ title: "Opener" }, { title: "Closer" }],
+  });
+
+  const response = await request.post("/api/shares", {
+    multipart: { source: playlist.url, album: JSON.stringify({ title: "Album Club Week" }) },
+  });
+
+  expect(response.status()).toBe(201);
+  const { analyticsId } = (await response.json()) as { analyticsId: string };
+
+  await expect
+    .poll(
+      async () =>
+        (await upstreams.analyticsEvents({ includeUnowned: true }))
+          .filter(({ properties }) => properties.share_id === analyticsId)
+          .map(({ event, properties }) => ({ event, properties })),
+      { message: "server share_created event", ...IMPORT_TIMEOUT },
+    )
+    .toEqual([
+      {
+        event: "share_created",
+        properties: {
+          $process_person_profile: false,
+          event_version: 1,
+          deploy_env: "production",
+          app_id: "tagium",
+          release_sha: "e2e",
+          share_id: analyticsId,
+          share_kind: "album",
+          track_count: 2,
+          content_title: "Album Club Week",
+        },
+      },
+    ]);
+});
+
 test("each app reports page views under its own app and first-party host only", async ({
   page,
   baseURL,

@@ -24,6 +24,7 @@ import { listenForTagiumPresence, watchForAnotherTagiumTab } from "@/features/sh
 import { shareLinkForSlug, shareSlugFromPathname } from "@/features/share/shareLink";
 import { shareEligibility, shareTrackEligibility } from "@/features/share/shareEligibility";
 import { manifestArtwork, manifestTrackCount, type Manifest } from "@/features/share/shareManifest";
+import { manifestContentTitle } from "@/features/share/shareContentTitle";
 import {
   ShareIneligibleError,
   sharePublicationErrorMessage,
@@ -68,12 +69,6 @@ const sharedContentAddedDescription = (manifest: Manifest) => {
   const count = manifestTrackCount(manifest);
 
   return `downloading ${count} ${count === 1 ? "track" : "tracks"} — watch progress in the sidebar.`;
-};
-
-const manifestContentTitle = (manifest: Manifest) => {
-  const title = manifest.kind === "album" ? manifest.album.title : manifest.track.metadata.title;
-
-  return title.trim() || `untitled ${manifest.kind}`;
 };
 
 const albumForTrack = (albums: readonly AlbumGroup[], trackId: string) =>
