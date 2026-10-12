@@ -1,8 +1,11 @@
 import { useState } from "react";
+import { toast } from "sonner";
+import { planTrackIds, type ExportPlan } from "@/features/export/exportConfirmation";
 import { getMediaUrlEntryPresentation } from "@/features/import/mediaUrlEntryPresentation";
 import { useMediaUrlEntryController } from "@/features/import/useMediaUrlEntryController";
 import { useExportSession } from "@/features/export/useExportSession";
 import { useLibraryStore } from "@/features/library/useLibraryStore";
+import { removeDownloadedTracksFromAlbums } from "@/features/library/albumOps";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
 import type { AppSettings } from "@/features/library/types";
 import {
@@ -30,7 +33,13 @@ export function useAudioTaggerController() {
   const workspaceNavigation = useWorkspaceNavigation({ library, editor });
   const activeView = workspaceNavigation.activeView;
   const activateEditor = workspaceNavigation.showEditor;
-  const exporting = useExportSession({ library, editor: editor.commands, settings });
+
+  const exporting = useExportSession({
+    library,
+    editor: editor.commands,
+    settings,
+    onConfirmedDownload: (plan) => clearDownloadedTracks(plan),
+  });
 
   const importing = useAudioImportSession({
     library,
@@ -42,6 +51,18 @@ export function useAudioTaggerController() {
       else void exporting.exportTrack(target.trackId);
     },
   });
+
+  const clearDownloadedTracks = (plan: ExportPlan) => {
+    if (!settings.clearAfterSidebarDownload) return;
+    const trackIds = planTrackIds(plan);
+    importing.commands.removeTracks(trackIds);
+    library.dispatch({
+      type: "tracks-removed",
+      trackIds,
+      albums: removeDownloadedTracksFromAlbums(library.getSnapshot().albums, new Set(trackIds)),
+    });
+    toast(`cleared ${trackIds.length} downloaded ${trackIds.length === 1 ? "track" : "tracks"}`);
+  };
 
   const sharing = useShareWorkflow({ library, editor, importing, enabled: shareLinksEnabled });
   const busy = importing.status.importing || exporting.exporting;

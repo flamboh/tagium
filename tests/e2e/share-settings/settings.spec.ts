@@ -39,6 +39,9 @@ const settingsControls = (page: Page) => ({
   downloadAfterImport: page.getByRole("checkbox", {
     name: /^start download immediately after import/u,
   }),
+  clearAfterSidebarDownload: page.getByRole("checkbox", {
+    name: /^clear tracks from the sidebar after downloading them/u,
+  }),
   advanced: page.getByRole("checkbox", { name: /^show advanced fields/u }),
   link: (name: string) => page.getByRole("switch", { name, exact: true }),
 });
@@ -60,6 +63,7 @@ const expectSettings = async (
     bitrate: string;
     soundcloudCover: boolean;
     downloadAfterImport: boolean;
+    clearAfterSidebarDownload: boolean;
     advanced: boolean;
     links: boolean;
   },
@@ -70,6 +74,9 @@ const expectSettings = async (
   await expect(controls.bitrate).toHaveAccessibleName(`mp3 bitrate, ${expected.bitrate} kbps`);
   await expect(controls.soundcloudCover).toBeChecked({ checked: expected.soundcloudCover });
   await expect(controls.downloadAfterImport).toBeChecked({ checked: expected.downloadAfterImport });
+  await expect(controls.clearAfterSidebarDownload).toBeChecked({
+    checked: expected.clearAfterSidebarDownload,
+  });
   await openSettings(page, "editing");
   await expect(controls.advanced).toBeChecked({ checked: expected.advanced });
   await openSettings(page, "linking");
@@ -140,6 +147,7 @@ test("every setting persists across reloads, and unreadable stored settings fall
     bitrate: "320",
     soundcloudCover: true,
     downloadAfterImport: false,
+    clearAfterSidebarDownload: false,
     advanced: false,
     links: true,
   };
@@ -155,6 +163,7 @@ test("every setting persists across reloads, and unreadable stored settings fall
   await chooseOption(page, /^mp3 bitrate, /u, "mp3 bitrate", /^128 kbps$/u);
   await controls.soundcloudCover.click();
   await controls.downloadAfterImport.click();
+  await controls.clearAfterSidebarDownload.click();
   await openSettings(page, "editing");
   await page.locator("label").filter({ hasText: "show advanced fields" }).click();
   await expect(controls.advanced).toBeChecked();
@@ -171,6 +180,7 @@ test("every setting persists across reloads, and unreadable stored settings fall
     bitrate: "128",
     soundcloudCover: false,
     downloadAfterImport: true,
+    clearAfterSidebarDownload: true,
     advanced: true,
     links: false,
   });
