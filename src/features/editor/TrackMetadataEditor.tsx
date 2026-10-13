@@ -36,6 +36,7 @@ import {
 import { getTrackFailureDisplay } from "@/shared/systemFailure";
 import type { AlbumGroup, AudioMetadata, TagiumFile, TrackClip } from "@/features/library/types";
 import { getAudioFormat } from "@/features/audio/audioFormat";
+import { getAlternateKeySpelling, type KeyNotation } from "@/features/analysis/musicalKey";
 import {
   getMetadataLinkDescriptor,
   type MetadataLinkState,
@@ -65,6 +66,10 @@ interface TrackMetadataEditorProps {
   selectedFileAlbum: AlbumGroup | undefined;
   syncFilenames: boolean;
   advancedMetadata: boolean;
+  djAnalysis: boolean;
+  keyNotation: KeyNotation;
+  /** Whether tempo and key detection is still queued or running for the selected track. */
+  analysisPending: boolean;
   metadataLinks: MetadataLinkState;
   onPreviewMetadataChange: (
     field: "filename" | "title" | "artist",
@@ -445,9 +450,11 @@ interface AdvancedFieldRegistrations {
 function BpmField({
   registration,
   error,
+  detecting = false,
 }: {
   registration: UseFormRegisterReturn<"bpm">;
   error: string | undefined;
+  detecting?: boolean;
 }) {
   return (
     <div>
@@ -462,7 +469,8 @@ function BpmField({
         label="bpm"
         aria-invalid={Boolean(error)}
         aria-describedby={error ? "track-bpm-error" : undefined}
-        placeholder="120"
+        aria-busy={detecting}
+        placeholder={detecting ? "detecting" : "120"}
         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
       />
       {error && (
@@ -478,17 +486,43 @@ function BpmField({
   );
 }
 
-function KeyField({ registration }: { registration: UseFormRegisterReturn<"musicalKey"> }) {
+const alternateKeyLabels = { standard: "standard", camelot: "camelot" } as const;
+
+function KeyField({
+  registration,
+  detecting = false,
+  alternate,
+}: {
+  registration: UseFormRegisterReturn<"musicalKey">;
+  detecting?: boolean;
+  /** The key's other notation, shown beside the tagged spelling. */
+  alternate?: ReturnType<typeof getAlternateKeySpelling>;
+}) {
   return (
-    <FloatingLabelInput
-      {...registration}
-      id="track-key"
-      label="key"
-      placeholder="Am"
-      autoCapitalize="off"
-      autoCorrect="off"
-      spellCheck={false}
-    />
+    <div className="relative">
+      <FloatingLabelInput
+        {...registration}
+        id="track-key"
+        label="key"
+        aria-busy={detecting}
+        aria-describedby={alternate ? "track-key-alternate" : undefined}
+        placeholder={detecting ? "detecting" : "Am"}
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
+        className={alternate ? "pr-14" : undefined}
+      />
+      {alternate && (
+        <span
+          id="track-key-alternate"
+          data-key-alternate
+          className="pointer-events-none absolute right-3 bottom-2 text-sm text-muted-foreground"
+        >
+          <span className="sr-only">{alternateKeyLabels[alternate.style]} notation </span>
+          {alternate.text}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -497,12 +531,15 @@ function AdvancedTrackDetailsFields({
   errors,
   albumArtistLinked,
   linkedArtistValue,
+  showDjFields,
   onFieldsMount,
 }: {
   registrations: AdvancedFieldRegistrations;
   errors: FieldErrors<AudioMetadata>;
   albumArtistLinked: boolean;
   linkedArtistValue: string;
+  /** False when the dj fields have their own row outside the advanced pane. */
+  showDjFields: boolean;
   onFieldsMount?: (node: HTMLDivElement | null) => void;
 }) {
   const albumArtistReason = getMetadataLinkDescriptor("albumArtist").disabledReason;
@@ -533,7 +570,10 @@ function AdvancedTrackDetailsFields({
           </p>
         )}
       </div>
-      <div ref={onFieldsMount} className="grid grid-cols-3 gap-2">
+      <div
+        ref={onFieldsMount}
+        className={showDjFields ? "grid grid-cols-3 gap-2" : "grid grid-cols-1 gap-2"}
+      >
         <div>
           <FloatingLabelInput
             type="number"
@@ -559,8 +599,12 @@ function AdvancedTrackDetailsFields({
             </p>
           )}
         </div>
-        <BpmField registration={registrations.bpm} error={errors.bpm?.message} />
-        <KeyField registration={registrations.musicalKey} />
+        {showDjFields && (
+          <>
+            <BpmField registration={registrations.bpm} error={errors.bpm?.message} />
+            <KeyField registration={registrations.musicalKey} />
+          </>
+        )}
       </div>
       <FloatingLabelInput
         {...registrations.composer}
@@ -583,10 +627,12 @@ const useAdvancedMetadataFormBoundary = ({
   register,
   control,
   enabled,
+  bpmEnabled,
 }: {
   register: UseFormRegister<AudioMetadata>;
   control: Control<AudioMetadata>;
   enabled: boolean;
+  bpmEnabled: boolean;
 }) => {
   const registrations: AdvancedFieldRegistrations = {
     albumArtist: register("albumArtist"),
@@ -597,7 +643,7 @@ const useAdvancedMetadataFormBoundary = ({
     composer: register("composer"),
     bpm: register("bpm", {
       ...nullableNumberRegistration,
-      validate: (value) => !enabled || validateBpm(value),
+      validate: (value) => !bpmEnabled || validateBpm(value),
     }),
     musicalKey: register("musicalKey", { setValueAs: (value: string) => value.trim() }),
     comment: register("comment"),
@@ -854,6 +900,9 @@ function LoadedTrackMetadataEditor({
   selectedFileAlbum,
   syncFilenames,
   advancedMetadata,
+  djAnalysis,
+  keyNotation,
+  analysisPending,
   metadataLinks,
   onPreviewMetadataChange,
   editorMode,
@@ -889,6 +938,15 @@ function LoadedTrackMetadataEditor({
     register,
     control,
     enabled: advancedMetadata,
+    bpmEnabled: advancedMetadata || djAnalysis,
+  });
+
+  const watchedBpm = useWatch({ control, name: "bpm", defaultValue: selectedFile.metadata.bpm });
+
+  const watchedKey = useWatch({
+    control,
+    name: "musicalKey",
+    defaultValue: selectedFile.metadata.musicalKey,
   });
 
   const pendingAdvancedFocusRef = useRef<"discNumber" | "bpm" | null>(null);
@@ -927,22 +985,24 @@ function LoadedTrackMetadataEditor({
   const downloadDisabledReason = getDownloadDisabledReason(isTrackCoverProcessing, filenameInvalid);
 
   const submitDownload = () => {
-    if (advancedMetadata) {
+    if (advancedMetadata || djAnalysis) {
       const validationErrors = getAdvancedMetadataValidationErrors(getValues());
+      const discNumberError = advancedMetadata ? validationErrors.discNumber : undefined;
       clearErrors(["discNumber", "bpm"]);
 
-      if (validationErrors.discNumber || validationErrors.bpm) {
-        if (validationErrors.discNumber) {
-          setError("discNumber", { type: "validate", message: validationErrors.discNumber });
+      if (discNumberError || validationErrors.bpm) {
+        if (discNumberError) {
+          setError("discNumber", { type: "validate", message: discNumberError });
         }
 
         if (validationErrors.bpm) {
           setError("bpm", { type: "validate", message: validationErrors.bpm });
         }
 
-        const invalidField = validationErrors.discNumber ? "discNumber" : "bpm";
+        const invalidField = discNumberError ? "discNumber" : "bpm";
 
-        if (editorMode === "advanced") {
+        // With dj analysis on, bpm sits in its own row and is visible in either mode.
+        if (editorMode === "advanced" || (invalidField === "bpm" && djAnalysis)) {
           setFocus(invalidField, { shouldSelect: true });
         } else {
           pendingAdvancedFocusRef.current = invalidField;
@@ -1049,6 +1109,7 @@ function LoadedTrackMetadataEditor({
                       errors={advancedFields.errors}
                       albumArtistLinked={metadataLinks.albumArtist}
                       linkedArtistValue={linkedAlbumArtistDisplay}
+                      showDjFields={!djAnalysis}
                       onFieldsMount={focusPendingAdvancedField}
                     />
                   </div>
@@ -1059,6 +1120,24 @@ function LoadedTrackMetadataEditor({
                 data-editor-actions
                 className="flex min-w-0 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3"
               >
+                {djAnalysis && (
+                  <div data-dj-fields className="grid grid-cols-2 gap-2">
+                    <BpmField
+                      registration={advancedFields.registrations.bpm}
+                      error={advancedFields.errors.bpm?.message}
+                      detecting={analysisPending && watchedBpm === null}
+                    />
+                    <KeyField
+                      registration={advancedFields.registrations.musicalKey}
+                      detecting={analysisPending && !watchedKey}
+                      alternate={
+                        keyNotation === "both"
+                          ? getAlternateKeySpelling(watchedKey ?? "")
+                          : undefined
+                      }
+                    />
+                  </div>
+                )}
                 <TrackWaveform
                   key={selectedFile.id}
                   active={viewActive ?? true}

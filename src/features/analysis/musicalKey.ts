@@ -8,6 +8,9 @@ export interface MusicalKey {
 
 export type KeyNotationStyle = "standard" | "camelot";
 
+/** How detected keys are written and shown; "both" writes the standard name. */
+export type KeyNotation = KeyNotationStyle | "both";
+
 const majorNames = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"] as const;
 
 const minorNames = [
@@ -83,4 +86,20 @@ export const parseMusicalKey = (text: string): MusicalKey | undefined => {
     pitchClass: wrap(natural + accidental),
     mode: minor ? "minor" : "major",
   };
+};
+
+/** The spelling a detected key is tagged with under a notation preference. */
+export const formatDetectedKey = (key: MusicalKey, notation: KeyNotation) =>
+  formatMusicalKey(key, notation === "camelot" ? "camelot" : "standard");
+
+/** The other spelling of a key tag, for showing both notations side by side. */
+export const getAlternateKeySpelling = (text: string) => {
+  const key = parseMusicalKey(text);
+
+  if (!key) return undefined;
+  const writtenInCamelot = /^\d/u.test(text.trim());
+
+  return writtenInCamelot
+    ? { style: "standard" as const, text: formatMusicalKey(key, "standard") }
+    : { style: "camelot" as const, text: formatMusicalKey(key, "camelot") };
 };

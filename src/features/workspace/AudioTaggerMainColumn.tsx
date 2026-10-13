@@ -14,8 +14,17 @@ type ColumnProps = {
 };
 
 function AudioTaggerViews({ controller, menuInViewHeader, mobileMenuButton }: ColumnProps) {
-  const { library, editor, settings, activeView, importing, exporting, mobile, libraryIsEmpty } =
-    controller;
+  const {
+    library,
+    editor,
+    settings,
+    analysis,
+    activeView,
+    importing,
+    exporting,
+    mobile,
+    libraryIsEmpty,
+  } = controller;
 
   const { selectedFileId } = library.state;
   const headerLeadingAction = menuInViewHeader ? mobileMenuButton : undefined;
@@ -56,6 +65,9 @@ function AudioTaggerViews({ controller, menuInViewHeader, mobileMenuButton }: Co
           selectedFileAlbum={editor.selectedFileAlbum}
           syncFilenames={settings.syncFilenames}
           advancedMetadata={settings.advancedMetadata}
+          djAnalysis={settings.djAnalysis}
+          keyNotation={settings.keyNotation}
+          analysisPending={selectedFileId !== null && analysis.pendingTrackIds.has(selectedFileId)}
           metadataLinks={getMetadataLinkState(settings, editor.selectedFileAlbum)}
           onPreviewMetadataChange={(field, event) =>
             editor.commands.preview(field, event.target.value)

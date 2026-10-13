@@ -1,4 +1,5 @@
 import { Effect, Option, Schema } from "effect";
+import type { KeyNotation } from "@/features/analysis/musicalKey";
 import type { AudioDownloadBitrate, AudioDownloadFormat } from "@/features/import/cobaltAudio";
 import type { AppSettings } from "@/features/library/types";
 
@@ -15,6 +16,12 @@ export const AUDIO_FORMAT_OPTIONS = [
   "mp3",
 ] as const satisfies readonly AudioDownloadFormat[];
 
+export const KEY_NOTATION_OPTIONS = [
+  "standard",
+  "camelot",
+  "both",
+] as const satisfies readonly KeyNotation[];
+
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   syncTrackNumbers: true,
   syncFilenames: true,
@@ -23,6 +30,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   applySoundCloudAlbumCoverToTracks: true,
   downloadAfterImport: false,
   advancedMetadata: false,
+  djAnalysis: false,
+  keyNotation: "standard",
   metadataLinks: {
     singleAlbum: true,
     artist: true,
@@ -57,6 +66,11 @@ const storedAppSettingsSchema = Schema.Struct({
   ),
   downloadAfterImport: booleanWithDefault(DEFAULT_APP_SETTINGS.downloadAfterImport),
   advancedMetadata: booleanWithDefault(DEFAULT_APP_SETTINGS.advancedMetadata),
+  djAnalysis: booleanWithDefault(DEFAULT_APP_SETTINGS.djAnalysis),
+  keyNotation: Schema.Literals(KEY_NOTATION_OPTIONS).pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_APP_SETTINGS.keyNotation))),
+    Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_APP_SETTINGS.keyNotation)),
+  ),
   metadataLinks: Schema.Struct({
     singleAlbum: booleanWithDefault(DEFAULT_APP_SETTINGS.metadataLinks.singleAlbum),
     artist: booleanWithDefault(DEFAULT_APP_SETTINGS.metadataLinks.artist),

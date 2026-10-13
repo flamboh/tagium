@@ -7,6 +7,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type { AppSettings } from "@/features/library/types";
 import {
   AboutSettingsSection,
+  DjSettingsSection,
   EditingSettingsSection,
   ImportingSettingsSection,
   LinkingSettingsSection,
@@ -24,6 +25,7 @@ const sections = [
   { id: "importing", label: "importing", ordinal: "1" },
   { id: "editing", label: "editing", ordinal: "2" },
   { id: "linking", label: "linking", ordinal: "3" },
+  { id: "dj", label: "dj", ordinal: "4" },
   { id: "about", label: "about" },
 ] as const;
 
@@ -110,6 +112,7 @@ export default function SettingsPage({
           {activeSection === "linking" && (
             <LinkingSettingsSection settings={settings} onChange={onChange} />
           )}
+          {activeSection === "dj" && <DjSettingsSection settings={settings} onChange={onChange} />}
           {activeSection === "about" && <AboutSettingsSection />}
         </div>
       </div>

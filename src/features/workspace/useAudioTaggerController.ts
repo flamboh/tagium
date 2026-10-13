@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { getMediaUrlEntryPresentation } from "@/features/import/mediaUrlEntryPresentation";
 import { useMediaUrlEntryController } from "@/features/import/useMediaUrlEntryController";
+import { useTrackAnalysis } from "@/features/analysis/useTrackAnalysis";
 import { useExportSession } from "@/features/export/useExportSession";
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
@@ -43,6 +44,7 @@ export function useAudioTaggerController() {
     },
   });
 
+  const analysis = useTrackAnalysis({ library, settings });
   const sharing = useShareWorkflow({ library, editor, importing, enabled: shareLinksEnabled });
   const busy = importing.status.importing || exporting.exporting;
 
@@ -107,6 +109,7 @@ export function useAudioTaggerController() {
     library,
     settings,
     editor,
+    analysis,
     activeView,
     exporting,
     importing,

@@ -1,4 +1,5 @@
 import type { AudioDownloadBitrate, AudioDownloadFormat } from "@/features/import/cobaltAudio";
+import type { KeyNotation } from "@/features/analysis/musicalKey";
 import type { AudioMetadata, MetadataPatch } from "@/features/audio/metadata";
 import type { AudioFormat } from "@/features/audio/metadataEngine/types";
 
@@ -85,6 +86,8 @@ export interface AppSettings {
   applySoundCloudAlbumCoverToTracks: boolean;
   downloadAfterImport: boolean;
   advancedMetadata: boolean;
+  djAnalysis: boolean;
+  keyNotation: KeyNotation;
   metadataLinks: MetadataLinks;
 }
 

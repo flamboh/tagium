@@ -268,6 +268,11 @@ export default defineConfig({
     exclude: ["**/node_modules/**", "**/.git/**", "**/.repos/**", "**/e2e/**", "tests/live/**"],
   },
   plugins: [react(), libavAssets(), ...(isTest ? [] : [nitro()])],
+  optimizeDeps: {
+    // The analysis worker loads these lazily; discovering them mid-session would make the dev
+    // server reload the page and drop the in-memory library.
+    include: ["essentia.js/dist/essentia-wasm.es.js", "essentia.js/dist/essentia.js-core.es.js"],
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
