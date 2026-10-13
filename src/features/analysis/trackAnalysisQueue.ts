@@ -118,9 +118,10 @@ export const createTrackAnalysisQueue = ({
       }
 
       queued = queued.filter((trackId) => trackIds.has(trackId));
+      const queuedIds = new Set(queued);
 
       for (const file of files) {
-        if (attempted.has(file.id) || file.id === running || queued.includes(file.id)) continue;
+        if (attempted.has(file.id) || file.id === running || queuedIds.has(file.id)) continue;
 
         if (!isAnalyzable(file)) continue;
 

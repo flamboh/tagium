@@ -623,6 +623,54 @@ function AdvancedTrackDetailsFields({
   );
 }
 
+/** The row of dj tags shown in every editor mode while dj analysis is on. */
+function DjTrackFields({
+  control,
+  registrations,
+  bpmError,
+  keyNotation,
+  analysisPending,
+}: {
+  control: Control<AudioMetadata>;
+  registrations: Pick<AdvancedFieldRegistrations, "bpm" | "musicalKey">;
+  bpmError: string | undefined;
+  keyNotation: KeyNotation;
+  analysisPending: boolean;
+}) {
+  const bpm = useWatch({ control, name: "bpm" });
+  const musicalKey = useWatch({ control, name: "musicalKey" }) ?? "";
+
+  return (
+    <div data-dj-fields className="grid grid-cols-2 gap-2">
+      <BpmField
+        registration={registrations.bpm}
+        error={bpmError}
+        detecting={analysisPending && (bpm ?? null) === null}
+      />
+      <KeyField
+        registration={registrations.musicalKey}
+        detecting={analysisPending && musicalKey === ""}
+        alternate={keyNotation === "both" ? getAlternateKeySpelling(musicalKey) : undefined}
+      />
+    </div>
+  );
+}
+
+/** The tag errors that block a download, limited to the fields the editor currently shows. */
+const getDownloadValidationErrors = (
+  values: AudioMetadata,
+  advancedMetadata: boolean,
+  djAnalysis: boolean,
+) => {
+  if (!advancedMetadata && !djAnalysis) return undefined;
+  const errors = getAdvancedMetadataValidationErrors(values);
+  const discNumber = advancedMetadata ? errors.discNumber : undefined;
+
+  if (!discNumber && !errors.bpm) return undefined;
+
+  return { discNumber, bpm: errors.bpm, field: discNumber ? "discNumber" : "bpm" } as const;
+};
+
 const useAdvancedMetadataFormBoundary = ({
   register,
   control,
@@ -941,14 +989,6 @@ function LoadedTrackMetadataEditor({
     bpmEnabled: advancedMetadata || djAnalysis,
   });
 
-  const watchedBpm = useWatch({ control, name: "bpm", defaultValue: selectedFile.metadata.bpm });
-
-  const watchedKey = useWatch({
-    control,
-    name: "musicalKey",
-    defaultValue: selectedFile.metadata.musicalKey,
-  });
-
   const pendingAdvancedFocusRef = useRef<"discNumber" | "bpm" | null>(null);
 
   const { editorBodyRef, editorActionsRef, changeEditorMode } = useEditorModeLayoutAnimation({
@@ -985,32 +1025,26 @@ function LoadedTrackMetadataEditor({
   const downloadDisabledReason = getDownloadDisabledReason(isTrackCoverProcessing, filenameInvalid);
 
   const submitDownload = () => {
-    if (advancedMetadata || djAnalysis) {
-      const validationErrors = getAdvancedMetadataValidationErrors(getValues());
-      const discNumberError = advancedMetadata ? validationErrors.discNumber : undefined;
-      clearErrors(["discNumber", "bpm"]);
+    const invalid = getDownloadValidationErrors(getValues(), advancedMetadata, djAnalysis);
 
-      if (discNumberError || validationErrors.bpm) {
-        if (discNumberError) {
-          setError("discNumber", { type: "validate", message: discNumberError });
-        }
+    clearErrors(["discNumber", "bpm"]);
 
-        if (validationErrors.bpm) {
-          setError("bpm", { type: "validate", message: validationErrors.bpm });
-        }
-
-        const invalidField = discNumberError ? "discNumber" : "bpm";
-
-        // With dj analysis on, bpm sits in its own row and is visible in either mode.
-        if (editorMode === "advanced" || (invalidField === "bpm" && djAnalysis)) {
-          setFocus(invalidField, { shouldSelect: true });
-        } else {
-          pendingAdvancedFocusRef.current = invalidField;
-          changeEditorMode("advanced");
-        }
-
-        return;
+    if (invalid) {
+      if (invalid.discNumber) {
+        setError("discNumber", { type: "validate", message: invalid.discNumber });
       }
+
+      if (invalid.bpm) setError("bpm", { type: "validate", message: invalid.bpm });
+
+      // With dj analysis on, bpm sits in its own row and is visible in either mode.
+      if (editorMode === "advanced" || (invalid.field === "bpm" && djAnalysis)) {
+        setFocus(invalid.field, { shouldSelect: true });
+      } else {
+        pendingAdvancedFocusRef.current = invalid.field;
+        changeEditorMode("advanced");
+      }
+
+      return;
     }
 
     void onDownloadUpdatedFile(getValues());
@@ -1121,22 +1155,13 @@ function LoadedTrackMetadataEditor({
                 className="flex min-w-0 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3"
               >
                 {djAnalysis && (
-                  <div data-dj-fields className="grid grid-cols-2 gap-2">
-                    <BpmField
-                      registration={advancedFields.registrations.bpm}
-                      error={advancedFields.errors.bpm?.message}
-                      detecting={analysisPending && watchedBpm === null}
-                    />
-                    <KeyField
-                      registration={advancedFields.registrations.musicalKey}
-                      detecting={analysisPending && !watchedKey}
-                      alternate={
-                        keyNotation === "both"
-                          ? getAlternateKeySpelling(watchedKey ?? "")
-                          : undefined
-                      }
-                    />
-                  </div>
+                  <DjTrackFields
+                    control={control}
+                    registrations={advancedFields.registrations}
+                    bpmError={advancedFields.errors.bpm?.message}
+                    keyNotation={keyNotation}
+                    analysisPending={analysisPending}
+                  />
                 )}
                 <TrackWaveform
                   key={selectedFile.id}
