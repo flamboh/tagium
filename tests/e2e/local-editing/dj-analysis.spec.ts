@@ -78,7 +78,7 @@ test("leaves tracks untouched until dj analysis is turned on in settings", async
   await page.getByRole("button", { name: "settings", exact: true }).click();
   await page
     .getByRole("navigation", { name: "settings sections" })
-    .getByRole("button", { name: "dj", exact: true })
+    .getByRole("button", { name: "editing", exact: true })
     .click();
   await expect(page.getByRole("button", { name: /^key notation, / })).toBeDisabled();
   await page.getByRole("checkbox", { name: /^detect bpm and key/u }).click();
@@ -97,7 +97,7 @@ test("leaves tracks untouched until dj analysis is turned on in settings", async
   await page.getByRole("button", { name: "settings", exact: true }).click();
   await page
     .getByRole("navigation", { name: "settings sections" })
-    .getByRole("button", { name: "dj", exact: true })
+    .getByRole("button", { name: "editing", exact: true })
     .click();
   await expect(page.getByRole("checkbox", { name: /^detect bpm and key/u })).toBeChecked();
   await expect(

@@ -202,7 +202,7 @@ export function EditingSettingsSection({ settings, onChange }: SettingsSectionPr
       <div className="space-y-1">
         <h3 className="text-base font-semibold">editing</h3>
         <p className="text-sm leading-5 text-muted-foreground">
-          choose which fields the track editor shows you.
+          choose which fields the track editor shows you and fills in for you.
         </p>
       </div>
       <label className={checkboxRowClassName}>
@@ -224,21 +224,17 @@ export function EditingSettingsSection({ settings, onChange }: SettingsSectionPr
           </span>
         </span>
       </label>
+      <DjAnalysisSettings settings={settings} onChange={onChange} />
     </section>
   );
 }
 
-export function DjSettingsSection({ settings, onChange }: SettingsSectionProps) {
+/** The tempo and key detection controls shown in the editing section. */
+function DjAnalysisSettings({ settings, onChange }: SettingsSectionProps) {
   const [notationOpen, setNotationOpen] = useState(false);
 
   return (
-    <section className="flex max-w-xl flex-col gap-5">
-      <div className="space-y-1">
-        <h3 className="text-base font-semibold">dj</h3>
-        <p className="text-sm leading-5 text-muted-foreground">
-          tag tracks with the tempo and key dj software reads on import.
-        </p>
-      </div>
+    <>
       <label className={checkboxRowClassName}>
         <Checkbox
           id="dj-analysis"
@@ -254,8 +250,8 @@ export function DjSettingsSection({ settings, onChange }: SettingsSectionProps) 
         <span className="space-y-0.5">
           <span className="block text-sm font-medium leading-5">detect bpm and key</span>
           <span className="block text-xs leading-5 text-muted-foreground">
-            analyzes each track on this device and fills its empty bpm and key fields. tracks longer
-            than 15 minutes are skipped.
+            for dj software. analyzes each track on this device and fills its empty bpm and key
+            fields. tracks longer than 15 minutes are skipped.
           </span>
         </span>
       </label>
@@ -310,7 +306,7 @@ export function DjSettingsSection({ settings, onChange }: SettingsSectionProps) 
           applies to keys detected from now on. keys already on a track are left as they are.
         </p>
       </div>
-    </section>
+    </>
   );
 }
 
