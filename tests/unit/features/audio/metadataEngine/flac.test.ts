@@ -421,3 +421,56 @@ describe("FLAC metadata driver", () => {
     ).rejects.toBeInstanceOf(AudioMetadataWriteError);
   });
 });
+
+describe("FLAC musical key", () => {
+  const keyed = (...comments: string[]) =>
+    concat(utf8("fLaC"), block(0, streamInfo()), block(4, vorbis(comments), true), audio);
+
+  it("prefers INITIALKEY over a legacy KEY comment", async () => {
+    const inspected = await Effect.runPromise(
+      flacDriver.inspect(blobByteSource(new Blob([keyed("KEY=8A", "INITIALKEY=Am")]))),
+    );
+
+    expect(inspected.metadata.musicalKey).toBe("Am");
+  });
+
+  it("writes INITIALKEY, drops the legacy KEY comment, and clears on empty", async () => {
+    const original = keyed("TITLE=Title", "KEY=8A", "X-private=opaque value");
+    const source = blobByteSource(new Blob([original]));
+    expect((await Effect.runPromise(flacDriver.inspect(source))).metadata.musicalKey).toBe("8A");
+
+    const patched = await outputBytes(
+      (await Effect.runPromise(flacDriver.patch(source, { musicalKey: "F#m" }))).parts,
+    );
+
+    const patchedText = new TextDecoder().decode(patched);
+    expect(patchedText).toContain("INITIALKEY=F#m");
+    expect(patchedText).not.toContain("KEY=8A");
+    expect(patchedText).toContain("X-private=opaque value");
+
+    const inspected = await Effect.runPromise(
+      flacDriver.inspect(blobByteSource(new Blob([patched]))),
+    );
+
+    expect(inspected.metadata).toMatchObject({ title: "Title", musicalKey: "F#m" });
+    expect([...patched.subarray(audioOffset(patched))]).toEqual([
+      ...original.subarray(audioOffset(original)),
+    ]);
+
+    const cleared = await outputBytes(
+      (
+        await Effect.runPromise(
+          flacDriver.patch(blobByteSource(new Blob([patched])), { musicalKey: "" }),
+        )
+      ).parts,
+    );
+
+    expect(new TextDecoder().decode(cleared)).not.toContain("INITIALKEY");
+
+    const clearedInspection = await Effect.runPromise(
+      flacDriver.inspect(blobByteSource(new Blob([cleared]))),
+    );
+
+    expect(clearedInspection.metadata).toMatchObject({ title: "Title", musicalKey: "" });
+  });
+});

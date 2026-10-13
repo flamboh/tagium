@@ -40,6 +40,7 @@ for (const format of formats) {
     await field(page, "album artist").fill("New album artist 🎼");
     await numberField(page, "disc number").fill("3");
     await numberField(page, "bpm").fill("127");
+    await field(page, "key").fill("F#m");
     await field(page, "composer").fill("Zoë Nova");
     await field(page, "comment").fill("Edited comment\nSecond line é 🦊");
     await expect(page.getByRole("heading", { level: 2 })).toHaveText(`${title}.${format}`);
@@ -60,6 +61,7 @@ for (const format of formats) {
       trackTotal: taggedTags.trackTotal,
       discNumber: 3,
       bpm: 127,
+      musicalKey: "F#m",
       composer: "Zoë Nova",
       comment: "Edited comment\nSecond line é 🦊",
     });

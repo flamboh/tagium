@@ -41,6 +41,7 @@ interface ParsedMp4 {
   sampleRate: number;
   metadata: AudioInspection["metadata"];
   discTotal: number | null;
+  freeformNames: Map<number, string>;
 }
 
 const readError = (message: string, cause?: unknown) =>
@@ -452,6 +453,7 @@ const parseMetadata = (
     const { ilst } = itunesMetadataPath(moov);
     const values = new Map<string, string[]>();
     const freeform = new Map<string, string[]>();
+    const freeformNames = new Map<number, string>();
     const pictures: ArtworkEntry[] = [];
     let trackNumber: number | null = null;
     let trackTotal: number | null = null;
@@ -472,7 +474,15 @@ const parseMetadata = (
       "©cmt",
     ]);
 
-    const knownFreeformItems = new Set(["TITLE", "ARTIST", "ALBUM", "DATE", "GENRE"]);
+    const knownFreeformItems = new Set([
+      "TITLE",
+      "ARTIST",
+      "ALBUM",
+      "DATE",
+      "GENRE",
+      "INITIALKEY",
+      "KEY",
+    ]);
 
     for (const item of ilst?.children ?? []) {
       if (item.type === "----") {
@@ -499,6 +509,8 @@ const parseMetadata = (
 
           if (entry.type === "data") itemPayloads.push(payload);
         }
+
+        freeformNames.set(item.start, name);
 
         if (knownFreeformItems.has(name)) {
           const itemValues: string[] = [];
@@ -617,8 +629,10 @@ const parseMetadata = (
         comment: values.get("©cmt")?.[0] ?? "",
         discNumber,
         bpm,
+        musicalKey: freeform.get("INITIALKEY")?.[0] ?? freeform.get("KEY")?.[0] ?? "",
       } satisfies AudioInspection["metadata"],
       discTotal,
+      freeformNames,
     };
   });
 
@@ -645,9 +659,16 @@ const parse = (source: ByteSource): Effect.Effect<ParsedMp4, AudioMetadataReadEr
       return yield* Effect.fail(readError("ftyp atom is truncated."));
     const { duration, sampleRate } = yield* parseAudioTrack(source, moov);
     yield* validateDataReferences(source, moov);
-    const { metadata, discTotal } = yield* parseMetadata(source, moov, duration, sampleRate, mdats);
 
-    return { atoms, moov, mdats, duration, sampleRate, metadata, discTotal };
+    const { metadata, discTotal, freeformNames } = yield* parseMetadata(
+      source,
+      moov,
+      duration,
+      sampleRate,
+      mdats,
+    );
+
+    return { atoms, moov, mdats, duration, sampleRate, metadata, discTotal, freeformNames };
   });
 
 const atomHeader = (type: string, size: number, extended = false) => {
@@ -680,6 +701,15 @@ const makeDiscItem = (value: number, total: number | null | undefined) =>
   makeAtom("disk", [makeData(concat(put16(0), put16(value), put16(total ?? 0)), 0)]);
 
 const makeBpmItem = (value: number) => makeAtom("tmpo", [makeData(put16(value), 21)]);
+
+const freeformKey = (name: string) => `----:${name.toUpperCase()}`;
+
+const makeFreeformItem = (name: string, value: string) =>
+  makeAtom("----", [
+    makeAtom("mean", [put32(0), textBytes("com.apple.iTunes")]),
+    makeAtom("name", [put32(0), textBytes(name)]),
+    makeData(textBytes(value), 1),
+  ]);
 
 const makeArtworkItem = (pictures: ArtworkEntry[]) =>
   makeAtom(
@@ -751,6 +781,14 @@ const replacementEntries = (
     result.set("tmpo", changes.bpm === null ? null : makeBpmItem(changes.bpm));
   }
 
+  if (changes.musicalKey !== undefined) {
+    result.set(
+      freeformKey("initialkey"),
+      changes.musicalKey === "" ? null : makeFreeformItem("initialkey", changes.musicalKey),
+    );
+    result.set(freeformKey("key"), null);
+  }
+
   if (changes.picture !== undefined)
     result.set("covr", changes.picture.length ? makeArtworkItem(changes.picture) : null);
 
@@ -814,6 +852,7 @@ interface BuildContext {
   delta: number;
   moov: Atom;
   mdats: Atom[];
+  freeformNames: Map<number, string>;
   targetIlstStart?: number;
   targetMetaStart?: number;
   targetUdtaStart?: number;
@@ -864,11 +903,16 @@ const buildAtom = (
       const parts: BlobPart[] = [];
 
       for (const item of atom.children ?? []) {
-        const replacement = context.replacements.get(item.type);
+        const key =
+          item.type === "----"
+            ? freeformKey(context.freeformNames.get(item.start) ?? "")
+            : item.type;
 
-        if (replacement !== undefined || context.replacements.has(item.type)) {
-          if (!emitted.has(item.type) && replacement) parts.push(replacement);
-          emitted.add(item.type);
+        const replacement = context.replacements.get(key);
+
+        if (replacement !== undefined || context.replacements.has(key)) {
+          if (!emitted.has(key) && replacement) parts.push(replacement);
+          emitted.add(key);
         } else {
           parts.push(source.slice(item.start, item.start + item.size));
         }
@@ -923,6 +967,7 @@ const buildMoov = (
     delta,
     moov: parsed.moov,
     mdats: parsed.mdats,
+    freeformNames: parsed.freeformNames,
     targetIlstStart: metadataPath.ilst?.start,
     targetMetaStart: metadataPath.meta?.start,
     targetUdtaStart: metadataPath.udta?.start,
@@ -952,6 +997,7 @@ const patch = (
         "discNumber",
         "composer",
         "bpm",
+        "musicalKey",
         "comment",
         "picture",
         "dateText",

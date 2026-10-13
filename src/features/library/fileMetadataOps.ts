@@ -72,6 +72,10 @@ export const sanitizePendingMetadataPatch = (
     sanitized.composer = patch.composer;
   }
 
+  if (hasOwn(patch, "musicalKey") && patch.musicalKey !== undefined) {
+    sanitized.musicalKey = patch.musicalKey;
+  }
+
   if (hasOwn(patch, "comment") && patch.comment !== undefined) {
     sanitized.comment = patch.comment;
   }
@@ -126,6 +130,7 @@ const createMetadataPatch = (metadata: AudioMetadata): DownloadedTrackMetadataPa
   discNumber: metadata.discNumber,
   composer: metadata.composer,
   bpm: metadata.bpm,
+  musicalKey: metadata.musicalKey,
   comment: metadata.comment,
 });
 
@@ -180,6 +185,7 @@ const areWritableMetadataFieldsEqual = (
   firstMetadata.discNumber === secondMetadata.discNumber &&
   firstMetadata.composer === secondMetadata.composer &&
   firstMetadata.bpm === secondMetadata.bpm &&
+  firstMetadata.musicalKey === secondMetadata.musicalKey &&
   firstMetadata.comment === secondMetadata.comment;
 
 const applyProviderDisplayMetadata = (

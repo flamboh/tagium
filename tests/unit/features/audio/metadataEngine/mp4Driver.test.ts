@@ -420,3 +420,37 @@ describe("mp4Driver", () => {
     );
   });
 });
+
+describe("mp4Driver musical key", () => {
+  const mdatPayloads = (bytes: Uint8Array) =>
+    topAtoms(bytes)
+      .filter((entry) => entry.type === "mdat")
+      .map((entry) => bytes.slice(entry.start + 8, entry.start + entry.size));
+
+  it("adds, replaces, and clears the iTunes initialkey freeform item", async () => {
+    const fixture = makeFixture({ binaryFreeform: true });
+    expect((await runInspect(fixture.bytes)).metadata.musicalKey).toBe("");
+
+    const added = await runPatch(fixture.bytes, { musicalKey: "Am" });
+    expect((await runInspect(added)).metadata).toMatchObject({ musicalKey: "Am", bpm: 128 });
+    expect(includes(added, ascii("com.apple.iTunes"))).toBe(true);
+    expect(includes(added, ascii("initialkey"))).toBe(true);
+    // unrelated freeform items are untouched
+    expect(includes(added, ascii("Fallback title"))).toBe(true);
+    expect(Array.from(added).join(",")).toContain("255,254,0");
+
+    for (const opaque of fixture.opaque) expect(includes(added, opaque)).toBe(true);
+    expect(mdatPayloads(added)).toEqual(fixture.media);
+
+    const replaced = await runPatch(added, { musicalKey: "8A" });
+    expect((await runInspect(replaced)).metadata.musicalKey).toBe("8A");
+    expect(new TextDecoder("latin1").decode(replaced).split("initialkey")).toHaveLength(2);
+    expect(mdatPayloads(replaced)).toEqual(fixture.media);
+
+    const cleared = await runPatch(replaced, { musicalKey: "" });
+    expect((await runInspect(cleared)).metadata.musicalKey).toBe("");
+    expect(includes(cleared, ascii("initialkey"))).toBe(false);
+    expect(includes(cleared, ascii("Fallback title"))).toBe(true);
+    expect(mdatPayloads(cleared)).toEqual(fixture.media);
+  });
+});

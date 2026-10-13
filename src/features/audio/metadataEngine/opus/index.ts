@@ -871,6 +871,11 @@ const encodeTags = (tags: OpusTags, changes: MetadataChanges) => {
   replaceText("COPYRIGHT", changes.copyright);
   replaceText("LANGUAGE", changes.language);
 
+  if (changes.musicalKey !== undefined) {
+    replaceText("INITIALKEY", changes.musicalKey);
+    replacements.set("KEY", []);
+  }
+
   if (changes.year !== undefined) {
     replacements.set(
       "DATE",
@@ -1114,6 +1119,7 @@ const inspect = (source: ByteSource) =>
       comment: firstValue(comments, "COMMENT") ?? firstValue(comments, "DESCRIPTION") ?? "",
       discNumber: canonicalInteger(firstValue(comments, "DISCNUMBER")),
       bpm: canonicalInteger(firstValue(comments, "BPM")),
+      musicalKey: firstValue(comments, "INITIALKEY") ?? firstValue(comments, "KEY") ?? "",
     };
 
     return { format, metadata } satisfies AudioInspection;
@@ -1142,6 +1148,7 @@ const patch = (source: ByteSource, changes: MetadataChanges) => {
       "discNumber",
       "composer",
       "bpm",
+      "musicalKey",
       "comment",
       "copyright",
       "language",

@@ -707,3 +707,53 @@ describe("mp3Driver", () => {
     ).rejects.toThrow("APEv2 footer declares an invalid size or item count.");
   });
 });
+
+describe("mp3Driver musical key", () => {
+  it("reads, replaces, and clears the ID3 initial key frame", async () => {
+    const audio = validMp3Bytes();
+    const unknown = rawFrame("PRIV", Uint8Array.of(9, 8, 7, 6));
+
+    const source = blobByteSource(
+      new Blob([concat(tag(frame("TKEY", "Am"), frame("TBPM", "128"), unknown), audio)]),
+    );
+
+    const inspected = await Effect.runPromise(mp3Driver.inspect(source));
+    expect(inspected.metadata).toMatchObject({ musicalKey: "Am", bpm: 128 });
+
+    const patchedPlan = await Effect.runPromise(mp3Driver.patch(source, { musicalKey: "8A" }));
+    const patched = new Uint8Array(await new Blob(patchedPlan.parts).arrayBuffer());
+    expect(patched.slice(-audio.length)).toEqual(audio);
+    expect(includes(patched, unknown)).toBe(true);
+    const updated = await Effect.runPromise(mp3Driver.inspect(blobByteSource(new Blob([patched]))));
+    expect(updated.metadata).toMatchObject({ musicalKey: "8A", bpm: 128 });
+    expect(new TextDecoder("latin1").decode(patched).split("TKEY")).toHaveLength(2);
+
+    const clearedPlan = await Effect.runPromise(
+      mp3Driver.patch(blobByteSource(new Blob([patched])), { musicalKey: "" }),
+    );
+
+    const cleared = new Uint8Array(await new Blob(clearedPlan.parts).arrayBuffer());
+
+    const clearedInspection = await Effect.runPromise(
+      mp3Driver.inspect(blobByteSource(new Blob([cleared]))),
+    );
+
+    expect(clearedInspection.metadata).toMatchObject({ musicalKey: "", bpm: 128 });
+    expect(new TextDecoder("latin1").decode(cleared)).not.toContain("TKEY");
+  });
+
+  it("falls back to and rewrites an APEv2-only key", async () => {
+    const audio = validMp3Bytes();
+    const source = blobByteSource(new Blob([concat(audio, apeTag(apeItem("INITIALKEY", "F#m")))]));
+    const inspected = await Effect.runPromise(mp3Driver.inspect(source));
+    expect(inspected.metadata.musicalKey).toBe("F#m");
+
+    const patchedPlan = await Effect.runPromise(mp3Driver.patch(source, { musicalKey: "Bb" }));
+    const patched = new Uint8Array(await new Blob(patchedPlan.parts).arrayBuffer());
+    expect(includes(patched, audio)).toBe(true);
+    expect(includes(patched, apeItem("INITIALKEY", "Bb"))).toBe(true);
+    expect(includes(patched, apeItem("INITIALKEY", "F#m"))).toBe(false);
+    const updated = await Effect.runPromise(mp3Driver.inspect(blobByteSource(new Blob([patched]))));
+    expect(updated.metadata.musicalKey).toBe("Bb");
+  });
+});

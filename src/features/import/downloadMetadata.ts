@@ -46,6 +46,7 @@ export const createDownloadMetadata = ({
   comment: "",
   discNumber: null,
   bpm: null,
+  musicalKey: "",
 });
 
 export const getPlaylistTrackPendingYear = (

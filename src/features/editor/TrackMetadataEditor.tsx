@@ -438,7 +438,58 @@ interface AdvancedFieldRegistrations {
   discNumber: UseFormRegisterReturn<"discNumber">;
   composer: UseFormRegisterReturn<"composer">;
   bpm: UseFormRegisterReturn<"bpm">;
+  musicalKey: UseFormRegisterReturn<"musicalKey">;
   comment: UseFormRegisterReturn<"comment">;
+}
+
+function BpmField({
+  registration,
+  error,
+}: {
+  registration: UseFormRegisterReturn<"bpm">;
+  error: string | undefined;
+}) {
+  return (
+    <div>
+      <FloatingLabelInput
+        type="number"
+        inputMode="numeric"
+        min={1}
+        max={999}
+        step={1}
+        {...registration}
+        id="track-bpm"
+        label="bpm"
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? "track-bpm-error" : undefined}
+        placeholder="120"
+        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+      />
+      {error && (
+        <p
+          id="track-bpm-error"
+          className="mt-1 text-xs leading-5 text-destructive"
+          aria-live="polite"
+        >
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function KeyField({ registration }: { registration: UseFormRegisterReturn<"musicalKey"> }) {
+  return (
+    <FloatingLabelInput
+      {...registration}
+      id="track-key"
+      label="key"
+      placeholder="Am"
+      autoCapitalize="off"
+      autoCorrect="off"
+      spellCheck={false}
+    />
+  );
 }
 
 function AdvancedTrackDetailsFields({
@@ -482,7 +533,7 @@ function AdvancedTrackDetailsFields({
           </p>
         )}
       </div>
-      <div ref={onFieldsMount} className="grid grid-cols-2 gap-2">
+      <div ref={onFieldsMount} className="grid grid-cols-3 gap-2">
         <div>
           <FloatingLabelInput
             type="number"
@@ -508,31 +559,8 @@ function AdvancedTrackDetailsFields({
             </p>
           )}
         </div>
-        <div>
-          <FloatingLabelInput
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={999}
-            step={1}
-            {...registrations.bpm}
-            id="track-bpm"
-            label="bpm"
-            aria-invalid={Boolean(errors.bpm)}
-            aria-describedby={errors.bpm ? "track-bpm-error" : undefined}
-            placeholder="120"
-            className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          />
-          {errors.bpm && (
-            <p
-              id="track-bpm-error"
-              className="mt-1 text-xs leading-5 text-destructive"
-              aria-live="polite"
-            >
-              {errors.bpm.message}
-            </p>
-          )}
-        </div>
+        <BpmField registration={registrations.bpm} error={errors.bpm?.message} />
+        <KeyField registration={registrations.musicalKey} />
       </div>
       <FloatingLabelInput
         {...registrations.composer}
@@ -571,6 +599,7 @@ const useAdvancedMetadataFormBoundary = ({
       ...nullableNumberRegistration,
       validate: (value) => !enabled || validateBpm(value),
     }),
+    musicalKey: register("musicalKey", { setValueAs: (value: string) => value.trim() }),
     comment: register("comment"),
   };
 

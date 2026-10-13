@@ -159,6 +159,9 @@ export const createSparseMetadataPatch = (
         }
 
         break;
+      case "musicalKey":
+        patch.musicalKey = metadata.musicalKey;
+        break;
       case "comment":
         patch.comment = metadata.comment;
         break;
