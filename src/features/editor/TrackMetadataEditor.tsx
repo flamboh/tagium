@@ -1204,7 +1204,7 @@ function LoadedTrackMetadataEditor({
                   onClick={submitDownload}
                   disabled={!canDownloadTrack}
                   disabledReason={downloadDisabledReason}
-                  processing={djAnalysis && analysisPending}
+                  processing={analysisPending}
                 />
               </div>
             </div>

@@ -22,6 +22,54 @@ type FooterProps = Pick<
   | "onOpenSettings"
 >;
 
+function DownloadAllButton({
+  enabled,
+  loading,
+  disabledReason,
+  processingCount,
+  onDownloadAll,
+}: {
+  enabled: boolean;
+  loading: boolean;
+  disabledReason: string;
+  /** Tracks still waiting on bpm and key detection; the download still works. */
+  processingCount: number;
+  onDownloadAll: () => void;
+}) {
+  const processing = enabled && processingCount > 0;
+
+  const button = (
+    <Button
+      className="w-full [@media(pointer:coarse)]:min-h-11"
+      onClick={onDownloadAll}
+      disabled={!enabled}
+    >
+      {processing && (
+        <HugeiconsIcon
+          icon={loaderCircleIcon}
+          strokeWidth={2}
+          aria-hidden="true"
+          className="animate-spin motion-reduce:animate-none"
+        />
+      )}
+      {loading ? "downloading..." : "download all"}
+    </Button>
+  );
+
+  if (enabled && !processing) return button;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {enabled ? button : <span className="block">{button}</span>}
+      </TooltipTrigger>
+      <TooltipContent>
+        {processing ? describeProcessingTracks(processingCount) : disabledReason}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export default function TagSidebarFooter({
   files,
   filenamePreviewStore,
@@ -52,41 +100,13 @@ export default function TagSidebarFooter({
 
   return (
     <div className="px-3 py-3 border-t flex-shrink-0 flex flex-col gap-2">
-      {canDownloadAll && !loading && processingCount > 0 ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button className="w-full [@media(pointer:coarse)]:min-h-11" onClick={onDownloadAll}>
-              <HugeiconsIcon
-                icon={loaderCircleIcon}
-                strokeWidth={2}
-                aria-hidden="true"
-                className="animate-spin motion-reduce:animate-none"
-              />
-              download all
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{describeProcessingTracks(processingCount)}</TooltipContent>
-        </Tooltip>
-      ) : canDownloadAll && !loading ? (
-        <Button className="w-full [@media(pointer:coarse)]:min-h-11" onClick={onDownloadAll}>
-          download all
-        </Button>
-      ) : (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="block">
-              <Button
-                className="w-full [@media(pointer:coarse)]:min-h-11"
-                onClick={onDownloadAll}
-                disabled
-              >
-                {loading ? "downloading..." : "download all"}
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{downloadAllReason}</TooltipContent>
-        </Tooltip>
-      )}
+      <DownloadAllButton
+        enabled={canDownloadAll && !loading}
+        loading={loading}
+        disabledReason={downloadAllReason}
+        processingCount={processingCount}
+        onDownloadAll={onDownloadAll}
+      />
       <Button
         variant="outline"
         data-export-focus-fallback
