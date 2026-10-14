@@ -72,7 +72,7 @@ export const parseMusicalKey = (text: string): MusicalKey | undefined => {
   }
 
   const standard = value.match(/^([A-G])([#♯b♭]?)\s*(maj(?:or)?|min(?:or)?|m)?$/iu);
-  const natural = standard ? naturalPitchClasses.get(standard[1]!) : undefined;
+  const natural = standard ? naturalPitchClasses.get(standard[1]!.toUpperCase()) : undefined;
 
   if (!standard || natural === undefined) return undefined;
   const accidental = standard[2] === "" ? 0 : standard[2] === "#" || standard[2] === "♯" ? 1 : -1;

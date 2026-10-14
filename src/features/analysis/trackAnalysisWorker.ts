@@ -1,8 +1,9 @@
 import Essentia from "essentia.js/dist/essentia.js-core.es.js";
 import { EssentiaWASM } from "essentia.js/dist/essentia-wasm.es.js";
-import { analyzeSamples, mixToMono, type TrackAnalysis } from "@/features/analysis/trackAnalysis";
+import { analyzeSamples, type TrackAnalysis } from "@/features/analysis/trackAnalysis";
 
-export type TrackAnalysisRequest = { channels: Float32Array[] };
+/** Mono samples at the analysis rate. */
+export type TrackAnalysisRequest = { samples: Float32Array<ArrayBuffer> };
 
 export type TrackAnalysisMessage = { analysis: TrackAnalysis } | { error: string };
 
@@ -12,7 +13,7 @@ self.onmessage = (event: MessageEvent<TrackAnalysisRequest>) => {
   let message: TrackAnalysisMessage;
 
   try {
-    message = { analysis: analyzeSamples(essentia, mixToMono(event.data.channels)) };
+    message = { analysis: analyzeSamples(essentia, event.data.samples) };
   } catch (error) {
     message = { error: error instanceof Error ? error.message : "track analysis failed." };
   }

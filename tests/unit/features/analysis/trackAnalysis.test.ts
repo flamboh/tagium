@@ -86,8 +86,16 @@ describe("track analysis", () => {
 
   it("averages channels into mono", () => {
     const left = Float32Array.of(1, 0, -1);
-    expect(mixToMono([left])).toBe(left);
+    const mono = mixToMono([left]);
+    expect(mono).not.toBe(left);
+    expect(Array.from(mono)).toEqual([1, 0, -1]);
     expect(Array.from(mixToMono([left, Float32Array.of(0, 0, 1)]))).toEqual([0.5, 0, 0]);
     expect(mixToMono([])).toHaveLength(0);
+  });
+
+  it("keeps only the middle window of long audio", () => {
+    const ramp = Float32Array.from({ length: 10 }, (_, index) => index);
+    expect(Array.from(mixToMono([ramp], 4))).toEqual([3, 4, 5, 6]);
+    expect(Array.from(mixToMono([ramp, ramp], 2))).toEqual([4, 5]);
   });
 });

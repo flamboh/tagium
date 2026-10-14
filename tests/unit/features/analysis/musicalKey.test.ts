@@ -50,11 +50,17 @@ describe("musical key notation", () => {
     ["1m", { pitchClass: 9, mode: "minor" }],
     ["6m", { pitchClass: 8, mode: "minor" }],
     ["12d", { pitchClass: 5, mode: "major" }],
+    ["am", { pitchClass: 9, mode: "minor" }],
+    ["a minor", { pitchClass: 9, mode: "minor" }],
+    ["f#m", { pitchClass: 6, mode: "minor" }],
+    ["bbm", { pitchClass: 10, mode: "minor" }],
+    ["eb", { pitchClass: 3, mode: "major" }],
+    ["AM", { pitchClass: 9, mode: "major" }],
   ])("reads the %s spelling", (text, key) => {
     expect(parseMusicalKey(text)).toEqual(key);
   });
 
-  it.each(["", "H", "13A", "0B", "am", "8C", "A#x", "off"])("rejects %j", (text) => {
+  it.each(["", "H", "h", "13A", "0B", "8C", "A#x", "off"])("rejects %j", (text) => {
     expect(parseMusicalKey(text)).toBeUndefined();
   });
 });

@@ -15,6 +15,12 @@ export const ANALYSIS_SAMPLE_RATE = 22_050;
 
 const MIN_ANALYSIS_SECONDS = 10;
 
+/**
+ * Only the middle of a long track is analyzed. Tempo and key settle well within this, and it
+ * bounds the mono copy and the worker's wasm memory regardless of the track's length.
+ */
+export const MAX_ANALYZED_SECONDS = 6 * 60;
+
 const SILENCE_PEAK = 1e-3;
 
 // Tempo estimators cannot tell a beat from its half or double, so every estimate is folded into
@@ -37,19 +43,26 @@ export const foldBpm = (bpm: number) => {
   return Math.round(folded);
 };
 
-export const mixToMono = (channels: readonly Float32Array[]) => {
-  const [first, ...rest] = channels;
-
-  if (!first) return new Float32Array();
-
-  if (rest.length === 0) return first;
-  const mono = new Float32Array(first.length);
+/**
+ * Averages the channels into one new buffer, keeping at most `maxFrames` from the middle of the
+ * track. The copy is always fresh, so it can be transferred without touching the decoded audio.
+ */
+export const mixToMono = (
+  channels: readonly Float32Array[],
+  maxFrames = Number.POSITIVE_INFINITY,
+) => {
+  const length = channels[0]?.length ?? 0;
+  const frames = Math.min(length, maxFrames);
+  const start = Math.floor((length - frames) / 2);
+  const mono = new Float32Array(frames);
 
   for (const channel of channels) {
-    for (let index = 0; index < mono.length; index += 1) mono[index]! += channel[index] ?? 0;
+    for (let index = 0; index < frames; index += 1) mono[index]! += channel[start + index] ?? 0;
   }
 
-  for (let index = 0; index < mono.length; index += 1) mono[index]! /= channels.length;
+  if (channels.length > 1) {
+    for (let index = 0; index < frames; index += 1) mono[index]! /= channels.length;
+  }
 
   return mono;
 };
