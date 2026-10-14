@@ -442,6 +442,11 @@ const decodeUtf16 = (bytes: Uint8Array) => {
   return output;
 };
 
+const ITUNES_MEAN = "com.apple.iTunes";
+
+/** Freeform items are identified by their namespace and name; only com.apple.iTunes is ours. */
+const freeformKey = (mean: string, name: string) => `----:${mean}:${name.toUpperCase()}`;
+
 const parseMetadata = (
   source: ByteSource,
   moov: Atom,
@@ -474,18 +479,13 @@ const parseMetadata = (
       "©cmt",
     ]);
 
-    const knownFreeformItems = new Set([
-      "TITLE",
-      "ARTIST",
-      "ALBUM",
-      "DATE",
-      "GENRE",
-      "INITIALKEY",
-      "KEY",
-    ]);
+    const knownFreeformItems = new Set(["TITLE", "ARTIST", "ALBUM", "DATE", "GENRE"]);
+
+    const itunesKeys = new Map<string, string>();
 
     for (const item of ilst?.children ?? []) {
       if (item.type === "----") {
+        let mean = "";
         let name = "";
         const itemPayloads: Array<{ type: number; bytes: Uint8Array<ArrayBuffer> }> = [];
 
@@ -499,18 +499,29 @@ const parseMetadata = (
             );
           }
 
-          if (entry.type === "name") {
+          if (entry.type === "mean" || entry.type === "name") {
+            let text = "";
+
             try {
-              name = decodeUtf8(payload.bytes).toUpperCase();
+              text = decodeUtf8(payload.bytes);
             } catch {
-              name = "";
+              text = "";
             }
+
+            if (entry.type === "mean") mean = text;
+            else name = text.toUpperCase();
           }
 
           if (entry.type === "data") itemPayloads.push(payload);
         }
 
-        freeformNames.set(item.start, name);
+        freeformNames.set(item.start, freeformKey(mean, name));
+
+        if (mean === ITUNES_MEAN && (name === "INITIALKEY" || name === "KEY")) {
+          const text = itemPayloads.find((payload) => payload.type === 1);
+
+          if (text && !itunesKeys.has(name)) itunesKeys.set(name, decodeUtf8(text.bytes));
+        }
 
         if (knownFreeformItems.has(name)) {
           const itemValues: string[] = [];
@@ -629,7 +640,7 @@ const parseMetadata = (
         comment: values.get("©cmt")?.[0] ?? "",
         discNumber,
         bpm,
-        musicalKey: freeform.get("INITIALKEY")?.[0] ?? freeform.get("KEY")?.[0] ?? "",
+        musicalKey: itunesKeys.get("INITIALKEY") ?? itunesKeys.get("KEY") ?? "",
       } satisfies AudioInspection["metadata"],
       discTotal,
       freeformNames,
@@ -702,11 +713,9 @@ const makeDiscItem = (value: number, total: number | null | undefined) =>
 
 const makeBpmItem = (value: number) => makeAtom("tmpo", [makeData(put16(value), 21)]);
 
-const freeformKey = (name: string) => `----:${name.toUpperCase()}`;
-
 const makeFreeformItem = (name: string, value: string) =>
   makeAtom("----", [
-    makeAtom("mean", [put32(0), textBytes("com.apple.iTunes")]),
+    makeAtom("mean", [put32(0), textBytes(ITUNES_MEAN)]),
     makeAtom("name", [put32(0), textBytes(name)]),
     makeData(textBytes(value), 1),
   ]);
@@ -783,10 +792,10 @@ const replacementEntries = (
 
   if (changes.musicalKey !== undefined) {
     result.set(
-      freeformKey("initialkey"),
+      freeformKey(ITUNES_MEAN, "initialkey"),
       changes.musicalKey === "" ? null : makeFreeformItem("initialkey", changes.musicalKey),
     );
-    result.set(freeformKey("key"), null);
+    result.set(freeformKey(ITUNES_MEAN, "key"), null);
   }
 
   if (changes.picture !== undefined)
@@ -904,9 +913,7 @@ const buildAtom = (
 
       for (const item of atom.children ?? []) {
         const key =
-          item.type === "----"
-            ? freeformKey(context.freeformNames.get(item.start) ?? "")
-            : item.type;
+          item.type === "----" ? (context.freeformNames.get(item.start) ?? "") : item.type;
 
         const replacement = context.replacements.get(key);
 

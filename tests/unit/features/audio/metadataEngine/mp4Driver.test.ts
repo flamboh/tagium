@@ -48,6 +48,7 @@ interface FixtureOptions {
   offsetKind?: "stco" | "co64";
   externalReference?: boolean;
   binaryFreeform?: boolean;
+  foreignKeys?: boolean;
 }
 
 const makeFixture = ({
@@ -58,6 +59,7 @@ const makeFixture = ({
   offsetKind = "stco",
   externalReference = false,
   binaryFreeform = false,
+  foreignKeys = false,
 }: FixtureOptions = {}) => {
   const ftyp = atom("ftyp", ascii("M4A "), u32(0), ascii("isomM4A "));
   const media1 = Uint8Array.from({ length: 37 }, (_, index) => (index * 17 + 3) & 0xff);
@@ -118,6 +120,21 @@ const makeFixture = ({
       data(Uint8Array.of(0xff, 0xfe, 0x00), 0),
     );
 
+    const foreignKeyItems = [
+      atom(
+        "----",
+        atom("mean", u32(0), ascii("vendor.example")),
+        atom("name", u32(0), ascii("INITIALKEY")),
+        data(ascii("vendor initial key")),
+      ),
+      atom(
+        "----",
+        atom("mean", u32(0), ascii("vendor.example")),
+        atom("name", u32(0), ascii("KEY")),
+        data(Uint8Array.of(0xde, 0xad, 0xbe, 0xef), 0),
+      ),
+    ];
+
     const ilst = atom(
       "ilst",
       textItem("©nam", title),
@@ -144,6 +161,7 @@ const makeFixture = ({
       unknownItem,
       freeform,
       ...(binaryFreeform ? [opaqueFreeform] : []),
+      ...(foreignKeys ? foreignKeyItems : []),
     );
 
     const meta = atom(
@@ -451,6 +469,22 @@ describe("mp4Driver musical key", () => {
     expect((await runInspect(cleared)).metadata.musicalKey).toBe("");
     expect(includes(cleared, ascii("initialkey"))).toBe(false);
     expect(includes(cleared, ascii("Fallback title"))).toBe(true);
+    expect(mdatPayloads(cleared)).toEqual(fixture.media);
+  });
+
+  it("ignores and keeps key items from other namespaces", async () => {
+    const fixture = makeFixture({ foreignKeys: true });
+    expect((await runInspect(fixture.bytes)).metadata.musicalKey).toBe("");
+
+    const keyed = await runPatch(fixture.bytes, { musicalKey: "Am" });
+    expect((await runInspect(keyed)).metadata.musicalKey).toBe("Am");
+    expect(includes(keyed, ascii("vendor initial key"))).toBe(true);
+    expect(includes(keyed, Uint8Array.of(0xde, 0xad, 0xbe, 0xef))).toBe(true);
+
+    const cleared = await runPatch(keyed, { musicalKey: "" });
+    expect((await runInspect(cleared)).metadata.musicalKey).toBe("");
+    expect(includes(cleared, ascii("vendor initial key"))).toBe(true);
+    expect(includes(cleared, Uint8Array.of(0xde, 0xad, 0xbe, 0xef))).toBe(true);
     expect(mdatPayloads(cleared)).toEqual(fixture.media);
   });
 });
