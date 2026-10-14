@@ -37,10 +37,9 @@ const keyNotationLabels = {
   both: "standard and camelot",
 } as const satisfies Record<AppSettings["keyNotation"], string>;
 
-// Key names are tag values, so their examples keep the casing that gets written.
 const keyNotationDescriptions = {
-  standard: "tags musical names like Am and F#m.",
-  camelot: "tags wheel codes like 8A and 11A.",
+  standard: "tags note names, with m for minor keys.",
+  camelot: "tags camelot wheel numbers, with a for minor and b for major.",
   both: "tags the musical name and shows its camelot code beside it.",
 } as const satisfies Record<AppSettings["keyNotation"], string>;
 

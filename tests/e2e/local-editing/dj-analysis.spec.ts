@@ -104,3 +104,39 @@ test("leaves tracks untouched until dj analysis is turned on in settings", async
     page.getByRole("button", { name: "key notation, standard and camelot" }),
   ).toBeVisible();
 });
+
+test("downloads go ahead while detection runs and say which tracks are still processing", async ({
+  page,
+}) => {
+  let releaseWorker = () => {};
+
+  const workerHeld = new Promise<void>((resolve) => {
+    releaseWorker = resolve;
+  });
+
+  await page.route(/trackAnalysisWorker[^/]*\.js/u, async (route) => {
+    await workerHeld;
+    await route.continue();
+  });
+  await seedSettings(page, { djAnalysis: true, keyNotation: "standard" });
+  await page.goto("/");
+  await pickFiles(page, [djFixture("mp3")]);
+  await expect(numberField(page, "bpm")).toHaveAttribute("placeholder", "detecting");
+
+  const downloadTrackButton = page.getByRole("button", { name: "download track", exact: true });
+  await downloadTrackButton.hover();
+  await expect(page.getByRole("tooltip")).toHaveText("1 track is still processing key/bpm");
+  const downloadAllButton = page.getByRole("button", { name: "download all", exact: true });
+  await downloadAllButton.hover();
+  await expect(page.getByRole("tooltip")).toHaveText("1 track is still processing key/bpm");
+
+  const { metadata: early } = await inspectAudio(await downloadTrack(page));
+  expect(early).toMatchObject({ bpm: null, musicalKey: "" });
+
+  releaseWorker();
+  await expect(numberField(page, "bpm")).toHaveValue("128", SETTLE_TIMEOUT);
+  await downloadTrackButton.hover();
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  const { metadata: tagged } = await inspectAudio(await downloadTrack(page));
+  expect(tagged).toMatchObject({ bpm: 128, musicalKey: "Am" });
+});

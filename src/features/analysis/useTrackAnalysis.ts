@@ -14,23 +14,32 @@ const noPendingTracks: ReadonlySet<string> = new Set();
 export const useTrackAnalysis = ({
   library,
   settings,
+  exporting,
+  isExportRunning,
 }: {
   library: LibraryStore;
   settings: AppSettings;
+  /** Rerenders when an export finishes, so results held during it are applied. */
+  exporting: boolean;
+  isExportRunning: () => boolean;
 }) => {
   const [pendingTrackIds, setPendingTrackIds] = useState(noPendingTracks);
   const settingsRef = useRef(settings);
   const queueRef = useRef<TrackAnalysisQueue | null>(null);
+  const isExportRunningRef = useRef(isExportRunning);
   useLayoutEffect(() => {
     settingsRef.current = settings;
-  }, [settings]);
+    isExportRunningRef.current = isExportRunning;
+  }, [isExportRunning, settings]);
 
   const { getSnapshot, dispatch } = library;
   useEffect(() => {
     const queue = createTrackAnalysisQueue({
       library: { getSnapshot, dispatch },
       getSettings: () => settingsRef.current,
-      analyze: (file, duration) => Effect.runPromise(analyzeTrack(file, duration)),
+      isExportRunning: () => isExportRunningRef.current(),
+      analyze: (file, duration, signal) =>
+        Effect.runPromise(analyzeTrack(file, duration), { signal }),
       onPendingChange: setPendingTrackIds,
     });
 
@@ -44,7 +53,7 @@ export const useTrackAnalysis = ({
 
   useEffect(() => {
     queueRef.current?.sync();
-  }, [library.state.files, settings.djAnalysis]);
+  }, [exporting, library.state.files, settings.djAnalysis]);
 
   return { pendingTrackIds };
 };

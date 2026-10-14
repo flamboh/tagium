@@ -1,5 +1,8 @@
 "use client";
 
+import { HugeiconsIcon } from "@hugeicons/react";
+import { loaderCircleIcon } from "@/components/icons/loaderCircle";
+import { describeProcessingTracks } from "@/features/analysis/analysisProgress";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode, RefObject, TransitionEvent } from "react";
 import {
@@ -725,22 +728,46 @@ function DownloadTrackButton({
   onClick,
   disabled,
   disabledReason,
+  processing,
 }: {
   onClick: () => void;
   disabled: boolean;
   disabledReason: string;
+  /** The track's bpm and key detection hasn't finished; downloading still works. */
+  processing: boolean;
 }) {
+  const showProcessing = processing && !disabled;
+
+  const button = (
+    <Button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="min-w-36 max-lg:[@media(max-height:700px)]:h-10 max-lg:[@media(max-height:700px)]:text-xs"
+    >
+      {showProcessing && (
+        <HugeiconsIcon
+          icon={loaderCircleIcon}
+          strokeWidth={2}
+          aria-hidden="true"
+          className="animate-spin motion-reduce:animate-none"
+        />
+      )}
+      download track
+    </Button>
+  );
+
   return (
     <div className="flex items-center justify-end gap-2">
       <DisabledReason disabled={disabled} reason={disabledReason}>
-        <Button
-          type="button"
-          onClick={onClick}
-          disabled={disabled}
-          className="min-w-36 max-lg:[@media(max-height:700px)]:h-10 max-lg:[@media(max-height:700px)]:text-xs"
-        >
-          download track
-        </Button>
+        {showProcessing ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{button}</TooltipTrigger>
+            <TooltipContent>{describeProcessingTracks(1)}</TooltipContent>
+          </Tooltip>
+        ) : (
+          button
+        )}
       </DisabledReason>
     </div>
   );
@@ -1177,6 +1204,7 @@ function LoadedTrackMetadataEditor({
                   onClick={submitDownload}
                   disabled={!canDownloadTrack}
                   disabledReason={downloadDisabledReason}
+                  processing={djAnalysis && analysisPending}
                 />
               </div>
             </div>

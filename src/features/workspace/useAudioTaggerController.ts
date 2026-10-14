@@ -44,7 +44,13 @@ export function useAudioTaggerController() {
     },
   });
 
-  const analysis = useTrackAnalysis({ library, settings });
+  const analysis = useTrackAnalysis({
+    library,
+    settings,
+    exporting: exporting.exporting,
+    isExportRunning: exporting.isExportRunning,
+  });
+
   const sharing = useShareWorkflow({ library, editor, importing, enabled: shareLinksEnabled });
   const busy = importing.status.importing || exporting.exporting;
 

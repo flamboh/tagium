@@ -30,6 +30,7 @@ export default function AudioTaggerSidebar({ controller }: { controller: AudioTa
       mobileDrawerRef={drawerRef}
       onMobileClose={mobileNavigation.closeDrawer}
       loading={busy}
+      analysisPendingTrackIds={controller.analysis.pendingTrackIds}
       files={files}
       filenamePreviewStore={editor.filenamePreviewStore}
       albums={albums}

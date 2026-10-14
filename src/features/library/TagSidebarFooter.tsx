@@ -1,24 +1,41 @@
 import { Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  countProcessingTracks,
+  describeProcessingTracks,
+} from "@/features/analysis/analysisProgress";
 import type { TagSidebarPanelProps } from "@/features/library/TagSidebarPanel";
 import { useLiveTrackFilenameValidity } from "@/features/library/trackFilenamePreview";
 import { cn } from "@/lib/utils";
 
 type FooterProps = Pick<
   TagSidebarPanelProps,
-  "files" | "filenamePreviewStore" | "loading" | "settingsOpen" | "onDownloadAll" | "onOpenSettings"
+  | "files"
+  | "filenamePreviewStore"
+  | "loading"
+  | "analysisPendingTrackIds"
+  | "settingsOpen"
+  | "onDownloadAll"
+  | "onOpenSettings"
 >;
 
 export default function TagSidebarFooter({
   files,
   filenamePreviewStore,
   loading,
+  analysisPendingTrackIds,
   settingsOpen,
   onDownloadAll,
   onOpenSettings,
 }: FooterProps) {
+  const processingCount = countProcessingTracks(
+    files.map((file) => file.id),
+    analysisPendingTrackIds,
+  );
+
   const hasValidFilename = useLiveTrackFilenameValidity(filenamePreviewStore);
   const hasInvalidFilename = files.some((file) => file.metadata && !hasValidFilename(file));
 
@@ -35,7 +52,22 @@ export default function TagSidebarFooter({
 
   return (
     <div className="px-3 py-3 border-t flex-shrink-0 flex flex-col gap-2">
-      {canDownloadAll && !loading ? (
+      {canDownloadAll && !loading && processingCount > 0 ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button className="w-full [@media(pointer:coarse)]:min-h-11" onClick={onDownloadAll}>
+              <HugeiconsIcon
+                icon={loaderCircleIcon}
+                strokeWidth={2}
+                aria-hidden="true"
+                className="animate-spin motion-reduce:animate-none"
+              />
+              download all
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{describeProcessingTracks(processingCount)}</TooltipContent>
+        </Tooltip>
+      ) : canDownloadAll && !loading ? (
         <Button className="w-full [@media(pointer:coarse)]:min-h-11" onClick={onDownloadAll}>
           download all
         </Button>

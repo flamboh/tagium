@@ -35,6 +35,8 @@ import {
 
 export interface ExportSession {
   exporting: boolean;
+  /** True from the moment an export starts, before React has rendered the exporting state. */
+  isExportRunning: () => boolean;
   confirmation: ExportPlan | null;
   confirmationStatus: "ready" | "changed" | "unavailable";
   downloadAll: () => void;
@@ -75,7 +77,15 @@ export const useExportSession = ({
   editor: ExportEditor;
   settings: AppSettings;
 }): ExportSession => {
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExportingState] = useState(false);
+  const activeExportsRef = useRef(0);
+
+  const setExporting = useCallback((active: boolean) => {
+    activeExportsRef.current = Math.max(0, activeExportsRef.current + (active ? 1 : -1));
+    setExportingState(activeExportsRef.current > 0);
+  }, []);
+
+  const isExportRunning = useCallback(() => activeExportsRef.current > 0, []);
   const [confirmation, setConfirmation] = useState<ExportPlan | null>(null);
 
   const [confirmationStatus, setConfirmationStatus] = useState<"ready" | "changed" | "unavailable">(
@@ -541,6 +551,7 @@ export const useExportSession = ({
 
   return {
     exporting,
+    isExportRunning,
     confirmation,
     confirmationStatus,
     downloadAll,

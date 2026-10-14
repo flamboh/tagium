@@ -1,5 +1,6 @@
 "use client";
 
+import { countProcessingTracks } from "@/features/analysis/analysisProgress";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -44,6 +45,7 @@ interface AlbumSidebarProps {
   selectedFileId: string | null;
   selectedFileIds: Set<string>;
   cleanupSuggestionCountByAlbumId: ReadonlyMap<string, number>;
+  analysisPendingTrackIds: ReadonlySet<string>;
   onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
   onSelectFile: (albumId: string, fileId: string, event?: ReactMouseEvent) => void;
   onSelectLooseTrack: (fileId: string, event?: ReactMouseEvent) => void;
@@ -93,6 +95,7 @@ export default function AlbumSidebar({
   selectedFileId,
   selectedFileIds,
   cleanupSuggestionCountByAlbumId,
+  analysisPendingTrackIds,
   onSelectAlbum,
   onSelectFile,
   onSelectLooseTrack,
@@ -298,6 +301,7 @@ export default function AlbumSidebar({
                   album={album}
                   selected={selectedAlbumId === album.id}
                   canDownload={canDownloadAlbum}
+                  processingCount={countProcessingTracks(album.trackIds, analysisPendingTrackIds)}
                   cleanupSuggestionCount={cleanupSuggestionCount}
                   actions={actions}
                   spotlight={shareSpotlightFor("album", album.id)}
