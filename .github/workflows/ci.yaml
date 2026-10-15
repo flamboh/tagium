@@ -98,10 +98,11 @@ jobs:
           elif git diff --quiet "$BEFORE_SHA" "$GITHUB_SHA" -- \
             fly.cobalt.toml \
             Dockerfile.cobalt \
-            .dockerignore \
+            Dockerfile.cobalt.dockerignore \
             cobalt-machine-proxy.mjs \
             cobalt-soundcloud.mjs \
-            cobalt-soundcloud-helpers.mjs; then
+            cobalt-soundcloud-helpers.mjs \
+            cobalt-patch-ffmpeg.mjs; then
             echo "should_deploy=false" >> "$GITHUB_OUTPUT"
           else
             echo "should_deploy=true" >> "$GITHUB_OUTPUT"
