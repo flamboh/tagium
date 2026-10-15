@@ -142,6 +142,8 @@ const fetchUpstream = <A>(
     );
 
     if (!response.ok) {
+      void response.body?.cancel().catch(() => {});
+
       return yield* fail(
         context,
         startedAt,
@@ -157,7 +159,13 @@ const fetchUpstream = <A>(
     const parseStage = stage.replace("_fetch", "_parse");
 
     return yield* Effect.tryPromise({
-      try: () => options.read(response),
+      try: (signal) => {
+        signal.addEventListener("abort", () => void response.body?.cancel().catch(() => {}), {
+          once: true,
+        });
+
+        return options.read(response);
+      },
       catch: (cause) =>
         new SoundCloudStreamError({ stage: parseStage, code: options.parseCode ?? code, cause }),
     }).pipe(
@@ -242,6 +250,8 @@ export const parseSoundCloudMediaPlaylist = (
       }
 
       if (line.startsWith("#EXT-X-BYTERANGE")) return yield* Effect.fail("byterange");
+
+      if (line === "#EXT-X-DISCONTINUITY") return yield* Effect.fail("discontinuity");
 
       if (line.startsWith("#EXT-X-MAP:")) {
         if (playlistAttribute(line, "BYTERANGE")) return yield* Effect.fail("byterange");

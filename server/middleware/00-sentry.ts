@@ -12,7 +12,9 @@ type SentryRuntimeRequest = Request & {
 };
 
 export default defineMiddleware((event, next) => {
-  if (!new URL(event.req.url).pathname.startsWith("/api/cobalt/")) return next();
+  const { pathname } = new URL(event.req.url);
+
+  if (!pathname.startsWith("/api/cobalt/") && pathname !== "/api/soundcloud-stream") return next();
 
   // SAFETY: Nitro's Cloudflare adapter supplies this request shape in the Cloudflare runtime.
   const cloudflare = (event.req as SentryRuntimeRequest).runtime?.cloudflare;

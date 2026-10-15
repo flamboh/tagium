@@ -56,11 +56,22 @@ describe("soundcloud media playlist", () => {
       '#EXTM3U\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI="k"\n#EXT-X-MAP:URI="i.mp4"\n#EXTINF:1,\ns.m4s',
     ],
     ["byterange", '#EXTM3U\n#EXT-X-MAP:URI="i.mp4"\n#EXTINF:1,\n#EXT-X-BYTERANGE:10@0\ns.m4s'],
+    [
+      "discontinuity",
+      '#EXTM3U\n#EXT-X-MAP:URI="i.mp4"\n#EXTINF:1,\na.m4s\n#EXT-X-DISCONTINUITY\n#EXTINF:1,\nb.m4s',
+    ],
     ["init", "#EXTM3U\n#EXTINF:1,\ns.m4s"],
     ["empty", '#EXTM3U\n#EXT-X-MAP:URI="i.mp4"\n#EXT-X-ENDLIST'],
     ["segment", '#EXTM3U\n#EXT-X-MAP:URI="i.mp4"\ns.m4s'],
   ])("rejects %s playlists", (reason, text) => {
     expect(parseFailure(text)).toBe(reason);
+  });
+
+  it("accepts a discontinuity sequence without discontinuities", () => {
+    expect(
+      parse('#EXTM3U\n#EXT-X-DISCONTINUITY-SEQUENCE:0\n#EXT-X-MAP:URI="i.mp4"\n#EXTINF:1,\ns.m4s')
+        .segmentUrls,
+    ).toHaveLength(1);
   });
 
   it("accepts an explicit unencrypted key", () => {
