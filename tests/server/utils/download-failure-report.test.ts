@@ -88,6 +88,39 @@ describe("download failure report", () => {
     expect(events[0]?.level).toBe("warning");
   });
 
+  it.each([
+    "error.api.fetch.empty",
+    "error.api.fetch.soundcloud.stream_fetch.404",
+    "error.api.fetch.soundcloud.stream_fetch.404.contentType-application/json",
+  ])("reports SoundCloud tracks without a playable stream as a warning (%s)", async (errorCode) => {
+    const events = await captureSentryEvents(() =>
+      reportDownloadFailure({
+        route: "audio",
+        stage: "cobalt.resolve_error",
+        requestId: "request-test",
+        errorCode,
+        sourceUrl: "https://soundcloud.com/forss/flickermood",
+      }),
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe("warning");
+  });
+
+  it("reports SoundCloud stream failures that are not missing content", async () => {
+    const events = await captureSentryEvents(() =>
+      reportDownloadFailure({
+        route: "audio",
+        stage: "cobalt.resolve_error",
+        requestId: "request-test",
+        errorCode: "error.api.fetch.soundcloud.stream_fetch.403",
+        sourceUrl: "https://soundcloud.com/forss/flickermood",
+      }),
+    );
+
+    expect(events[0]?.level).toBe("error");
+  });
+
   it("skips missing SoundCloud content", async () => {
     const events = await captureSentryEvents(() =>
       reportDownloadFailure({
