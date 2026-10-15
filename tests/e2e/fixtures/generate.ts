@@ -9,6 +9,7 @@ import {
   audioFixtureTags,
   imageFixtures,
   mediaFixtures,
+  soundcloudHlsFixture,
   videoStreamFixtures,
 } from "./catalog.ts";
 
@@ -223,4 +224,25 @@ run(
   "color=c=0x33aa55:s=32x32:r=2:d=1",
   ...bitexact,
   join(outputDir, mediaFixtures["anim-gif"].file),
+);
+
+run(
+  "-i",
+  join(outputDir, soundcloudHlsFixture.source),
+  "-c",
+  "copy",
+  ...bitexact,
+  "-f",
+  "hls",
+  "-hls_time",
+  "1",
+  "-hls_playlist_type",
+  "vod",
+  "-hls_segment_type",
+  "fmp4",
+  "-hls_fmp4_init_filename",
+  "soundcloud-init.mp4",
+  "-hls_segment_filename",
+  join(outputDir, "soundcloud-segment-%d.m4s"),
+  join(outputDir, soundcloudHlsFixture.playlist),
 );

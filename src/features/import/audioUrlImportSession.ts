@@ -2,10 +2,10 @@ import { analytics } from "@/analytics";
 import { Option, Schema } from "effect";
 import { toPublicAudioError } from "@/features/audio/audioErrors";
 import type {
+  AudioDownloadRequest,
   CobaltAudioDownloadLifecycleEvent,
-  CobaltAudioDownloadRequest,
 } from "@/features/import/cobaltAudio";
-import { downloadFromCobalt, provideAudioBackend } from "@/features/audio/audioBackend";
+import { downloadAudio, provideAudioBackend } from "@/features/audio/audioBackend";
 import {
   applyPlaylistImportedCover,
   applySingleAlbumTitlesToFiles,
@@ -214,10 +214,10 @@ export const createAudioUrlImportSession = ({
     controller = createPlaylistDownloadController<ManagedDownloadTrack>({
       createModelTrack: createPlaylistDownloadModelTrack,
       downloadTrack: (track) => {
-        const request: CobaltAudioDownloadRequest = track.downloadRequest;
+        const request: AudioDownloadRequest = track.downloadRequest;
 
         return provideAudioBackend(
-          downloadFromCobalt({
+          downloadAudio({
             ...request,
             onLifecycle: (event) => {
               try {

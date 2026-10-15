@@ -170,19 +170,22 @@ const failureCases: FailureCase[] = [
   },
   {
     name: "a missing soundcloud track",
-    arrange: async (upstreams) => {
-      const track = await upstreams.soundcloud.track({
-        metadata: { kind: "status", status: 404 },
-      });
-
-      await upstreams.cobalt.fail(track.url, "error.api.fetch.soundcloud.resolve_fetch.404");
-
-      return track;
-    },
+    arrange: (upstreams) =>
+      upstreams.soundcloud.track({ metadata: { kind: "status", status: 404 } }),
     title: "we could not access this media",
     detail: "media is private, unavailable, or no longer exists.",
     toast: "check that the link is public and still available, then try again.",
     retryable: false,
+    cobaltCalls: 0,
+  },
+  {
+    name: "a drm-protected soundcloud track",
+    arrange: (upstreams) => upstreams.soundcloud.track({ transcodings: "encrypted" }),
+    title: "this media is drm-protected",
+    detail: "this media is drm-protected and can't be downloaded.",
+    toast: "tagium can't download drm-protected media. try another link.",
+    retryable: false,
+    cobaltCalls: 0,
   },
   {
     name: "drm-protected media",
@@ -217,17 +220,13 @@ const failureCases: FailureCase[] = [
     retryable: true,
   },
   {
-    name: "an empty soundcloud stream",
-    arrange: async (upstreams) => {
-      const track = await upstreams.soundcloud.track();
-      await upstreams.cobalt.fail(track.url, "error.api.fetch.soundcloud.stream_parse");
-
-      return track;
-    },
+    name: "a soundcloud track without a playable stream",
+    arrange: (upstreams) => upstreams.soundcloud.track({ transcodings: "legacy" }),
     title: "we could not read this media",
     detail: "the media provider returned an unexpected response.",
     toast: "the provider returned an unexpected response. try again or use another link.",
     retryable: true,
+    cobaltCalls: 0,
   },
   {
     name: "an unreadable download plan",
@@ -341,14 +340,33 @@ test("recovers from a busy download service when the track is retried", async ({
 });
 
 test("imports a track whose audio stream starts out empty", async ({ page, upstreams }) => {
-  const track = await upstreams.soundcloud.track({ title: "Slow Start", cover: null });
-  await upstreams.cobalt.emptyTunnel(track.url, 2);
+  const video = await upstreams.youtube.video({ title: "Slow Start", cover: null });
+  await upstreams.cobalt.emptyTunnel(video.url, 2);
+
+  await page.goto("/");
+  await importUrl(page, video.url);
+  await waitForTrackReady(page);
+
+  expect(await upstreams.calls({ route: "cobalt.tunnel.audio" })).toHaveLength(3);
+  const exported = await captureDownload(page, () => downloadTrackButton(page).click());
+  expect((await inspectAudio(exported)).metadata.title).toBe("Slow Start");
+});
+
+test("retries soundcloud stream segments that fail or arrive empty", async ({
+  page,
+  upstreams,
+}) => {
+  const track = await upstreams.soundcloud.track({
+    title: "Slow Start",
+    cover: null,
+    tunnel: [{ kind: "empty" }, { kind: "status", status: 503 }, { kind: "ok" }],
+  });
 
   await page.goto("/");
   await importUrl(page, track.url);
   await waitForTrackReady(page);
 
-  expect(await upstreams.calls({ route: "cobalt.tunnel.audio" })).toHaveLength(3);
+  expect(await upstreams.calls({ route: "soundcloud.segment" })).toHaveLength(6);
   const exported = await captureDownload(page, () => downloadTrackButton(page).click());
   expect((await inspectAudio(exported)).metadata.title).toBe("Slow Start");
 });

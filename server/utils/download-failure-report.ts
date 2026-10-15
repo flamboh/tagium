@@ -3,7 +3,7 @@ import { parseMediaLink } from "../../src/lib/media-link";
 import { isMissingSoundCloudContent } from "./cobalt-error-code";
 
 export type DownloadFailure = {
-  route: "download" | "audio" | "tunnel";
+  route: "download" | "audio" | "tunnel" | "soundcloud_stream";
   stage: string;
   requestId: string;
   errorCode?: string;
@@ -26,6 +26,8 @@ const userInputErrorCodes = new Set([
 
 const warningErrorCodes = new Set([
   "error.api.content.too_long",
+  "error.api.content.region",
+  "error.api.content.paid",
   "error.api.content.video.unavailable",
 ]);
 

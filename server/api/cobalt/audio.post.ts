@@ -24,10 +24,10 @@ import {
   type CobaltRuntimeEnv as DevControlRuntimeEnv,
 } from "../../utils/dev-controls";
 import { decodeRequestBody, urlStringSchema } from "../../utils/schema";
+import { enforceSameOrigin } from "../../utils/same-origin";
 import { publicCobaltErrorCode } from "../../utils/cobalt-error-code";
 import { reportDownloadFailure } from "../../utils/download-failure-report";
 import { getYouTubeVideoId, resolveYouTubeUploadYear } from "../../utils/youtube";
-import { isSoundCloudHost } from "../../../src/lib/media-link";
 
 enum CobaltResponseType {
   Error = "error",
@@ -110,23 +110,8 @@ type CobaltAudioResult = {
 
 type AudioDownloadFormat = Schema.Schema.Type<typeof audioRequestSchema>["audioFormat"];
 
-/**
- * Only request source formats from providers whose preferred output Tagium can edit.
- */
-const cobaltAudioFormat = (url: string, requestedFormat: AudioDownloadFormat) => {
-  let isSoundCloud = false;
-
-  try {
-    const source = new URL(url);
-    isSoundCloud = source.protocol === "https:" && isSoundCloudHost(source.hostname);
-  } catch {
-    // The request schema reports invalid URLs before this policy is reached.
-  }
-
-  return requestedFormat === "best" && (Boolean(getYouTubeVideoId(url)) || isSoundCloud)
-    ? "best"
-    : "mp3";
-};
+const cobaltAudioFormat = (url: string, requestedFormat: AudioDownloadFormat) =>
+  requestedFormat === "best" && getYouTubeVideoId(url) ? "best" : "mp3";
 
 interface CobaltAudioLogDetails {
   stage?: string;
@@ -205,44 +190,6 @@ const getCobaltHeaders = (
   }
 
   return headers;
-};
-
-const getRequestOrigin = (request: Request) => {
-  const origin = request.headers.get("origin");
-
-  if (!origin) {
-    return undefined;
-  }
-
-  return origin;
-};
-
-const getAllowedOrigin = (
-  request: Request,
-  requestOrigin: string,
-  runtimeEnv: CobaltRuntimeEnv,
-) => {
-  if (runtimeEnv.COBALT_ALLOWED_ORIGIN) {
-    return runtimeEnv.COBALT_ALLOWED_ORIGIN;
-  }
-
-  return new URL(request.url, requestOrigin).origin;
-};
-
-const enforceSameOrigin = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
-  const requestOrigin = getRequestOrigin(request);
-
-  if (!requestOrigin) {
-    return new Response("Download requests require an Origin header.", { status: 403 });
-  }
-
-  const allowedOrigin = getAllowedOrigin(request, requestOrigin, runtimeEnv);
-
-  if (requestOrigin !== allowedOrigin) {
-    return new Response("Download origin is not allowed.", { status: 403 });
-  }
-
-  return undefined;
 };
 
 const parseCobaltJson = async (response: Response) => {
@@ -527,7 +474,7 @@ export default defineHandler(async (event) => {
 
   try {
     const runtimeEnv = getRuntimeEnv(event.req);
-    const forbidden = enforceSameOrigin(event.req, runtimeEnv);
+    const forbidden = enforceSameOrigin(event.req, runtimeEnv.COBALT_ALLOWED_ORIGIN);
 
     if (forbidden) {
       return forbidden;

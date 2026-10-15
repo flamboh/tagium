@@ -28,6 +28,8 @@ export const FAKE_POSTHOG_KEY = "phc_e2e_public_key";
 
 export const FAKE_SOUNDCLOUD_CLIENT_ID = "e2eSoundCloudClientId00000000000";
 
+export const FAKE_SOUNDCLOUD_PLAYBACK_ORIGIN = "https://playback.media-streaming.soundcloud.cloud";
+
 export type Sequence<T> = T | readonly T[];
 
 export type Json =
@@ -55,6 +57,13 @@ export type TunnelBehavior =
   | { kind: "stall"; bytes?: number }
   | { kind: "hang" };
 
+export type SoundCloudStreamBehavior =
+  | { kind: "ok" }
+  | { kind: "status"; status: number }
+  | { kind: "hang" };
+
+export type SoundCloudTranscodings = "aac" | "encrypted" | "legacy";
+
 export type MetadataBehavior = { kind: "ok" } | { kind: "status"; status: number };
 
 export type MediaScenario = {
@@ -72,6 +81,9 @@ export type MediaScenario = {
   genre?: string;
   album?: string;
   soundcloudId?: number;
+  soundcloudPolicy?: "ALLOW" | "BLOCK" | "SNIP";
+  soundcloudTranscodings?: SoundCloudTranscodings;
+  soundcloudStream?: Sequence<SoundCloudStreamBehavior>;
   video?: VideoStreamFixtureName[];
   metadata: MetadataBehavior;
   cobalt: Sequence<CobaltBehavior>;

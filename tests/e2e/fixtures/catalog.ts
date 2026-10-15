@@ -110,3 +110,14 @@ export const mediaFixtures = {
 } as const satisfies Record<string, { file: string; mime: string }>;
 
 export type MediaFixtureName = keyof typeof mediaFixtures;
+
+export const soundcloudHlsFixture = {
+  source: audioFixtures.m4a.stream,
+  playlist: "soundcloud.m3u8",
+  files: [
+    "soundcloud-init.mp4",
+    "soundcloud-segment-0.m4s",
+    "soundcloud-segment-1.m4s",
+    "soundcloud-segment-2.m4s",
+  ],
+} as const;

@@ -74,6 +74,12 @@ export const cobaltRequests = async (upstreams: Upstreams) =>
 export const cobaltRequestCount = async (upstreams: Upstreams, url: string) =>
   (await cobaltRequests(upstreams)).filter((request) => request.url === url).length;
 
+export const soundcloudStreamKeys = async (upstreams: Upstreams) =>
+  (await upstreams.calls({ route: "soundcloud.stream" })).map((call) => call.key);
+
+export const soundcloudStreamCount = async (upstreams: Upstreams, track: { key: string }) =>
+  (await soundcloudStreamKeys(upstreams)).filter((key) => key === track.key).length;
+
 export const removeTrack = async (page: Page, filename: string) => {
   await page.getByRole("button", { name: `track actions for ${filename}` }).click();
   await page.getByRole("menuitem", { name: "remove track" }).click();
@@ -88,7 +94,7 @@ export const holdDownloadPlans = async (page: Page) => {
   const requested: { url: string; year?: number }[] = [];
   let holding = true;
   const forward = (route: Route) => route.continue().catch(() => {});
-  await page.route("**/api/cobalt/audio", async (route) => {
+  await page.route(/\/api\/(?:cobalt\/audio|soundcloud-stream)$/u, async (route) => {
     const body = route.request().postDataJSON() as { url: string; year?: number };
     const { url } = body;
     requested.push(body);

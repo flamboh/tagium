@@ -2,15 +2,17 @@ import { Context, Effect, Layer } from "effect";
 import {
   CobaltAudio,
   CobaltAudioLive,
-  type CobaltAudioDownloadRequest,
+  type AudioDownloadRequest,
 } from "@/features/import/cobaltAudio";
+import { SoundCloudAudio, SoundCloudAudioLive } from "@/features/import/soundcloudAudio";
 import { AudioMetadataIO, AudioMetadataIOLive } from "@/features/audio/audioMetadataIO";
 import { makeAudioRuntime } from "@/features/audio/audioRuntime";
 import type { AudioMetadata, TagiumFile } from "@/features/library/types";
 import type { UploadedTrack } from "@/features/audio/mp3Utils";
+import { parseMediaLink } from "@/lib/media-link";
 
 interface AudioBackendService {
-  readonly downloadFromCobalt: (request: CobaltAudioDownloadRequest) => Effect.Effect<File, Error>;
+  readonly downloadAudio: (request: AudioDownloadRequest) => Effect.Effect<File, Error>;
   readonly parseUploads: (uploadedFiles: File[]) => Effect.Effect<UploadedTrack[], never>;
   readonly writeTags: (
     fileToUpdate: TagiumFile,
@@ -20,10 +22,14 @@ interface AudioBackendService {
 
 const makeAudioBackend = Effect.gen(function* () {
   const cobaltAudio = yield* CobaltAudio;
+  const soundCloudAudio = yield* SoundCloudAudio;
   const metadataIO = yield* AudioMetadataIO;
 
   return AudioBackend.of({
-    downloadFromCobalt: (request) => cobaltAudio.download(request),
+    downloadAudio: (request) =>
+      parseMediaLink(request.sourceUrl).provider === "soundcloud"
+        ? soundCloudAudio.download(request)
+        : cobaltAudio.download(request),
     parseUploads: (uploadedFiles) => metadataIO.parseUploadedTracks(uploadedFiles),
     writeTags: (fileToUpdate, newTags) => metadataIO.writeMetadataToFile(fileToUpdate, newTags),
   });
@@ -36,18 +42,18 @@ export class AudioBackend extends Context.Service<AudioBackend, AudioBackendServ
 const AudioBackendLayer = Layer.effect(AudioBackend, makeAudioBackend);
 
 const AudioBackendLive = AudioBackendLayer.pipe(
-  Layer.provide(Layer.merge(CobaltAudioLive, AudioMetadataIOLive)),
+  Layer.provide(Layer.mergeAll(CobaltAudioLive, SoundCloudAudioLive, AudioMetadataIOLive)),
 );
 
 const audioBackendRuntime = makeAudioRuntime(AudioBackendLive);
 
-export const downloadFromCobalt = (request: CobaltAudioDownloadRequest) =>
+export const downloadAudio = (request: AudioDownloadRequest) =>
   Effect.scoped(
     Effect.gen(function* () {
       const signal = yield* Effect.abortSignal;
       const backend = yield* AudioBackend;
 
-      return yield* backend.downloadFromCobalt({
+      return yield* backend.downloadAudio({
         ...request,
         signal: request.signal ?? signal,
       });

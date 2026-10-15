@@ -1,7 +1,12 @@
 import { Effect, Schema } from "effect";
 import { defineHandler } from "nitro";
-import { getSoundCloudClientId } from "../utils/soundcloud";
-import { resolveSoundCloudShortLink } from "../utils/soundcloud-link";
+import { getSoundCloudLogContext } from "../utils/soundcloud-observability";
+import {
+  isSoundCloudTrackUrl,
+  normalizeTrackSourceUrl,
+  resolveSoundCloudTrack,
+  soundCloudCoverUrl,
+} from "../utils/soundcloud-track";
 import { urlStringSchema } from "../utils/schema";
 import { parseMediaLink } from "../../src/lib/media-link";
 
@@ -12,60 +17,6 @@ const oEmbedSchema = Schema.Struct({
   author_name: Schema.optionalKey(Schema.String),
   thumbnail_url: Schema.optionalKey(urlStringSchema),
 });
-
-const soundCloudTrackSchema = Schema.Struct({
-  title: nonEmptyStringSchema,
-  artwork_url: Schema.optionalKey(Schema.NullOr(urlStringSchema)),
-  user: Schema.optionalKey(Schema.Struct({ username: Schema.optionalKey(Schema.String) })),
-});
-
-const soundCloudShortHosts = new Set(["on.soundcloud.com", "snd.sc"]);
-
-const normalizeTrackMetadataSourceUrl = async (sourceUrl: string, signal: AbortSignal) => {
-  const parsed = parseMediaLink(sourceUrl);
-
-  if (parsed.kind !== "unsupported") return parsed.canonicalUrl;
-
-  const candidate = new URL(sourceUrl);
-
-  if (!soundCloudShortHosts.has(candidate.hostname.toLowerCase())) return sourceUrl;
-
-  return (await resolveSoundCloudShortLink(sourceUrl, { signal })).canonicalUrl;
-};
-
-const isSoundCloudUrl = (url: URL) => {
-  const parsed = parseMediaLink(url.toString());
-
-  return parsed.provider === "soundcloud" && parsed.kind === "track";
-};
-
-export const resolveSoundCloudTrackMetadata = async (
-  sourceUrl: string,
-  options: {
-    fetch?: typeof globalThis.fetch;
-    getClientId?: () => Promise<string>;
-    signal?: AbortSignal;
-  } = {},
-) => {
-  const fetch = options.fetch ?? globalThis.fetch;
-  const clientId = await (options.getClientId ?? getSoundCloudClientId)();
-  const resolveUrl = new URL("https://api-v2.soundcloud.com/resolve");
-  resolveUrl.searchParams.set("url", sourceUrl);
-  resolveUrl.searchParams.set("client_id", clientId);
-  const response = await fetch(resolveUrl, { signal: options.signal });
-
-  if (!response.ok) throw new Error(`track_metadata.fetch_failed (${response.status})`);
-
-  const metadata = await Effect.runPromise(
-    Schema.decodeUnknownEffect(soundCloudTrackSchema)(await response.json()),
-  );
-
-  return {
-    title: metadata.title.trim(),
-    artist: metadata.user?.username?.trim() ?? "",
-    coverUrl: metadata.artwork_url?.replace(/-large/, "-t1080x1080") ?? undefined,
-  };
-};
 
 export const getTrackMetadataEndpoint = (sourceUrl: string) => {
   const parsed = parseMediaLink(sourceUrl);
@@ -91,10 +42,19 @@ export default defineHandler(async (event) => {
   const requestedSourceUrl = requestUrl.searchParams.get("url");
 
   if (!requestedSourceUrl) throw new Error("track_metadata.url_required");
-  const sourceUrl = await normalizeTrackMetadataSourceUrl(requestedSourceUrl, event.req.signal);
+  const sourceUrl = await normalizeTrackSourceUrl(requestedSourceUrl, event.req.signal);
 
-  if (isSoundCloudUrl(new URL(sourceUrl))) {
-    return resolveSoundCloudTrackMetadata(sourceUrl, { signal: event.req.signal });
+  if (isSoundCloudTrackUrl(sourceUrl)) {
+    const { track } = await Effect.runPromise(
+      resolveSoundCloudTrack(sourceUrl, getSoundCloudLogContext(event.req, sourceUrl)),
+      { signal: event.req.signal },
+    );
+
+    return {
+      title: track.title.trim(),
+      artist: track.user?.username?.trim() ?? "",
+      coverUrl: soundCloudCoverUrl(track.artwork_url) ?? undefined,
+    };
   }
 
   const endpoint = getTrackMetadataEndpoint(sourceUrl);

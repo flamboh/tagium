@@ -21,6 +21,8 @@ import {
   type RateLimitRule,
   type Scenario,
   type Sequence,
+  type SoundCloudStreamBehavior,
+  type SoundCloudTranscodings,
   type TunnelBehavior,
   type UpstreamCall,
 } from "../harness/protocol.ts";
@@ -57,7 +59,14 @@ export type GifPostOptions = PostOptions & Omit<Extract<PostMedia, { kind: "gif"
 
 const defaultYouTubeVideoStreams: VideoStreamFixtureName[] = ["h264-1080", "h264-720", "h264-480"];
 
-export type SoundCloudTrackOptions = MediaOptions & { user?: string; slug?: string; id?: number };
+export type SoundCloudTrackOptions = MediaOptions & {
+  user?: string;
+  slug?: string;
+  id?: number;
+  policy?: MediaScenario["soundcloudPolicy"];
+  transcodings?: SoundCloudTranscodings;
+  stream?: Sequence<SoundCloudStreamBehavior>;
+};
 
 export type FakeMedia = {
   key: string;
@@ -161,6 +170,9 @@ export const createUpstreams = (owner: string) => {
       genre: options.genre,
       album: options.album,
       soundcloudId: options.id ?? randomInt(100_000_000, 2_000_000_000),
+      soundcloudPolicy: options.policy,
+      soundcloudTranscodings: options.transcodings,
+      soundcloudStream: options.stream,
       metadata: options.metadata ?? { kind: "ok" },
       cobalt: options.cobalt ?? { kind: "ok" },
       tunnel: options.tunnel ?? { kind: "ok" },

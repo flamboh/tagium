@@ -154,8 +154,8 @@ test("the waveform drifts steadily while a track downloads and decodes, then twe
   page,
   upstreams,
 }) => {
-  const first = await upstreams.soundcloud.track({ title: "Loading Wave" });
-  const second = await upstreams.soundcloud.track({ title: "Other Wave" });
+  const first = await upstreams.youtube.video({ title: "Loading Wave" });
+  const second = await upstreams.youtube.video({ title: "Other Wave" });
   const releaseTunnel = await holdTunnel(page);
   await holdDecoding(page);
   await recordFrames(page);
@@ -207,7 +207,7 @@ test("the waveform stays still while loading when reduced motion is requested", 
   upstreams,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  const track = await upstreams.soundcloud.track({ title: "Still Wave" });
+  const track = await upstreams.youtube.video({ title: "Still Wave" });
   const releaseTunnel = await holdTunnel(page);
   await holdDecoding(page);
   await recordFrames(page);
