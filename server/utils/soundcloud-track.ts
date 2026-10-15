@@ -132,47 +132,47 @@ const fetchUpstream = <A>(
     const { stage, code, context } = options;
     const startedAt = Date.now();
 
-    const response = yield* Effect.tryPromise({
-      try: (signal) => fetch(url, { signal }),
-      catch: (cause) => new SoundCloudStreamError({ stage, code, cause }),
+    const parseStage = stage.replace("_fetch", "_parse");
+    let reading = false;
+
+    const result = yield* Effect.tryPromise({
+      try: async (signal) => {
+        const response = await fetch(url, { signal });
+
+        if (!response.ok) {
+          void response.body?.cancel().catch(() => {});
+
+          return { ok: false as const, response };
+        }
+
+        reading = true;
+
+        return { ok: true as const, value: await options.read(response) };
+      },
+      catch: (cause) =>
+        reading
+          ? new SoundCloudStreamError({ stage: parseStage, code: options.parseCode ?? code, cause })
+          : new SoundCloudStreamError({ stage, code, cause }),
     }).pipe(
       Effect.catchTag("SoundCloudStreamError", (error) =>
         fail(context, startedAt, error, { errorType: errorType(error) }),
       ),
     );
 
-    if (!response.ok) {
-      void response.body?.cancel().catch(() => {});
-
+    if (!result.ok) {
       return yield* fail(
         context,
         startedAt,
         new SoundCloudStreamError({
           stage,
-          code: options.statusCode?.(response.status) ?? code,
-          upstreamStatus: response.status,
+          code: options.statusCode?.(result.response.status) ?? code,
+          upstreamStatus: result.response.status,
         }),
-        upstreamDetails(response),
+        upstreamDetails(result.response),
       );
     }
 
-    const parseStage = stage.replace("_fetch", "_parse");
-
-    return yield* Effect.tryPromise({
-      try: (signal) => {
-        signal.addEventListener("abort", () => void response.body?.cancel().catch(() => {}), {
-          once: true,
-        });
-
-        return options.read(response);
-      },
-      catch: (cause) =>
-        new SoundCloudStreamError({ stage: parseStage, code: options.parseCode ?? code, cause }),
-    }).pipe(
-      Effect.catchTag("SoundCloudStreamError", (error) =>
-        fail(context, startedAt, error, { errorType: errorType(error) }),
-      ),
-    );
+    return result.value;
   });
 
 const decodeJson =

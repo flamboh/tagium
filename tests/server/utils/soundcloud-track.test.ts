@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vite-plus/test";
-import { Effect } from "effect";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { Effect, Fiber } from "effect";
 import {
   parseSoundCloudMediaPlaylist,
+  resolveSoundCloudTrack,
   selectSoundCloudTranscoding,
   soundCloudTrackMetadata,
   type SoundCloudTrack,
@@ -142,5 +143,43 @@ describe("soundcloud track metadata", () => {
     expect(
       soundCloudTrackMetadata({ title: "Untitled", genre: " ", publisher_metadata: null }),
     ).toEqual({ title: "Untitled" });
+  });
+});
+
+describe("soundcloud upstream cancellation", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("aborts the upstream request when interrupted while the body is streaming", async () => {
+    let resolveSignal: AbortSignal | undefined;
+    let markResolveStarted: () => void = () => {};
+
+    const resolveStarted = new Promise<void>((resolve) => (markResolveStarted = resolve));
+
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === "https://soundcloud.com/") {
+        return new Response('"hydratable":"apiClient","data":{"id":"client-id"}');
+      }
+
+      resolveSignal = init?.signal ?? undefined;
+      markResolveStarted();
+
+      return new Response(new ReadableStream({ start: () => {} }), {
+        headers: { "content-type": "application/json" },
+      });
+    });
+
+    const fiber = Effect.runFork(
+      resolveSoundCloudTrack("https://soundcloud.com/forss/flickermood", { requestId: "test" }),
+    );
+
+    await resolveStarted;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await Effect.runPromise(Fiber.interrupt(fiber));
+
+    expect(resolveSignal?.aborted).toBe(true);
   });
 });
