@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/cloudflare";
 import { parseMediaLink } from "../../src/lib/media-link";
-import { isMissingSoundCloudContent, isMissingSoundCloudStream } from "./cobalt-error-code";
+import { isMissingSoundCloudContent } from "./cobalt-error-code";
 
 export type DownloadFailure = {
   route: "download" | "audio" | "tunnel";
@@ -27,11 +27,7 @@ const userInputErrorCodes = new Set([
 const warningErrorCodes = new Set([
   "error.api.content.too_long",
   "error.api.content.video.unavailable",
-  "error.api.fetch.empty",
 ]);
-
-const isWarningErrorCode = (code: string) =>
-  warningErrorCodes.has(code) || isMissingSoundCloudStream(code);
 
 export const downloadServiceFromUrl = (sourceUrl: string | undefined) =>
   sourceUrl ? parseMediaLink(sourceUrl).provider : "unknown";
@@ -60,7 +56,7 @@ export const reportDownloadFailure = (failure: DownloadFailure) => {
     scope.setFingerprint(["download-failure", failure.route, service, reason]);
     Sentry.captureMessage(
       `${service} ${failure.route} failed: ${reason}`,
-      isWarningErrorCode(reason) ? "warning" : "error",
+      warningErrorCodes.has(reason) ? "warning" : "error",
     );
   });
 };
