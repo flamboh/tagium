@@ -183,3 +183,33 @@ describe("soundcloud upstream cancellation", () => {
     expect(resolveSignal?.aborted).toBe(true);
   });
 });
+
+describe("soundcloud client id cancellation", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("aborts client id discovery when interrupted while the home page is streaming", async () => {
+    let homeSignal: AbortSignal | undefined;
+    let markHomeStarted: () => void = () => {};
+
+    const homeStarted = new Promise<void>((resolve) => (markHomeStarted = resolve));
+
+    vi.stubGlobal("fetch", async (_input: RequestInfo | URL, init?: RequestInit) => {
+      homeSignal = init?.signal ?? undefined;
+      markHomeStarted();
+
+      return new Response(new ReadableStream({ start: () => {} }));
+    });
+
+    const fiber = Effect.runFork(
+      resolveSoundCloudTrack("https://soundcloud.com/forss/flickermood", { requestId: "test" }),
+    );
+
+    await homeStarted;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await Effect.runPromise(Fiber.interrupt(fiber));
+
+    expect(homeSignal?.aborted).toBe(true);
+  });
+});

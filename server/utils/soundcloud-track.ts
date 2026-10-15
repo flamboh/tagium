@@ -183,7 +183,11 @@ const decodeJson =
 export const resolveSoundCloudTrack = (sourceUrl: string, context: SoundCloudLogContext) =>
   Effect.gen(function* () {
     const clientId = yield* Effect.tryPromise({
-      try: () => getSoundCloudClientId(globalThis.fetch, context),
+      try: (signal) =>
+        getSoundCloudClientId(
+          (input, init) => globalThis.fetch(input, { ...init, signal }),
+          context,
+        ),
       catch: (cause) =>
         new SoundCloudStreamError({ stage: "client_id", code: "error.api.fetch.fail", cause }),
     });
