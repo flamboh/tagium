@@ -168,8 +168,12 @@ test("the editor reports missing and drm-protected imports by their category", a
   upstreams,
 }) => {
   const missing = await upstreams.youtube.missingVideo();
-  const protectedTrack = await upstreams.soundcloud.track({ title: "Locked Song", cover: null });
-  await upstreams.cobalt.fail(protectedTrack.url, "error.api.soundcloud.maybe_drm");
+
+  const protectedTrack = await upstreams.soundcloud.track({
+    title: "Locked Song",
+    cover: null,
+    transcodings: "encrypted",
+  });
 
   const categories = async () =>
     (await upstreams.analyticsEvents()).filter(

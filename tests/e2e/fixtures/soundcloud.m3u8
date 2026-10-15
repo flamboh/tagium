@@ -1,0 +1,13 @@
+#EXTM3U
+#EXT-X-VERSION:7
+#EXT-X-TARGETDURATION:1
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-PLAYLIST-TYPE:VOD
+#EXT-X-MAP:URI="soundcloud-init.mp4"
+#EXTINF:1.021678,
+soundcloud-segment-0.m4s
+#EXTINF:0.998458,
+soundcloud-segment-1.m4s
+#EXTINF:0.023220,
+soundcloud-segment-2.m4s
+#EXT-X-ENDLIST

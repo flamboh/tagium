@@ -4,6 +4,7 @@ import {
   audioFixtures,
   imageFixtures,
   mediaFixtures,
+  soundcloudHlsFixture,
   type AudioFixtureName,
   type ImageFixtureName,
   type MediaFixtureName,
@@ -33,6 +34,26 @@ const media = Object.fromEntries(
     new Uint8Array(readFileSync(fixturePath(fixture.file))),
   ]),
 ) as Record<MediaFixtureName, Uint8Array<ArrayBuffer>>;
+
+const soundcloudHls = new Map<string, Uint8Array<ArrayBuffer>>(
+  [soundcloudHlsFixture.playlist, ...soundcloudHlsFixture.files].map((file) => [
+    file,
+    new Uint8Array(readFileSync(fixturePath(file))),
+  ]),
+);
+
+export const soundcloudHlsResponse = (file: string) => {
+  const bytes = soundcloudHls.get(file);
+
+  if (!bytes) return undefined;
+
+  return new Response(bytes, {
+    headers: {
+      "content-type": file.endsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "audio/mp4",
+      "content-length": String(bytes.byteLength),
+    },
+  });
+};
 
 const font = new Uint8Array(
   readFileSync(

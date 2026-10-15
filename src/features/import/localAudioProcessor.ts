@@ -4,18 +4,13 @@ import {
   AudioWorkerError,
   toPublicAudioError,
 } from "@/features/audio/audioErrors";
-import {
-  decodeCobaltLocalProcessingMessageEffect,
-  type CobaltDownloadPlan,
-} from "@/features/import/cobaltAudioSchemas";
+import { decodeCobaltLocalProcessingMessageEffect } from "@/features/import/cobaltAudioSchemas";
 import {
   inspectAudioFile,
   patchAudioFileWithChanges,
 } from "@/features/audio/metadataEngine/engine";
 import type { MetadataChanges } from "@/features/audio/metadataEngine/types";
 import { cropCoverArtToSquare } from "@/features/editor/coverArtProcessing";
-
-type LocalAudioPlan = Extract<CobaltDownloadPlan, { status: "local-processing" }>;
 
 type LocalAudioProcessingRequest = {
   audioFile: File;
@@ -31,26 +26,34 @@ type LocalAudioProcessingRequest = {
   };
 };
 
-export interface ProcessLocalAudioRequest {
-  plan: LocalAudioPlan;
+export interface LocalAudioOutput {
+  filename: string;
+  type: string;
+  metadata?: Record<string, string | undefined>;
+}
+
+export interface ProcessAudioRequest {
+  audioFile: File;
+  coverFile?: File;
+  audio: {
+    copy: boolean;
+    format: string;
+    bitrate: string;
+    cropCover?: boolean;
+  };
+  output: LocalAudioOutput;
   lastModified: number;
-  fetchTunnelFile: (url: string, filename: string) => Effect.Effect<File, unknown>;
   signal?: AbortSignal;
 }
 
 type LocalAudioProcessorService = {
-  readonly validateLocalAudioPlan: (plan: LocalAudioPlan) => Effect.Effect<void, Error>;
-  readonly runLocalProcessingWorker: (
-    request: LocalAudioProcessingRequest,
-    signal?: AbortSignal,
-  ) => Effect.Effect<Blob, Error>;
-  readonly tagCobaltAudioFile: (
-    file: File,
-    plan: LocalAudioPlan,
-    coverFile: File | undefined,
-    lastModified: number,
-  ) => Effect.Effect<File, Error>;
-  readonly processLocalAudio: (request: ProcessLocalAudioRequest) => Effect.Effect<File, unknown>;
+  readonly processAudio: (request: ProcessAudioRequest) => Effect.Effect<File, Error>;
+};
+
+export const canPostTagAudioFilename = (filename: string) => {
+  const extension = filename.split(".").pop()?.toLowerCase();
+
+  return extension === "mp3" || extension === "m4a" || extension === "opus";
 };
 
 const stripMetadataControlCharacters = (value: string) =>
@@ -174,36 +177,15 @@ const runLocalProcessingWorker = (request: LocalAudioProcessingRequest, signal?:
       }),
   );
 
-export const validateLocalAudioPlan = (plan: LocalAudioPlan) => {
-  if (plan.type !== "audio" && plan.type !== "proxy") {
-    throw new Error("cobalt local processing response was not audio or proxy.");
-  }
-
-  if (!plan.audio) {
-    throw new Error("cobalt local processing response missing audio settings.");
-  }
-
-  if (plan.tunnel.length === 0) {
-    throw new Error("cobalt local processing response missing audio tunnel.");
-  }
-
-  if (plan.tunnel.length > 2) {
-    throw new Error("cobalt local processing response included unexpected tunnels.");
-  }
-
-  if (plan.audio.cover && plan.tunnel.length !== 2) {
-    throw new Error("cobalt local processing response missing cover tunnel.");
-  }
-};
-
-const tagCobaltAudioFile = async (
+const tagAudioFile = async (
   file: File,
-  plan: LocalAudioPlan,
+  output: LocalAudioOutput,
   coverFile: File | undefined,
+  cropCover: boolean,
   lastModified: number,
 ) => {
   const { inspection, metadata } = await Effect.runPromise(inspectAudioFile(file));
-  const supplied = plan.output.metadata;
+  const supplied = output.metadata;
   const changes: MetadataChanges = {};
 
   if (supplied?.title) changes.title = stripMetadataControlCharacters(supplied.title);
@@ -235,7 +217,7 @@ const tagCobaltAudioFile = async (
   }
 
   if (coverFile) {
-    const cover = plan.audio?.cropCover
+    const cover = cropCover
       ? await cropCoverArtToSquare(coverFile).catch(() => coverFile)
       : coverFile;
 
@@ -253,105 +235,56 @@ const tagCobaltAudioFile = async (
     patchAudioFileWithChanges(file, changes, metadata.filename),
   );
 
-  return new File([tagged], plan.output.filename, {
+  return new File([tagged], output.filename, {
     type: tagged.type,
     lastModified,
   });
 };
 
-const makeLocalAudioProcessor = Effect.fn("makeLocalAudioProcessor")(() =>
-  Effect.sync(() =>
-    LocalAudioProcessor.of(
-      (() => {
-        const service: LocalAudioProcessorService = {
-          validateLocalAudioPlan: (plan) =>
-            Effect.sync(() => {
-              validateLocalAudioPlan(plan);
-            }),
-          runLocalProcessingWorker: (request, signal) =>
-            runLocalProcessingWorker(request, signal).pipe(Effect.mapError(toPublicAudioError)),
-          tagCobaltAudioFile: (file, plan, coverFile, lastModified) =>
-            Effect.tryPromise({
-              try: () => tagCobaltAudioFile(file, plan, coverFile, lastModified),
-              catch: toPublicAudioError,
-            }),
-          processLocalAudio: ({ plan, lastModified, fetchTunnelFile, signal }) =>
-            Effect.gen(function* () {
-              yield* service.validateLocalAudioPlan(plan);
+const processAudio = ({
+  audioFile,
+  coverFile,
+  audio,
+  output,
+  lastModified,
+  signal,
+}: ProcessAudioRequest) =>
+  Effect.gen(function* () {
+    const outputFormat = output.filename.split(".").pop()?.toLowerCase();
 
-              const outputFormat = plan.output.filename.split(".").pop()?.toLowerCase();
+    if (!outputFormat) {
+      return yield* Effect.fail(new Error("local audio processing is missing an output format."));
+    }
 
-              if (!outputFormat) {
-                return yield* Effect.fail(
-                  new Error("cobalt local processing response missing output format."),
-                );
-              }
+    const blob = yield* runLocalProcessingWorker(
+      {
+        audioFile,
+        audio: { copy: audio.copy, format: audio.format, bitrate: audio.bitrate },
+        output: { type: output.type, format: outputFormat, metadata: output.metadata },
+      },
+      signal,
+    ).pipe(Effect.mapError(toPublicAudioError));
 
-              const audioTunnel = plan.tunnel[0];
+    signal?.throwIfAborted();
 
-              if (!audioTunnel) {
-                return yield* Effect.fail(
-                  new Error("cobalt local processing response missing audio tunnel."),
-                );
-              }
+    const file = new File([blob], output.filename, { type: output.type, lastModified });
 
-              const canPostTag =
-                outputFormat === "mp3" || outputFormat === "m4a" || outputFormat === "opus";
+    if (!canPostTagAudioFilename(output.filename) || (!coverFile && !output.metadata)) {
+      return file;
+    }
 
-              const coverTunnel = canPostTag ? plan.tunnel[1] : undefined;
-              const audioFileEffect = fetchTunnelFile(audioTunnel, "input-0");
-
-              const audioAndCover = coverTunnel
-                ? Effect.all([audioFileEffect, fetchTunnelFile(coverTunnel, "input-1")], {
-                    concurrency: 2,
-                  })
-                : Effect.map(audioFileEffect, (audioFile) => [audioFile, undefined] as const);
-
-              const [audioFile, coverFile] = yield* audioAndCover;
-
-              const blob = yield* service.runLocalProcessingWorker(
-                {
-                  audioFile,
-                  audio: {
-                    copy: plan.type === "proxy" || plan.audio.copy,
-                    format: plan.audio.format,
-                    bitrate: plan.audio.bitrate,
-                  },
-                  output: {
-                    type: plan.output.type,
-                    format: outputFormat,
-                    metadata: plan.output.metadata,
-                  },
-                },
-                signal,
-              );
-
-              signal?.throwIfAborted();
-
-              const file = new File([blob], plan.output.filename, {
-                type: plan.output.type,
-                lastModified,
-              });
-
-              signal?.throwIfAborted();
-
-              if (!canPostTag || (!coverFile && !plan.output.metadata)) {
-                return file;
-              }
-
-              return yield* service.tagCobaltAudioFile(file, plan, coverFile, lastModified);
-            }),
-        };
-
-        return service;
-      })(),
-    ),
-  ),
-);
+    return yield* Effect.tryPromise({
+      try: () => tagAudioFile(file, output, coverFile, audio.cropCover === true, lastModified),
+      catch: toPublicAudioError,
+    });
+  });
 
 export class LocalAudioProcessor extends Context.Service<
   LocalAudioProcessor,
   LocalAudioProcessorService
 >()("LocalAudioProcessor") {}
 
-export const LocalAudioProcessorLive = Layer.effect(LocalAudioProcessor, makeLocalAudioProcessor());
+export const LocalAudioProcessorLive = Layer.succeed(
+  LocalAudioProcessor,
+  LocalAudioProcessor.of({ processAudio }),
+);

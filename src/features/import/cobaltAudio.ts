@@ -1,8 +1,12 @@
 import { Context, Effect, Layer } from "effect";
 import { AudioDecodeError, toPublicAudioError } from "@/features/audio/audioErrors";
 import { cobaltDownloadScheduler } from "@/shared/cobalt/cobaltDownloadScheduler";
-import { decodeCobaltDownloadPlanEffect } from "@/features/import/cobaltAudioSchemas";
 import {
+  decodeCobaltDownloadPlanEffect,
+  type CobaltDownloadPlan,
+} from "@/features/import/cobaltAudioSchemas";
+import {
+  canPostTagAudioFilename,
   LocalAudioProcessor,
   LocalAudioProcessorLive,
 } from "@/features/import/localAudioProcessor";
@@ -39,7 +43,7 @@ export type CobaltAudioDownloadLifecycleCallback = (
   event: CobaltAudioDownloadLifecycleEvent,
 ) => void;
 
-export interface CobaltAudioDownloadRequest {
+export interface AudioDownloadRequest {
   sourceUrl: string;
   audioBitrate: AudioDownloadBitrate;
   audioFormat: AudioDownloadFormat;
@@ -53,7 +57,9 @@ export interface CobaltAudioDownloadRequest {
 
 const MAX_TUNNEL_ATTEMPTS = 7;
 
-const getStableLastModified = (sourceUrl: string) =>
+type LocalAudioPlan = Extract<CobaltDownloadPlan, { status: "local-processing" }>;
+
+export const getStableLastModified = (sourceUrl: string) =>
   Array.from(sourceUrl).reduce((hash, character) => {
     return (hash * 31 + character.charCodeAt(0)) % 2_147_483_647;
   }, 1);
@@ -100,6 +106,24 @@ const tunnelReadinessFromResponse = (
   };
 };
 
+const validateLocalAudioPlan = (plan: LocalAudioPlan) => {
+  if (plan.type !== "audio" && plan.type !== "proxy") {
+    throw new Error("cobalt local processing response was not audio or proxy.");
+  }
+
+  if (!plan.audio) {
+    throw new Error("cobalt local processing response missing audio settings.");
+  }
+
+  if (plan.tunnel.length > 2) {
+    throw new Error("cobalt local processing response included unexpected tunnels.");
+  }
+
+  if (plan.audio.cover && plan.tunnel.length !== 2) {
+    throw new Error("cobalt local processing response missing cover tunnel.");
+  }
+};
+
 const decodeCobaltDownloadPlan = Effect.fn("decodeCobaltDownloadPlan")(function* (input: unknown) {
   return yield* decodeCobaltDownloadPlanEffect(input).pipe(
     Effect.mapError(
@@ -115,7 +139,7 @@ const decodeCobaltDownloadPlan = Effect.fn("decodeCobaltDownloadPlan")(function*
 const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
   const localAudioProcessor = yield* LocalAudioProcessor;
 
-  const fetchPlan = (request: CobaltAudioDownloadRequest) =>
+  const fetchPlan = (request: AudioDownloadRequest) =>
     Effect.tryPromise({
       try: async () => {
         const headers = new Headers({
@@ -212,25 +236,65 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
       catch: (error) => new ImportStageError("tunnel", toPublicAudioError(error)),
     });
 
-  const runDownload = (request: CobaltAudioDownloadRequest) =>
+  const processLocalPlan = (
+    plan: LocalAudioPlan,
+    lastModified: number,
+    request: AudioDownloadRequest,
+  ) =>
+    Effect.gen(function* () {
+      const [audioTunnel, coverTunnel] = plan.tunnel;
+
+      yield* Effect.try({
+        try: () => validateLocalAudioPlan(plan),
+        catch: (error) => new ImportStageError("processing", toPublicAudioError(error)),
+      });
+
+      if (!audioTunnel) {
+        return yield* Effect.fail(
+          new ImportStageError(
+            "processing",
+            new Error("cobalt local processing response missing audio tunnel."),
+          ),
+        );
+      }
+
+      const fetchTunnel = (url: string, filename: string) =>
+        fetchTunnelFile(url, filename, lastModified, request.onLifecycle, request.signal);
+
+      const [audioFile, coverFile] = yield* Effect.all(
+        [
+          fetchTunnel(audioTunnel, "input-0"),
+          coverTunnel && canPostTagAudioFilename(plan.output.filename)
+            ? fetchTunnel(coverTunnel, "input-1")
+            : Effect.succeed(undefined),
+        ],
+        { concurrency: 2 },
+      );
+
+      return yield* localAudioProcessor
+        .processAudio({
+          audioFile,
+          coverFile,
+          audio: {
+            copy: plan.type === "proxy" || plan.audio.copy,
+            format: plan.audio.format,
+            bitrate: plan.audio.bitrate,
+            cropCover: plan.audio.cropCover,
+          },
+          output: plan.output,
+          lastModified,
+          signal: request.signal,
+        })
+        .pipe(Effect.mapError((error) => new ImportStageError("processing", error)));
+    });
+
+  const runDownload = (request: AudioDownloadRequest) =>
     Effect.gen(function* () {
       const plan = yield* fetchPlan(request);
       const lastModified = getStableLastModified(request.sourceUrl);
 
       if (plan.status === "local-processing") {
-        return yield* localAudioProcessor
-          .processLocalAudio({
-            plan,
-            lastModified,
-            fetchTunnelFile: (url, filename) =>
-              fetchTunnelFile(url, filename, lastModified, request.onLifecycle, request.signal),
-            signal: request.signal,
-          })
-          .pipe(
-            Effect.mapError((error) =>
-              error instanceof ImportStageError ? error : new ImportStageError("processing", error),
-            ),
-          );
+        return yield* processLocalPlan(plan, lastModified, request);
       }
 
       return yield* fetchTunnelFile(
@@ -258,7 +322,7 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
 export class CobaltAudio extends Context.Service<
   CobaltAudio,
   {
-    readonly download: (request: CobaltAudioDownloadRequest) => Effect.Effect<File, Error>;
+    readonly download: (request: AudioDownloadRequest) => Effect.Effect<File, Error>;
   }
 >()("CobaltAudio") {}
 

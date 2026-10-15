@@ -6,6 +6,7 @@ import type {
   RateLimitRule,
   Scenario,
   Sequence,
+  SoundCloudStreamBehavior,
   TunnelBehavior,
   UpstreamCall,
 } from "./protocol.ts";
@@ -14,7 +15,7 @@ const HANG_LIMIT_MS = 10 * 60_000;
 
 type Owned<T> = { value: T; owner: string };
 
-type Cursor = { cobalt: number; tunnel: number };
+type Cursor = { cobalt: number; tunnel: number; stream: number };
 
 export type CallFilter = {
   owner?: string;
@@ -56,7 +57,7 @@ export const createRegistry = () => {
     let value = cursors.get(key);
 
     if (!value) {
-      value = { cobalt: 0, tunnel: 0 };
+      value = { cobalt: 0, tunnel: 0, stream: 0 };
       cursors.set(key, value);
     }
 
@@ -151,6 +152,12 @@ export const createRegistry = () => {
       if (!sequence) return undefined;
 
       return pick(sequence, cursor(key).cobalt++);
+    },
+    nextSoundCloudStream(key: string) {
+      return pick<SoundCloudStreamBehavior>(
+        this.media(key)?.soundcloudStream ?? { kind: "ok" },
+        cursor(key).stream++,
+      );
     },
     nextTunnel(key: string) {
       const sequence =

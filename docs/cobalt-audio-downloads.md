@@ -4,6 +4,14 @@ Tagium sends browser download requests through its own `/api/cobalt/audio` endpo
 uses Cobalt only as a download proxy; metadata processing stays local in the browser. SoundCloud
 sets are resolved by Tagium and imported track by track as one album.
 
+The editor doesn't use Cobalt for SoundCloud. `/api/soundcloud-stream` resolves the track and its
+`aac_*` HLS playlist on the Worker (api-v2 has no CORS), and the browser downloads the init
+segment, media segments and artwork straight from SoundCloud's CDN, which allows any origin. It
+joins the fMP4 segments, then remuxes them to m4a or encodes mp3 with the same libav worker.
+The playlist URL expires within minutes, so the Worker reads it immediately and returns the
+segment URLs, which last about two hours. Tagium Save still downloads SoundCloud through Cobalt,
+which is why `cobalt-soundcloud.mjs` and the m4a ffmpeg patch stay in the Cobalt image.
+
 ## Production topology
 
 `fly.cobalt.toml` deploys the pinned Cobalt image behind `cobalt-machine-proxy.mjs`. The wrapper

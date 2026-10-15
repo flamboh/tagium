@@ -97,12 +97,12 @@ test("crops a single track while it downloads and applies the crop to the loaded
   page,
   upstreams,
 }) => {
-  const track = await upstreams.soundcloud.track({ title: "Early Crop", audio: "mp3" });
+  const video = await upstreams.youtube.video({ title: "Early Crop", audio: "mp3" });
   const release = await holdTunnel(page);
   const preview = audioPreview(page);
 
   await page.goto("/");
-  await importUrl(page, track.url);
+  await importUrl(page, video.url);
   await expect(preview).toHaveAttribute("data-waveform-status", "waiting");
   await expect(preview).toContainText("0:00 / −:−−");
   const fractions = await cropDuringDownload(page);
@@ -118,16 +118,16 @@ test("maps a crop made against a set track's listed length onto its real length"
   page,
   upstreams,
 }) => {
-  const set = await upstreams.soundcloud.set({
+  const playlist = await upstreams.youtube.playlist({
     title: "Early Set",
-    tracks: [{ title: "Listed Long", durationSec: 12, audio: "mp3" }],
+    videos: [{ title: "Listed Long", durationSec: 12, audio: "mp3" }],
   });
 
   const release = await holdTunnel(page);
   const preview = audioPreview(page);
 
   await page.goto("/");
-  await importUrl(page, set.url);
+  await importUrl(page, playlist.url);
   await expect(preview).toContainText("0:00 / 0:12");
   const fractions = await cropDuringDownload(page);
   await expect(preview).toContainText(

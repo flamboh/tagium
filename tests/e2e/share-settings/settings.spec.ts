@@ -188,7 +188,7 @@ test("the download format and bitrate choices describe and change the audio tagi
   await page.getByRole("button", { name: "download format, mp3" }).click();
   const formats = page.getByRole("group", { name: "download format" });
   await expect(formats.getByRole("button")).toHaveText([
-    "best compatiblekeeps the original audio without converting it, usually opus from youtube and mp3 from soundcloud.",
+    "best compatiblekeeps the original audio without converting it, usually opus from youtube and m4a from soundcloud.",
     "mp3converts every download to mp3 at the selected bitrate.",
   ]);
   await expect(formats.getByRole("button", { name: /^mp3/u })).toHaveAttribute(

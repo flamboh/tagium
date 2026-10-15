@@ -3,7 +3,6 @@ import { captureDownload, inspectAudio, unzipDownload } from "../support/audio";
 import { expectDownloadName, journey, test } from "../support/test";
 import {
   audioPreview,
-  cobaltRequests,
   downloadTrackButton,
   field,
   holdDownloadPlans,
@@ -11,6 +10,7 @@ import {
   importUrl,
   numberField,
   queueStatus,
+  soundcloudStreamKeys,
   useSettings,
   waitForTrackReady,
   expect,
@@ -224,8 +224,11 @@ test("resolves soundcloud short links to the canonical track and set", async ({
   await expect(page.getByRole("button", { name: "Short Set Shorty · 2 tracks" })).toBeVisible();
   await expect(queueStatus(page, "downloaded 2/2")).toBeVisible(SETTLE_TIMEOUT);
 
-  expect((await cobaltRequests(upstreams)).map((request) => request.url).sort()).toEqual(
-    [track.url, ...set.tracks.map((setTrack) => setTrack.url)].sort(),
+  const streamKeys = await soundcloudStreamKeys(upstreams);
+  expect(streamKeys).toHaveLength(3);
+  expect(streamKeys).toEqual(
+    expect.arrayContaining([track.key, ...set.tracks.map((setTrack) => setTrack.key)]),
   );
+  expect(await upstreams.calls({ route: "cobalt.resolve" })).toHaveLength(0);
   expect(await upstreams.calls({ route: "soundcloud.short_link" })).toHaveLength(2);
 });

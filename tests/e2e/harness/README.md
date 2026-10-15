@@ -11,7 +11,8 @@ browser ──► miniflare :4317 ──► built worker (.output/server) + asse
    │                               └─ outboundService ─┐
    └─ context.route (off-origin) ─► control :4318 ─────┴─► fakes/router.ts
                                      ▲                     cobalt · youtube · ytimg · soundcloud
-          specs register scenarios ──┘                     sndcdn · on.soundcloud.com · fontshare
+          specs register scenarios ──┘                     sndcdn · soundcloud playback cdn
+                                                           on.soundcloud.com · fontshare
 ```
 
 - `server.ts` starts Miniflare and the control server. Bindings come from the same
@@ -105,3 +106,19 @@ The fake Cobalt follows Cobalt's forced local-processing rules for tagium save r
   body cleanly, so the worker would see a truncated but complete response.
 - `probeMedia(file)` (`support/media.ts`) runs ffprobe from the app's libav.js build in Node and
   decodes every frame it can (no VP9 decoder, so VP9 reports packets only).
+
+## SoundCloud audio
+
+The editor saves SoundCloud tracks without Cobalt. `/api/soundcloud-stream` resolves the track on
+the fake `api-v2.soundcloud.com`, follows the `aac_160k` transcoding to a playlist on the fake
+`playback.media-streaming.soundcloud.cloud`, and the browser downloads `soundcloud-init.mp4` and the
+`soundcloud-segment-*.m4s` fixtures (an HLS fMP4 split of `stream.m4a`) from that host.
+
+- `soundcloud.track({ policy })` serves `BLOCK` or `SNIP`, and `transcodings` serves `"encrypted"`
+  (drm) or `"legacy"` (no playable aac stream) instead of the default aac set.
+- `stream` is a sequence for the transcoding request (`{ kind: "status", status }`, `hang`), so
+  `[{ kind: "status", status: 500 }, { kind: "ok" }]` fails the first attempt only.
+- `tunnel` behaviors apply to each init and segment request, in request order.
+- `metadata: { kind: "status", status: 404 }` makes every resolve of the track fail, including the
+  one behind the download.
+- Tagium Save still sends SoundCloud through the fake Cobalt.

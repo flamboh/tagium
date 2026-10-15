@@ -2,6 +2,7 @@ import {
   FAKE_COBALT_ORIGIN,
   FAKE_DIRECT_MEDIA_ORIGIN,
   FAKE_POSTHOG_ORIGIN,
+  FAKE_SOUNDCLOUD_PLAYBACK_ORIGIN,
   type UpstreamCall,
 } from "../protocol.ts";
 import type { Registry } from "../registry.ts";
@@ -10,6 +11,7 @@ import { fakeCobalt, fakeDirectMedia } from "./cobalt.ts";
 import {
   fakeSoundCloudApi,
   fakeSoundCloudArtwork,
+  fakeSoundCloudPlayback,
   fakeSoundCloudShortLink,
   fakeSoundCloudWeb,
 } from "./soundcloud.ts";
@@ -22,6 +24,8 @@ const cobaltHost = new URL(FAKE_COBALT_ORIGIN).host;
 const directMediaHost = new URL(FAKE_DIRECT_MEDIA_ORIGIN).host;
 
 const postHogHost = new URL(FAKE_POSTHOG_ORIGIN).host;
+
+const soundcloudPlaybackHost = new URL(FAKE_SOUNDCLOUD_PLAYBACK_ORIGIN).host;
 
 const FONT_URL = "https://api.fontshare.com/e2e/satoshi.ttf";
 
@@ -60,6 +64,8 @@ const dispatch = (request: FakeRequest): FakeResult => {
   if (host === "api-v2.soundcloud.com") return fakeSoundCloudApi(request);
 
   if (/^i\d\.sndcdn\.com$/u.test(host)) return fakeSoundCloudArtwork(request);
+
+  if (host === soundcloudPlaybackHost) return fakeSoundCloudPlayback(request);
 
   if (host === "on.soundcloud.com" || host === "snd.sc") return fakeSoundCloudShortLink(request);
 

@@ -19,6 +19,7 @@ import {
   type RequestLogContext,
 } from "../../utils/request-observability";
 import { decodeRequestBody } from "../../utils/schema";
+import { enforceSameOrigin } from "../../utils/same-origin";
 import { publicCobaltErrorCode } from "../../utils/cobalt-error-code";
 import { reportDownloadFailure } from "../../utils/download-failure-report";
 import type { CobaltRuntimeEnv as DevControlRuntimeEnv } from "../../utils/dev-controls";
@@ -94,23 +95,6 @@ const getRequestHeaders = (
   }
 
   return headers;
-};
-
-const getAllowedOrigin = (request: Request, requestOrigin: string, runtimeEnv: CobaltRuntimeEnv) =>
-  runtimeEnv.COBALT_ALLOWED_ORIGIN ?? new URL(request.url, requestOrigin).origin;
-
-const enforceSameOrigin = (request: Request, runtimeEnv: CobaltRuntimeEnv) => {
-  const requestOrigin = request.headers.get("origin");
-
-  if (!requestOrigin) {
-    return new Response("Download requests require an Origin header.", { status: 403 });
-  }
-
-  if (requestOrigin !== getAllowedOrigin(request, requestOrigin, runtimeEnv)) {
-    return new Response("Download origin is not allowed.", { status: 403 });
-  }
-
-  return undefined;
 };
 
 const requestCobaltDownload = async (
@@ -294,7 +278,7 @@ export default defineHandler(async (event) => {
 
   try {
     const runtimeEnv = getRuntimeEnv(event.req);
-    const forbidden = enforceSameOrigin(event.req, runtimeEnv);
+    const forbidden = enforceSameOrigin(event.req, runtimeEnv.COBALT_ALLOWED_ORIGIN);
 
     if (forbidden) return forbidden;
 

@@ -70,11 +70,7 @@ test("keeps the original provider audio when best compatible is chosen", async (
     cover: null,
   });
 
-  const track = await upstreams.soundcloud.track({
-    title: "Original Track",
-    audio: "opus",
-    cover: null,
-  });
+  const track = await upstreams.soundcloud.track({ title: "Original Track", author: "Cloud" });
 
   await page.goto("/");
   await openImportSettings(page);
@@ -82,7 +78,7 @@ test("keeps the original provider audio when best compatible is chosen", async (
   const formats = page.getByRole("group", { name: "download format" });
   await expect(
     formats.getByText(
-      "keeps the original audio without converting it, usually opus from youtube and mp3 from soundcloud.",
+      "keeps the original audio without converting it, usually opus from youtube and m4a from soundcloud.",
     ),
   ).toBeVisible();
   await formats.getByRole("button", { name: /^best compatible/u }).click();
@@ -102,14 +98,15 @@ test("keeps the original provider audio when best compatible is chosen", async (
   await expect(page.getByRole("heading", { level: 2 })).toContainText("Original Track");
   await waitForTrackReady(page);
   const soundcloudFile = await captureDownload(page, () => downloadTrackButton(page).click());
-  expectDownloadName(soundcloudFile, "Original Track.opus");
-  expect((await inspectAudio(soundcloudFile)).metadata.title).toBe("Original Track");
-  await expectLosslessAudio(soundcloudFile, streamFixture("opus"));
+  expectDownloadName(soundcloudFile, "Original Track.m4a");
+  const soundcloudAudio = await inspectAudio(soundcloudFile);
+  expect(soundcloudAudio.format).toBe("m4a");
+  expect(soundcloudAudio.metadata).toMatchObject({ title: "Original Track", artist: "Cloud" });
+  expect(soundcloudAudio.metadata.picture).toHaveLength(1);
+  await expectLosslessAudio(soundcloudFile, streamFixture("m4a"));
 
-  expect((await cobaltRequests(upstreams)).map((request) => request.audioFormat)).toEqual([
-    "best",
-    "best",
-  ]);
+  expect((await cobaltRequests(upstreams)).map((request) => request.audioFormat)).toEqual(["best"]);
+  expect(await upstreams.calls({ route: "soundcloud.segment" })).toHaveLength(4);
 });
 
 test("downloads a single right after import when the setting is on", async ({
