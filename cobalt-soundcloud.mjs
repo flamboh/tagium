@@ -147,7 +147,7 @@ const findBestForPreset = (transcodings, preset) => {
 
     if (entry?.preset?.startsWith(`${preset}_`)) {
       if (protocol === "progressive") return entry;
-      inferior = entry;
+      inferior ??= entry;
     }
   }
 
@@ -208,6 +208,13 @@ export default async function soundcloud(input) {
   if (mp3Media && (obj.format === "mp3" || !selectedStream)) {
     selectedStream = mp3Media;
     bestAudio = "mp3";
+  }
+
+  const aacMedia = findBestForPreset(json.media.transcodings, "aac");
+
+  if (!selectedStream && aacMedia) {
+    selectedStream = aacMedia;
+    bestAudio = "m4a";
   }
 
   if (!selectedStream) return { error: "fetch.empty" };
