@@ -261,7 +261,7 @@ export default defineConfig({
       },
     ],
     options: {
-      typeAware: true,
+      typeAware: false,
     },
   },
   test: {
