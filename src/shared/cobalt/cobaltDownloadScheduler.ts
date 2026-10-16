@@ -6,13 +6,20 @@ import { createConcurrencyLimiter } from "@/shared/download/concurrencyLimiter";
 
 export type CobaltTunnelWaitCallback = (waiting: boolean) => void;
 
+interface WaitForAdmissionOptions {
+  cost?: number;
+  signal?: AbortSignal;
+}
+
+interface WaitForTunnelStartOptions {
+  signal?: AbortSignal;
+  onWaitChange?: CobaltTunnelWaitCallback;
+}
+
 export interface CobaltDownloadScheduler {
   schedule: <Value>(work: () => Promise<Value>, signal?: AbortSignal) => Promise<Value>;
-  waitForAdmission: (options?: { cost?: number; signal?: AbortSignal }) => Promise<void>;
-  waitForTunnelStart: (options?: {
-    signal?: AbortSignal;
-    onWaitChange?: CobaltTunnelWaitCallback;
-  }) => Promise<void>;
+  waitForAdmission: (options?: WaitForAdmissionOptions) => Promise<void>;
+  waitForTunnelStart: (options?: WaitForTunnelStartOptions) => Promise<void>;
 }
 
 const delay = async (milliseconds: number, signal?: AbortSignal) => {
@@ -54,7 +61,7 @@ export const createCobaltDownloadScheduler = ({
   const waitForAdmission: CobaltDownloadScheduler["waitForAdmission"] = async ({
     cost = DEFAULT_DOWNLOAD_ADMISSION_COST,
     signal,
-  } = {}) => {
+  }: WaitForAdmissionOptions = {}) => {
     while (true) {
       signal?.throwIfAborted();
       const reservation = admission.reserve(cost, Date.now());
@@ -67,7 +74,7 @@ export const createCobaltDownloadScheduler = ({
   const waitForTunnelStart: CobaltDownloadScheduler["waitForTunnelStart"] = async ({
     signal,
     onWaitChange,
-  } = {}) => {
+  }: WaitForTunnelStartOptions = {}) => {
     signal?.throwIfAborted();
 
     let releaseQueue = () => {};

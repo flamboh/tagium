@@ -35,6 +35,7 @@ jobs:
 
       - run: vp install
       - run: vp check
+      - run: vp run typecheck
       - run: vp test
       - run: vp build
 
