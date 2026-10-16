@@ -29,7 +29,7 @@ browser ──► miniflare :4317 ──► built worker (.output/server) + asse
 
 `server/utils/dev-controls.ts` only lets `local` and `preview` serve `/api/dev/*`, consume dev
 fault injection, and show the dev panel. `production` makes the UI, routes and error paths match
-tagium.app. Admission (`cobalt-request-admission.ts`) always uses the rate-limiter bindings when
+tagium.app. Admission (`download-request-admission.ts`) always uses the rate-limiter bindings when
 they exist, and the same-origin checks compare `Origin` with the request URL. Both work on
 `127.0.0.1` without special cases. Faults are injected at the fake upstreams instead of through
 dev controls.

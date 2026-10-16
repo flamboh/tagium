@@ -3,9 +3,25 @@ import { mockEvent } from "h3";
 import handler from "../../server/api/soundcloud-stream.post";
 import { captureSentryEvents } from "./sentry-events";
 
-type RuntimeRequest = Request & {
-  runtime: { cloudflare: { env: { TAGIUM_DEPLOY_ENV: "local" | "production" } } };
+type RateLimitBinding = {
+  limit: (input: { key: string }) => Promise<{ success: boolean }>;
 };
+
+type RuntimeRequest = Request & {
+  runtime: {
+    cloudflare: {
+      env: {
+        TAGIUM_DEPLOY_ENV: "local" | "production";
+        COBALT_SESSION_RATE_LIMITER?: RateLimitBinding;
+        COBALT_CLIENT_RATE_LIMITER?: RateLimitBinding;
+        SOUNDCLOUD_SESSION_RATE_LIMITER?: RateLimitBinding;
+        SOUNDCLOUD_CLIENT_RATE_LIMITER?: RateLimitBinding;
+      };
+    };
+  };
+};
+
+const limiter = (success = true) => vi.fn<RateLimitBinding["limit"]>(async () => ({ success }));
 
 const clientId = "soundcloudTestClientId0000000000";
 
@@ -131,6 +147,64 @@ describe("soundcloud stream endpoint", () => {
     expect(streamRequest.pathname).toContain("/aac_160k/");
     expect(streamRequest.searchParams.get("client_id")).toBe(clientId);
     expect(streamRequest.searchParams.get("track_authorization")).toBe("auth-token");
+  });
+
+  it("admits requests through the soundcloud rate limiters instead of cobalt's", async () => {
+    stubSoundCloud(trackJson());
+
+    const limiters = {
+      COBALT_SESSION_RATE_LIMITER: { limit: limiter() },
+      COBALT_CLIENT_RATE_LIMITER: { limit: limiter() },
+      SOUNDCLOUD_SESSION_RATE_LIMITER: { limit: limiter() },
+      SOUNDCLOUD_CLIENT_RATE_LIMITER: { limit: limiter() },
+    };
+
+    const request = makeRequest();
+    request.headers.set("cf-connecting-ip", "203.0.113.9");
+    request.runtime.cloudflare.env = { TAGIUM_DEPLOY_ENV: "production", ...limiters };
+
+    const response = await call(request);
+
+    expect(response.status).toBe(200);
+    expect(limiters.SOUNDCLOUD_SESSION_RATE_LIMITER.limit).toHaveBeenCalledOnce();
+    expect(limiters.SOUNDCLOUD_CLIENT_RATE_LIMITER.limit).toHaveBeenCalledWith({
+      key: "203.0.113.9",
+    });
+    expect(limiters.COBALT_SESSION_RATE_LIMITER.limit).not.toHaveBeenCalled();
+    expect(limiters.COBALT_CLIENT_RATE_LIMITER.limit).not.toHaveBeenCalled();
+  });
+
+  it("rate limits on the soundcloud session limiter before contacting soundcloud", async () => {
+    const requested = stubSoundCloud(trackJson());
+    const request = makeRequest();
+    request.runtime.cloudflare.env = {
+      TAGIUM_DEPLOY_ENV: "production",
+      COBALT_SESSION_RATE_LIMITER: { limit: limiter() },
+      COBALT_CLIENT_RATE_LIMITER: { limit: limiter() },
+      SOUNDCLOUD_SESSION_RATE_LIMITER: { limit: limiter(false) },
+      SOUNDCLOUD_CLIENT_RATE_LIMITER: { limit: limiter() },
+    };
+
+    const response = await call(request);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("60");
+    expect(requested).toEqual([]);
+  });
+
+  it("fails closed in production when only the cobalt limiters are bound", async () => {
+    const requested = stubSoundCloud(trackJson());
+    const request = makeRequest();
+    request.runtime.cloudflare.env = {
+      TAGIUM_DEPLOY_ENV: "production",
+      COBALT_SESSION_RATE_LIMITER: { limit: limiter() },
+      COBALT_CLIENT_RATE_LIMITER: { limit: limiter() },
+    };
+
+    const response = await call(request);
+
+    expect(response.status).toBe(503);
+    expect(requested).toEqual([]);
   });
 
   it("rejects cross-origin requests before contacting soundcloud", async () => {

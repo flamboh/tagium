@@ -257,6 +257,21 @@ const failureCases: FailureCase[] = [
     cobaltCalls: 0,
   },
   {
+    name: "too many soundcloud download requests",
+    arrange: async (upstreams, context) => {
+      const ip = `203.0.113.${randomInt(1, 255)}`;
+      await context.setExtraHTTPHeaders({ "cf-connecting-ip": ip });
+      await upstreams.rateLimits.limit("SOUNDCLOUD_CLIENT_RATE_LIMITER", ip, 0);
+
+      return upstreams.soundcloud.track({ title: "Failing Song" });
+    },
+    title: "too many download requests",
+    detail: "too many download requests. try again shortly.",
+    toast: "wait a moment, then try the download again.",
+    retryable: true,
+    cobaltCalls: 0,
+  },
+  {
     name: "a download plan cobalt cannot vouch for",
     arrange: async (upstreams) => {
       const video = await upstreams.youtube.video({ title: "Failing Song" });

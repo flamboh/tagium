@@ -4,7 +4,7 @@ import { parseCobaltMachineId } from "../../utils/cobalt-machine-affinity";
 import {
   getCobaltRequestAdmission,
   type CloudflareRateLimitBinding,
-} from "../../utils/cobalt-request-admission";
+} from "../../utils/download-request-admission";
 import {
   cobaltDownloadRequestSchema,
   decodeCobaltDownloadResponse,

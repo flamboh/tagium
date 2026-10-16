@@ -1,12 +1,14 @@
 import { Context, Data, Effect, Layer, Schedule, Schema } from "effect";
 import { AudioDecodeError, toPublicAudioError } from "@/features/audio/audioErrors";
-import { cobaltDownloadScheduler } from "@/shared/cobalt/cobaltDownloadScheduler";
+import { createConcurrencyLimiter } from "@/shared/download/concurrencyLimiter";
 import { getStableLastModified, type AudioDownloadRequest } from "@/features/import/cobaltAudio";
 import { ImportStageError } from "@/features/import/importLifecycle";
 import {
   LocalAudioProcessor,
   LocalAudioProcessorLive,
 } from "@/features/import/localAudioProcessor";
+
+export const SOUNDCLOUD_MAX_CONCURRENT_DOWNLOADS = 6;
 
 const SEGMENT_CONCURRENCY = 4;
 
@@ -168,6 +170,8 @@ export const soundCloudOutputMetadata = (
   return year === undefined ? stream.metadata : { ...stream.metadata, date: String(year) };
 };
 
+const soundCloudDownloads = createConcurrencyLimiter(SOUNDCLOUD_MAX_CONCURRENT_DOWNLOADS);
+
 const makeSoundCloudAudio = Effect.fn("makeSoundCloudAudio")(function* () {
   const localAudioProcessor = yield* LocalAudioProcessor;
 
@@ -222,7 +226,7 @@ const makeSoundCloudAudio = Effect.fn("makeSoundCloudAudio")(function* () {
   return SoundCloudAudio.of({
     download: (request) =>
       Effect.tryPromise({
-        try: () => cobaltDownloadScheduler.schedule(() => run(request), request.signal),
+        try: () => soundCloudDownloads.run(() => run(request), request.signal),
         catch: toPublicAudioError,
       }),
   });
@@ -235,6 +239,8 @@ export class SoundCloudAudio extends Context.Service<
   }
 >()("SoundCloudAudio") {}
 
-export const SoundCloudAudioLive = Layer.effect(SoundCloudAudio, makeSoundCloudAudio()).pipe(
+export const SoundCloudAudioLayer = Layer.effect(SoundCloudAudio, makeSoundCloudAudio());
+
+export const SoundCloudAudioLive = SoundCloudAudioLayer.pipe(
   Layer.provide(LocalAudioProcessorLive),
 );

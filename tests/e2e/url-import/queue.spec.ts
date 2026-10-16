@@ -137,40 +137,44 @@ test("imports a youtube playlist as an ordered album, three downloads at a time"
   expect(await upstreams.calls({ route: "youtube.browse" })).toHaveLength(1);
 });
 
-test("removing a downloading and a queued track shrinks the run and starts the next track", async ({
+test("a soundcloud set downloads six tracks at a time and removing tracks starts the next one", async ({
   page,
   context,
   upstreams,
 }) => {
   await useSettings(context, { audioFormat: "best" });
-  const set = await trackSet(upstreams, "Removal Set", 5);
-  const [first, second, third, fourth, fifth] = set.tracks;
+  const set = await trackSet(upstreams, "Removal Set", 8);
+  const urls = set.tracks.map((track) => track.url);
   const plans = await holdDownloadPlans(page);
 
   await page.goto("/");
   await importUrl(page, set.url);
-  await expect(queueStatus(page, "downloading 0/5")).toBeVisible();
-  await expect.poll(plans.requested).toEqual([first!.url, second!.url, third!.url]);
+  await expect(queueStatus(page, "downloading 0/8")).toBeVisible();
+  await expect.poll(plans.requested).toEqual(urls.slice(0, 6));
+  await expect(page.getByText("+4 more", { exact: true })).toBeVisible();
 
   await removeTrack(page, "Track 1.mp3");
-  await expect(queueStatus(page, "downloading 0/4")).toBeVisible();
-  await expect.poll(plans.requested).toEqual([first!.url, second!.url, third!.url, fourth!.url]);
+  await expect(queueStatus(page, "downloading 0/7")).toBeVisible();
+  await expect.poll(plans.requested).toEqual(urls.slice(0, 7));
 
-  await removeTrack(page, "Track 5.mp3");
-  await expect(queueStatus(page, "downloading 0/3")).toBeVisible();
+  await removeTrack(page, "Track 8.mp3");
+  await expect(queueStatus(page, "downloading 0/6")).toBeVisible();
 
   await plans.releaseAll();
-  await expect(queueStatus(page, "downloaded 3/3")).toBeVisible(SETTLE_TIMEOUT);
-  await expect(trackButtons(page)).toHaveText([
-    /^1\s*Track 2\.m4a$/u,
-    /^2\s*Track 3\.m4a$/u,
-    /^3\s*Track 4\.m4a$/u,
-  ]);
+  await expect(queueStatus(page, "downloaded 6/6")).toBeVisible(SETTLE_TIMEOUT);
+  await expect(trackButtons(page)).toHaveText(
+    Array.from(
+      { length: 6 },
+      (_, index) => new RegExp(`^${index + 1}\\s*Track ${index + 2}\\.m4a$`, "u"),
+    ),
+  );
   await expect(page.getByRole("button", { name: "download all" })).toBeEnabled();
-  expect(plans.requested()).not.toContain(fifth!.url);
+  expect(plans.requested()).not.toContain(urls[7]);
   const streamKeys = await soundcloudStreamKeys(upstreams);
-  expect(streamKeys).toHaveLength(3);
-  expect(streamKeys).toEqual(expect.arrayContaining([second!.key, third!.key, fourth!.key]));
+  expect(streamKeys).toHaveLength(6);
+  expect(streamKeys).toEqual(
+    expect.arrayContaining(set.tracks.slice(1, 7).map((track) => track.key)),
+  );
 });
 
 test("canceling a playlist keeps its tracks and retry downloads all of them", async ({
@@ -179,26 +183,26 @@ test("canceling a playlist keeps its tracks and retry downloads all of them", as
   upstreams,
 }) => {
   await useSettings(context, { audioFormat: "best" });
-  const set = await trackSet(upstreams, "Cancel Set", 4);
+  const set = await trackSet(upstreams, "Cancel Set", 8);
   const plans = await holdDownloadPlans(page);
 
   await page.goto("/");
   await importUrl(page, set.url);
-  await expect.poll(() => plans.requested().length).toBe(3);
+  await expect.poll(() => plans.requested().length).toBe(6);
 
   await page.getByRole("button", { name: "cancel playlist downloads" }).click();
-  await expect(queueStatus(page, "canceled 4/4")).toBeVisible();
+  await expect(queueStatus(page, "canceled 8/8")).toBeVisible();
   await expect(page.getByText("remaining tracks canceled", { exact: true })).toBeVisible();
   await expect(audioPreview(page).getByRole("status")).toHaveText("download canceled");
   await expect(downloadTrackButton(page)).toBeDisabled();
   await expect(page.getByRole("button", { name: "download all" })).toBeDisabled();
-  await expect(trackButtons(page)).toHaveCount(4);
+  await expect(trackButtons(page)).toHaveCount(8);
   await plans.releaseAll();
 
   await page.getByRole("button", { name: "retry playlist downloads" }).click();
-  await expect(queueStatus(page, "downloaded 4/4")).toBeVisible(SETTLE_TIMEOUT);
+  await expect(queueStatus(page, "downloaded 8/8")).toBeVisible(SETTLE_TIMEOUT);
   await expect(page.getByRole("button", { name: "download all" })).toBeEnabled();
-  expect(plans.requested().slice(3).sort()).toEqual(set.tracks.map((track) => track.url).sort());
+  expect(plans.requested().slice(6).sort()).toEqual(set.tracks.map((track) => track.url).sort());
 
   for (const track of set.tracks) {
     expect(await soundcloudStreamCount(upstreams, track)).toBe(1);

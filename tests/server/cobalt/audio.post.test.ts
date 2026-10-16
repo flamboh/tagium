@@ -11,6 +11,8 @@ type RuntimeRequest = Request & {
         COBALT_MACHINE_AFFINITY_SECRET: string;
         COBALT_SESSION_RATE_LIMITER?: RateLimitBinding;
         COBALT_CLIENT_RATE_LIMITER?: RateLimitBinding;
+        SOUNDCLOUD_SESSION_RATE_LIMITER?: RateLimitBinding;
+        SOUNDCLOUD_CLIENT_RATE_LIMITER?: RateLimitBinding;
         TAGIUM_DEPLOY_ENV: "local" | "preview" | "production";
       };
     };
@@ -171,6 +173,38 @@ describe("cobalt audio endpoint", () => {
       machineId: "cobalt-machine-1",
     });
     expect(JSON.stringify(event)).not.toContain("youtube.com");
+  });
+
+  it("admits requests through the cobalt rate limiters instead of soundcloud's", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          status: "tunnel",
+          url: "https://cobalt.test/tunnel?id=123456789012345678901",
+          filename: "download.m4a",
+        }),
+      ),
+    );
+    const limit = () => vi.fn<RateLimitBinding["limit"]>(async () => ({ success: true }));
+
+    const limiters = {
+      COBALT_SESSION_RATE_LIMITER: { limit: limit() },
+      COBALT_CLIENT_RATE_LIMITER: { limit: limit() },
+      SOUNDCLOUD_SESSION_RATE_LIMITER: { limit: limit() },
+      SOUNDCLOUD_CLIENT_RATE_LIMITER: { limit: limit() },
+    };
+
+    const request = makeAudioRequest();
+    Object.assign(request.runtime.cloudflare.env, { TAGIUM_DEPLOY_ENV: "production" }, limiters);
+
+    const response = await handler(makeEvent(request));
+
+    expect(response.status).toBe(200);
+    expect(limiters.COBALT_SESSION_RATE_LIMITER.limit).toHaveBeenCalledOnce();
+    expect(limiters.COBALT_CLIENT_RATE_LIMITER.limit).toHaveBeenCalledOnce();
+    expect(limiters.SOUNDCLOUD_SESSION_RATE_LIMITER.limit).not.toHaveBeenCalled();
+    expect(limiters.SOUNDCLOUD_CLIENT_RATE_LIMITER.limit).not.toHaveBeenCalled();
   });
 
   it("fails closed when production admission bindings are missing", async () => {

@@ -27,6 +27,16 @@ const wrangler = {
       namespace_id: "1042702",
       simple: { limit: 60, period: 60 },
     },
+    {
+      name: "SOUNDCLOUD_SESSION_RATE_LIMITER",
+      namespace_id: "1042703",
+      simple: { limit: 60, period: 60 },
+    },
+    {
+      name: "SOUNDCLOUD_CLIENT_RATE_LIMITER",
+      namespace_id: "1042704",
+      simple: { limit: 120, period: 60 },
+    },
   ],
 };
 
