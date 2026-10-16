@@ -5,7 +5,7 @@ export const isMissingSoundCloudContent = (code: string) =>
 
 export const publicCobaltErrorCode = (code: string) => {
   if (isMissingSoundCloudContent(code)) {
-    return "error.api.content.video.unavailable";
+    return "error.api.content.post.unavailable";
   }
 
   if (

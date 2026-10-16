@@ -1,10 +1,14 @@
-import { describe, expect, it, vi } from "vite-plus/test";
-import { Effect } from "effect";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { Effect, Layer } from "effect";
 import {
   downloadStreamParts,
+  SoundCloudAudio,
+  SoundCloudAudioLayer,
   soundCloudOutputMetadata,
   type SoundCloudStream,
 } from "@/features/import/soundcloudAudio";
+import { LocalAudioProcessor } from "@/features/import/localAudioProcessor";
+import { getSystemFailurePresentation } from "@/shared/systemFailure";
 
 const bytes = (...values: number[]) => new Uint8Array(values);
 
@@ -117,6 +121,85 @@ describe("soundcloud stream part download", () => {
 
     expect(error.cause).toBeInstanceOf(DOMException);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("soundcloud audio download", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const streamFor = (generation: number) => ({
+    initUrl: `https://cdn.test/${generation}/init`,
+    segmentUrls: [`https://cdn.test/${generation}/a`, `https://cdn.test/${generation}/b`],
+    durationMs: 1000,
+    metadata: { title: "Expiring" },
+    coverUrl: null,
+  });
+
+  const stubSoundCloud = (segmentStatus: (url: string) => number) => {
+    let resolutions = 0;
+    const segmentRequests: string[] = [];
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = urlOf(input);
+
+        if (url === "/api/soundcloud-stream") {
+          resolutions += 1;
+
+          return Response.json(streamFor(resolutions));
+        }
+
+        segmentRequests.push(url);
+        const status = segmentStatus(url);
+
+        if (status === 200) return new Response(new TextEncoder().encode(new URL(url).pathname));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        return new Response(null, { status });
+      }),
+    );
+
+    return { resolutions: () => resolutions, segmentRequests };
+  };
+
+  const processor = Layer.succeed(
+    LocalAudioProcessor,
+    LocalAudioProcessor.of({ processAudio: ({ audioFile }) => Effect.succeed(audioFile) }),
+  );
+
+  const download = Effect.gen(function* () {
+    const audio = yield* SoundCloudAudio;
+
+    return yield* audio.download({
+      sourceUrl: "https://soundcloud.com/artist/expiring",
+      audioBitrate: "128",
+      audioFormat: "best",
+    });
+  }).pipe(Effect.provide(SoundCloudAudioLayer.pipe(Layer.provide(processor))));
+
+  it("re-resolves an expired stream once and resumes from the parts it already has", async () => {
+    const soundcloud = stubSoundCloud((url) => (url === "https://cdn.test/1/b" ? 403 : 200));
+
+    const file = await succeed(download);
+
+    expect(soundcloud.resolutions()).toBe(2);
+    expect(await file.text()).toBe("/1/init/1/a/2/b");
+    expect(soundcloud.segmentRequests).not.toContain("https://cdn.test/2/init");
+  });
+
+  it("reports a stream that keeps expiring as an expired download link", async () => {
+    const soundcloud = stubSoundCloud((url) => (url.endsWith("/b") ? 404 : 200));
+
+    const error = await fail(download);
+
+    expect(soundcloud.resolutions()).toBe(2);
+    expect(getSystemFailurePresentation(error, "download")).toMatchObject({
+      code: "link_expired",
+      retryable: true,
+    });
   });
 });
 

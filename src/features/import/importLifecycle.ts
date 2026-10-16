@@ -76,53 +76,8 @@ const errorMessage = (cause: unknown) => {
   return "";
 };
 
-export const importFailureCodeFrom = (error: Error): ImportFailureCode => {
-  const message = errorMessage(error).toLowerCase();
-
-  if (message.includes("error.api.capacity_exceeded")) return "capacity";
-
-  if (
-    message.includes("error.api.rate_exceeded") ||
-    message.includes("rate limit") ||
-    /\b429\b/.test(message)
-  ) {
-    return "rate_limited";
-  }
-
-  if (
-    message.includes("error.api.unreachable") ||
-    message.includes("cobalt_api_url is not configured") ||
-    message.includes("networkerror") ||
-    message.includes("failed to fetch")
-  ) {
-    return "service_unavailable";
-  }
-
-  if (message.includes("error.api.timed_out") || /\btimed?\s*out\b/.test(message)) {
-    return "timeout";
-  }
-
-  if (message.includes("error.api.fetch.empty") || message.includes("response was empty")) {
-    return "empty_response";
-  }
-
-  if (message.includes("error.api.fetch.fail")) return "fetch_failed";
-
-  if (/metadata.*(?:write|appl)|write.*metadata/.test(message)) return "metadata_write_failed";
-
-  if (/could not be parsed|decode|malformed|metadata read/.test(message)) return "parse_failed";
-  const classified = getSystemFailurePresentation(error, "import").code;
-
-  if (
-    classified === "unsupported_source" ||
-    classified === "private_or_missing" ||
-    classified === "invalid_response"
-  ) {
-    return classified;
-  }
-
-  return "unknown";
-};
+export const importFailureCodeFrom = (error: Error): ImportFailureCode =>
+  getSystemFailurePresentation(error, "import").code;
 
 export const importFailureStageFromDownloadError = (error: Error): ImportFailureStage =>
   error instanceof ImportStageError ? error.stage : "plan";

@@ -40,7 +40,9 @@ test("rejects incomplete and unsupported links beside the url field", async ({
     "https://soundcloud.com/artist/track/extra",
   ]) {
     await importUrl(page, url);
-    await expect(page.getByText("try a public soundcloud or youtube track url")).toBeVisible();
+    await expect(
+      page.getByText("paste a public soundcloud or youtube track, set, or playlist link"),
+    ).toBeVisible();
     await expect(urlField(page)).toHaveValue(url);
   }
 
@@ -106,9 +108,7 @@ test("explains a missing soundcloud set or youtube playlist beside the url field
 
   for (const url of [set.url, playlist.url]) {
     await importUrl(page, url);
-    await expect(
-      page.getByText("check that the link is public and still available, then try again"),
-    ).toBeVisible();
+    await expect(page.getByText("check that the link is public and still available")).toBeVisible();
     await expect(urlField(page)).toHaveValue(url);
   }
 
@@ -133,9 +133,9 @@ test("reports a soundcloud set or youtube playlist outage as an import failure",
       notifications(page).getByText("tagium could not import this media. try again in a moment."),
     ).toBeVisible();
     await expect(urlField(page)).toHaveValue(url);
-    await expect(
-      page.getByText("check that the link is public and still available, then try again"),
-    ).toHaveCount(0);
+    await expect(page.getByText("check that the link is public and still available")).toHaveCount(
+      0,
+    );
   }
 
   await expect(page.getByText("no tracks yet")).toBeVisible();
@@ -159,13 +159,28 @@ const youtubeFailing = (code: string) => async (upstreams: Upstreams) => {
   return video;
 };
 
+const youtubeBlocking = {
+  title: "youtube is blocking downloads right now",
+  detail: "youtube is blocking downloads. try again later.",
+  toast: "this isn't a problem with your link. try again later.",
+  retryable: true,
+};
+
 const failureCases: FailureCase[] = [
   {
-    name: "a private or removed youtube video",
+    name: "an unavailable youtube video",
     arrange: (upstreams) => upstreams.youtube.missingVideo(),
+    title: "this video is unavailable",
+    detail: "unavailable or blocked by youtube.",
+    toast: "it may be private, removed, or temporarily blocked by youtube.",
+    retryable: false,
+  },
+  {
+    name: "a private youtube video",
+    arrange: youtubeFailing("error.api.content.video.private"),
     title: "we could not access this media",
     detail: "media is private, unavailable, or no longer exists.",
-    toast: "check that the link is public and still available, then try again.",
+    toast: "check that the link is public and still available.",
     retryable: false,
   },
   {
@@ -174,8 +189,91 @@ const failureCases: FailureCase[] = [
       upstreams.soundcloud.track({ metadata: { kind: "status", status: 404 } }),
     title: "we could not access this media",
     detail: "media is private, unavailable, or no longer exists.",
-    toast: "check that the link is public and still available, then try again.",
+    toast: "check that the link is public and still available.",
     retryable: false,
+    cobaltCalls: 0,
+  },
+  {
+    name: "a soundcloud go+ preview",
+    arrange: (upstreams) => upstreams.soundcloud.track({ policy: "SNIP" }),
+    title: "this track is a go+ preview",
+    detail: "only a go+ preview is available.",
+    toast: "soundcloud only streams a preview of this track, so tagium can't save it.",
+    retryable: false,
+    cobaltCalls: 0,
+  },
+  {
+    name: "a region-locked soundcloud track",
+    arrange: (upstreams) => upstreams.soundcloud.track({ policy: "BLOCK" }),
+    title: "this media is region-locked",
+    detail: "region-locked.",
+    toast: "the provider blocks it where our servers are. try another link.",
+    retryable: false,
+    cobaltCalls: 0,
+  },
+  {
+    name: "a region-locked youtube video",
+    arrange: youtubeFailing("error.api.content.video.region"),
+    title: "this media is region-locked",
+    detail: "region-locked.",
+    toast: "the provider blocks it where our servers are. try another link.",
+    retryable: false,
+  },
+  {
+    name: "a soundcloud track longer than three hours",
+    arrange: (upstreams) => upstreams.soundcloud.track({ durationSec: 3 * 60 * 60 + 1 }),
+    title: "this media is too long",
+    detail: "longer than 3 hours.",
+    toast: "tagium can save media up to 3 hours long.",
+    retryable: false,
+    cobaltCalls: 0,
+  },
+  {
+    name: "a live youtube stream",
+    arrange: youtubeFailing("error.api.content.video.live"),
+    title: "live streams can't be saved",
+    detail: "live streams can't be saved.",
+    toast: "wait until the stream ends, then try again.",
+    retryable: false,
+  },
+  {
+    name: "an age-restricted youtube video",
+    arrange: youtubeFailing("error.api.content.video.age"),
+    title: "this media is age-restricted",
+    detail: "age-restricted.",
+    toast: "tagium can't sign in to download age-restricted media.",
+    retryable: false,
+  },
+  {
+    name: "youtube asking cobalt to sign in",
+    arrange: youtubeFailing("error.api.youtube.login"),
+    ...youtubeBlocking,
+  },
+  {
+    name: "youtube rate-limiting cobalt",
+    arrange: youtubeFailing("error.api.fetch.rate"),
+    ...youtubeBlocking,
+  },
+  {
+    name: "an expired cobalt tunnel",
+    arrange: async (upstreams) => {
+      const video = await upstreams.youtube.video({ title: "Failing Song" });
+      await upstreams.cobalt.tunnel(video.url, { kind: "status", status: 404 });
+
+      return video;
+    },
+    title: "the download link expired",
+    detail: "download link expired. try again.",
+    toast: "try again to get a fresh link.",
+    retryable: true,
+  },
+  {
+    name: "soundcloud segments that keep expiring",
+    arrange: (upstreams) => upstreams.soundcloud.track({ tunnel: { kind: "status", status: 403 } }),
+    title: "the download link expired",
+    detail: "download link expired. try again.",
+    toast: "try again to get a fresh link.",
+    retryable: true,
     cobaltCalls: 0,
   },
   {
@@ -200,7 +298,7 @@ const failureCases: FailureCase[] = [
     arrange: youtubeFailing("error.api.link.unsupported"),
     title: "this link is not supported",
     detail: "this link is not supported.",
-    toast: "try a public soundcloud or youtube track url.",
+    toast: "paste a public soundcloud or youtube track, set, or playlist link.",
     retryable: false,
   },
   {
@@ -384,4 +482,23 @@ test("retries soundcloud stream segments that fail or arrive empty", async ({
   expect(await upstreams.calls({ route: "soundcloud.segment" })).toHaveLength(6);
   const exported = await captureDownload(page, () => downloadTrackButton(page).click());
   expect((await inspectAudio(exported)).metadata.title).toBe("Slow Start");
+});
+
+test("fetches a fresh soundcloud stream when its segment links expire", async ({
+  page,
+  upstreams,
+}) => {
+  const track = await upstreams.soundcloud.track({
+    title: "Fresh Link",
+    cover: null,
+    tunnel: [{ kind: "status", status: 403 }, { kind: "ok" }],
+  });
+
+  await page.goto("/");
+  await importUrl(page, track.url);
+  await waitForTrackReady(page);
+
+  expect(await upstreams.calls({ route: "soundcloud.stream" })).toHaveLength(2);
+  const exported = await captureDownload(page, () => downloadTrackButton(page).click());
+  expect((await inspectAudio(exported)).metadata.title).toBe("Fresh Link");
 });

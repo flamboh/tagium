@@ -201,7 +201,7 @@ export const resolveSoundCloudTrack = (sourceUrl: string, context: SoundCloudLog
       code: "error.api.fetch.fail",
       context,
       read: decodeJson(soundCloudTrackSchema),
-      statusCode: (status) => (status === 404 ? "error.api.content.video.unavailable" : undefined),
+      statusCode: (status) => (status === 404 ? "error.api.content.post.unavailable" : undefined),
     });
 
     return { clientId, track };

@@ -195,8 +195,8 @@ test("the editor reports missing and drm-protected imports by their category", a
       IMPORT_TIMEOUT,
     )
     .toEqual([
-      { provider: "youtube", code: "private_or_missing" },
-      { provider: "soundcloud", code: "unsupported_source" },
+      { provider: "youtube", code: "video_unavailable" },
+      { provider: "soundcloud", code: "drm_protected" },
     ]);
   expectPrivate(await categories(), [missing.id, "Locked Song"]);
 });
@@ -275,7 +275,7 @@ test("tagium save reports each download outcome with its provider and failure co
       ["soundcloud", "completed", undefined, undefined],
       ["youtube", "failed", "planning", "capacity"],
       ["youtube", "completed", undefined, undefined],
-      ["youtube", "failed", "planning", "private_or_missing"],
+      ["youtube", "failed", "planning", "video_unavailable"],
     ]);
   const events = await upstreams.analyticsEvents();
   expect(

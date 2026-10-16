@@ -40,6 +40,9 @@ const isRetryablePartError = (error: SoundCloudPartError) => {
   return error.status === 408 || error.status === 429 || error.status >= 500;
 };
 
+const isExpiredPartError = (error: SoundCloudPartError) =>
+  error.status === 403 || error.status === 404;
+
 export interface DownloadStreamPartsOptions {
   urls: readonly string[];
   concurrency?: number;
@@ -48,6 +51,7 @@ export interface DownloadStreamPartsOptions {
   signal?: AbortSignal;
   onProgress?: (progress: { completed: number; total: number }) => void;
   fetch?: typeof globalThis.fetch;
+  cache?: Map<number, Uint8Array<ArrayBuffer>>;
 }
 
 export const downloadStreamParts = ({
@@ -58,11 +62,16 @@ export const downloadStreamParts = ({
   signal,
   onProgress,
   fetch = globalThis.fetch,
+  cache = new Map<number, Uint8Array<ArrayBuffer>>(),
 }: DownloadStreamPartsOptions) => {
   let completed = 0;
 
-  const fetchPart = (url: string) =>
-    Effect.tryPromise({
+  const fetchPart = (url: string, index: number) => {
+    const cached = cache.get(index);
+
+    if (cached) return Effect.succeed(cached);
+
+    return Effect.tryPromise({
       try: async (interrupt) => {
         const response = await fetch(url, {
           signal: signal ? AbortSignal.any([signal, interrupt]) : interrupt,
@@ -93,13 +102,15 @@ export const downloadStreamParts = ({
         while: isRetryablePartError,
         schedule: Schedule.exponential(retryDelayMs),
       }),
-      Effect.tap(() =>
+      Effect.tap((bytes) =>
         Effect.sync(() => {
+          cache.set(index, bytes);
           completed += 1;
           onProgress?.({ completed, total: urls.length });
         }),
       ),
     );
+  };
 
   return Effect.forEach(urls, fetchPart, { concurrency });
 };
@@ -142,6 +153,32 @@ const fetchStream = (request: AudioDownloadRequest) =>
     Effect.mapError((error) => new ImportStageError("plan", toPublicAudioError(error))),
   );
 
+const downloadAudioParts = (stream: SoundCloudStream, request: AudioDownloadRequest) => {
+  const cache = new Map<number, Uint8Array<ArrayBuffer>>();
+
+  const download = (current: SoundCloudStream) =>
+    downloadStreamParts({
+      urls: [current.initUrl, ...current.segmentUrls],
+      signal: request.signal,
+      cache,
+    });
+
+  return download(stream).pipe(
+    Effect.catchIf(isExpiredPartError, () =>
+      fetchStream(request).pipe(
+        Effect.flatMap((fresh) => {
+          if (fresh.segmentUrls.length !== stream.segmentUrls.length) cache.clear();
+
+          return download(fresh);
+        }),
+      ),
+    ),
+    Effect.catchTag("SoundCloudPartError", (error) =>
+      Effect.fail(new ImportStageError("tunnel", error)),
+    ),
+  );
+};
+
 const fetchCover = (coverUrl: string, signal?: AbortSignal) =>
   Effect.promise(async () => {
     try {
@@ -182,10 +219,7 @@ const makeSoundCloudAudio = Effect.fn("makeSoundCloudAudio")(function* () {
 
       const [parts, coverFile] = yield* Effect.all(
         [
-          downloadStreamParts({
-            urls: [stream.initUrl, ...stream.segmentUrls],
-            signal: request.signal,
-          }).pipe(Effect.mapError((error) => new ImportStageError("tunnel", error))),
+          downloadAudioParts(stream, request),
           stream.coverUrl ? fetchCover(stream.coverUrl, request.signal) : Effect.succeed(undefined),
         ],
         { concurrency: 2 },

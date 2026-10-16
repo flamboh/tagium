@@ -162,7 +162,7 @@ const runLocalProcessingWorker = (request: LocalAudioProcessingRequest, signal?:
         };
 
         worker.onerror = (error) => {
-          complete(Effect.fail(new Error(error.message)));
+          complete(Effect.fail(new Error(`local audio processing failed: ${error.message}`)));
         };
 
         worker.postMessage({

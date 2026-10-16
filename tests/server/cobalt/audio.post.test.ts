@@ -175,6 +175,30 @@ describe("cobalt audio endpoint", () => {
     expect(JSON.stringify(event)).not.toContain("youtube.com");
   });
 
+  it("hides unexpected handler failures behind a stable error code", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          {
+            status: "tunnel",
+            url: "https://cobalt.test/tunnel?id=123456789012345678901",
+            filename: "download.mp3",
+          },
+          { headers: { "X-Cobalt-Machine-Id": "cobalt-machine-1" } },
+        ),
+      ),
+    );
+    const request = makeAudioRequest();
+    request.runtime.cloudflare.env.COBALT_MACHINE_AFFINITY_SECRET = "";
+
+    const response = await handler(makeEvent(request));
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe("error.api.handler_failure");
+  });
+
   it("admits requests through the cobalt rate limiters instead of soundcloud's", async () => {
     vi.stubGlobal(
       "fetch",
