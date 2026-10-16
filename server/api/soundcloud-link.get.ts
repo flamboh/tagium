@@ -13,6 +13,10 @@ export default defineHandler(async (event) => {
       throw new HTTPError({ status: 422, message: error.message });
     }
 
+    if (error instanceof Error && error.message === "soundcloud.short_link_upstream_failed") {
+      throw new HTTPError({ status: 502, message: error.message });
+    }
+
     throw error;
   }
 });

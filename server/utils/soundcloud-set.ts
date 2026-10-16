@@ -19,11 +19,14 @@ const TRACK_RESOLVE_CONCURRENCY = 4;
 class SoundCloudTrackResolveError extends Error {
   constructor(
     readonly stage: "track.resolve_fetch" | "track.resolve_parse",
-    options?: ErrorOptions,
+    options?: ErrorOptions & { missing?: boolean },
   ) {
     super(stage, options);
     this.name = "SoundCloudTrackResolveError";
+    this.missing = options?.missing ?? false;
   }
+
+  readonly missing: boolean;
 }
 
 const soundCloudTrackSchema = Schema.Struct({
@@ -121,7 +124,9 @@ const resolveTrack = async (
         upstreamFailureDetails(response, contentType),
         startedAt,
       );
-      throw new SoundCloudTrackResolveError("track.resolve_fetch");
+      throw new SoundCloudTrackResolveError("track.resolve_fetch", {
+        missing: [401, 403, 404, 410].includes(response.status),
+      });
     }
 
     try {
@@ -167,6 +172,7 @@ const resolveTracks = async (
   }> = [];
 
   let failedTracks = decodeFailures;
+  let transientFailures = 0;
 
   const failuresByStage: Record<string, number> = decodeFailures
     ? { "track.entry_parse": decodeFailures }
@@ -192,6 +198,15 @@ const resolveTracks = async (
       } else {
         failedTracks++;
 
+        if (
+          !(
+            settledTrack.reason instanceof SoundCloudTrackResolveError &&
+            settledTrack.reason.missing
+          )
+        ) {
+          transientFailures++;
+        }
+
         const stage =
           settledTrack.reason instanceof SoundCloudTrackResolveError
             ? settledTrack.reason.stage
@@ -209,7 +224,10 @@ const resolveTracks = async (
       failed: failedTracks,
       failuresByStage,
     });
-    throw new HTTPError({ status: 422, message: "soundcloud.no_resolvable_tracks" });
+    throw new HTTPError({
+      status: transientFailures > 0 ? 502 : 422,
+      message: "soundcloud.no_resolvable_tracks",
+    });
   }
 
   await logSoundCloudCompletion(context, {
