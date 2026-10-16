@@ -437,7 +437,7 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
   }
 
   if (tracks.length === 0) {
-    throw new HTTPError({ status: 422, message: "youtube.no_resolvable_tracks" });
+    throw new HTTPError({ status: truncated ? 502 : 422, message: "youtube.no_resolvable_tracks" });
   }
 
   const skippedCount =
