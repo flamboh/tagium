@@ -101,7 +101,12 @@ export const configureShareDeploymentBindings = (
   ];
 
   const downloadRateLimits = (config.ratelimits ?? []).filter((binding) =>
-    ["COBALT_SESSION_RATE_LIMITER", "COBALT_CLIENT_RATE_LIMITER"].includes(binding.name ?? ""),
+    [
+      "COBALT_SESSION_RATE_LIMITER",
+      "COBALT_CLIENT_RATE_LIMITER",
+      "SOUNDCLOUD_SESSION_RATE_LIMITER",
+      "SOUNDCLOUD_CLIENT_RATE_LIMITER",
+    ].includes(binding.name ?? ""),
   );
 
   config.ratelimits = [...downloadRateLimits, ...shareRateLimits];

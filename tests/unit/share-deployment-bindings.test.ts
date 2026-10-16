@@ -14,6 +14,8 @@ describe("share deployment config contract", () => {
       ratelimits: [
         { name: "COBALT_SESSION_RATE_LIMITER", namespace_id: "1042701" },
         { name: "COBALT_CLIENT_RATE_LIMITER", namespace_id: "1042702" },
+        { name: "SOUNDCLOUD_SESSION_RATE_LIMITER", namespace_id: "1042703" },
+        { name: "SOUNDCLOUD_CLIENT_RATE_LIMITER", namespace_id: "1042704" },
       ],
     };
 
@@ -39,6 +41,8 @@ describe("share deployment config contract", () => {
       expect.arrayContaining([
         expect.objectContaining({ name: "COBALT_SESSION_RATE_LIMITER" }),
         expect.objectContaining({ name: "COBALT_CLIENT_RATE_LIMITER" }),
+        expect.objectContaining({ name: "SOUNDCLOUD_SESSION_RATE_LIMITER" }),
+        expect.objectContaining({ name: "SOUNDCLOUD_CLIENT_RATE_LIMITER" }),
         expect.objectContaining({
           name: "SHARE_CREATE_RATE_LIMITER",
           namespace_id: target.createRateLimitNamespace,

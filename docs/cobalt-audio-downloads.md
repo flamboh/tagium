@@ -12,6 +12,11 @@ The playlist URL expires within minutes, so the Worker reads it immediately and 
 segment URLs, which last about two hours. Tagium Save still downloads SoundCloud through Cobalt,
 which is why `cobalt-soundcloud.mjs` and the m4a ffmpeg patch stay in the Cobalt image.
 
+Because SoundCloud downloads never reach Fly, they don't share Cobalt's limits. The browser runs
+six SoundCloud downloads at a time (three for Cobalt), with its own slot pool and no tunnel-start
+spacing, and `/api/soundcloud-stream` uses `SOUNDCLOUD_SESSION_RATE_LIMITER` (60/min) and
+`SOUNDCLOUD_CLIENT_RATE_LIMITER` (120/min) instead of the Cobalt limiters.
+
 ## Production topology
 
 `fly.cobalt.toml` deploys the pinned Cobalt image behind `cobalt-machine-proxy.mjs`. The wrapper

@@ -14,12 +14,21 @@ import {
   removePlaylistDownloadTracks,
   reserveNextPlaylistDownloadTrack,
   type ActivePlaylistDownload,
+  type PlaylistDownloadLimits,
   type PlaylistDownloadQueueRun,
   type PlaylistDownloadQueueRuntimeSnapshot,
   type PlaylistDownloadRuntimeTrack,
 } from "@/features/import/playlistDownloadQueueRuntime";
-import type { PlaylistDownloadQueueTrack as PlaylistDownloadQueueModelTrack } from "@/features/import/playlistDownloadQueue";
-import { createDownloadAdmissionWindow } from "@/shared/cobalt/downloadAdmissionWindow";
+import type {
+  PlaylistDownloadQueueItem,
+  PlaylistDownloadQueueTrack as PlaylistDownloadQueueModelTrack,
+} from "@/features/import/playlistDownloadQueue";
+import {
+  createDownloadAdmissionWindow,
+  DEFAULT_DOWNLOAD_ADMISSION_COST,
+  type DownloadAdmissionWindow,
+} from "@/shared/download/downloadAdmissionWindow";
+import { parseMediaLink } from "@/lib/media-link";
 import {
   importFailureStageFromDownloadError,
   ImportStageError,
@@ -27,7 +36,14 @@ import {
 } from "@/features/import/importLifecycle";
 import type { ImportFailureStage, ImportOutcome } from "@/analytics";
 
-export const PLAYLIST_DOWNLOAD_CONCURRENCY = 3;
+export const PLAYLIST_DOWNLOAD_CONCURRENCY = { soundcloud: 6, cobalt: 3 } as const;
+
+const SOUNDCLOUD_TRACKS_PER_MINUTE = 60;
+
+type PlaylistDownloadService = keyof typeof PLAYLIST_DOWNLOAD_CONCURRENCY;
+
+const downloadServiceFor = (sourceUrl: string): PlaylistDownloadService =>
+  parseMediaLink(sourceUrl).provider === "soundcloud" ? "soundcloud" : "cobalt";
 
 type PlaylistDownloadControllerRun<Track extends PlaylistDownloadRuntimeTrack> =
   PlaylistDownloadQueueRun<Track> & {
@@ -161,7 +177,23 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
   >();
 
   const pendingRetryAttemptIds = new Map<number, Map<string, number>>();
-  const downloadAdmission = createDownloadAdmissionWindow();
+
+  const downloadAdmission: Record<PlaylistDownloadService, DownloadAdmissionWindow> = {
+    soundcloud: createDownloadAdmissionWindow({
+      maxCost: SOUNDCLOUD_TRACKS_PER_MINUTE * DEFAULT_DOWNLOAD_ADMISSION_COST,
+    }),
+    cobalt: createDownloadAdmissionWindow(),
+  };
+
+  const limitsFor = (item: PlaylistDownloadQueueItem): PlaylistDownloadLimits => {
+    const service = downloadServiceFor(item.sourceUrl);
+
+    return {
+      concurrency: PLAYLIST_DOWNLOAD_CONCURRENCY[service],
+      admission: downloadAdmission[service],
+    };
+  };
+
   const now = deps.now ?? (() => Date.now());
 
   const notifyTrackSettled = (
@@ -430,19 +462,19 @@ export const createPlaylistDownloadController = <Track extends PlaylistDownloadR
 
     clearBudgetWake(run);
 
-    while (run.active.length < PLAYLIST_DOWNLOAD_CONCURRENCY && run.pending.length > 0) {
-      const budget = reserveNextPlaylistDownloadTrack(run, downloadAdmission, now());
+    while (run.pending.length > 0) {
+      const next = reserveNextPlaylistDownloadTrack(run, limitsFor, now());
 
-      if (budget.status === "waiting-for-tunnel-budget") {
-        scheduleBudgetWake(run, budget.waitMs);
+      if (next.status === "waiting-for-tunnel-budget") {
+        scheduleBudgetWake(run, next.waitMs);
         publish(run);
 
         return;
       }
 
-      if (budget.status === "reserved") {
-        startDownload(run, budget.track);
-      }
+      if (next.status !== "reserved") break;
+
+      startDownload(run, next.track);
     }
 
     finishIfIdle(run);

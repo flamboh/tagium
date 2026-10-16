@@ -241,4 +241,4 @@ const estimatePlaylistDownloadQueueEtaMs = (queue: PlaylistDownloadQueueState, n
   return Math.round(etaMs);
 };
 
-import { DEFAULT_DOWNLOAD_ADMISSION_COST } from "@/shared/cobalt/downloadAdmissionWindow";
+import { DEFAULT_DOWNLOAD_ADMISSION_COST } from "@/shared/download/downloadAdmissionWindow";

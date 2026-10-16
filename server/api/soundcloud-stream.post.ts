@@ -2,9 +2,9 @@ import { Effect, Schema } from "effect";
 import { defineHandler } from "nitro";
 import { env as processEnv } from "node:process";
 import {
-  getCobaltRequestAdmission,
-  type CobaltAdmissionRuntimeEnv,
-} from "../utils/cobalt-request-admission";
+  getSoundCloudRequestAdmission,
+  type SoundCloudAdmissionRuntimeEnv,
+} from "../utils/download-request-admission";
 import { reportDownloadFailure } from "../utils/download-failure-report";
 import { enforceSameOrigin } from "../utils/same-origin";
 import { decodeRequestBody, urlStringSchema } from "../utils/schema";
@@ -15,7 +15,9 @@ import {
   resolveSoundCloudStream,
 } from "../utils/soundcloud-track";
 
-type SoundCloudStreamRuntimeEnv = { COBALT_ALLOWED_ORIGIN?: string } & CobaltAdmissionRuntimeEnv;
+type SoundCloudStreamRuntimeEnv = {
+  COBALT_ALLOWED_ORIGIN?: string;
+} & SoundCloudAdmissionRuntimeEnv;
 
 type CloudflareRequest = Request & {
   runtime?: { cloudflare?: { env?: SoundCloudStreamRuntimeEnv } };
@@ -41,7 +43,7 @@ export default defineHandler(async (event) => {
   if (forbidden) return forbidden;
 
   const body = await decodeRequestBody(event.req, streamRequestSchema);
-  const admission = getCobaltRequestAdmission(event.req, runtimeEnv);
+  const admission = getSoundCloudRequestAdmission(event.req, runtimeEnv);
 
   if (!admission) {
     return new Response("Download admission is unavailable.", {

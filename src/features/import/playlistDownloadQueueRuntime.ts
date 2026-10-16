@@ -8,8 +8,9 @@ import {
   markPlaylistDownloadFailed,
   retryPlaylistDownloadItem,
 } from "@/features/import/playlistDownloadQueue";
-import type { DownloadAdmissionWindow } from "@/shared/cobalt/downloadAdmissionWindow";
+import type { DownloadAdmissionWindow } from "@/shared/download/downloadAdmissionWindow";
 import type {
+  PlaylistDownloadQueueItem,
   PlaylistDownloadQueueState as PlaylistDownloadQueueModel,
   PlaylistDownloadQueueTrack as PlaylistDownloadQueueModelTrack,
 } from "@/features/import/playlistDownloadQueue";
@@ -58,9 +59,17 @@ export type PlaylistDownloadQueueRuntimeSnapshot = {
   waitingForTunnelBudget: boolean;
 };
 
+export type PlaylistDownloadLimits = {
+  concurrency: number;
+  admission: DownloadAdmissionWindow;
+};
+
 export type ReserveNextPlaylistDownloadResult<Track extends PlaylistDownloadRuntimeTrack> =
   | {
       status: "empty";
+    }
+  | {
+      status: "at-capacity";
     }
   | {
       status: "reserved";
@@ -212,7 +221,7 @@ export const enqueuePlaylistDownloadQueueTracks = <Track extends PlaylistDownloa
 
 export const reserveNextPlaylistDownloadTrack = <Track extends PlaylistDownloadRuntimeTrack>(
   run: PlaylistDownloadQueueRun<Track>,
-  admission: DownloadAdmissionWindow,
+  limitsFor: (item: PlaylistDownloadQueueItem) => PlaylistDownloadLimits,
   nowMs: number,
 ): ReserveNextPlaylistDownloadResult<Track> => {
   const nextTrack = run.pending[0];
@@ -228,6 +237,10 @@ export const reserveNextPlaylistDownloadTrack = <Track extends PlaylistDownloadR
   if (!queueItem) {
     throw new Error("playlist download item not found.");
   }
+
+  const { concurrency, admission } = limitsFor(queueItem);
+
+  if (run.active.length >= concurrency) return { status: "at-capacity" };
 
   const budget = admission.reserve(queueItem.tunnelCost, nowMs);
 

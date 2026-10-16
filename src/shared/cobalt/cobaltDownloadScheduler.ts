@@ -1,7 +1,8 @@
 import {
   createDownloadAdmissionWindow,
   DEFAULT_DOWNLOAD_ADMISSION_COST,
-} from "@/shared/cobalt/downloadAdmissionWindow";
+} from "@/shared/download/downloadAdmissionWindow";
+import { createConcurrencyLimiter } from "@/shared/download/concurrencyLimiter";
 
 export type CobaltTunnelWaitCallback = (waiting: boolean) => void;
 
@@ -44,72 +45,11 @@ export const createCobaltDownloadScheduler = ({
   maxConcurrentDownloads?: number;
   tunnelStartIntervalMs?: number;
 } = {}): CobaltDownloadScheduler => {
-  let activeDownloads = 0;
-  const pendingDownloads: Array<() => void> = [];
+  const downloads = createConcurrencyLimiter(maxConcurrentDownloads);
   let nextTunnelStartAt = 0;
   let tunnelStartQueue = Promise.resolve();
   let waitingTunnelStarts = 0;
   const admission = createDownloadAdmissionWindow();
-
-  const releaseDownloadSlot = () => {
-    const next = pendingDownloads.shift();
-
-    if (next) {
-      next();
-
-      return;
-    }
-
-    activeDownloads -= 1;
-  };
-
-  const reserveDownloadSlot = async (signal?: AbortSignal) => {
-    signal?.throwIfAborted();
-
-    if (activeDownloads < maxConcurrentDownloads) {
-      activeDownloads += 1;
-
-      return;
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      const resolveSlot = () => {
-        signal?.removeEventListener("abort", onAbort);
-
-        if (signal?.aborted) {
-          releaseDownloadSlot();
-          reject(signal.reason);
-
-          return;
-        }
-
-        resolve();
-      };
-
-      const onAbort = () => {
-        const pendingIndex = pendingDownloads.indexOf(resolveSlot);
-
-        if (pendingIndex >= 0) {
-          pendingDownloads.splice(pendingIndex, 1);
-        }
-
-        reject(signal?.reason);
-      };
-
-      signal?.addEventListener("abort", onAbort, { once: true });
-      pendingDownloads.push(resolveSlot);
-    });
-  };
-
-  const schedule = async <Value>(work: () => Promise<Value>, signal?: AbortSignal) => {
-    await reserveDownloadSlot(signal);
-
-    try {
-      return await work();
-    } finally {
-      releaseDownloadSlot();
-    }
-  };
 
   const waitForAdmission: CobaltDownloadScheduler["waitForAdmission"] = async ({
     cost = DEFAULT_DOWNLOAD_ADMISSION_COST,
@@ -186,7 +126,7 @@ export const createCobaltDownloadScheduler = ({
     }
   };
 
-  return { schedule, waitForAdmission, waitForTunnelStart };
+  return { schedule: downloads.run, waitForAdmission, waitForTunnelStart };
 };
 
 export let cobaltDownloadScheduler = createCobaltDownloadScheduler();

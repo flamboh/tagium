@@ -8,18 +8,23 @@ export type CloudflareRateLimitBinding = {
   limit: (input: { key: string }) => Promise<{ success: boolean }>;
 };
 
-export type CobaltRequestAdmissionDecision =
+export type DownloadRequestAdmissionDecision =
   | { status: "allowed"; setCookie?: string }
   | { status: "limited"; scope: "session" | "client"; setCookie?: string }
   | { status: "unavailable"; setCookie?: string };
 
-export interface CobaltRequestAdmission {
-  admit: (request: Request) => Promise<CobaltRequestAdmissionDecision>;
+export interface DownloadRequestAdmission {
+  admit: (request: Request) => Promise<DownloadRequestAdmissionDecision>;
 }
 
 export type CobaltAdmissionRuntimeEnv = {
   COBALT_CLIENT_RATE_LIMITER?: CloudflareRateLimitBinding;
   COBALT_SESSION_RATE_LIMITER?: CloudflareRateLimitBinding;
+} & DevControlRuntimeEnv;
+
+export type SoundCloudAdmissionRuntimeEnv = {
+  SOUNDCLOUD_CLIENT_RATE_LIMITER?: CloudflareRateLimitBinding;
+  SOUNDCLOUD_SESSION_RATE_LIMITER?: CloudflareRateLimitBinding;
 } & DevControlRuntimeEnv;
 
 const SESSION_COOKIE_NAME = "tagium_client_id";
@@ -64,13 +69,13 @@ const getSessionIdentity = (request: Request) => {
 const getClientKey = (request: Request) =>
   request.headers.get("cf-connecting-ip") || "unknown-client";
 
-export const createCloudflareCobaltRequestAdmission = ({
+export const createCloudflareDownloadRequestAdmission = ({
   sessionLimiter,
   clientLimiter,
 }: {
   sessionLimiter: CloudflareRateLimitBinding;
   clientLimiter: CloudflareRateLimitBinding;
-}): CobaltRequestAdmission => ({
+}): DownloadRequestAdmission => ({
   admit: async (request) => {
     const session = getSessionIdentity(request);
 
@@ -95,26 +100,47 @@ export const createCloudflareCobaltRequestAdmission = ({
   },
 });
 
-export const createInMemoryCobaltRequestAdmission = (
+export const createInMemoryDownloadRequestAdmission = (
   enforce: (request: Request) => Response | undefined,
-): CobaltRequestAdmission => ({
+): DownloadRequestAdmission => ({
   admit: async (request) =>
     enforce(request) ? { status: "limited", scope: "client" } : { status: "allowed" },
 });
 
 /** Uses Tagium's provisioned admission policy in deployed environments and its dev policy locally. */
-export const getCobaltRequestAdmission = (
+const getDownloadRequestAdmission = (
   request: Request,
-  runtimeEnv: CobaltAdmissionRuntimeEnv,
-): CobaltRequestAdmission | undefined => {
-  if (runtimeEnv.COBALT_SESSION_RATE_LIMITER && runtimeEnv.COBALT_CLIENT_RATE_LIMITER) {
-    return createCloudflareCobaltRequestAdmission({
-      sessionLimiter: runtimeEnv.COBALT_SESSION_RATE_LIMITER,
-      clientLimiter: runtimeEnv.COBALT_CLIENT_RATE_LIMITER,
-    });
+  runtimeEnv: DevControlRuntimeEnv,
+  sessionLimiter: CloudflareRateLimitBinding | undefined,
+  clientLimiter: CloudflareRateLimitBinding | undefined,
+): DownloadRequestAdmission | undefined => {
+  if (sessionLimiter && clientLimiter) {
+    return createCloudflareDownloadRequestAdmission({ sessionLimiter, clientLimiter });
   }
 
   return getDeployEnv(request, runtimeEnv).deployEnv === "local"
-    ? createInMemoryCobaltRequestAdmission(enforceRateLimit)
+    ? createInMemoryDownloadRequestAdmission(enforceRateLimit)
     : undefined;
 };
+
+export const getCobaltRequestAdmission = (
+  request: Request,
+  runtimeEnv: CobaltAdmissionRuntimeEnv,
+) =>
+  getDownloadRequestAdmission(
+    request,
+    runtimeEnv,
+    runtimeEnv.COBALT_SESSION_RATE_LIMITER,
+    runtimeEnv.COBALT_CLIENT_RATE_LIMITER,
+  );
+
+export const getSoundCloudRequestAdmission = (
+  request: Request,
+  runtimeEnv: SoundCloudAdmissionRuntimeEnv,
+) =>
+  getDownloadRequestAdmission(
+    request,
+    runtimeEnv,
+    runtimeEnv.SOUNDCLOUD_SESSION_RATE_LIMITER,
+    runtimeEnv.SOUNDCLOUD_CLIENT_RATE_LIMITER,
+  );
