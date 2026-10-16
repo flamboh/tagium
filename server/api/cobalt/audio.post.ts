@@ -666,10 +666,6 @@ export default defineHandler(async (event) => {
       });
     }
 
-    if (error instanceof Error) {
-      return cobaltErrorResponse(error.message);
-    }
-
-    return cobaltErrorResponse("Download failed.");
+    return cobaltErrorResponse("error.api.handler_failure");
   }
 });

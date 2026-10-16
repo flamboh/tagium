@@ -9,11 +9,15 @@ const copy = {
   busy: "downloads are busy. try again in a moment.",
   rateLimited: "too many download requests. try again shortly.",
   timeout: "download timed out. try again.",
-  unavailable: "downloads are temporarily unavailable.",
+  serviceUnavailable: "downloads are temporarily unavailable.",
   unexpected: "the media provider returned an unexpected response.",
   unsupported: "this link is not supported.",
   missing: "media is private, unavailable, or no longer exists.",
+  unavailable: "unavailable or blocked by youtube.",
   drm: "this media is drm-protected and can't be downloaded.",
+  preview: "only a go+ preview is available.",
+  blocked: "youtube is blocking downloads. try again later.",
+  expired: "download link expired. try again.",
 };
 
 type Failure = {
@@ -40,7 +44,7 @@ const failures: Failure[] = [
   },
   {
     name: "an unreachable download service",
-    message: copy.unavailable,
+    message: copy.serviceUnavailable,
     retryable: true,
     arrange: soundcloudFailing("error.api.unreachable", 500),
   },
@@ -77,10 +81,44 @@ const failures: Failure[] = [
     },
   },
   {
-    name: "a missing youtube video",
-    message: copy.missing,
+    name: "an unavailable youtube video",
+    message: copy.unavailable,
     retryable: false,
     arrange: async (upstreams) => (await upstreams.youtube.missingVideo()).url,
+  },
+  {
+    name: "a missing soundcloud track",
+    message: copy.missing,
+    retryable: false,
+    arrange: soundcloudFailing("error.api.fetch.soundcloud.resolve_fetch.404"),
+  },
+  {
+    name: "a soundcloud go+ preview",
+    message: copy.preview,
+    retryable: false,
+    arrange: soundcloudFailing("error.api.content.paid"),
+  },
+  {
+    name: "youtube blocking downloads",
+    message: copy.blocked,
+    retryable: true,
+    arrange: async (upstreams) => {
+      const video = await upstreams.youtube.video({ cover: null });
+      await upstreams.cobalt.fail(video.url, "error.api.youtube.login");
+
+      return video.url;
+    },
+  },
+  {
+    name: "an expired download link",
+    message: copy.expired,
+    retryable: true,
+    arrange: async (upstreams) => {
+      const track = await upstreams.soundcloud.track({ cover: null });
+      await upstreams.cobalt.tunnel(track.url, { kind: "status", status: 404 });
+
+      return track.url;
+    },
   },
   {
     name: "a private youtube video",

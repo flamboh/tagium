@@ -211,11 +211,15 @@ const createLibAV = async () =>
   });
 
 const errorMessage = (error) => {
-  if (error instanceof Error) {
+  if (!(error instanceof Error)) {
+    return "local audio processing failed.";
+  }
+
+  if (error.message.startsWith("local audio processing")) {
     return error.message;
   }
 
-  return "local audio processing failed.";
+  return `local audio processing failed: ${error.message}`;
 };
 
 export const processLocalAudio = async (request) => {

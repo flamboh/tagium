@@ -315,7 +315,7 @@ describe("soundcloud stream endpoint", () => {
       response = await call();
     });
 
-    expect(await response?.text()).toBe("error.api.content.video.unavailable");
+    expect(await response?.text()).toBe("error.api.content.post.unavailable");
     expect(events).toHaveLength(0);
   });
 });

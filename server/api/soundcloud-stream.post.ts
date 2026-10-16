@@ -34,7 +34,7 @@ const getRuntimeEnv = (request: Request): SoundCloudStreamRuntimeEnv => ({
 const errorResponse = (code: string) =>
   new Response(code, { status: 502, headers: { "Content-Type": "text/plain;charset=UTF-8" } });
 
-const isUnreportedCode = (code: string) => code === "error.api.content.video.unavailable";
+const isUnreportedCode = (code: string) => code === "error.api.content.post.unavailable";
 
 export default defineHandler(async (event) => {
   const runtimeEnv = getRuntimeEnv(event.req);

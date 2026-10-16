@@ -6,6 +6,7 @@ import {
   MAX_CONTENT_TITLE_LENGTH,
   normalizeContentTitle,
 } from "@/features/share/shareContentTitle";
+import { systemFailureCodes, type SystemFailureCode } from "@/shared/systemFailure";
 
 export type { MediaLinkKind } from "@/lib/media-link";
 
@@ -59,19 +60,7 @@ export type DownloadFailureStage = "planning" | "tunnel" | "processing" | "final
 
 export type ImportFailureStage = "plan" | "tunnel" | "processing" | "hydration";
 
-export type ImportFailureCode =
-  | "capacity"
-  | "rate_limited"
-  | "service_unavailable"
-  | "timeout"
-  | "fetch_failed"
-  | "empty_response"
-  | "parse_failed"
-  | "metadata_write_failed"
-  | "unsupported_source"
-  | "private_or_missing"
-  | "invalid_response"
-  | "unknown";
+export type ImportFailureCode = SystemFailureCode;
 
 export type CobaltTunnelOutcome = "ready" | "recovered" | "exhausted" | "non_retryable";
 
@@ -81,17 +70,7 @@ export type CobaltTunnelElapsedBucket =
   | "5_to_15_seconds"
   | "15_seconds_or_more";
 
-export type AnalyticsErrorCode =
-  | "capacity"
-  | "rate_limited"
-  | "service_unavailable"
-  | "timeout"
-  | "parse_failed"
-  | "metadata_write_failed"
-  | "unsupported_source"
-  | "private_or_missing"
-  | "invalid_response"
-  | "unknown";
+export type AnalyticsErrorCode = SystemFailureCode | "metadata_write_failed";
 
 const MEDIA_LINK_KIND_PROPERTY = "shape";
 
@@ -650,20 +629,7 @@ const isImportOutcome = isOneOf(["completed", "partial", "failed", "canceled"] a
 
 const isImportFailureStage = isOneOf(["plan", "tunnel", "processing", "hydration"] as const);
 
-const isImportFailureCode = isOneOf([
-  "capacity",
-  "rate_limited",
-  "service_unavailable",
-  "timeout",
-  "fetch_failed",
-  "empty_response",
-  "parse_failed",
-  "metadata_write_failed",
-  "unsupported_source",
-  "private_or_missing",
-  "invalid_response",
-  "unknown",
-] as const);
+const isImportFailureCode = isOneOf(systemFailureCodes);
 
 const isNonNegativeInteger = (value: AnalyticsProperty) =>
   isNumber(value) && Number.isInteger(value) && value >= 0;
@@ -737,18 +703,7 @@ const isDownloadFailureStage = isOneOf(["planning", "tunnel", "processing", "fin
 
 const isExportKind = isOneOf(["track", "album", "library"] as const);
 
-const isAnalyticsErrorCode = isOneOf([
-  "capacity",
-  "rate_limited",
-  "service_unavailable",
-  "timeout",
-  "parse_failed",
-  "metadata_write_failed",
-  "unsupported_source",
-  "private_or_missing",
-  "invalid_response",
-  "unknown",
-] as const);
+const isAnalyticsErrorCode = isOneOf([...systemFailureCodes, "metadata_write_failed"] as const);
 
 const isSizeBucket = isOneOf([
   "under_10_mb",
