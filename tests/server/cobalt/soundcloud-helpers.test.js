@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   buildSoundCloudFailureCode,
   isSoundCloudResolvePayload,
+  unplayableSoundCloudError,
 } from "../../../cobalt-soundcloud-helpers.mjs";
 
 describe("Cobalt SoundCloud adapter helpers", () => {
@@ -29,5 +30,17 @@ describe("Cobalt SoundCloud adapter helpers", () => {
     ).toBe(
       "fetch.soundcloud.resolve_fetch.contentType-application/json.retryAfter-30.errorType-TypeError",
     );
+  });
+
+  it("reports drm only when every stream is encrypted", () => {
+    const stream = (protocol) => ({ preset: "aac_160k", format: { protocol } });
+
+    expect(
+      unplayableSoundCloudError([stream("ctr-encrypted-hls"), stream("cbc-encrypted-hls")]),
+    ).toBe("soundcloud.maybe_drm");
+    expect(unplayableSoundCloudError([stream("ctr-encrypted-hls"), stream("hls")])).toBe(
+      "soundcloud.no_stream",
+    );
+    expect(unplayableSoundCloudError([])).toBe("soundcloud.no_stream");
   });
 });

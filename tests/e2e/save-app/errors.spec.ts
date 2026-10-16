@@ -15,6 +15,7 @@ const copy = {
   missing: "media is private, unavailable, or no longer exists.",
   unavailable: "unavailable or blocked by youtube.",
   drm: "this media is drm-protected and can't be downloaded.",
+  noStream: "soundcloud has no downloadable stream for this track.",
   preview: "only a go+ preview is available.",
   blocked: "youtube is blocking downloads. try again later.",
   expired: "download link expired. try again.",
@@ -132,10 +133,16 @@ const failures: Failure[] = [
     },
   },
   {
-    name: "drm-protected soundcloud audio",
+    name: "soundcloud audio with only encrypted streams",
     message: copy.drm,
     retryable: false,
     arrange: soundcloudFailing("error.api.soundcloud.maybe_drm"),
+  },
+  {
+    name: "soundcloud audio with no playable stream",
+    message: copy.noStream,
+    retryable: false,
+    arrange: soundcloudFailing("error.api.soundcloud.no_stream"),
   },
   {
     name: "a drm-protected youtube video",

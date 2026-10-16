@@ -372,10 +372,10 @@ const failureCases: FailureCase[] = [
   {
     name: "a soundcloud track without a playable stream",
     arrange: (upstreams) => upstreams.soundcloud.track({ transcodings: "legacy" }),
-    title: "we could not read this media",
-    detail: "the media provider returned an unexpected response.",
-    toast: "the provider returned an unexpected response. try again or use another link.",
-    retryable: true,
+    title: "soundcloud has no downloadable stream for this track",
+    detail: "soundcloud has no downloadable stream for this track.",
+    toast: "try another track.",
+    retryable: false,
     cobaltCalls: 0,
   },
   {

@@ -24,6 +24,7 @@ const cases: Array<{ message: string; code: SystemFailureCode; retryable: boolea
   { message: "unsupported url", code: "unsupported_source", retryable: false },
   { message: "error.api.soundcloud.maybe_drm", code: "drm_protected", retryable: false },
   { message: "error.api.youtube.drm", code: "drm_protected", retryable: false },
+  { message: "error.api.soundcloud.no_stream", code: "no_stream", retryable: false },
   { message: "error.api.content.paid", code: "paid_preview", retryable: false },
   { message: "error.api.content.region", code: "region_locked", retryable: false },
   { message: "error.api.content.video.region", code: "region_locked", retryable: false },

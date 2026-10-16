@@ -3,6 +3,7 @@ import { resolveRedirectingURL } from "../url.js";
 import {
   buildSoundCloudFailureCode,
   isSoundCloudResolvePayload,
+  unplayableSoundCloudError,
 } from "../../../cobalt-soundcloud-helpers.mjs";
 
 const cachedClient = { version: "", id: "" };
@@ -197,9 +198,7 @@ export default async function soundcloud(input) {
 
   if (json.policy === "SNIP") return { error: "content.paid" };
 
-  if (!Array.isArray(json.media?.transcodings) || !json.media.transcodings.length) {
-    return { error: "fetch.empty" };
-  }
+  if (!Array.isArray(json.media?.transcodings)) return { error: "soundcloud.no_stream" };
 
   let bestAudio = "opus";
   let selectedStream = findBestForPreset(json.media.transcodings, "opus");
@@ -217,7 +216,7 @@ export default async function soundcloud(input) {
     bestAudio = "m4a";
   }
 
-  if (!selectedStream) return { error: "fetch.empty" };
+  if (!selectedStream) return { error: unplayableSoundCloudError(json.media.transcodings) };
 
   const streamUrl = new URL(selectedStream.url);
   streamUrl.searchParams.set("client_id", clientId);
