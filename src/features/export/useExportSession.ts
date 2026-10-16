@@ -364,7 +364,7 @@ export const useExportSession = ({
         setExporting(false);
       }
     },
-    [prepareFiles, projectExportFiles, writeFiles],
+    [prepareFiles, projectExportFiles, setExporting, writeFiles],
   );
 
   const rememberConfirmationTrigger = useCallback(() => {
@@ -499,7 +499,7 @@ export const useExportSession = ({
         setExporting(false);
       }
     },
-    [library, updateTags],
+    [library, setExporting, updateTags],
   );
 
   const downloadTrack = useCallback<SubmitHandler<AudioMetadata>>(
