@@ -80,4 +80,14 @@ describe("soundcloud set resolution", () => {
 
     expect(error).toMatchObject({ status: 502, message: "soundcloud.no_resolvable_tracks" });
   });
+
+  it("stays retryable when set entries can't be decoded", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    stubSoundCloud([{ id: 7, kind: "track", duration: "not a number" }], []);
+
+    const error = await resolveSoundCloudSet(setUrl, context).catch((cause: unknown) => cause);
+
+    expect(error).toMatchObject({ status: 502, message: "soundcloud.no_resolvable_tracks" });
+  });
 });

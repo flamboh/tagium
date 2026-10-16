@@ -549,7 +549,7 @@ export const createAudioUrlImportSession = ({
             endpoint.searchParams.set("url", trimmedUrl);
             shortLinkLookupFailed = true;
             const response = await fetch(endpoint);
-            shortLinkLookupFailed = response.status >= 500;
+            shortLinkLookupFailed = response.status !== 422;
 
             if (response.ok) {
               const candidateResult = Option.getOrNull(
@@ -557,6 +557,7 @@ export const createAudioUrlImportSession = ({
               );
 
               if (candidateResult) {
+                shortLinkLookupFailed = false;
                 const reparsed = parseMediaLink(candidateResult.canonicalUrl);
 
                 if (reparsed.kind !== "unsupported") {

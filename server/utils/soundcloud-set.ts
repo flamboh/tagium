@@ -172,7 +172,7 @@ const resolveTracks = async (
   }> = [];
 
   let failedTracks = decodeFailures;
-  let transientFailures = 0;
+  let transientFailures = decodeFailures;
 
   const failuresByStage: Record<string, number> = decodeFailures
     ? { "track.entry_parse": decodeFailures }
