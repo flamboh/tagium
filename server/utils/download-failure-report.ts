@@ -29,6 +29,7 @@ const warningErrorCodes = new Set([
   "error.api.content.region",
   "error.api.content.paid",
   "error.api.content.video.unavailable",
+  "error.api.soundcloud.maybe_drm",
 ]);
 
 export const downloadServiceFromUrl = (sourceUrl: string | undefined) =>

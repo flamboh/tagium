@@ -190,7 +190,7 @@ describe("soundcloud stream endpoint", () => {
     ]);
   });
 
-  it("treats tracks with only encrypted streams as drm-protected", async () => {
+  it("reports tracks with only encrypted streams as a drm warning", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     stubSoundCloud(
       trackJson({
@@ -199,10 +199,14 @@ describe("soundcloud stream endpoint", () => {
         },
       }),
     );
+    let response: Response | undefined;
 
-    const response = await call();
+    const events = await captureSentryEvents(async () => {
+      response = await call();
+    });
 
-    expect(await response.text()).toBe("error.api.soundcloud.maybe_drm");
+    expect(await response?.text()).toBe("error.api.soundcloud.maybe_drm");
+    expect(events.map((event) => event.level)).toEqual(["warning"]);
   });
 
   it("reports unusable playlists as an error-level event", async () => {
