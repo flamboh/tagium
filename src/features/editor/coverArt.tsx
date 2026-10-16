@@ -58,7 +58,7 @@ const coverArtClasses = {
     uploadRow:
       "flex w-[min(80vw,clamp(7.5rem,calc(75svh-25.3125rem),19.25rem))] max-lg:[@media(max-height:700px)]:w-24 lg:w-auto lg:flex-1 lg:flex-col lg:gap-2",
     uploadButton:
-      "h-10 w-full border-dashed border-2 flex gap-2 px-3 hover:bg-accent/50 cursor-pointer max-lg:[@media(max-height:700px)]:gap-1 lg:h-auto lg:min-h-24 lg:w-64 lg:flex-1 lg:flex-col",
+      "h-10 w-full border-dashed border-2 flex gap-2 px-3 hover:bg-accent/50 cursor-pointer max-lg:[@media(max-height:700px)]:gap-1 lg:h-auto lg:min-h-24 lg:max-h-30 lg:w-64 lg:flex-1 lg:flex-col",
     uploadIcon:
       "h-6 w-6 text-muted-foreground max-lg:[@media(max-height:700px)]:h-4 max-lg:[@media(max-height:700px)]:w-4",
   },

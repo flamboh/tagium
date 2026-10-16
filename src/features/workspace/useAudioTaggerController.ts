@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { getMediaUrlEntryPresentation } from "@/features/import/mediaUrlEntryPresentation";
 import { useMediaUrlEntryController } from "@/features/import/useMediaUrlEntryController";
+import { useTrackAnalysis } from "@/features/analysis/useTrackAnalysis";
 import { useExportSession } from "@/features/export/useExportSession";
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
@@ -41,6 +42,13 @@ export function useAudioTaggerController() {
       if (target.kind === "album") void exporting.exportAlbum(target.albumId);
       else void exporting.exportTrack(target.trackId);
     },
+  });
+
+  const analysis = useTrackAnalysis({
+    library,
+    settings,
+    exporting: exporting.exporting,
+    isExportRunning: exporting.isExportRunning,
   });
 
   const sharing = useShareWorkflow({ library, editor, importing, enabled: shareLinksEnabled });
@@ -107,6 +115,7 @@ export function useAudioTaggerController() {
     library,
     settings,
     editor,
+    analysis,
     activeView,
     exporting,
     importing,

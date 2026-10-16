@@ -170,6 +170,8 @@ export type AnalyticsEvent =
       applySoundCloudCover: boolean;
       downloadAfterImport: boolean;
       advancedMetadata: boolean;
+      djAnalysis: boolean;
+      keyNotation: "standard" | "camelot" | "both";
       metadataLinks: MetadataLinkState;
     }
   | {
@@ -457,6 +459,8 @@ const CUSTOM_EVENT_PROPERTIES = {
     "apply_soundcloud_cover",
     "download_after_import",
     "advanced_metadata",
+    "dj_analysis",
+    "key_notation",
     ...METADATA_LINK_DESCRIPTORS.map((descriptor) => descriptor.analyticsProperty),
   ]),
   album_created: new Set([...COMMON_CUSTOM_PROPERTIES, "track_count", "has_cover"]),
@@ -1193,6 +1197,8 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
           apply_soundcloud_cover: event.applySoundCloudCover,
           download_after_import: event.downloadAfterImport,
           advanced_metadata: event.advancedMetadata,
+          dj_analysis: event.djAnalysis,
+          key_notation: event.keyNotation,
           ...serializeMetadataLinkAnalytics(event.metadataLinks),
         },
       };

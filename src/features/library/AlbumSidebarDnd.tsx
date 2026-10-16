@@ -1,5 +1,6 @@
 "use client";
 
+import { describeProcessingTracks } from "@/features/analysis/analysisProgress";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { useDroppable } from "@dnd-kit/core";
@@ -312,6 +313,8 @@ type AlbumCardProps = {
   album: AlbumGroup;
   selected: boolean;
   canDownload: boolean;
+  /** Album tracks still waiting on bpm and key detection; the download still works. */
+  processingCount: number;
   cleanupSuggestionCount: number;
   actions: AlbumActionItem[];
   spotlight?: ActionSpotlight<AlbumActionItemId> | null;
@@ -369,6 +372,7 @@ export function SortableAlbumCard({
   album,
   selected,
   canDownload,
+  processingCount,
   cleanupSuggestionCount,
   actions,
   spotlight,
@@ -436,12 +440,25 @@ export function SortableAlbumCard({
                 disabled={!canDownload}
                 aria-label={`download ${album.title}`}
               >
-                <HugeiconsIcon icon={Download01Icon} strokeWidth={2} className="h-3.5 w-3.5" />
+                <HugeiconsIcon
+                  icon={canDownload && processingCount > 0 ? loaderCircleIcon : Download01Icon}
+                  strokeWidth={2}
+                  className={cn(
+                    "h-3.5 w-3.5",
+                    canDownload &&
+                      processingCount > 0 &&
+                      "animate-spin text-muted-foreground motion-reduce:animate-none",
+                  )}
+                />
               </Button>
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            {canDownload ? "download album" : "album tracks need files, metadata, and filenames"}
+            {!canDownload
+              ? "album tracks need files, metadata, and filenames"
+              : processingCount > 0
+                ? describeProcessingTracks(processingCount)
+                : "download album"}
           </TooltipContent>
         </Tooltip>
         <SpotlitActionMenu

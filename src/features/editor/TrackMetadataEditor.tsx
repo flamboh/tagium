@@ -1,5 +1,8 @@
 "use client";
 
+import { HugeiconsIcon } from "@hugeicons/react";
+import { loaderCircleIcon } from "@/components/icons/loaderCircle";
+import { describeProcessingTracks } from "@/features/analysis/analysisProgress";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode, RefObject, TransitionEvent } from "react";
 import {
@@ -36,6 +39,7 @@ import {
 import { getTrackFailureDisplay } from "@/shared/systemFailure";
 import type { AlbumGroup, AudioMetadata, TagiumFile, TrackClip } from "@/features/library/types";
 import { getAudioFormat } from "@/features/audio/audioFormat";
+import { getAlternateKeySpelling, type KeyNotation } from "@/features/analysis/musicalKey";
 import {
   getMetadataLinkDescriptor,
   type MetadataLinkState,
@@ -65,6 +69,10 @@ interface TrackMetadataEditorProps {
   selectedFileAlbum: AlbumGroup | undefined;
   syncFilenames: boolean;
   advancedMetadata: boolean;
+  djAnalysis: boolean;
+  keyNotation: KeyNotation;
+  /** Whether tempo and key detection is still queued or running for the selected track. */
+  analysisPending: boolean;
   metadataLinks: MetadataLinkState;
   onPreviewMetadataChange: (
     field: "filename" | "title" | "artist",
@@ -445,9 +453,11 @@ interface AdvancedFieldRegistrations {
 function BpmField({
   registration,
   error,
+  detecting = false,
 }: {
   registration: UseFormRegisterReturn<"bpm">;
   error: string | undefined;
+  detecting?: boolean;
 }) {
   return (
     <div>
@@ -462,7 +472,8 @@ function BpmField({
         label="bpm"
         aria-invalid={Boolean(error)}
         aria-describedby={error ? "track-bpm-error" : undefined}
-        placeholder="120"
+        aria-busy={detecting}
+        placeholder={detecting ? "detecting" : "120"}
         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
       />
       {error && (
@@ -478,17 +489,43 @@ function BpmField({
   );
 }
 
-function KeyField({ registration }: { registration: UseFormRegisterReturn<"musicalKey"> }) {
+const alternateKeyLabels = { standard: "standard", camelot: "camelot" } as const;
+
+function KeyField({
+  registration,
+  detecting = false,
+  alternate,
+}: {
+  registration: UseFormRegisterReturn<"musicalKey">;
+  detecting?: boolean;
+  /** The key's other notation, shown beside the tagged spelling. */
+  alternate?: ReturnType<typeof getAlternateKeySpelling>;
+}) {
   return (
-    <FloatingLabelInput
-      {...registration}
-      id="track-key"
-      label="key"
-      placeholder="Am"
-      autoCapitalize="off"
-      autoCorrect="off"
-      spellCheck={false}
-    />
+    <div className="relative">
+      <FloatingLabelInput
+        {...registration}
+        id="track-key"
+        label="key"
+        aria-busy={detecting}
+        aria-describedby={alternate ? "track-key-alternate" : undefined}
+        placeholder={detecting ? "detecting" : "Am"}
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
+        className={alternate ? "pr-14" : undefined}
+      />
+      {alternate && (
+        <span
+          id="track-key-alternate"
+          data-key-alternate
+          className="pointer-events-none absolute right-3 bottom-2 text-sm text-muted-foreground"
+        >
+          <span className="sr-only">{alternateKeyLabels[alternate.style]} notation </span>
+          {alternate.text}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -497,12 +534,15 @@ function AdvancedTrackDetailsFields({
   errors,
   albumArtistLinked,
   linkedArtistValue,
+  showDjFields,
   onFieldsMount,
 }: {
   registrations: AdvancedFieldRegistrations;
   errors: FieldErrors<AudioMetadata>;
   albumArtistLinked: boolean;
   linkedArtistValue: string;
+  /** False when the dj fields have their own row outside the advanced pane. */
+  showDjFields: boolean;
   onFieldsMount?: (node: HTMLDivElement | null) => void;
 }) {
   const albumArtistReason = getMetadataLinkDescriptor("albumArtist").disabledReason;
@@ -533,7 +573,10 @@ function AdvancedTrackDetailsFields({
           </p>
         )}
       </div>
-      <div ref={onFieldsMount} className="grid grid-cols-3 gap-2">
+      <div
+        ref={onFieldsMount}
+        className={showDjFields ? "grid grid-cols-3 gap-2" : "grid grid-cols-1 gap-2"}
+      >
         <div>
           <FloatingLabelInput
             type="number"
@@ -559,8 +602,12 @@ function AdvancedTrackDetailsFields({
             </p>
           )}
         </div>
-        <BpmField registration={registrations.bpm} error={errors.bpm?.message} />
-        <KeyField registration={registrations.musicalKey} />
+        {showDjFields && (
+          <>
+            <BpmField registration={registrations.bpm} error={errors.bpm?.message} />
+            <KeyField registration={registrations.musicalKey} />
+          </>
+        )}
       </div>
       <FloatingLabelInput
         {...registrations.composer}
@@ -579,14 +626,64 @@ function AdvancedTrackDetailsFields({
   );
 }
 
+/** The row of dj tags shown in every editor mode while dj analysis is on. */
+function DjTrackFields({
+  control,
+  registrations,
+  bpmError,
+  keyNotation,
+  analysisPending,
+}: {
+  control: Control<AudioMetadata>;
+  registrations: Pick<AdvancedFieldRegistrations, "bpm" | "musicalKey">;
+  bpmError: string | undefined;
+  keyNotation: KeyNotation;
+  analysisPending: boolean;
+}) {
+  const bpm = useWatch({ control, name: "bpm" });
+  const musicalKey = useWatch({ control, name: "musicalKey" }) ?? "";
+
+  return (
+    <div data-dj-fields className="grid grid-cols-2 gap-2">
+      <BpmField
+        registration={registrations.bpm}
+        error={bpmError}
+        detecting={analysisPending && (bpm ?? null) === null}
+      />
+      <KeyField
+        registration={registrations.musicalKey}
+        detecting={analysisPending && musicalKey === ""}
+        alternate={keyNotation === "both" ? getAlternateKeySpelling(musicalKey) : undefined}
+      />
+    </div>
+  );
+}
+
+/** The tag errors that block a download, limited to the fields the editor currently shows. */
+const getDownloadValidationErrors = (
+  values: AudioMetadata,
+  advancedMetadata: boolean,
+  djAnalysis: boolean,
+) => {
+  if (!advancedMetadata && !djAnalysis) return undefined;
+  const errors = getAdvancedMetadataValidationErrors(values);
+  const discNumber = advancedMetadata ? errors.discNumber : undefined;
+
+  if (!discNumber && !errors.bpm) return undefined;
+
+  return { discNumber, bpm: errors.bpm, field: discNumber ? "discNumber" : "bpm" } as const;
+};
+
 const useAdvancedMetadataFormBoundary = ({
   register,
   control,
   enabled,
+  bpmEnabled,
 }: {
   register: UseFormRegister<AudioMetadata>;
   control: Control<AudioMetadata>;
   enabled: boolean;
+  bpmEnabled: boolean;
 }) => {
   const registrations: AdvancedFieldRegistrations = {
     albumArtist: register("albumArtist"),
@@ -597,7 +694,7 @@ const useAdvancedMetadataFormBoundary = ({
     composer: register("composer"),
     bpm: register("bpm", {
       ...nullableNumberRegistration,
-      validate: (value) => !enabled || validateBpm(value),
+      validate: (value) => !bpmEnabled || validateBpm(value),
     }),
     musicalKey: register("musicalKey", { setValueAs: (value: string) => value.trim() }),
     comment: register("comment"),
@@ -631,22 +728,46 @@ function DownloadTrackButton({
   onClick,
   disabled,
   disabledReason,
+  processing,
 }: {
   onClick: () => void;
   disabled: boolean;
   disabledReason: string;
+  /** The track's bpm and key detection hasn't finished; downloading still works. */
+  processing: boolean;
 }) {
+  const showProcessing = processing && !disabled;
+
+  const button = (
+    <Button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="min-w-36 max-lg:[@media(max-height:700px)]:h-10 max-lg:[@media(max-height:700px)]:text-xs"
+    >
+      {showProcessing && (
+        <HugeiconsIcon
+          icon={loaderCircleIcon}
+          strokeWidth={2}
+          aria-hidden="true"
+          className="animate-spin motion-reduce:animate-none"
+        />
+      )}
+      download track
+    </Button>
+  );
+
   return (
     <div className="flex items-center justify-end gap-2">
       <DisabledReason disabled={disabled} reason={disabledReason}>
-        <Button
-          type="button"
-          onClick={onClick}
-          disabled={disabled}
-          className="min-w-36 max-lg:[@media(max-height:700px)]:h-10 max-lg:[@media(max-height:700px)]:text-xs"
-        >
-          download track
-        </Button>
+        {showProcessing ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{button}</TooltipTrigger>
+            <TooltipContent>{describeProcessingTracks(1)}</TooltipContent>
+          </Tooltip>
+        ) : (
+          button
+        )}
       </DisabledReason>
     </div>
   );
@@ -854,6 +975,9 @@ function LoadedTrackMetadataEditor({
   selectedFileAlbum,
   syncFilenames,
   advancedMetadata,
+  djAnalysis,
+  keyNotation,
+  analysisPending,
   metadataLinks,
   onPreviewMetadataChange,
   editorMode,
@@ -889,6 +1013,7 @@ function LoadedTrackMetadataEditor({
     register,
     control,
     enabled: advancedMetadata,
+    bpmEnabled: advancedMetadata || djAnalysis,
   });
 
   const pendingAdvancedFocusRef = useRef<"discNumber" | "bpm" | null>(null);
@@ -927,30 +1052,26 @@ function LoadedTrackMetadataEditor({
   const downloadDisabledReason = getDownloadDisabledReason(isTrackCoverProcessing, filenameInvalid);
 
   const submitDownload = () => {
-    if (advancedMetadata) {
-      const validationErrors = getAdvancedMetadataValidationErrors(getValues());
-      clearErrors(["discNumber", "bpm"]);
+    const invalid = getDownloadValidationErrors(getValues(), advancedMetadata, djAnalysis);
 
-      if (validationErrors.discNumber || validationErrors.bpm) {
-        if (validationErrors.discNumber) {
-          setError("discNumber", { type: "validate", message: validationErrors.discNumber });
-        }
+    clearErrors(["discNumber", "bpm"]);
 
-        if (validationErrors.bpm) {
-          setError("bpm", { type: "validate", message: validationErrors.bpm });
-        }
-
-        const invalidField = validationErrors.discNumber ? "discNumber" : "bpm";
-
-        if (editorMode === "advanced") {
-          setFocus(invalidField, { shouldSelect: true });
-        } else {
-          pendingAdvancedFocusRef.current = invalidField;
-          changeEditorMode("advanced");
-        }
-
-        return;
+    if (invalid) {
+      if (invalid.discNumber) {
+        setError("discNumber", { type: "validate", message: invalid.discNumber });
       }
+
+      if (invalid.bpm) setError("bpm", { type: "validate", message: invalid.bpm });
+
+      // With dj analysis on, bpm sits in its own row and is visible in either mode.
+      if (editorMode === "advanced" || (invalid.field === "bpm" && djAnalysis)) {
+        setFocus(invalid.field, { shouldSelect: true });
+      } else {
+        pendingAdvancedFocusRef.current = invalid.field;
+        changeEditorMode("advanced");
+      }
+
+      return;
     }
 
     void onDownloadUpdatedFile(getValues());
@@ -1049,6 +1170,7 @@ function LoadedTrackMetadataEditor({
                       errors={advancedFields.errors}
                       albumArtistLinked={metadataLinks.albumArtist}
                       linkedArtistValue={linkedAlbumArtistDisplay}
+                      showDjFields={!djAnalysis}
                       onFieldsMount={focusPendingAdvancedField}
                     />
                   </div>
@@ -1059,6 +1181,15 @@ function LoadedTrackMetadataEditor({
                 data-editor-actions
                 className="flex min-w-0 flex-col gap-2 max-lg:[@media(max-height:700px)]:gap-1.5 lg:gap-3"
               >
+                {djAnalysis && (
+                  <DjTrackFields
+                    control={control}
+                    registrations={advancedFields.registrations}
+                    bpmError={advancedFields.errors.bpm?.message}
+                    keyNotation={keyNotation}
+                    analysisPending={analysisPending}
+                  />
+                )}
                 <TrackWaveform
                   key={selectedFile.id}
                   active={viewActive ?? true}
@@ -1073,6 +1204,7 @@ function LoadedTrackMetadataEditor({
                   onClick={submitDownload}
                   disabled={!canDownloadTrack}
                   disabledReason={downloadDisabledReason}
+                  processing={analysisPending}
                 />
               </div>
             </div>

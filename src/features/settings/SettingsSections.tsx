@@ -8,7 +8,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { AppSettings } from "@/features/library/types";
 import SettingsLinkMap from "@/features/settings/SettingsLinkMap";
-import { AUDIO_BITRATE_OPTIONS, AUDIO_FORMAT_OPTIONS } from "@/features/settings/settings";
+import {
+  AUDIO_BITRATE_OPTIONS,
+  AUDIO_FORMAT_OPTIONS,
+  KEY_NOTATION_OPTIONS,
+} from "@/features/settings/settings";
 
 interface SettingsSectionProps {
   settings: AppSettings;
@@ -26,6 +30,18 @@ const audioFormatDescriptions = {
   best: "keeps the original audio without converting it, usually opus from youtube and m4a from soundcloud.",
   mp3: "converts every download to mp3 at the selected bitrate.",
 } as const satisfies Record<AppSettings["audioFormat"], string>;
+
+const keyNotationLabels = {
+  standard: "standard",
+  camelot: "camelot",
+  both: "standard and camelot",
+} as const satisfies Record<AppSettings["keyNotation"], string>;
+
+const keyNotationDescriptions = {
+  standard: "tags note names, with m for minor keys.",
+  camelot: "tags camelot wheel numbers, with a for minor and b for major.",
+  both: "tags the musical name and shows its camelot code beside it.",
+} as const satisfies Record<AppSettings["keyNotation"], string>;
 
 export function ImportingSettingsSection({ settings, onChange }: SettingsSectionProps) {
   const [formatOpen, setFormatOpen] = useState(false);
@@ -185,7 +201,7 @@ export function EditingSettingsSection({ settings, onChange }: SettingsSectionPr
       <div className="space-y-1">
         <h3 className="text-base font-semibold">editing</h3>
         <p className="text-sm leading-5 text-muted-foreground">
-          choose which fields the track editor shows you.
+          choose which fields the track editor shows you and fills in for you.
         </p>
       </div>
       <label className={checkboxRowClassName}>
@@ -207,7 +223,89 @@ export function EditingSettingsSection({ settings, onChange }: SettingsSectionPr
           </span>
         </span>
       </label>
+      <DjAnalysisSettings settings={settings} onChange={onChange} />
     </section>
+  );
+}
+
+/** The tempo and key detection controls shown in the editing section. */
+function DjAnalysisSettings({ settings, onChange }: SettingsSectionProps) {
+  const [notationOpen, setNotationOpen] = useState(false);
+
+  return (
+    <>
+      <label className={checkboxRowClassName}>
+        <Checkbox
+          id="dj-analysis"
+          checked={settings.djAnalysis}
+          onCheckedChange={(checked) =>
+            onChange({
+              ...settings,
+              djAnalysis: checked === true,
+            })
+          }
+          className="mt-0.5"
+        />
+        <span className="space-y-0.5">
+          <span className="block text-sm font-medium leading-5">detect bpm and key</span>
+          <span className="block text-xs leading-5 text-muted-foreground">
+            for dj software. analyzes each track on this device and fills its empty bpm and key
+            fields. tracks longer than 15 minutes are skipped.
+          </span>
+        </span>
+      </label>
+      <div className="flex flex-col gap-2">
+        <span className="text-sm font-medium">key notation</span>
+        <Popover open={notationOpen} onOpenChange={setNotationOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9 w-full justify-between px-2 font-normal"
+              aria-label={`key notation, ${keyNotationLabels[settings.keyNotation]}`}
+              disabled={!settings.djAnalysis}
+            >
+              <span>{keyNotationLabels[settings.keyNotation]}</span>
+              <HugeiconsIcon
+                icon={UnfoldMoreIcon}
+                strokeWidth={2}
+                className="size-4 text-muted-foreground"
+              />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="w-(--radix-popover-trigger-width) p-1"
+            role="group"
+            aria-label="key notation"
+          >
+            {KEY_NOTATION_OPTIONS.map((notation) => (
+              <Button
+                key={notation}
+                type="button"
+                variant="ghost"
+                className={`h-auto min-h-10 w-full justify-start px-2 py-1.5 text-start font-normal ${settings.keyNotation === notation ? "bg-accent text-accent-foreground" : ""}`}
+                aria-pressed={settings.keyNotation === notation}
+                onClick={() => {
+                  onChange({ ...settings, keyNotation: notation });
+                  setNotationOpen(false);
+                }}
+              >
+                <span className="min-w-0 space-y-0.5">
+                  <span className="block text-sm">{keyNotationLabels[notation]}</span>
+                  <span className="block text-xs leading-4 text-muted-foreground">
+                    {keyNotationDescriptions[notation]}
+                  </span>
+                </span>
+              </Button>
+            ))}
+          </PopoverContent>
+        </Popover>
+        <p className="text-xs leading-5 text-muted-foreground">
+          applies to keys detected from now on. keys already on a track are left as they are.
+        </p>
+      </div>
+    </>
   );
 }
 

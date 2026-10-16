@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
-import { formatMusicalKey, parseMusicalKey, type MusicalKey } from "@/features/analysis/musicalKey";
+import {
+  formatDetectedKey,
+  formatMusicalKey,
+  getAlternateKeySpelling,
+  parseMusicalKey,
+  type MusicalKey,
+} from "@/features/analysis/musicalKey";
 
 const wheel: Array<[camelot: string, standard: string]> = [
   ["1A", "G#m"],
@@ -62,5 +68,21 @@ describe("musical key notation", () => {
 
   it.each(["", "H", "h", "13A", "0B", "8C", "A#x", "off"])("rejects %j", (text) => {
     expect(parseMusicalKey(text)).toBeUndefined();
+  });
+
+  it("tags detected keys in the chosen notation, using the standard name for both", () => {
+    const key: MusicalKey = { pitchClass: 6, mode: "minor" };
+    expect(formatDetectedKey(key, "standard")).toBe("F#m");
+    expect(formatDetectedKey(key, "both")).toBe("F#m");
+    expect(formatDetectedKey(key, "camelot")).toBe("11A");
+  });
+
+  it("offers the other notation of a key tag", () => {
+    expect(getAlternateKeySpelling("Am")).toEqual({ style: "camelot", text: "8A" });
+    expect(getAlternateKeySpelling("8A")).toEqual({ style: "standard", text: "Am" });
+    expect(getAlternateKeySpelling("1d")).toEqual({ style: "standard", text: "C" });
+    expect(getAlternateKeySpelling("G minor")).toEqual({ style: "camelot", text: "6A" });
+    expect(getAlternateKeySpelling("")).toBeUndefined();
+    expect(getAlternateKeySpelling("unknown")).toBeUndefined();
   });
 });

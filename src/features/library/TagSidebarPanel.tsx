@@ -27,6 +27,8 @@ export interface TagSidebarPanelProps {
   selectedFileId: string | null;
   selectedFileIds: Set<string>;
   cleanupSuggestionCountByAlbumId: ReadonlyMap<string, number>;
+  /** Tracks whose bpm and key detection is still queued or running. */
+  analysisPendingTrackIds: ReadonlySet<string>;
   settingsOpen: boolean;
   onAudioUpload: (files: File[]) => void;
   onSelectAlbum: (albumId: string, event?: ReactMouseEvent) => void;
@@ -87,6 +89,7 @@ export default function TagSidebarPanel({
   selectedFileId,
   selectedFileIds,
   cleanupSuggestionCountByAlbumId,
+  analysisPendingTrackIds,
   settingsOpen,
   onAudioUpload,
   onSelectAlbum,
@@ -193,6 +196,7 @@ export default function TagSidebarPanel({
         selectedFileId={selectedFileId}
         selectedFileIds={selectedFileIds}
         cleanupSuggestionCountByAlbumId={cleanupSuggestionCountByAlbumId}
+        analysisPendingTrackIds={analysisPendingTrackIds}
         onSelectAlbum={onSelectAlbum}
         onSelectFile={onSelectFile}
         onSelectLooseTrack={onSelectLooseTrack}
@@ -228,6 +232,7 @@ export default function TagSidebarPanel({
         files={files}
         filenamePreviewStore={filenamePreviewStore}
         loading={loading}
+        analysisPendingTrackIds={analysisPendingTrackIds}
         settingsOpen={settingsOpen}
         onDownloadAll={onDownloadAll}
         onOpenSettings={onOpenSettings}

@@ -1,24 +1,89 @@
 import { Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  countProcessingTracks,
+  describeProcessingTracks,
+} from "@/features/analysis/analysisProgress";
 import type { TagSidebarPanelProps } from "@/features/library/TagSidebarPanel";
 import { useLiveTrackFilenameValidity } from "@/features/library/trackFilenamePreview";
 import { cn } from "@/lib/utils";
 
 type FooterProps = Pick<
   TagSidebarPanelProps,
-  "files" | "filenamePreviewStore" | "loading" | "settingsOpen" | "onDownloadAll" | "onOpenSettings"
+  | "files"
+  | "filenamePreviewStore"
+  | "loading"
+  | "analysisPendingTrackIds"
+  | "settingsOpen"
+  | "onDownloadAll"
+  | "onOpenSettings"
 >;
+
+function DownloadAllButton({
+  enabled,
+  loading,
+  disabledReason,
+  processingCount,
+  onDownloadAll,
+}: {
+  enabled: boolean;
+  loading: boolean;
+  disabledReason: string;
+  /** Tracks still waiting on bpm and key detection; the download still works. */
+  processingCount: number;
+  onDownloadAll: () => void;
+}) {
+  const processing = enabled && processingCount > 0;
+
+  const button = (
+    <Button
+      className="w-full [@media(pointer:coarse)]:min-h-11"
+      onClick={onDownloadAll}
+      disabled={!enabled}
+    >
+      {processing && (
+        <HugeiconsIcon
+          icon={loaderCircleIcon}
+          strokeWidth={2}
+          aria-hidden="true"
+          className="animate-spin motion-reduce:animate-none"
+        />
+      )}
+      {loading ? "downloading..." : "download all"}
+    </Button>
+  );
+
+  if (enabled && !processing) return button;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {enabled ? button : <span className="block">{button}</span>}
+      </TooltipTrigger>
+      <TooltipContent>
+        {processing ? describeProcessingTracks(processingCount) : disabledReason}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 export default function TagSidebarFooter({
   files,
   filenamePreviewStore,
   loading,
+  analysisPendingTrackIds,
   settingsOpen,
   onDownloadAll,
   onOpenSettings,
 }: FooterProps) {
+  const processingCount = countProcessingTracks(
+    files.map((file) => file.id),
+    analysisPendingTrackIds,
+  );
+
   const hasValidFilename = useLiveTrackFilenameValidity(filenamePreviewStore);
   const hasInvalidFilename = files.some((file) => file.metadata && !hasValidFilename(file));
 
@@ -35,26 +100,13 @@ export default function TagSidebarFooter({
 
   return (
     <div className="px-3 py-3 border-t flex-shrink-0 flex flex-col gap-2">
-      {canDownloadAll && !loading ? (
-        <Button className="w-full [@media(pointer:coarse)]:min-h-11" onClick={onDownloadAll}>
-          download all
-        </Button>
-      ) : (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="block">
-              <Button
-                className="w-full [@media(pointer:coarse)]:min-h-11"
-                onClick={onDownloadAll}
-                disabled
-              >
-                {loading ? "downloading..." : "download all"}
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{downloadAllReason}</TooltipContent>
-        </Tooltip>
-      )}
+      <DownloadAllButton
+        enabled={canDownloadAll && !loading}
+        loading={loading}
+        disabledReason={downloadAllReason}
+        processingCount={processingCount}
+        onDownloadAll={onDownloadAll}
+      />
       <Button
         variant="outline"
         data-export-focus-fallback

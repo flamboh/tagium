@@ -295,6 +295,40 @@ export function applyTrackOrderNumbersToFiles(
   });
 }
 
+/** Fills a track's empty tempo and key with detected values; values already present win. */
+export function applyDetectedTrackTagsToFiles(
+  files: TagiumFile[],
+  fileId: string,
+  detected: Pick<AudioMetadata, "bpm" | "musicalKey">,
+) {
+  let changed = false;
+
+  const nextFiles = files.map((file) => {
+    if (file.id !== fileId || !file.metadata) return file;
+    const patch: MetadataPatch = {};
+
+    if (file.metadata.bpm === null && detected.bpm !== null) patch.bpm = detected.bpm;
+
+    if (file.metadata.musicalKey === "" && detected.musicalKey !== "") {
+      patch.musicalKey = detected.musicalKey;
+    }
+
+    if (Object.keys(patch).length === 0) return file;
+    changed = true;
+
+    return markPendingMetadataPatch(
+      {
+        ...file,
+        status: file.status === "saved" ? "pending" : file.status,
+        metadata: { ...file.metadata, ...patch },
+      },
+      patch,
+    );
+  });
+
+  return changed ? nextFiles : files;
+}
+
 export function applySyncedFilenamesToFiles(files: TagiumFile[], trackIds?: string[]) {
   const trackIdSet = trackIds ? new Set(trackIds) : undefined;
 
