@@ -563,3 +563,53 @@ describe("Opus metadata driver", () => {
     ).rejects.toBeInstanceOf(AudioMetadataWriteError);
   });
 });
+
+describe("Opus musical key", () => {
+  it("reads a legacy KEY comment, writes INITIALKEY, and clears on empty", async () => {
+    const audioBodies = [Uint8Array.of(0xf8, 0xaa, 0xbb, 0xcc)];
+
+    const original = validOpusBytes({
+      comments: ["TITLE=Title", "KEY=8A", "X-private=opaque value"],
+      audioBodies,
+    });
+
+    const source = blobByteSource(new Blob([original]));
+    expect((await Effect.runPromise(opusDriver.inspect(source))).metadata.musicalKey).toBe("8A");
+
+    const patched = await outputBytes(
+      (await Effect.runPromise(opusDriver.patch(source, { musicalKey: "Am" }))).parts,
+    );
+
+    const patchedText = new TextDecoder().decode(patched);
+    expect(patchedText).toContain("INITIALKEY=Am");
+    expect(patchedText).not.toContain("KEY=8A");
+    expect(patchedText).toContain("X-private=opaque value");
+
+    const inspected = await Effect.runPromise(
+      opusDriver.inspect(blobByteSource(new Blob([patched]))),
+    );
+
+    expect(inspected.metadata).toMatchObject({ title: "Title", musicalKey: "Am" });
+    expect(
+      fixturePages(patched)
+        .slice(-audioBodies.length)
+        .map((page) => page.body),
+    ).toEqual(audioBodies);
+
+    const cleared = await outputBytes(
+      (
+        await Effect.runPromise(
+          opusDriver.patch(blobByteSource(new Blob([patched])), { musicalKey: "" }),
+        )
+      ).parts,
+    );
+
+    expect(new TextDecoder().decode(cleared)).not.toContain("INITIALKEY");
+
+    const clearedInspection = await Effect.runPromise(
+      opusDriver.inspect(blobByteSource(new Blob([cleared]))),
+    );
+
+    expect(clearedInspection.metadata).toMatchObject({ title: "Title", musicalKey: "" });
+  });
+});

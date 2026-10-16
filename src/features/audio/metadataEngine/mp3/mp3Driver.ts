@@ -327,6 +327,7 @@ const ids = {
   trackNumber: ["TRCK", "TRK"],
   discNumber: ["TPOS", "TPA"],
   bpm: ["TBPM", "TBP"],
+  musicalKey: ["TKEY", "TKE"],
   picture: ["APIC", "PIC"],
   dateText: ["TDRC", "TYER", "TYE"],
   trackText: ["TRCK", "TRK"],
@@ -346,6 +347,7 @@ const idSets = {
   trackNumber: new Set(ids.trackNumber),
   discNumber: new Set(ids.discNumber),
   bpm: new Set(ids.bpm),
+  musicalKey: new Set(ids.musicalKey),
   picture: new Set<string>(ids.picture),
   dateText: new Set(ids.dateText),
   trackText: new Set(ids.trackText),
@@ -580,6 +582,7 @@ const apeKeys = {
   comment: ["comment"],
   discNumber: ["disc", "discnumber"],
   bpm: ["bpm"],
+  musicalKey: ["initialkey", "key"],
 } as const;
 
 const firstApeValue = (ape: ParsedApe, keys: readonly string[]) => {
@@ -643,6 +646,7 @@ const patchApe = (ape: ParsedApe, changes: MetadataChanges) => {
         Match.when("albumArtist", () => "Album Artist"),
         Match.when("discNumber", () => "Disc"),
         Match.when("bpm", () => "BPM"),
+        Match.when("musicalKey", () => "INITIALKEY"),
         Match.orElse((other) => other[0]!.toUpperCase() + other.slice(1)),
       );
 
@@ -844,6 +848,8 @@ const buildTag = (parsed: ParsedTag | undefined, changes: MetadataChanges) => {
   }
 
   if ("bpm" in changes) addText("bpm", changes.bpm == null ? "" : String(changes.bpm));
+
+  if (changes.musicalKey !== undefined) addText("musicalKey", changes.musicalKey);
 
   if (changes.dateText !== undefined) addText("dateText", changes.dateText);
 
@@ -1085,6 +1091,9 @@ export const mp3Driver: FormatDriver = {
           comment: readUserComment(parsed) ?? firstApeValue(ape, apeKeys.comment) ?? "",
           discNumber: canonicalInteger(discText, true),
           bpm: canonicalInteger(bpmText),
+          musicalKey: String(
+            firstText(parsed, idSets.musicalKey) ?? firstApeValue(ape, apeKeys.musicalKey) ?? "",
+          ),
         },
       };
     }).pipe(
@@ -1109,6 +1118,7 @@ export const mp3Driver: FormatDriver = {
         "trackNumber",
         "discNumber",
         "bpm",
+        "musicalKey",
         "picture",
         "dateText",
         "trackText",

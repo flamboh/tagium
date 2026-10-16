@@ -36,6 +36,7 @@ export interface MetadataChanges {
   trackNumber?: number | null;
   discNumber?: number | null;
   bpm?: number | null;
+  musicalKey?: string;
   picture?: ArtworkEntry[];
   dateText?: string;
   trackText?: string;

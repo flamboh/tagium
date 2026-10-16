@@ -63,6 +63,7 @@ const createSubmittedMetadataPatch = (metadata: AudioMetadata): MetadataPatch =>
   discNumber: getNullableNumericPatchValue(metadata.discNumber),
   composer: metadata.composer,
   bpm: getNullableNumericPatchValue(metadata.bpm),
+  musicalKey: metadata.musicalKey,
   comment: metadata.comment,
 });
 
@@ -96,6 +97,8 @@ const applyMetadataPatch = (metadata: AudioMetadata, patch: MetadataPatch): Audi
   if (patch.composer !== undefined) next.composer = patch.composer;
 
   if (patch.bpm !== undefined) next.bpm = getNullableNumericMetadataValue(patch.bpm);
+
+  if (patch.musicalKey !== undefined) next.musicalKey = patch.musicalKey;
 
   if (patch.comment !== undefined) next.comment = patch.comment;
 

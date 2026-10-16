@@ -203,7 +203,7 @@ export function EditingSettingsSection({ settings, onChange }: SettingsSectionPr
         <span className="space-y-0.5">
           <span className="block text-sm font-medium leading-5">show advanced fields</span>
           <span className="block text-xs leading-5 text-muted-foreground">
-            adds album artist, disc number, composer, bpm, and comments to the track editor.
+            adds album artist, disc number, composer, bpm, key, and comments to the track editor.
           </span>
         </span>
       </label>

@@ -132,6 +132,8 @@ export const diffEditableMetadata = (
 
   if (current.bpm !== next.bpm) changes.bpm = next.bpm;
 
+  if (current.musicalKey !== next.musicalKey) changes.musicalKey = next.musicalKey;
+
   if (current.comment !== next.comment) changes.comment = next.comment;
 
   if (!artworkEqual(current.picture, next.picture)) {
