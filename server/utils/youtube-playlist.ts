@@ -188,9 +188,13 @@ const findDuration = (value: JsonValue): number | undefined => {
   return undefined;
 };
 
-const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouTubeTrack[]) => {
+type CollectedTracks = { seenVideoIds: Set<string>; tracks: YouTubeTrack[]; duplicates: number };
+
+const collectTracks = (value: JsonValue, collected: CollectedTracks) => {
+  const { seenVideoIds, tracks } = collected;
+
   if (Array.isArray(value)) {
-    for (const entry of value) collectTracks(entry, seenVideoIds, tracks);
+    for (const entry of value) collectTracks(entry, collected);
 
     return;
   }
@@ -198,6 +202,10 @@ const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouT
   if (!isRecord(value)) return;
 
   const legacyVideo = decodeLegacyVideoOption(value.playlistVideoRenderer);
+
+  if (Option.isSome(legacyVideo) && seenVideoIds.has(legacyVideo.value.videoId)) {
+    collected.duplicates++;
+  }
 
   if (Option.isSome(legacyVideo) && !seenVideoIds.has(legacyVideo.value.videoId)) {
     const title = getText(legacyVideo.value.title)?.trim();
@@ -218,6 +226,10 @@ const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouT
   }
 
   const lockupVideo = decodeLockupVideoOption(value.lockupViewModel);
+
+  if (Option.isSome(lockupVideo) && seenVideoIds.has(lockupVideo.value.contentId)) {
+    collected.duplicates++;
+  }
 
   if (
     Option.isSome(lockupVideo) &&
@@ -244,7 +256,7 @@ const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouT
     }
   }
 
-  for (const entry of Object.values(value)) collectTracks(entry, seenVideoIds, tracks);
+  for (const entry of Object.values(value)) collectTracks(entry, collected);
 };
 
 const collectContinuationTokens = (value: JsonValue, tokens: string[]) => {
@@ -397,9 +409,9 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
 
   if (!title) throw new Error("youtube.playlist_title");
 
-  const tracks: YouTubeTrack[] = [];
-  const seenVideoIds = new Set<string>();
-  collectTracks(initialData, seenVideoIds, tracks);
+  const collected: CollectedTracks = { seenVideoIds: new Set(), tracks: [], duplicates: 0 };
+  const { tracks } = collected;
+  collectTracks(initialData, collected);
 
   const declaredTrackCount = getDeclaredTrackCount(initialData);
   let truncated = false;
@@ -422,7 +434,7 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
         break;
       }
 
-      collectTracks(continuation, seenVideoIds, tracks);
+      collectTracks(continuation, collected);
 
       if (declaredTrackCount !== undefined && tracks.length >= declaredTrackCount) break;
       collectContinuationTokens(continuation, pendingTokens);
@@ -443,7 +455,7 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
   const skippedCount =
     truncated || declaredTrackCount === undefined
       ? 0
-      : Math.max(0, declaredTrackCount - tracks.length);
+      : Math.max(0, declaredTrackCount - tracks.length - collected.duplicates);
 
   const year = await Effect.runPromise(
     Effect.tryPromise({

@@ -39,4 +39,25 @@ describe("youtube playlist resolution", () => {
 
     expect(error).toMatchObject({ status: 502, message: "youtube.no_resolvable_tracks" });
   });
+
+  it("doesn't count repeated videos as unavailable", async () => {
+    const video = (videoId: string) => ({
+      playlistVideoRenderer: {
+        videoId,
+        title: { simpleText: `video ${videoId}` },
+        lengthSeconds: "60",
+      },
+    });
+
+    stubYouTube({
+      metadata: { playlistMetadataRenderer: { title: "repeats" } },
+      sidebar: { playlistSidebarPrimaryInfoRenderer: { stats: [{ simpleText: "3 videos" }] } },
+      contents: [video("aaaaaaaaaaa"), video("aaaaaaaaaaa"), video("bbbbbbbbbbb")],
+    });
+
+    const playlist = await resolveYouTubePlaylist(playlistUrl, new AbortController().signal);
+
+    expect(playlist.tracks).toHaveLength(2);
+    expect(playlist.skippedCount).toBe(0);
+  });
 });
