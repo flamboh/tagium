@@ -118,6 +118,7 @@ export type YouTubePlaylistScenario = {
   videoKeys: string[];
   pageSize: number;
   renderer: "legacy" | "lockup";
+  hiddenCount?: number;
   status?: number;
   alert?: string;
 };

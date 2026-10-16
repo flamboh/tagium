@@ -1,6 +1,7 @@
 import type { PlaylistDownloadControllerSnapshot } from "@/features/import/playlistDownloadController";
 import type { PlaylistDownloadQueuePanelState } from "@/features/import/PlaylistDownloadQueuePanel";
 import type { TagiumFile } from "@/features/library/types";
+import { getTrackFailureDisplay } from "@/shared/systemFailure";
 
 const formatEta = (etaMs?: number) => {
   if (etaMs === undefined) return null;
@@ -23,7 +24,11 @@ export const getImportQueuePresentation = (
   const trackIds = new Set(snapshot.trackIds);
 
   const retryCount = files.filter(
-    (file) => trackIds.has(file.id) && !file.file && file.downloadRequest,
+    (file) =>
+      trackIds.has(file.id) &&
+      !file.file &&
+      file.downloadRequest &&
+      (!file.downloadError || getTrackFailureDisplay(file.downloadError).retryable),
   ).length;
 
   let status: PlaylistDownloadQueuePanelState["status"] = "downloading";

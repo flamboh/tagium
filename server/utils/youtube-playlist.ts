@@ -107,6 +107,8 @@ interface YouTubePlaylist {
   year?: number;
   coverUrl?: string;
   tracks: YouTubeTrack[];
+  skippedCount: number;
+  truncated: boolean;
 }
 
 const isRecord = Schema.is(jsonRecordSchema);
@@ -186,9 +188,13 @@ const findDuration = (value: JsonValue): number | undefined => {
   return undefined;
 };
 
-const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouTubeTrack[]) => {
+type CollectedTracks = { seenVideoIds: Set<string>; tracks: YouTubeTrack[]; duplicates: number };
+
+const collectTracks = (value: JsonValue, collected: CollectedTracks) => {
+  const { seenVideoIds, tracks } = collected;
+
   if (Array.isArray(value)) {
-    for (const entry of value) collectTracks(entry, seenVideoIds, tracks);
+    for (const entry of value) collectTracks(entry, collected);
 
     return;
   }
@@ -196,6 +202,10 @@ const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouT
   if (!isRecord(value)) return;
 
   const legacyVideo = decodeLegacyVideoOption(value.playlistVideoRenderer);
+
+  if (Option.isSome(legacyVideo) && seenVideoIds.has(legacyVideo.value.videoId)) {
+    collected.duplicates++;
+  }
 
   if (Option.isSome(legacyVideo) && !seenVideoIds.has(legacyVideo.value.videoId)) {
     const title = getText(legacyVideo.value.title)?.trim();
@@ -216,6 +226,10 @@ const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouT
   }
 
   const lockupVideo = decodeLockupVideoOption(value.lockupViewModel);
+
+  if (Option.isSome(lockupVideo) && seenVideoIds.has(lockupVideo.value.contentId)) {
+    collected.duplicates++;
+  }
 
   if (
     Option.isSome(lockupVideo) &&
@@ -242,7 +256,7 @@ const collectTracks = (value: JsonValue, seenVideoIds: Set<string>, tracks: YouT
     }
   }
 
-  for (const entry of Object.values(value)) collectTracks(entry, seenVideoIds, tracks);
+  for (const entry of Object.values(value)) collectTracks(entry, collected);
 };
 
 const collectContinuationTokens = (value: JsonValue, tokens: string[]) => {
@@ -395,11 +409,12 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
 
   if (!title) throw new Error("youtube.playlist_title");
 
-  const tracks: YouTubeTrack[] = [];
-  const seenVideoIds = new Set<string>();
-  collectTracks(initialData, seenVideoIds, tracks);
+  const collected: CollectedTracks = { seenVideoIds: new Set(), tracks: [], duplicates: 0 };
+  const { tracks } = collected;
+  collectTracks(initialData, collected);
 
   const declaredTrackCount = getDeclaredTrackCount(initialData);
+  let truncated = false;
 
   if (declaredTrackCount === undefined || tracks.length < declaredTrackCount) {
     const pendingTokens: string[] = [];
@@ -414,15 +429,33 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
 
       const continuation = await fetchContinuation(token, config, signal);
 
-      if (!continuation) break;
-      collectTracks(continuation, seenVideoIds, tracks);
+      if (!continuation) {
+        truncated = true;
+        break;
+      }
+
+      collectTracks(continuation, collected);
 
       if (declaredTrackCount !== undefined && tracks.length >= declaredTrackCount) break;
       collectContinuationTokens(continuation, pendingTokens);
     }
+
+    const reachedDeclaredCount =
+      declaredTrackCount !== undefined && tracks.length >= declaredTrackCount;
+
+    if (!reachedDeclaredCount && pendingTokens.some((token) => !visitedTokens.has(token))) {
+      truncated = true;
+    }
   }
 
-  if (tracks.length === 0) throw new Error("youtube.no_resolvable_tracks");
+  if (tracks.length === 0) {
+    throw new HTTPError({ status: truncated ? 502 : 422, message: "youtube.no_resolvable_tracks" });
+  }
+
+  const skippedCount =
+    truncated || declaredTrackCount === undefined
+      ? 0
+      : Math.max(0, declaredTrackCount - tracks.length - collected.duplicates);
 
   const year = await Effect.runPromise(
     Effect.tryPromise({
@@ -454,6 +487,8 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
     isAlbum: false,
     coverUrl: getPlaylistCover(initialData),
     tracks,
+    skippedCount,
+    truncated,
   };
 
   if (year !== undefined) playlist.year = year;

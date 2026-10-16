@@ -19,11 +19,14 @@ const TRACK_RESOLVE_CONCURRENCY = 4;
 class SoundCloudTrackResolveError extends Error {
   constructor(
     readonly stage: "track.resolve_fetch" | "track.resolve_parse",
-    options?: ErrorOptions,
+    options?: ErrorOptions & { missing?: boolean },
   ) {
     super(stage, options);
     this.name = "SoundCloudTrackResolveError";
+    this.missing = options?.missing ?? false;
   }
+
+  readonly missing: boolean;
 }
 
 const soundCloudTrackSchema = Schema.Struct({
@@ -121,7 +124,9 @@ const resolveTrack = async (
         upstreamFailureDetails(response, contentType),
         startedAt,
       );
-      throw new SoundCloudTrackResolveError("track.resolve_fetch");
+      throw new SoundCloudTrackResolveError("track.resolve_fetch", {
+        missing: [401, 403, 404, 410].includes(response.status),
+      });
     }
 
     try {
@@ -167,6 +172,7 @@ const resolveTracks = async (
   }> = [];
 
   let failedTracks = decodeFailures;
+  let transientFailures = decodeFailures;
 
   const failuresByStage: Record<string, number> = decodeFailures
     ? { "track.entry_parse": decodeFailures }
@@ -192,6 +198,15 @@ const resolveTracks = async (
       } else {
         failedTracks++;
 
+        if (
+          !(
+            settledTrack.reason instanceof SoundCloudTrackResolveError &&
+            settledTrack.reason.missing
+          )
+        ) {
+          transientFailures++;
+        }
+
         const stage =
           settledTrack.reason instanceof SoundCloudTrackResolveError
             ? settledTrack.reason.stage
@@ -209,7 +224,10 @@ const resolveTracks = async (
       failed: failedTracks,
       failuresByStage,
     });
-    throw new Error("soundcloud.no_resolvable_tracks");
+    throw new HTTPError({
+      status: transientFailures > 0 ? 502 : 422,
+      message: "soundcloud.no_resolvable_tracks",
+    });
   }
 
   await logSoundCloudCompletion(context, {
@@ -219,7 +237,7 @@ const resolveTracks = async (
     failuresByStage,
   });
 
-  return resolvedTracks;
+  return { resolvedTracks, failedTracks };
 };
 
 export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundCloudLogContext) => {
@@ -319,7 +337,7 @@ export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundClou
 
   await Promise.all(decodeFailureLogs);
 
-  const tracks = await resolveTracks(
+  const { resolvedTracks: tracks, failedTracks } = await resolveTracks(
     clientId,
     trackEntries,
     context,
@@ -350,5 +368,7 @@ export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundClou
       duration: track.duration === undefined ? undefined : track.duration / 1000,
       trackNumber: trackIndex,
     })),
+    skippedCount: failedTracks,
+    truncated: false,
   };
 };

@@ -63,7 +63,11 @@ export async function resolveSoundCloudShortLink(
         continue;
       }
 
-      if (!response.ok) throw new Error("soundcloud.short.unavailable");
+      if (response.status === 404 || response.status === 410) {
+        throw new Error("soundcloud.short.unavailable");
+      }
+
+      if (!response.ok) throw new Error("soundcloud.short_link_upstream_failed");
       const parsed = parseMediaLink(current.toString());
 
       if (parsed.provider !== "soundcloud") throw new Error("soundcloud.short.unsupported");

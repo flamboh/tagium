@@ -48,6 +48,14 @@ const cases: Array<{ message: string; code: SystemFailureCode; retryable: boolea
     code: "private_or_missing",
     retryable: false,
   },
+  { message: "soundcloud set request failed (422)", code: "playlist_empty", retryable: false },
+  { message: "youtube playlist request failed (422)", code: "playlist_empty", retryable: false },
+  {
+    message: "soundcloud short-link resolution failed",
+    code: "short_link_unresolved",
+    retryable: false,
+  },
+  { message: "soundcloud short-link lookup failed", code: "unknown", retryable: true },
   {
     message: "error.api.content.video.unavailable",
     code: "video_unavailable",

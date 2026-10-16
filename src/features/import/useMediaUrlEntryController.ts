@@ -5,7 +5,18 @@ import {
 } from "@/features/share/shareClient";
 import { InvalidShareLinkError, ShareLinksDisabledError } from "@/features/share/shareLink";
 import type { MediaUrlEntryController } from "@/shared/media-url/MediaUrlEntry";
-import { getSystemFailurePresentation, reportSystemFailure } from "@/shared/systemFailure";
+import {
+  getSystemFailurePresentation,
+  reportSystemFailure,
+  type SystemFailureCode,
+} from "@/shared/systemFailure";
+
+const INLINE_FAILURE_CODES = new Set<SystemFailureCode>([
+  "unsupported_source",
+  "private_or_missing",
+  "playlist_empty",
+  "short_link_unresolved",
+]);
 
 const validateMediaUrl = (value: string) => {
   if (!value) return "enter a media url";
@@ -67,10 +78,7 @@ export function useMediaUrlEntryController(
 
       const presentation = getSystemFailurePresentation(error, "import");
 
-      if (
-        presentation.code === "unsupported_source" ||
-        presentation.code === "private_or_missing"
-      ) {
+      if (INLINE_FAILURE_CODES.has(presentation.code)) {
         setValidationError(presentation.description.toLowerCase().replace(/\.$/, ""));
 
         return false;

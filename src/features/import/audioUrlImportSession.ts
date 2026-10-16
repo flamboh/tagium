@@ -1,5 +1,6 @@
 import { analytics } from "@/analytics";
 import { Option, Schema } from "effect";
+import { toast } from "sonner";
 import { toPublicAudioError } from "@/features/audio/audioErrors";
 import type {
   AudioDownloadRequest,
@@ -22,7 +23,7 @@ import {
   type PlaylistDownloadController,
   type PlaylistDownloadControllerSnapshot,
 } from "@/features/import/playlistDownloadController";
-import type { Playlist } from "@/features/import/playlist";
+import { playlistImportNotice, type Playlist } from "@/features/import/playlist";
 import { resolveSoundCloudSet } from "@/features/import/soundcloudSet";
 import { getTrackFailureDisplay, reportSystemFailure } from "@/shared/systemFailure";
 import { resolveTrackMetadata, type TrackMetadata } from "@/features/import/trackMetadata";
@@ -535,6 +536,7 @@ export const createAudioUrlImportSession = ({
       if (!trimmedUrl) return;
       let parsed = parseMediaLink(trimmedUrl);
       let shortLinkResolutionAttempted = false;
+      let shortLinkLookupFailed = false;
       let redirected = false;
 
       if (parsed.kind === "unsupported") {
@@ -545,7 +547,9 @@ export const createAudioUrlImportSession = ({
             shortLinkResolutionAttempted = true;
             const endpoint = new URL("/api/soundcloud-link", window.location.origin);
             endpoint.searchParams.set("url", trimmedUrl);
+            shortLinkLookupFailed = true;
             const response = await fetch(endpoint);
+            shortLinkLookupFailed = response.status !== 422;
 
             if (response.ok) {
               const candidateResult = Option.getOrNull(
@@ -553,6 +557,7 @@ export const createAudioUrlImportSession = ({
               );
 
               if (candidateResult) {
+                shortLinkLookupFailed = false;
                 const reparsed = parseMediaLink(candidateResult.canonicalUrl);
 
                 if (reparsed.kind !== "unsupported") {
@@ -596,9 +601,11 @@ export const createAudioUrlImportSession = ({
               : "invalid",
         });
         throw new Error(
-          shortLinkResolutionAttempted
-            ? "soundcloud short-link resolution failed"
-            : "unsupported url",
+          shortLinkLookupFailed
+            ? "soundcloud short-link lookup failed"
+            : shortLinkResolutionAttempted
+              ? "soundcloud short-link resolution failed"
+              : "unsupported url",
         );
       }
 
@@ -638,6 +645,9 @@ export const createAudioUrlImportSession = ({
               importOperationId,
               requestedFormat,
             );
+            const notice = playlistImportNotice(playlist);
+
+            if (notice) toast(notice.title, { description: notice.description });
           } catch (error) {
             importLifecycleTracker.fail(importOperationId, toPublicAudioError(error));
             throw error;
