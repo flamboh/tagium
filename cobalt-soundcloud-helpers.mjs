@@ -54,3 +54,9 @@ export const buildSoundCloudFailureCode = (stage, details = {}) => {
 
 export const isSoundCloudResolvePayload = (value) =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));
+
+export const unplayableSoundCloudError = (transcodings) =>
+  transcodings.length > 0 &&
+  transcodings.every((entry) => entry?.format?.protocol?.includes("encrypted"))
+    ? "soundcloud.maybe_drm"
+    : "soundcloud.no_stream";

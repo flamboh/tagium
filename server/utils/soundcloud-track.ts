@@ -349,7 +349,7 @@ export const resolveSoundCloudStream = (sourceUrl: string, context: SoundCloudLo
         startedAt,
         new SoundCloudStreamError({
           stage: "stream.select",
-          code: encryptedOnly ? "error.api.soundcloud.maybe_drm" : "error.api.fetch.empty",
+          code: encryptedOnly ? "error.api.soundcloud.maybe_drm" : "error.api.soundcloud.no_stream",
         }),
         {
           presets: presets.join(",") || null,

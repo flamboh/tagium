@@ -254,11 +254,11 @@ describe("soundcloud stream endpoint", () => {
       response = await call();
     });
 
-    expect(await response?.text()).toBe("error.api.fetch.empty");
+    expect(await response?.text()).toBe("error.api.soundcloud.no_stream");
     expect(events).toMatchObject([
       {
         level: "error",
-        message: "soundcloud soundcloud_stream failed: error.api.fetch.empty",
+        message: "soundcloud soundcloud_stream failed: error.api.soundcloud.no_stream",
         tags: { service: "soundcloud", stage: "soundcloud.stream.select" },
       },
     ]);

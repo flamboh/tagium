@@ -17,6 +17,7 @@ export const systemFailureCodes = [
   "service_unavailable",
   "unsupported_source",
   "drm_protected",
+  "no_stream",
   "paid_preview",
   "region_locked",
   "too_long",
@@ -103,6 +104,14 @@ const KNOWN_FAILURES = {
     trackDescription: "this media is drm-protected and can't be downloaded.",
     retryable: false,
     dedupeKey: "system-download-drm-protected",
+  },
+  no_stream: {
+    code: "no_stream",
+    title: "soundcloud has no downloadable stream for this track",
+    description: "try another track.",
+    trackDescription: "soundcloud has no downloadable stream for this track.",
+    retryable: false,
+    dedupeKey: "system-download-no-stream",
   },
   paid_preview: {
     code: "paid_preview",
@@ -352,6 +361,8 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
   }
 
   if (includesAny(lower, COBALT_DRM_CODES)) return KNOWN_FAILURES.drm_protected;
+
+  if (lower.includes("error.api.soundcloud.no_stream")) return KNOWN_FAILURES.no_stream;
 
   if (lower.includes("error.api.content.paid")) return KNOWN_FAILURES.paid_preview;
 
