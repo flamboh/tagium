@@ -14,7 +14,7 @@ const fullTrack = (id: number) => ({
   permalink_url: `https://soundcloud.com/artist/track-${id}`,
 });
 
-const stubSoundCloud = (tracks: unknown[], missingIds: number[]) =>
+const stubSoundCloud = (tracks: unknown[], missingIds: number[], missingStatus = 404) =>
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string | URL | Request) => {
@@ -29,7 +29,7 @@ const stubSoundCloud = (tracks: unknown[], missingIds: number[]) =>
       const id = Number(url.pathname.match(/^\/tracks\/(\d+)$/u)?.[1]);
 
       return missingIds.includes(id)
-        ? Response.json({}, { status: 404 })
+        ? Response.json({}, { status: missingStatus })
         : Response.json(fullTrack(id));
     }),
   );
@@ -62,5 +62,22 @@ describe("soundcloud set resolution", () => {
 
     expect(error).toBeInstanceOf(HTTPError);
     expect(error).toMatchObject({ status: 422, message: "soundcloud.no_resolvable_tracks" });
+  });
+
+  it("keeps a set retryable when its track lookups fail transiently", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    stubSoundCloud(
+      [
+        { id: 5, kind: "track" },
+        { id: 6, kind: "track" },
+      ],
+      [5, 6],
+      503,
+    );
+
+    const error = await resolveSoundCloudSet(setUrl, context).catch((cause: unknown) => cause);
+
+    expect(error).toMatchObject({ status: 502, message: "soundcloud.no_resolvable_tracks" });
   });
 });
