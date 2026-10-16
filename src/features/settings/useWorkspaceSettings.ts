@@ -33,6 +33,7 @@ export const useWorkspaceSettings = ({
         previous.applySoundCloudAlbumCoverToTracks !==
           nextSettings.applySoundCloudAlbumCoverToTracks ||
         previous.downloadAfterImport !== nextSettings.downloadAfterImport ||
+        previous.clearAfterSidebarDownload !== nextSettings.clearAfterSidebarDownload ||
         previous.advancedMetadata !== nextSettings.advancedMetadata ||
         Object.values(previous.metadataLinks).some(
           (enabled, index) => enabled !== Object.values(nextSettings.metadataLinks)[index],
@@ -54,6 +55,7 @@ export const useWorkspaceSettings = ({
           audioFormat: nextSettings.audioFormat,
           applySoundCloudCover: nextSettings.applySoundCloudAlbumCoverToTracks,
           downloadAfterImport: nextSettings.downloadAfterImport,
+          clearAfterSidebarDownload: nextSettings.clearAfterSidebarDownload,
           advancedMetadata: nextSettings.advancedMetadata,
           metadataLinks: getMetadataLinkState(nextSettings),
         });

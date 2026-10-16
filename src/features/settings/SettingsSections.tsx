@@ -36,7 +36,7 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
       <div className="space-y-1">
         <h3 className="text-base font-semibold">importing</h3>
         <p className="text-sm leading-5 text-muted-foreground">
-          choose what happens the moment audio lands in your library.
+          choose what happens when audio lands in your library and when it leaves.
         </p>
       </div>
       <div className="flex flex-col gap-2">
@@ -172,6 +172,27 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
           </span>
           <span className="block text-xs leading-5 text-muted-foreground">
             useful if you don't need detailed tagging and want a faster download
+          </span>
+        </span>
+      </label>
+      <label className={checkboxRowClassName}>
+        <Checkbox
+          checked={settings.clearAfterSidebarDownload}
+          onCheckedChange={(checked) =>
+            onChange({
+              ...settings,
+              clearAfterSidebarDownload: checked === true,
+            })
+          }
+          className="mt-0.5"
+        />
+        <span className="space-y-0.5">
+          <span className="block text-sm font-medium leading-5">
+            clear tracks from the sidebar after downloading them
+          </span>
+          <span className="block text-xs leading-5 text-muted-foreground">
+            applies to album and download all downloads. downloading a single track from the editor
+            keeps it in the sidebar.
           </span>
         </span>
       </label>

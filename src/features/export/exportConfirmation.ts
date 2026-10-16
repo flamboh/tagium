@@ -273,6 +273,9 @@ export const planExport = (
   return plan;
 };
 
+export const planTrackIds = (plan: ExportPlan) =>
+  plan.groups.flatMap((group) => group.tracks.map((track) => track.id));
+
 export const samePlan = (left: ExportPlan, right: ExportPlan) =>
   left === right ||
   (planFingerprints.has(left) &&

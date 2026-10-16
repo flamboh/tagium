@@ -28,6 +28,7 @@ import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type { AlbumGroup, AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
 import {
   planExport,
+  planTrackIds,
   samePlan,
   type ExportPlan,
   type ExportTarget,
@@ -63,17 +64,16 @@ const canRestoreFocus = (target: ConfirmationFocusTarget) =>
 const canReceiveFocus = (element: Element | null): element is Element & ConfirmationFocusTarget =>
   element !== null && "focus" in element && typeof element.focus === "function";
 
-const planTrackIds = (plan: ExportPlan) =>
-  plan.groups.flatMap((group) => group.tracks.map((track) => track.id));
-
 export const useExportSession = ({
   library,
   editor,
   settings,
+  onConfirmedDownload,
 }: {
   library: LibraryStore;
   editor: ExportEditor;
   settings: AppSettings;
+  onConfirmedDownload: (plan: ExportPlan) => void;
 }): ExportSession => {
   const [exporting, setExporting] = useState(false);
   const [confirmation, setConfirmation] = useState<ExportPlan | null>(null);
@@ -85,9 +85,11 @@ export const useExportSession = ({
   const confirmingRef = useRef(false);
   const confirmationTriggerRef = useRef<ConfirmationFocusTarget | null>(null);
   const settingsRef = useRef(settings);
+  const onConfirmedDownloadRef = useRef(onConfirmedDownload);
   useLayoutEffect(() => {
     settingsRef.current = settings;
-  }, [settings]);
+    onConfirmedDownloadRef.current = onConfirmedDownload;
+  }, [onConfirmedDownload, settings]);
   const updateTags = editor.updateTags;
 
   const targetContext = useCallback(
@@ -439,6 +441,7 @@ export const useExportSession = ({
       if (result === "success") {
         setConfirmationStatus("ready");
         setConfirmation(null);
+        onConfirmedDownloadRef.current(latestPlan);
       } else if (result === "unavailable") {
         setConfirmationStatus("unavailable");
       }

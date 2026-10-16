@@ -9,13 +9,16 @@ import {
 import { expect, expectDownloadName, test } from "../support/test";
 import {
   confirmDownload,
+  downloadAll,
   downloadTrack,
+  dropzone,
   field,
   editorMode,
   seedSettings,
   goHome,
   libraryCount,
   pickFiles,
+  toast,
   trackRow,
 } from "./workspace";
 
@@ -139,3 +142,49 @@ for (const existingAlbumArtist of ["Various Artists", ""]) {
     await expectLosslessAudio(single, source.file);
   });
 }
+
+test("clearing after sidebar downloads removes whole albums and the library, never a track downloaded from the editor", async ({
+  page,
+}) => {
+  await seedSettings(page, { clearAfterSidebarDownload: true });
+  await page.goto("/");
+  await pickFiles(page, [audioFixture("mp3").upload]);
+  await libraryCount(page, 1);
+  await goHome(page);
+  await pickFiles(page, [
+    audioFixture("mp3", "tone-2.mp3").upload,
+    audioFixture("mp3", "tone-3.mp3").upload,
+  ]);
+  await libraryCount(page, 3);
+
+  await trackRow(page, `1 ${fixtureTitle("mp3")}.mp3`).click();
+  await downloadTrack(page);
+  await libraryCount(page, 3);
+
+  await page.getByRole("button", { name: "download Fixture Album" }).click();
+  await expect(
+    page
+      .getByRole("dialog", { name: "download 2 tracks" })
+      .getByText("these tracks will be cleared from the sidebar after downloading."),
+  ).toBeVisible();
+  await confirmDownload(page, "download 2 tracks");
+  await expect(toast(page, "cleared 2 downloaded tracks")).toBeVisible();
+  await libraryCount(page, 1);
+  await expect(page.getByRole("button", { name: "download Fixture Album" })).toHaveCount(0);
+
+  await downloadAll(page, "download 1 track");
+  await expect(toast(page, "cleared 1 downloaded track")).toBeVisible();
+  await expect(dropzone(page)).toBeVisible();
+});
+
+test("sidebar downloads keep tracks when clearing is off", async ({ page }) => {
+  await page.goto("/");
+  await pickFiles(page, [audioFixture("mp3").upload]);
+  await libraryCount(page, 1);
+  await page.getByRole("button", { name: "download all", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "download 1 track" }).getByText(/cleared from the sidebar/u),
+  ).toHaveCount(0);
+  await confirmDownload(page, "download 1 track");
+  await libraryCount(page, 1);
+});

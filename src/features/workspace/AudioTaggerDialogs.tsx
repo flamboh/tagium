@@ -6,7 +6,7 @@ import ShareAlbumDialog from "@/features/share/ShareAlbumDialog";
 import type { AudioTaggerController } from "@/features/workspace/useAudioTaggerController";
 
 export default function AudioTaggerDialogs({ controller }: { controller: AudioTaggerController }) {
-  const { sharing, workspace, exporting } = controller;
+  const { sharing, workspace, exporting, settings } = controller;
 
   return (
     <>
@@ -27,6 +27,7 @@ export default function AudioTaggerDialogs({ controller }: { controller: AudioTa
         plan={exporting.confirmation}
         status={exporting.confirmationStatus}
         busy={exporting.exporting}
+        clearsAfterDownload={settings.clearAfterSidebarDownload}
         onCancel={exporting.cancelConfirmation}
         onConfirm={() => void exporting.confirmDownload()}
         onRestoreFocus={exporting.restoreConfirmationFocus}

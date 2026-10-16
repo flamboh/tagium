@@ -190,6 +190,7 @@ export type AnalyticsEvent =
       audioFormat: "best" | "mp3";
       applySoundCloudCover: boolean;
       downloadAfterImport: boolean;
+      clearAfterSidebarDownload: boolean;
       advancedMetadata: boolean;
       metadataLinks: MetadataLinkState;
     }
@@ -1237,6 +1238,7 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
           audio_format: event.audioFormat,
           apply_soundcloud_cover: event.applySoundCloudCover,
           download_after_import: event.downloadAfterImport,
+          clear_after_sidebar_download: event.clearAfterSidebarDownload,
           advanced_metadata: event.advancedMetadata,
           ...serializeMetadataLinkAnalytics(event.metadataLinks),
         },

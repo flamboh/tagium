@@ -19,6 +19,7 @@ export interface ExportConfirmationDialogProps {
   plan: ExportPlan | null;
   status: "ready" | "changed" | "unavailable";
   busy: boolean;
+  clearsAfterDownload: boolean;
   onCancel: () => void;
   onConfirm: () => void;
   onRestoreFocus: () => void;
@@ -78,6 +79,7 @@ export function ExportConfirmationDialogView({
   plan,
   status,
   busy,
+  clearsAfterDownload,
   onCancel,
   onConfirm,
   onRestoreFocus,
@@ -110,6 +112,12 @@ export function ExportConfirmationDialogView({
           <DialogTitle>
             download {plan?.trackCount ?? 0} {noun}
           </DialogTitle>
+          {clearsAfterDownload && (
+            <p className="text-sm text-muted-foreground">
+              {plan?.trackCount === 1 ? "this track" : "these tracks"} will be cleared from the
+              sidebar after downloading.
+            </p>
+          )}
           {status !== "ready" && (
             <p
               role="alert"

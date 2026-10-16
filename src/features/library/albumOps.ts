@@ -177,6 +177,18 @@ export function removeTrackFromAlbums(prevAlbums: AlbumGroup[], trackId: string)
   );
 }
 
+export function removeDownloadedTracksFromAlbums(
+  prevAlbums: AlbumGroup[],
+  trackIds: ReadonlySet<string>,
+) {
+  return prevAlbums.flatMap((album) => {
+    if (!album.trackIds.some((id) => trackIds.has(id))) return [album];
+    const remainingTrackIds = album.trackIds.filter((id) => !trackIds.has(id));
+
+    return remainingTrackIds.length === 0 ? [] : [{ ...album, trackIds: remainingTrackIds }];
+  });
+}
+
 export function moveTrackInSidebar(
   prevAlbums: AlbumGroup[],
   prevLooseTrackIds: string[],
