@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vp dev",
     "dev:cobalt": "API_URL=http://localhost:9000/ pnpm --dir ../oss/cobalt/api start",
-    "build": "tsc -b && vp build",
+    "build": "tsc-rs -b && vp build",
     "build:cloudflare": "bun run scripts/build-cloudflare.ts",
     "lint": "vp lint .",
     "lint:fix": "vp lint . --fix",
@@ -16,7 +16,7 @@
     "test:e2e": "vp exec playwright test",
     "test:e2e:serve": "node tests/e2e/harness/server.ts",
     "test:live": "vp exec playwright test -c playwright.live.config.ts",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc-rs -b",
     "prepare": "vp config",
     "alchemy:plan": "bun run build:cloudflare && alchemy plan",
     "alchemy:deploy": "bun run build:cloudflare && alchemy deploy",
@@ -79,8 +79,8 @@
     "react-test-renderer": "19.1.0",
     "shadcn": "^3.0.0",
     "tailwindcss": "^4",
+    "tsc-rs": "0.7.0",
     "tw-animate-css": "^1.3.7",
-    "typescript": "^5",
     "vite": "^8.0.7",
     "vite-plus": "^0.2.9",
     "vitest": "npm:@voidzero-dev/vite-plus-test@latest"

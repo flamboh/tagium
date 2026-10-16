@@ -27,6 +27,7 @@ jobs:
 
       - run: vp install
       - run: vp check
+      - run: vp run typecheck
       - run: vp test
 
   e2e:
