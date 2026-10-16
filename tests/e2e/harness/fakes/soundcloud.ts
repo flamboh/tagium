@@ -146,7 +146,14 @@ export const fakeSoundCloudApi = (request: FakeRequest): FakeResult => {
 
     if (!scenario) return unexpected("soundcloud.track");
 
-    return { route: "soundcloud.track", key: scenario.key, response: json(trackJson(scenario)) };
+    return {
+      route: "soundcloud.track",
+      key: scenario.key,
+      response:
+        scenario.metadata.kind === "status"
+          ? json({}, { status: scenario.metadata.status })
+          : json(trackJson(scenario)),
+    };
   }
 
   const media = url.pathname.match(

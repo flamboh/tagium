@@ -209,7 +209,7 @@ const resolveTracks = async (
       failed: failedTracks,
       failuresByStage,
     });
-    throw new Error("soundcloud.no_resolvable_tracks");
+    throw new HTTPError({ status: 422, message: "soundcloud.no_resolvable_tracks" });
   }
 
   await logSoundCloudCompletion(context, {
@@ -219,7 +219,7 @@ const resolveTracks = async (
     failuresByStage,
   });
 
-  return resolvedTracks;
+  return { resolvedTracks, failedTracks };
 };
 
 export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundCloudLogContext) => {
@@ -319,7 +319,7 @@ export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundClou
 
   await Promise.all(decodeFailureLogs);
 
-  const tracks = await resolveTracks(
+  const { resolvedTracks: tracks, failedTracks } = await resolveTracks(
     clientId,
     trackEntries,
     context,
@@ -350,5 +350,7 @@ export const resolveSoundCloudSet = async (sourceUrl: string, context: SoundClou
       duration: track.duration === undefined ? undefined : track.duration / 1000,
       trackNumber: trackIndex,
     })),
+    skippedCount: failedTracks,
+    truncated: false,
   };
 };

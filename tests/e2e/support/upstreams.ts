@@ -215,6 +215,7 @@ export const createUpstreams = (owner: string) => {
         videos: YouTubeVideoOptions[];
         pageSize?: number;
         renderer?: "legacy" | "lockup";
+        hiddenCount?: number;
         status?: number;
         missing?: boolean;
       }) {
@@ -230,6 +231,7 @@ export const createUpstreams = (owner: string) => {
           videoKeys: videos.map(({ scenario }) => scenario.key),
           pageSize: options.pageSize ?? 100,
           renderer: options.renderer ?? "lockup",
+          hiddenCount: options.hiddenCount,
           status: options.status,
           alert: options.missing ? "The playlist does not exist." : undefined,
         };

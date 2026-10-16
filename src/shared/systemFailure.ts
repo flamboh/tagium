@@ -23,6 +23,8 @@ export const systemFailureCodes = [
   "live_stream",
   "age_restricted",
   "private_or_missing",
+  "playlist_empty",
+  "short_link_unresolved",
   "video_unavailable",
   "provider_blocked",
   "link_expired",
@@ -149,6 +151,22 @@ const KNOWN_FAILURES = {
     trackDescription: "media is private, unavailable, or no longer exists.",
     retryable: false,
     dedupeKey: "system-download-private-or-missing",
+  },
+  playlist_empty: {
+    code: "playlist_empty",
+    title: "this playlist has nothing to save",
+    description: "none of this playlist's tracks can be saved. they may be private or removed.",
+    trackDescription: "none of this playlist's tracks can be saved.",
+    retryable: false,
+    dedupeKey: "system-download-playlist-empty",
+  },
+  short_link_unresolved: {
+    code: "short_link_unresolved",
+    title: "this short link doesn't lead anywhere",
+    description: "this soundcloud short link doesn't lead to a track or playlist.",
+    trackDescription: "this soundcloud short link doesn't lead to a track or playlist.",
+    retryable: false,
+    dedupeKey: "system-download-short-link-unresolved",
   },
   video_unavailable: {
     code: "video_unavailable",
@@ -351,6 +369,14 @@ const knownDownloadFailureFrom = (message: string): SystemFailurePresentation | 
     lower.includes("not supported")
   ) {
     return KNOWN_FAILURES.unsupported_source;
+  }
+
+  if (/\b(?:soundcloud set|youtube playlist) request failed \(422\)/.test(lower)) {
+    return KNOWN_FAILURES.playlist_empty;
+  }
+
+  if (lower.includes("soundcloud short-link resolution failed")) {
+    return KNOWN_FAILURES.short_link_unresolved;
   }
 
   if (lower.includes("error.api.content.video.unavailable")) {

@@ -236,7 +236,9 @@ test("a failed playlist track keeps the successes and retry downloads only the f
   await page.goto("/");
   await importUrl(page, set.url);
   await expect(queueStatus(page, "failed 1/4")).toBeVisible(SETTLE_TIMEOUT);
-  await expect(page.getByText("downloads failed", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("1 track couldn't be saved. select it to see why.", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "download all" })).toBeDisabled();
 
   await page.getByRole("button", { name: "2 Track 2.mp3 track has an error" }).click();
@@ -259,6 +261,26 @@ test("a failed playlist track keeps the successes and retry downloads only the f
   for (const track of [one!, three!, four!]) {
     expect(await soundcloudStreamCount(upstreams, track)).toBe(1);
   }
+});
+
+test("a playlist whose failures are all permanent offers no retry", async ({ page, upstreams }) => {
+  const set = await upstreams.soundcloud.set({
+    title: "Permanent Failures",
+    artwork: null,
+    tracks: [
+      { title: "Success", cover: null },
+      { title: "Private", cover: null, metadata: { kind: "status", status: 404 } },
+      { title: "Protected", cover: null, transcodings: "encrypted" },
+    ],
+  });
+
+  await page.goto("/");
+  await importUrl(page, set.url);
+  await expect(queueStatus(page, "failed 2/3")).toBeVisible(SETTLE_TIMEOUT);
+  await expect(
+    page.getByText("2 tracks couldn't be saved. select one to see why.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "retry playlist downloads" })).toHaveCount(0);
 });
 
 test("playlist retry skips missing and drm-protected failures", async ({ page, upstreams }) => {

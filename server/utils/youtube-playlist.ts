@@ -107,6 +107,8 @@ interface YouTubePlaylist {
   year?: number;
   coverUrl?: string;
   tracks: YouTubeTrack[];
+  skippedCount: number;
+  truncated: boolean;
 }
 
 const isRecord = Schema.is(jsonRecordSchema);
@@ -400,6 +402,7 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
   collectTracks(initialData, seenVideoIds, tracks);
 
   const declaredTrackCount = getDeclaredTrackCount(initialData);
+  let truncated = false;
 
   if (declaredTrackCount === undefined || tracks.length < declaredTrackCount) {
     const pendingTokens: string[] = [];
@@ -414,15 +417,33 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
 
       const continuation = await fetchContinuation(token, config, signal);
 
-      if (!continuation) break;
+      if (!continuation) {
+        truncated = true;
+        break;
+      }
+
       collectTracks(continuation, seenVideoIds, tracks);
 
       if (declaredTrackCount !== undefined && tracks.length >= declaredTrackCount) break;
       collectContinuationTokens(continuation, pendingTokens);
     }
+
+    const reachedDeclaredCount =
+      declaredTrackCount !== undefined && tracks.length >= declaredTrackCount;
+
+    if (!reachedDeclaredCount && pendingTokens.some((token) => !visitedTokens.has(token))) {
+      truncated = true;
+    }
   }
 
-  if (tracks.length === 0) throw new Error("youtube.no_resolvable_tracks");
+  if (tracks.length === 0) {
+    throw new HTTPError({ status: 422, message: "youtube.no_resolvable_tracks" });
+  }
+
+  const skippedCount =
+    truncated || declaredTrackCount === undefined
+      ? 0
+      : Math.max(0, declaredTrackCount - tracks.length);
 
   const year = await Effect.runPromise(
     Effect.tryPromise({
@@ -454,6 +475,8 @@ export const resolveYouTubePlaylist = async (sourceUrl: string, signal: AbortSig
     isAlbum: false,
     coverUrl: getPlaylistCover(initialData),
     tracks,
+    skippedCount,
+    truncated,
   };
 
   if (year !== undefined) playlist.year = year;

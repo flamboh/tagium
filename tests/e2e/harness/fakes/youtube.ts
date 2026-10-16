@@ -104,7 +104,14 @@ const playlistHtml = (request: FakeRequest, playlist: YouTubePlaylistScenario) =
                     },
                   }
                 : undefined,
-              stats: [{ runs: [{ text: String(playlist.videoKeys.length) }, { text: " videos" }] }],
+              stats: [
+                {
+                  runs: [
+                    { text: String(playlist.videoKeys.length + (playlist.hiddenCount ?? 0)) },
+                    { text: " videos" },
+                  ],
+                },
+              ],
             },
           },
           {

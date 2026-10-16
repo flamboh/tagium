@@ -100,11 +100,16 @@ export default function PlaylistDownloadQueuePanel({
       </div>
 
       {queue.status === "error" && (
-        <p className="mt-2 text-[11px] text-destructive">downloads failed</p>
+        <p className="mt-2 text-[11px] text-destructive">{failureSummary(queue.failedCount)}</p>
       )}
     </section>
   );
 }
+
+const failureSummary = (failedCount: number) =>
+  failedCount === 1
+    ? "1 track couldn't be saved. select it to see why."
+    : `${failedCount} tracks couldn't be saved. select one to see why.`;
 
 const queueLabel = (queue: PlaylistDownloadQueuePanelState) => {
   switch (queue.status) {

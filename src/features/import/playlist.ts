@@ -34,9 +34,17 @@ const playlistSchema = Schema.Struct({
   tracks: Schema.Array(playlistTrackSchema),
 });
 
-const decodePlaylistEffect = Schema.decodeUnknownEffect(playlistSchema);
+const playlistResponseSchema = Schema.Struct({
+  ...playlistSchema.fields,
+  skippedCount: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  truncated: Schema.Boolean,
+});
+
+const decodePlaylistEffect = Schema.decodeUnknownEffect(playlistResponseSchema);
 
 export type Playlist = Schema.Schema.Type<typeof playlistSchema>;
+
+export type PlaylistResponse = Schema.Schema.Type<typeof playlistResponseSchema>;
 
 export const decodePlaylist = async (input: unknown, providerName: string) => {
   try {
@@ -54,4 +62,15 @@ export const decodePlaylist = async (input: unknown, providerName: string) => {
   } catch (error) {
     throw toPublicAudioError(error);
   }
+};
+
+export const playlistImportNotice = ({ tracks, skippedCount, truncated }: PlaylistResponse) => {
+  if (truncated) return { title: `added the first ${tracks.length} tracks of this playlist` };
+
+  if (skippedCount === 0) return null;
+
+  return {
+    title: `added ${tracks.length} of ${tracks.length + skippedCount} tracks`,
+    description: `${skippedCount} ${skippedCount === 1 ? "was" : "were"} private or unavailable.`,
+  };
 };

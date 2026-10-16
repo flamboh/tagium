@@ -59,11 +59,10 @@ test("explains a soundcloud short link that does not lead to soundcloud", async 
   await page.goto("/");
   await importUrl(page, link);
 
-  const toast = notifications(page);
-  await expect(toast.getByText("import failed")).toBeVisible();
   await expect(
-    toast.getByText("tagium could not import this media. try again in a moment."),
+    page.getByText("this soundcloud short link doesn't lead to a track or playlist"),
   ).toBeVisible();
+  await expect(notifications(page).getByText("import failed")).toHaveCount(0);
   await expect(page.getByText("no tracks yet")).toBeVisible();
   await expect(urlField(page)).toHaveValue(link);
   expect(await upstreams.calls({ route: "cobalt.resolve" })).toHaveLength(0);
@@ -117,6 +116,59 @@ test("explains a missing soundcloud set or youtube playlist beside the url field
   expect(await upstreams.calls({ route: "soundcloud.resolve.set" })).toHaveLength(1);
   expect(await upstreams.calls({ route: "youtube.playlist" })).toHaveLength(1);
   expect(await upstreams.calls({ route: "cobalt.resolve" })).toHaveLength(0);
+});
+
+test("says how many playlist tracks were skipped", async ({ page, upstreams }) => {
+  const set = await upstreams.soundcloud.set({
+    tracks: [
+      { cover: null },
+      { cover: null, stub: true, metadata: { kind: "status", status: 404 } },
+      { cover: null },
+    ],
+  });
+
+  const playlist = await upstreams.youtube.playlist({
+    videos: [{ cover: null }, { cover: null }, { cover: null }],
+    hiddenCount: 2,
+  });
+
+  await page.goto("/");
+  await importUrl(page, set.url);
+  await expect(notifications(page).getByText("added 2 of 3 tracks")).toBeVisible();
+  await expect(notifications(page).getByText("1 was private or unavailable.")).toBeVisible();
+
+  await importUrl(page, playlist.url);
+  await expect(notifications(page).getByText("added 3 of 5 tracks")).toBeVisible();
+  await expect(notifications(page).getByText("2 were private or unavailable.")).toBeVisible();
+});
+
+test("explains a playlist with nothing to save beside the url field", async ({
+  page,
+  upstreams,
+}) => {
+  const set = await upstreams.soundcloud.set({
+    tracks: [{ stub: true, metadata: { kind: "status", status: 404 } }],
+  });
+
+  const playlist = await upstreams.youtube.playlist({ videos: [], hiddenCount: 2 });
+
+  await page.goto("/");
+
+  for (const url of [set.url, playlist.url]) {
+    const response = page.waitForResponse((candidate) =>
+      /\/api\/(soundcloud-set|youtube-playlist)\?/u.test(candidate.url()),
+    );
+
+    await importUrl(page, url);
+    expect((await response).status()).toBe(422);
+    await expect(
+      page.getByText("none of this playlist's tracks can be saved. they may be private or removed"),
+    ).toBeVisible();
+    await expect(urlField(page)).toHaveValue(url);
+  }
+
+  await expect(notifications(page).getByText("import failed")).toHaveCount(0);
+  await expect(page.getByText("no tracks yet")).toBeVisible();
 });
 
 test("reports a soundcloud set or youtube playlist outage as an import failure", async ({
