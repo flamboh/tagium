@@ -565,7 +565,7 @@ function LyricsField({
         className={cn("max-h-96", (retrying || refreshable) && "placeholder:text-transparent")}
       />
       {(retrying || refreshable) && (
-        <span className="pointer-events-none absolute top-[29px] left-[13px] flex h-5 items-center gap-1.5 text-base text-muted-foreground md:text-sm">
+        <span className="pointer-events-none absolute top-[33px] left-[13px] flex h-5 items-center gap-1.5 text-base text-muted-foreground md:text-sm">
           {retrying ? (
             <HugeiconsIcon
               icon={loaderCircleIcon}
