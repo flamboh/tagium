@@ -400,7 +400,7 @@ test("advanced fields are gated by settings and keep their values while hidden",
   await openSettings(page, "editing");
   await expect(
     page.getByText(
-      "adds album artist, disc number, composer, bpm, key, and comments to the track editor.",
+      "adds album artist, disc number, composer, bpm, key, comments, and lyrics to the track editor.",
     ),
   ).toBeVisible();
   const advanced = settingsControls(page).advanced;

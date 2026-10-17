@@ -165,6 +165,9 @@ export const createSparseMetadataPatch = (
       case "comment":
         patch.comment = metadata.comment;
         break;
+      case "lyrics":
+        patch.lyrics = metadata.lyrics;
+        break;
     }
   }
 

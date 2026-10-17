@@ -15,6 +15,7 @@ export const EDITABLE_METADATA_FIELDS = [
   "bpm",
   "musicalKey",
   "comment",
+  "lyrics",
 ] as const satisfies readonly (keyof MetadataPatch)[];
 
 export type EditableMetadataField = (typeof EDITABLE_METADATA_FIELDS)[number];
