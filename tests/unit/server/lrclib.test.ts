@@ -1,11 +1,6 @@
 import { Effect } from "effect";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import {
-  LrclibRequestError,
-  lookupLyrics,
-  pickSearchResult,
-  searchQueries,
-} from "../../../server/utils/lrclib";
+import { LrclibRequestError, lookupLyrics, pickSearchResult } from "../../../server/utils/lrclib";
 
 const credentials = { appId: "app", apiKey: "key" };
 
@@ -117,6 +112,7 @@ describe("lrclib lookup", () => {
     const requests = stubFetch(
       json({ name: "TrackNotFound" }, 404),
       json([record({ duration: 260 }), record({ duration: 201, syncedLyrics: null })]),
+      json([]),
     );
 
     await expect(
@@ -140,10 +136,9 @@ describe("lrclib lookup", () => {
     ).resolves.toEqual({ status: "found", lyrics: "[00:01.00] searched", synced: true });
   });
 
-  it("also searches without a featured artist or a version suffix", async () => {
+  it("searches without a featured artist or a version suffix", async () => {
     const requests = stubFetch(
       json({ name: "TrackNotFound" }, 404),
-      json([]),
       json([record({ syncedLyrics: "[00:01.00] simplified" })]),
     );
 
@@ -156,29 +151,55 @@ describe("lrclib lookup", () => {
         }),
       ),
     ).resolves.toMatchObject({ lyrics: "[00:01.00] simplified" });
-    expect(new URL(requests[2]!.url).searchParams.get("track_name")).toBe("Song");
+    expect(new URL(requests[1]!.url).searchParams.get("track_name")).toBe("Song");
   });
 
-  it("splits an artist out of a reposted artist - title upload", () => {
-    expect(searchQueries({ title: "LOONA - Hi High", artist: "naemii." })).toEqual([
-      { title: "LOONA - Hi High", artist: "naemii." },
-      { title: "Hi High", artist: "LOONA" },
-    ]);
-    expect(searchQueries({ title: "Song - 2011 Remaster", artist: "Artist" })).toEqual([
-      { title: "Song - 2011 Remaster", artist: "Artist" },
-      { title: "Song", artist: "Artist" },
-    ]);
+  it("searches the title alone for an artist the metadata mentions anywhere", async () => {
+    const requests = stubFetch(
+      json({ name: "TrackNotFound" }, 404),
+      json([]),
+      json([
+        record({ artistName: "Someone Else", syncedLyrics: "[00:01.00] wrong artist" }),
+        record({ artistName: "LOONA", syncedLyrics: "[00:01.00] reposted" }),
+      ]),
+    );
+
+    await expect(
+      Effect.runPromise(
+        lookupLyrics(credentials, { title: "LOONA - Hi High", artist: "naemii.", duration: 200 }),
+      ),
+    ).resolves.toMatchObject({ lyrics: "[00:01.00] reposted" });
+    expect(Object.fromEntries(new URL(requests[2]!.url).searchParams)).toEqual({
+      q: "LOONA - Hi High",
+    });
+  });
+
+  it("ignores a title-only match by an artist the metadata never mentions", async () => {
+    stubFetch(
+      json({ name: "TrackNotFound" }, 404),
+      json([]),
+      json([record({ artistName: "Someone Else" })]),
+    );
+
+    await expect(
+      Effect.runPromise(
+        lookupLyrics(credentials, { title: "Intro", artist: "Artist", duration: 200 }),
+      ),
+    ).resolves.toEqual({ status: "missing" });
   });
 
   it("searches straight away for a track too long for a signature match", async () => {
-    const requests = stubFetch(json([record({ duration: 200 })]));
+    const requests = stubFetch(json([record({ duration: 200 })]), json([]));
 
     await expect(
       Effect.runPromise(
         lookupLyrics(credentials, { title: "Song", artist: "Artist", duration: 7200 }),
       ),
     ).resolves.toEqual({ status: "missing" });
-    expect(requests.map((request) => new URL(request.url).pathname)).toEqual(["/api/search"]);
+    expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
+      "/api/search",
+      "/api/search",
+    ]);
   });
 
   it("waits out a busy server before giving up", async () => {

@@ -87,6 +87,7 @@ test("falls back to a duration matched search and rides out a busy lrclib", asyn
     ["lrclib.get", 503],
     ["lrclib.get", 404],
     ["lrclib.search", 200],
+    ["lrclib.search", 200],
   ]);
 });
 
@@ -106,7 +107,7 @@ test("leaves lyrics alone until find lyrics is turned on in settings", async ({
   await page.getByRole("checkbox", { name: /^find lyrics/u }).click();
   await backToWorkspace(page);
 
-  await expect.poll(async () => (await upstreams.calls({ key })).length).toBe(2);
+  await expect.poll(async () => (await upstreams.calls({ key })).length).toBe(3);
   await editorMode(page, "advanced").click();
   await expect(field(page, "lyrics")).toHaveValue("");
   await expect(field(page, "lyrics")).toHaveAttribute("placeholder", "no lyrics found on lrclib");
@@ -171,5 +172,5 @@ test("searches again once the title is corrected in the editor", async ({ page, 
   );
   await field(page, "title").fill(corrected);
   await expect(field(page, "lyrics")).toHaveValue(synced, SETTLE_TIMEOUT);
-  expect((await upstreams.calls({ key: missingKey })).length).toBe(2);
+  expect((await upstreams.calls({ key: missingKey })).length).toBe(3);
 });

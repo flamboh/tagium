@@ -10,7 +10,7 @@ export const fakeLrclib = (request: FakeRequest): FakeResult => {
   }
 
   const route = pathname === "/api/get" ? "lrclib.get" : "lrclib.search";
-  const key = lyricsKey(searchParams.get("track_name") ?? "");
+  const key = lyricsKey(searchParams.get("track_name") ?? searchParams.get("q") ?? "");
   const scenario = request.registry.lyrics(key);
 
   if (!scenario) return unexpected(route, key);

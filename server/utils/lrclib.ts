@@ -46,6 +46,7 @@ const recordSchema = Schema.Struct({
   instrumental: Schema.Boolean,
   plainLyrics: Schema.NullOr(Schema.String),
   syncedLyrics: Schema.NullOr(Schema.String),
+  artistName: Schema.String,
 });
 
 type LrclibRecord = Schema.Schema.Type<typeof recordSchema>;
@@ -174,29 +175,13 @@ const simplifyTitle = (title: string) =>
     .replace(/\s+-\s+[^-]*\b(?:remaster(?:ed)?|live|version|edit|mono|stereo|mix|demo)\b.*$/iu, "")
     .trim();
 
-const sameText = (first: string, second: string) =>
-  first.trim().toLocaleLowerCase() === second.trim().toLocaleLowerCase();
+const comparable = (text: string) =>
+  text.normalize("NFKC").toLocaleLowerCase().replace(/\s+/gu, " ").trim();
 
-export const searchQueries = ({ title, artist }: Pick<LyricsQuery, "title" | "artist">) => {
-  const simplified = simplifyTitle(title);
-  const split = simplified.match(/^(.+?)\s+[-–—]\s+(.+)$/u);
+const mentionsArtist = (record: LrclibRecord, query: Pick<LyricsQuery, "title" | "artist">) => {
+  const artist = comparable(record.artistName);
 
-  const candidates = [
-    { title, artist },
-    { title: simplified, artist },
-    ...(split && !sameText(split[1]!, artist)
-      ? [{ title: split[2]!.trim(), artist: split[1]!.trim() }]
-      : []),
-  ];
-
-  return candidates.filter(
-    (candidate, index) =>
-      candidate.title !== "" &&
-      candidates.findIndex(
-        (other) =>
-          sameText(other.title, candidate.title) && sameText(other.artist, candidate.artist),
-      ) === index,
-  );
+  return artist !== "" && comparable(`${query.title} ${query.artist}`).includes(artist);
 };
 
 const exactLookup = (credentials: LrclibCredentials, query: LyricsQuery) =>
@@ -224,35 +209,43 @@ const exactLookup = (credentials: LrclibCredentials, query: LyricsQuery) =>
     );
   });
 
-const searchLookup = (
-  credentials: LrclibCredentials,
-  duration: number,
-  search: Pick<LyricsQuery, "title" | "artist">,
-) =>
+const searchRecords = (credentials: LrclibCredentials, params: Record<string, string>) =>
   Effect.gen(function* () {
-    const results = yield* requestJson(
-      credentials,
-      "/api/search",
-      new URLSearchParams({ track_name: search.title, artist_name: search.artist }),
-    );
+    const results = yield* requestJson(credentials, "/api/search", new URLSearchParams(params));
 
-    if (results === undefined) return { status: "missing" } satisfies LyricsLookup;
+    if (results === undefined) return [];
 
-    const records = yield* decodeRecords(results).pipe(
+    return yield* decodeRecords(results).pipe(
       Effect.mapError((cause) => new LrclibRequestError({ cause })),
     );
-
-    return pickSearchResult(records, duration);
   });
+
+const searchLookups = (credentials: LrclibCredentials, query: LyricsQuery) => {
+  const title = simplifyTitle(query.title) || query.title;
+
+  return [
+    searchRecords(credentials, { track_name: title, artist_name: query.artist }).pipe(
+      Effect.map((records) => pickSearchResult(records, query.duration)),
+    ),
+    searchRecords(credentials, { q: title }).pipe(
+      Effect.map((records) =>
+        pickSearchResult(
+          records.filter((record) => mentionsArtist(record, query)),
+          query.duration,
+        ),
+      ),
+    ),
+  ];
+};
 
 export const lookupLyrics = (credentials: LrclibCredentials, query: LyricsQuery) =>
   Effect.gen(function* () {
     let best: LyricsLookup = (yield* exactLookup(credentials, query)) ?? { status: "missing" };
 
-    for (const search of searchQueries(query)) {
+    for (const search of searchLookups(credentials, query)) {
       if (isSettled(best)) return best;
 
-      const match = yield* searchLookup(credentials, query.duration, search);
+      const match = yield* search;
 
       if (lookupRank(match) < lookupRank(best)) best = match;
     }
