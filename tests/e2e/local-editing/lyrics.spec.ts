@@ -69,7 +69,7 @@ test("falls back to a duration matched search and rides out a busy lrclib", asyn
   });
 
   const key = await upstreams.lyrics(track.title, {
-    busy: [503, "ok"],
+    faults: [503, "ok"],
     search: [
       upstreams.lrclibRecord({ duration: source.duration + 30, plainLyrics: "wrong length" }),
       upstreams.lrclibRecord({ duration: source.duration, plainLyrics: "plain lyric" }),
@@ -105,12 +105,46 @@ test("leaves lyrics alone until find lyrics is turned on in settings", async ({
   await expect.poll(async () => (await upstreams.calls({ key })).length).toBe(2);
   await editorMode(page, "advanced").click();
   await expect(field(page, "lyrics")).toHaveValue("");
-  await expect(field(page, "lyrics")).toHaveAttribute(
-    "placeholder",
-    "paste plain or synced lrc lyrics",
-  );
+  await expect(field(page, "lyrics")).toHaveAttribute("placeholder", "no lyrics found on lrclib");
 
   await page.reload();
   await openSettings(page, "editing");
   await expect(page.getByRole("checkbox", { name: /^find lyrics/u })).toBeChecked();
+});
+
+test("says when lrclib can't be reached and searches again on retry", async ({
+  page,
+  upstreams,
+}) => {
+  const track = await uniqueTrack();
+  await upstreams.lyrics(track.title, {
+    faults: [500, "ok"],
+    exact: upstreams.lrclibRecord({ trackName: track.title, syncedLyrics: synced }),
+  });
+  await seedSettings(page, { findLyrics: true });
+  await page.goto("/");
+  await pickFiles(page, [track.upload]);
+
+  await expect(field(page, "lyrics")).toHaveAttribute(
+    "placeholder",
+    "couldn't reach lrclib",
+    SETTLE_TIMEOUT,
+  );
+  await page.getByRole("button", { name: "retry", exact: true }).click();
+  await expect(field(page, "lyrics")).toHaveValue(synced, SETTLE_TIMEOUT);
+  await expect(page.getByRole("button", { name: "retry", exact: true })).toHaveCount(0);
+});
+
+test("asks for a title and artist before it can search", async ({ page, upstreams }) => {
+  const track = await uniqueTrack();
+  await upstreams.lyrics(track.title);
+  await seedSettings(page, { findLyrics: true });
+  await page.goto("/");
+  await pickFiles(page, [track.upload]);
+  await field(page, "artist").fill("");
+
+  await expect(field(page, "lyrics")).toHaveAttribute(
+    "placeholder",
+    "add a title and artist to find lyrics",
+  );
 });

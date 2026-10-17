@@ -70,7 +70,10 @@ function AudioTaggerViews({ controller, menuInViewHeader, mobileMenuButton }: Co
           keyNotation={settings.keyNotation}
           analysisPending={selectedFileId !== null && analysis.pendingTrackIds.has(selectedFileId)}
           findLyrics={settings.findLyrics}
-          lyricsPending={selectedFileId !== null && lyrics.pendingTrackIds.has(selectedFileId)}
+          lyricsStatus={lyrics.statusOf(selectedFileId)}
+          onRetryLyrics={() => {
+            if (selectedFileId !== null) lyrics.retry(selectedFileId);
+          }}
           metadataLinks={getMetadataLinkState(settings, editor.selectedFileAlbum)}
           onPreviewMetadataChange={(field, event) =>
             editor.commands.preview(field, event.target.value)

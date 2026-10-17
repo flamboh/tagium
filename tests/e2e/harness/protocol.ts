@@ -157,7 +157,7 @@ export type LyricsScenario = {
   key: string;
   exact: LrclibRecord | null;
   search: LrclibRecord[];
-  busy?: Sequence<429 | 503 | "ok">;
+  faults?: Sequence<429 | 500 | 503 | "ok">;
 };
 
 export type ShortLinkScenario = {

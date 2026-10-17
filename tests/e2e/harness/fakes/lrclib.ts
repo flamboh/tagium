@@ -26,15 +26,15 @@ export const fakeLrclib = (request: FakeRequest): FakeResult => {
     };
   }
 
-  const busy = request.registry.nextLyricsBusy(key);
+  const fault = request.registry.nextLyricsFault(key);
 
-  if (busy !== "ok") {
+  if (fault !== "ok") {
     return {
       route,
       key,
       response: json(
-        { name: busy === 429 ? "RateLimitExceeded" : "ServerOverloaded", statusCode: busy },
-        { status: busy, headers: { "retry-after": "1" } },
+        { statusCode: fault },
+        { status: fault, headers: fault === 500 ? {} : { "retry-after": "1" } },
       ),
     };
   }

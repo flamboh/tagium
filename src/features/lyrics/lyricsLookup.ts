@@ -53,8 +53,15 @@ const retryAfterSeconds = (response: Response) => {
   return Number.isFinite(seconds) && seconds > 0 ? seconds : 2;
 };
 
-export const lookupLyrics = (query: LyricsQuery) =>
+export interface LyricsLookupProgress {
+  onSearching: () => void;
+  onBusy: () => void;
+}
+
+export const lookupLyrics = (query: LyricsQuery, progress: LyricsLookupProgress) =>
   Effect.gen(function* () {
+    yield* Effect.sync(progress.onSearching);
+
     const response = yield* Effect.tryPromise({
       try: (signal) =>
         fetch("/api/lyrics", {
@@ -67,6 +74,8 @@ export const lookupLyrics = (query: LyricsQuery) =>
     });
 
     if (response.status === 429 || response.status === 503) {
+      yield* Effect.sync(progress.onBusy);
+
       return yield* new LyricsBusyError({ retryAfterSeconds: retryAfterSeconds(response) });
     }
 

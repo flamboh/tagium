@@ -132,8 +132,8 @@ export const createRegistry = () => {
 
       return scenario?.type === "lyrics" ? scenario : undefined;
     },
-    nextLyricsBusy(key: string) {
-      return pick(this.lyrics(key)?.busy ?? "ok", cursor(key).lyrics++);
+    nextLyricsFault(key: string) {
+      return pick(this.lyrics(key)?.faults ?? "ok", cursor(key).lyrics++);
     },
     post(key: string | null): PostScenario | undefined {
       const scenario = key ? scenarios.get(key)?.value : undefined;

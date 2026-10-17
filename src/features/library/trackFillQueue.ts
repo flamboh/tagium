@@ -3,6 +3,7 @@ import type { LibraryStore } from "@/features/library/useLibraryStore";
 
 export interface TrackFillQueue {
   sync: () => void;
+  retry: (trackId: string) => void;
   dispose: () => void;
 }
 
@@ -112,59 +113,65 @@ export const createTrackFillQueue = <Track extends TagiumFile, Result>({
     }
   };
 
-  return {
-    sync: () => {
-      if (disposed) return;
-      const { files } = library.getSnapshot();
-      const trackIds = new Set(files.map((file) => file.id));
+  const sync = () => {
+    if (disposed) return;
+    const { files } = library.getSnapshot();
+    const trackIds = new Set(files.map((file) => file.id));
 
-      for (const trackId of attempted.keys()) {
-        if (!trackIds.has(trackId)) attempted.delete(trackId);
-      }
+    for (const trackId of attempted.keys()) {
+      if (!trackIds.has(trackId)) attempted.delete(trackId);
+    }
 
-      for (const trackId of held.keys()) {
-        if (!trackIds.has(trackId)) held.delete(trackId);
-      }
+    for (const trackId of held.keys()) {
+      if (!trackIds.has(trackId)) held.delete(trackId);
+    }
 
-      if (running && isStale(running.trackId, running.input)) cancelRunning();
+    if (running && isStale(running.trackId, running.input)) cancelRunning();
 
-      if (!isEnabled()) {
-        cancelRunning();
-        queued = [];
+    if (!isEnabled()) {
+      cancelRunning();
+      queued = [];
 
-        for (const trackId of held.keys()) attempted.delete(trackId);
-        held.clear();
-        emitPending();
-
-        return;
-      }
-
-      if (!isExportRunning()) {
-        for (const [trackId, { input, result }] of held) {
-          held.delete(trackId);
-          applyResult(trackId, input, result);
-        }
-      }
-
-      queued = queued.filter((trackId) => trackIds.has(trackId));
-      const queuedIds = new Set(queued);
-      const latestFiles = getCurrentFiles();
-
-      for (const file of latestFiles) {
-        if (file.id === running?.trackId || queuedIds.has(file.id) || !isReady(file)) continue;
-
-        if (isAttempted(file)) continue;
-
-        if (!needsFill(file)) {
-          attempted.set(file.id, inputKey(file));
-          continue;
-        }
-
-        queued.push(file.id);
-      }
-
-      runNext();
+      for (const trackId of held.keys()) attempted.delete(trackId);
+      held.clear();
       emitPending();
+
+      return;
+    }
+
+    if (!isExportRunning()) {
+      for (const [trackId, { input, result }] of held) {
+        held.delete(trackId);
+        applyResult(trackId, input, result);
+      }
+    }
+
+    queued = queued.filter((trackId) => trackIds.has(trackId));
+    const queuedIds = new Set(queued);
+    const latestFiles = getCurrentFiles();
+
+    for (const file of latestFiles) {
+      if (file.id === running?.trackId || queuedIds.has(file.id) || !isReady(file)) continue;
+
+      if (isAttempted(file)) continue;
+
+      if (!needsFill(file)) {
+        attempted.set(file.id, inputKey(file));
+        continue;
+      }
+
+      queued.push(file.id);
+    }
+
+    runNext();
+    emitPending();
+  };
+
+  return {
+    sync,
+    retry: (trackId) => {
+      attempted.delete(trackId);
+      sync();
     },
     dispose: () => {
       disposed = true;

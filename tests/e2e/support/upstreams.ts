@@ -360,7 +360,7 @@ export const createUpstreams = (owner: string) => {
     },
     async lyrics(
       trackName: string,
-      options: Partial<Pick<LyricsScenario, "exact" | "search" | "busy">> = {},
+      options: Partial<Pick<LyricsScenario, "exact" | "search" | "faults">> = {},
     ) {
       const scenario: LyricsScenario = {
         type: "lyrics",
@@ -369,7 +369,7 @@ export const createUpstreams = (owner: string) => {
         search: options.search ?? [],
       };
 
-      if (options.busy !== undefined) scenario.busy = options.busy;
+      if (options.faults !== undefined) scenario.faults = options.faults;
 
       await register([scenario]);
 

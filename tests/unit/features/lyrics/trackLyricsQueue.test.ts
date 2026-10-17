@@ -5,8 +5,16 @@ import {
   type LibraryAction,
 } from "@/features/library/libraryState";
 import type { AudioMetadata, TagiumFile } from "@/features/library/types";
-import { getLyricsQuery, type LyricsLookup } from "@/features/lyrics/lyricsLookup";
-import { createTrackLyricsQueue } from "@/features/lyrics/useTrackLyrics";
+import {
+  getLyricsQuery,
+  type LyricsLookup,
+  type LyricsLookupProgress,
+} from "@/features/lyrics/lyricsLookup";
+import {
+  createTrackLyricsQueue,
+  getLyricsLookupStatus,
+  type LyricsLookupStatus,
+} from "@/features/lyrics/useTrackLyrics";
 
 const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   filename: "track",
@@ -44,6 +52,10 @@ const setup = (files: TagiumFile[]) => {
   let findLyrics = true;
   const looked: string[] = [];
   const resolvers = new Map<string, (lookup: LyricsLookup) => void>();
+  const rejecters = new Map<string, (error: Error) => void>();
+  const progress = new Map<string, LyricsLookupProgress>();
+  let pending: ReadonlySet<string> = new Set();
+  const statuses = new Map<string, LyricsLookupStatus>();
 
   const queue = createTrackLyricsQueue({
     library: {
@@ -55,12 +67,21 @@ const setup = (files: TagiumFile[]) => {
     getCurrentFiles: () => unsaved ?? state.files,
     getSettings: () => ({ findLyrics }),
     isExportRunning: () => false,
-    lookup: (trackMetadata) =>
-      new Promise((resolve) => {
+    lookup: (trackMetadata, _signal, lookupProgress) =>
+      new Promise((resolve, reject) => {
         looked.push(trackMetadata.title);
         resolvers.set(trackMetadata.title, resolve);
+        rejecters.set(trackMetadata.title, reject);
+        progress.set(trackMetadata.title, lookupProgress);
+        lookupProgress.onSearching();
       }),
-    onPendingChange: () => {},
+    onPendingChange: (trackIds) => {
+      pending = trackIds;
+    },
+    onStatusChange: (trackId, status) => {
+      if (status === undefined) statuses.delete(trackId);
+      else statuses.set(trackId, status);
+    },
   });
 
   return {
@@ -80,6 +101,12 @@ const setup = (files: TagiumFile[]) => {
       resolvers.get(id)!(lookup);
       await new Promise((settle) => setTimeout(settle, 0));
     },
+    fail: async (id: string) => {
+      rejecters.get(id)!(new Error("lyrics.upstream_failed"));
+      await new Promise((settle) => setTimeout(settle, 0));
+    },
+    busy: (id: string) => progress.get(id)!.onBusy(),
+    status: (id: string) => getLyricsLookupStatus(id, pending, statuses),
   };
 };
 
@@ -102,6 +129,30 @@ describe("track lyrics queue", () => {
 
     harness.queue.sync();
     expect(harness.looked).toEqual(["one", "two"]);
+  });
+
+  it("reports each track's lookup state and retries a failed lookup on request", async () => {
+    const harness = setup([track("one"), track("two"), track("three")]);
+    harness.queue.sync();
+    expect(["one", "two", "three"].map(harness.status)).toEqual(["searching", "queued", "queued"]);
+
+    harness.busy("one");
+    expect(harness.status("one")).toBe("busy");
+
+    await harness.resolve("one", { status: "missing" });
+    await harness.resolve("two", { status: "instrumental" });
+    await harness.fail("three");
+    expect(["one", "two", "three"].map(harness.status)).toEqual([
+      "missing",
+      "instrumental",
+      "failed",
+    ]);
+
+    harness.queue.retry("three");
+    expect(harness.looked).toEqual(["one", "two", "three", "three"]);
+    await harness.resolve("three", { status: "found", lyrics: "found", synced: false });
+    expect(harness.status("three")).toBeUndefined();
+    expect(harness.getFile("three").metadata?.lyrics).toBe("found");
   });
 
   it("skips tracks that already have lyrics or no artist to search by", () => {
