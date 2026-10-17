@@ -69,6 +69,11 @@ describe("lrclib search results", () => {
     ).toEqual({ status: "found", lyrics: "[00:01.00] best", synced: true });
 
     expect(pickSearchResult([record({ duration: 230 })], 200)).toEqual({ status: "missing" });
+    expect(pickSearchResult([record({ duration: 215 })], 200)).toEqual({
+      status: "found",
+      lyrics: "plain line",
+      synced: false,
+    });
     expect(pickSearchResult([record({ instrumental: true, plainLyrics: null })], 200)).toEqual({
       status: "instrumental",
     });
@@ -115,6 +120,38 @@ describe("lrclib lookup", () => {
       ),
     ).resolves.toEqual({ status: "found", lyrics: "plain line", synced: false });
     expect(new URL(requests[1]!.url).pathname).toBe("/api/search");
+  });
+
+  it("keeps searching for synced lyrics when the signature match is plain", async () => {
+    stubFetch(
+      json(record({ syncedLyrics: null })),
+      json([record({ duration: 201, syncedLyrics: "[00:01.00] searched" })]),
+    );
+
+    await expect(
+      Effect.runPromise(
+        lookupLyrics(credentials, { title: "Song", artist: "Artist", duration: 200 }),
+      ),
+    ).resolves.toEqual({ status: "found", lyrics: "[00:01.00] searched", synced: true });
+  });
+
+  it("also searches without a featured artist or a version suffix", async () => {
+    const requests = stubFetch(
+      json({ name: "TrackNotFound" }, 404),
+      json([]),
+      json([record({ syncedLyrics: "[00:01.00] simplified" })]),
+    );
+
+    await expect(
+      Effect.runPromise(
+        lookupLyrics(credentials, {
+          title: "Song (feat. Guest) - 2011 Remaster",
+          artist: "Artist",
+          duration: 200,
+        }),
+      ),
+    ).resolves.toMatchObject({ lyrics: "[00:01.00] simplified" });
+    expect(new URL(requests[2]!.url).searchParams.get("track_name")).toBe("Song");
   });
 
   it("searches straight away for a track too long for a signature match", async () => {
