@@ -488,3 +488,35 @@ describe("mp4Driver musical key", () => {
     expect(mdatPayloads(cleared)).toEqual(fixture.media);
   });
 });
+
+describe("mp4Driver lyrics", () => {
+  const mdatPayloads = (bytes: Uint8Array) =>
+    topAtoms(bytes)
+      .filter((entry) => entry.type === "mdat")
+      .map((entry) => bytes.slice(entry.start + 8, entry.start + entry.size));
+
+  it("adds, replaces, and clears the lyrics atom apart from the comment", async () => {
+    const fixture = makeFixture();
+    const original = await runInspect(fixture.bytes);
+    expect(original.metadata.lyrics).toBe("");
+
+    const synced = "[00:01.00] first line\n[00:02.50] second line";
+    const added = await runPatch(fixture.bytes, { lyrics: synced });
+    expect((await runInspect(added)).metadata).toMatchObject({
+      lyrics: synced,
+      comment: original.metadata.comment,
+    });
+
+    for (const opaque of fixture.opaque) expect(includes(added, opaque)).toBe(true);
+    expect(mdatPayloads(added)).toEqual(fixture.media);
+
+    const replaced = await runPatch(added, { lyrics: "plain line" });
+    expect((await runInspect(replaced)).metadata.lyrics).toBe("plain line");
+    expect(includes(replaced, ascii("first line"))).toBe(false);
+
+    const cleared = await runPatch(replaced, { lyrics: "" });
+    expect((await runInspect(cleared)).metadata.lyrics).toBe("");
+    expect(includes(cleared, ascii("plain line"))).toBe(false);
+    expect(mdatPayloads(cleared)).toEqual(fixture.media);
+  });
+});

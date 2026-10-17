@@ -757,3 +757,84 @@ describe("mp3Driver musical key", () => {
     expect(updated.metadata.musicalKey).toBe("Bb");
   });
 });
+
+describe("mp3Driver lyrics", () => {
+  const lyricsFrame = (value: string, language = "eng") =>
+    rawFrame(
+      "USLT",
+      concat(Uint8Array.of(3), encoder.encode(language), Uint8Array.of(0), encoder.encode(value)),
+    );
+
+  it("reads, replaces, and clears the unsynced lyrics frame apart from the comment", async () => {
+    const audio = validMp3Bytes();
+    const unknown = rawFrame("PRIV", Uint8Array.of(9, 8, 7, 6));
+
+    const source = blobByteSource(
+      new Blob([concat(tag(lyricsFrame("old line"), commentFrame("", "a note"), unknown), audio)]),
+    );
+
+    const inspected = await Effect.runPromise(mp3Driver.inspect(source));
+    expect(inspected.metadata).toMatchObject({ lyrics: "old line", comment: "a note" });
+
+    const synced = "[00:01.00] first line\n[00:02.50] second line";
+    const patchedPlan = await Effect.runPromise(mp3Driver.patch(source, { lyrics: synced }));
+    const patched = new Uint8Array(await new Blob(patchedPlan.parts).arrayBuffer());
+    expect(patched.slice(-audio.length)).toEqual(audio);
+    expect(includes(patched, unknown)).toBe(true);
+    const updated = await Effect.runPromise(mp3Driver.inspect(blobByteSource(new Blob([patched]))));
+    expect(updated.metadata).toMatchObject({ lyrics: synced, comment: "a note" });
+    expect(new TextDecoder("latin1").decode(patched).split("USLT")).toHaveLength(2);
+
+    const clearedPlan = await Effect.runPromise(
+      mp3Driver.patch(blobByteSource(new Blob([patched])), { lyrics: "" }),
+    );
+
+    const cleared = new Uint8Array(await new Blob(clearedPlan.parts).arrayBuffer());
+
+    const clearedInspection = await Effect.runPromise(
+      mp3Driver.inspect(blobByteSource(new Blob([cleared]))),
+    );
+
+    expect(clearedInspection.metadata).toMatchObject({ lyrics: "", comment: "a note" });
+    expect(new TextDecoder("latin1").decode(cleared)).not.toContain("USLT");
+  });
+
+  it("keeps lyrics in other languages on an edit and clears them all on a clear", async () => {
+    const audio = validMp3Bytes();
+    const translation = lyricsFrame("ligne traduite", "fra");
+
+    const source = blobByteSource(
+      new Blob([concat(tag(lyricsFrame("original line"), translation), audio)]),
+    );
+
+    const patchedPlan = await Effect.runPromise(mp3Driver.patch(source, { lyrics: "edited line" }));
+    const patched = new Uint8Array(await new Blob(patchedPlan.parts).arrayBuffer());
+    expect(includes(patched, translation)).toBe(true);
+    expect(includes(patched, encoder.encode("original line"))).toBe(false);
+    const updated = await Effect.runPromise(mp3Driver.inspect(blobByteSource(new Blob([patched]))));
+    expect(updated.metadata.lyrics).toBe("edited line");
+
+    const clearedPlan = await Effect.runPromise(mp3Driver.patch(source, { lyrics: "" }));
+    const cleared = new Uint8Array(await new Blob(clearedPlan.parts).arrayBuffer());
+
+    const clearedInspection = await Effect.runPromise(
+      mp3Driver.inspect(blobByteSource(new Blob([cleared]))),
+    );
+
+    expect(clearedInspection.metadata.lyrics).toBe("");
+  });
+
+  it("falls back to and rewrites APEv2-only lyrics", async () => {
+    const audio = validMp3Bytes();
+    const source = blobByteSource(new Blob([concat(audio, apeTag(apeItem("Lyrics", "old")))]));
+    const inspected = await Effect.runPromise(mp3Driver.inspect(source));
+    expect(inspected.metadata.lyrics).toBe("old");
+
+    const patchedPlan = await Effect.runPromise(mp3Driver.patch(source, { lyrics: "new" }));
+    const patched = new Uint8Array(await new Blob(patchedPlan.parts).arrayBuffer());
+    expect(includes(patched, apeItem("Lyrics", "new"))).toBe(true);
+    expect(includes(patched, apeItem("Lyrics", "old"))).toBe(false);
+    const updated = await Effect.runPromise(mp3Driver.inspect(blobByteSource(new Blob([patched]))));
+    expect(updated.metadata.lyrics).toBe("new");
+  });
+});
