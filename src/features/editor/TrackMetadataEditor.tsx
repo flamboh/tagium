@@ -1,5 +1,6 @@
 "use client";
 
+import { Refresh04Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { describeProcessingTracks } from "@/features/analysis/analysisProgress";
@@ -539,6 +540,7 @@ function LyricsField({
   const shownStatus = (lyrics ?? "") === "" ? placeholder : undefined;
 
   const retrying = shownStatus === lyricsLookupPlaceholders.busy;
+  const failed = shownStatus === lyricsLookupPlaceholders.failed;
 
   const searching =
     retrying ||
@@ -555,31 +557,34 @@ function LyricsField({
         aria-busy={searching}
         placeholder={placeholder}
         spellCheck={false}
-        className={cn("max-h-96", retrying && "placeholder:text-transparent")}
+        className={cn("max-h-96", (retrying || failed) && "placeholder:text-transparent")}
       />
-      {retrying && (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute top-[29px] left-[13px] flex h-5 items-center gap-1.5 text-base text-muted-foreground md:text-sm"
-        >
-          <HugeiconsIcon
-            icon={loaderCircleIcon}
-            strokeWidth={2}
-            className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none"
-          />
-          {placeholder}
+      {(retrying || failed) && (
+        <span className="pointer-events-none absolute top-[29px] left-[13px] flex h-5 items-center gap-1.5 text-base text-muted-foreground md:text-sm">
+          {retrying ? (
+            <HugeiconsIcon
+              icon={loaderCircleIcon}
+              strokeWidth={2}
+              aria-hidden="true"
+              className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none"
+            />
+          ) : (
+            <button
+              type="button"
+              aria-label="retry lyrics search"
+              onClick={lookup.onRetry}
+              className="pointer-events-auto -m-1 inline-flex size-5.5 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+            >
+              <HugeiconsIcon
+                icon={Refresh04Icon}
+                strokeWidth={2}
+                aria-hidden="true"
+                className="size-3.5"
+              />
+            </button>
+          )}
+          <span aria-hidden="true">{placeholder}</span>
         </span>
-      )}
-      {shownStatus === lyricsLookupPlaceholders.failed && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={lookup.onRetry}
-          className="absolute right-7 bottom-2"
-        >
-          retry
-        </Button>
       )}
     </div>
   );

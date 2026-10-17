@@ -130,9 +130,9 @@ test("says when lrclib can't be reached and searches again on retry", async ({
     "couldn't reach lrclib",
     SETTLE_TIMEOUT,
   );
-  await page.getByRole("button", { name: "retry", exact: true }).click();
+  await page.getByRole("button", { name: "retry lyrics search" }).click();
   await expect(field(page, "lyrics")).toHaveValue(synced, SETTLE_TIMEOUT);
-  await expect(page.getByRole("button", { name: "retry", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "retry lyrics search" })).toHaveCount(0);
 });
 
 test("asks for a title and artist before it can search", async ({ page, upstreams }) => {
