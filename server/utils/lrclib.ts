@@ -168,13 +168,35 @@ export const pickSearchResult = (
   return plain ? { status: "found", lyrics: plain.trim(), synced: false } : { status: "missing" };
 };
 
-export const searchTitles = (title: string) => {
-  const simplified = title
+const simplifyTitle = (title: string) =>
+  title
     .replace(/\s*[([](?:feat\.?|ft\.?|with)\s[^)\]]*[)\]]/giu, "")
     .replace(/\s+-\s+[^-]*\b(?:remaster(?:ed)?|live|version|edit|mono|stereo|mix|demo)\b.*$/iu, "")
     .trim();
 
-  return simplified && simplified !== title ? [title, simplified] : [title];
+const sameText = (first: string, second: string) =>
+  first.trim().toLocaleLowerCase() === second.trim().toLocaleLowerCase();
+
+export const searchQueries = ({ title, artist }: Pick<LyricsQuery, "title" | "artist">) => {
+  const simplified = simplifyTitle(title);
+  const split = simplified.match(/^(.+?)\s+[-–—]\s+(.+)$/u);
+
+  const candidates = [
+    { title, artist },
+    { title: simplified, artist },
+    ...(split && !sameText(split[1]!, artist)
+      ? [{ title: split[2]!.trim(), artist: split[1]!.trim() }]
+      : []),
+  ];
+
+  return candidates.filter(
+    (candidate, index) =>
+      candidate.title !== "" &&
+      candidates.findIndex(
+        (other) =>
+          sameText(other.title, candidate.title) && sameText(other.artist, candidate.artist),
+      ) === index,
+  );
 };
 
 const exactLookup = (credentials: LrclibCredentials, query: LyricsQuery) =>
@@ -202,12 +224,16 @@ const exactLookup = (credentials: LrclibCredentials, query: LyricsQuery) =>
     );
   });
 
-const searchLookup = (credentials: LrclibCredentials, query: LyricsQuery, title: string) =>
+const searchLookup = (
+  credentials: LrclibCredentials,
+  duration: number,
+  search: Pick<LyricsQuery, "title" | "artist">,
+) =>
   Effect.gen(function* () {
     const results = yield* requestJson(
       credentials,
       "/api/search",
-      new URLSearchParams({ track_name: title, artist_name: query.artist }),
+      new URLSearchParams({ track_name: search.title, artist_name: search.artist }),
     );
 
     if (results === undefined) return { status: "missing" } satisfies LyricsLookup;
@@ -216,17 +242,17 @@ const searchLookup = (credentials: LrclibCredentials, query: LyricsQuery, title:
       Effect.mapError((cause) => new LrclibRequestError({ cause })),
     );
 
-    return pickSearchResult(records, query.duration);
+    return pickSearchResult(records, duration);
   });
 
 export const lookupLyrics = (credentials: LrclibCredentials, query: LyricsQuery) =>
   Effect.gen(function* () {
     let best: LyricsLookup = (yield* exactLookup(credentials, query)) ?? { status: "missing" };
 
-    for (const title of searchTitles(query.title)) {
+    for (const search of searchQueries(query)) {
       if (isSettled(best)) return best;
 
-      const match = yield* searchLookup(credentials, query, title);
+      const match = yield* searchLookup(credentials, query.duration, search);
 
       if (lookupRank(match) < lookupRank(best)) best = match;
     }

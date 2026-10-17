@@ -540,7 +540,11 @@ function LyricsField({
   const shownStatus = (lyrics ?? "") === "" ? placeholder : undefined;
 
   const retrying = shownStatus === lyricsLookupPlaceholders.busy;
-  const failed = shownStatus === lyricsLookupPlaceholders.failed;
+
+  const refreshable =
+    shownStatus === lyricsLookupPlaceholders.failed ||
+    shownStatus === lyricsLookupPlaceholders.missing ||
+    shownStatus === lyricsLookupPlaceholders.instrumental;
 
   const searching =
     retrying ||
@@ -557,9 +561,9 @@ function LyricsField({
         aria-busy={searching}
         placeholder={placeholder}
         spellCheck={false}
-        className={cn("max-h-96", (retrying || failed) && "placeholder:text-transparent")}
+        className={cn("max-h-96", (retrying || refreshable) && "placeholder:text-transparent")}
       />
-      {(retrying || failed) && (
+      {(retrying || refreshable) && (
         <span className="pointer-events-none absolute top-[29px] left-[13px] flex h-5 items-center gap-1.5 text-base text-muted-foreground md:text-sm">
           {retrying ? (
             <HugeiconsIcon
@@ -571,7 +575,7 @@ function LyricsField({
           ) : (
             <button
               type="button"
-              aria-label="retry lyrics search"
+              aria-label="search lrclib again"
               onClick={lookup.onRetry}
               className="pointer-events-auto -m-1 inline-flex size-5.5 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
             >

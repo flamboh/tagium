@@ -241,7 +241,8 @@ export function EditingSettingsSection({ settings, onChange }: SettingsSectionPr
           <span className="block text-sm font-medium leading-5">find lyrics</span>
           <span className="block text-xs leading-5 text-muted-foreground">
             looks up each track's title and artist on lrclib and fills its empty lyrics field,
-            synced when available.
+            synced when available. apple music shows them without syncing, and spotify doesn't read
+            lyrics from files.
           </span>
         </span>
       </label>

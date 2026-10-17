@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { UseFormSubscribe } from "react-hook-form";
 import { applyDetectedTrackTagsToFiles } from "@/features/library/fileMetadataOps";
 import { createTrackFillQueue, type TrackFillQueue } from "@/features/library/trackFillQueue";
 import type { AppSettings, AudioMetadata, TagiumFile } from "@/features/library/types";
@@ -12,6 +13,10 @@ import {
 } from "@/features/lyrics/lyricsLookup";
 
 const LOOKUP_SPACING = "300 millis";
+
+const EDIT_SETTLE_MS = 1500;
+
+const LOOKUP_FIELDS = ["title", "artist", "album"] as const;
 
 const noPendingTracks: ReadonlySet<string> = new Set();
 
@@ -101,12 +106,14 @@ export const getLyricsLookupStatus = (
 export const useTrackLyrics = ({
   library,
   projectFiles,
+  subscribeToEdits,
   settings,
   exporting,
   isExportRunning,
 }: {
   library: LibraryStore;
   projectFiles: () => TagiumFile[];
+  subscribeToEdits: UseFormSubscribe<AudioMetadata>;
   settings: AppSettings;
   exporting: boolean;
   isExportRunning: () => boolean;
@@ -164,6 +171,25 @@ export const useTrackLyrics = ({
   useEffect(() => {
     queueRef.current?.sync();
   }, [exporting, library.state.files, settings.findLyrics]);
+
+  useEffect(() => {
+    if (!settings.findLyrics) return;
+    let timer: ReturnType<typeof globalThis.setTimeout> | undefined;
+
+    const unsubscribe = subscribeToEdits({
+      name: LOOKUP_FIELDS,
+      formState: { values: true },
+      callback: () => {
+        if (timer !== undefined) globalThis.clearTimeout(timer);
+        timer = globalThis.setTimeout(() => queueRef.current?.sync(), EDIT_SETTLE_MS);
+      },
+    });
+
+    return () => {
+      if (timer !== undefined) globalThis.clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [settings.findLyrics, subscribeToEdits]);
 
   const retry = useCallback(
     (trackId: string) => {

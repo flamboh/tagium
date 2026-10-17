@@ -1,6 +1,11 @@
 import { Effect } from "effect";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { LrclibRequestError, lookupLyrics, pickSearchResult } from "../../../server/utils/lrclib";
+import {
+  LrclibRequestError,
+  lookupLyrics,
+  pickSearchResult,
+  searchQueries,
+} from "../../../server/utils/lrclib";
 
 const credentials = { appId: "app", apiKey: "key" };
 
@@ -152,6 +157,17 @@ describe("lrclib lookup", () => {
       ),
     ).resolves.toMatchObject({ lyrics: "[00:01.00] simplified" });
     expect(new URL(requests[2]!.url).searchParams.get("track_name")).toBe("Song");
+  });
+
+  it("splits an artist out of a reposted artist - title upload", () => {
+    expect(searchQueries({ title: "LOONA - Hi High", artist: "naemii." })).toEqual([
+      { title: "LOONA - Hi High", artist: "naemii." },
+      { title: "Hi High", artist: "LOONA" },
+    ]);
+    expect(searchQueries({ title: "Song - 2011 Remaster", artist: "Artist" })).toEqual([
+      { title: "Song - 2011 Remaster", artist: "Artist" },
+      { title: "Song", artist: "Artist" },
+    ]);
   });
 
   it("searches straight away for a track too long for a signature match", async () => {

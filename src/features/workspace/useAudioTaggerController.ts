@@ -55,6 +55,7 @@ export function useAudioTaggerController() {
   const lyrics = useTrackLyrics({
     library,
     projectFiles: editor.commands.projectFiles,
+    subscribeToEdits: editor.form.subscribe,
     settings,
     exporting: exporting.exporting,
     isExportRunning: exporting.isExportRunning,
