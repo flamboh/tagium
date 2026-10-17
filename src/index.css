@@ -321,3 +321,37 @@
     outline-color: color-mix(in oklab, var(--brand) 20%, transparent);
   }
 }
+
+@utility field-scrollbar {
+  --field-scrollbar-thumb: color-mix(in oklab, var(--muted-foreground) 40%, transparent);
+
+  &::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+    margin-block: var(--field-scrollbar-inset, 4px) 0.5rem;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    border: solid transparent;
+    border-width: 2px 3px;
+    border-radius: 9999px;
+    background-clip: padding-box;
+    background-color: var(--field-scrollbar-thumb);
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    --field-scrollbar-thumb: color-mix(in oklab, var(--muted-foreground) 70%, transparent);
+  }
+
+  &::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--field-scrollbar-thumb) transparent;
+  }
+}
