@@ -20,6 +20,7 @@ import {
   type UseFormSetFocus,
 } from "react-hook-form";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { FloatingLabelInput, FloatingLabelTextarea } from "@/components/ui/floating-label-field";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CoverArt from "@/features/editor/coverArt";
@@ -537,10 +538,12 @@ function LyricsField({
   const placeholder = getLyricsPlaceholder(lookup, [title, artist]);
   const shownStatus = (lyrics ?? "") === "" ? placeholder : undefined;
 
+  const retrying = shownStatus === lyricsLookupPlaceholders.busy;
+
   const searching =
+    retrying ||
     shownStatus === lyricsLookupPlaceholders.queued ||
-    shownStatus === lyricsLookupPlaceholders.searching ||
-    shownStatus === lyricsLookupPlaceholders.busy;
+    shownStatus === lyricsLookupPlaceholders.searching;
 
   return (
     <div className="relative">
@@ -552,8 +555,21 @@ function LyricsField({
         aria-busy={searching}
         placeholder={placeholder}
         spellCheck={false}
-        className="max-h-96"
+        className={cn("max-h-96", retrying && "placeholder:text-transparent")}
       />
+      {retrying && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute top-[29px] left-[13px] flex h-5 items-center gap-1.5 text-base text-muted-foreground md:text-sm"
+        >
+          <HugeiconsIcon
+            icon={loaderCircleIcon}
+            strokeWidth={2}
+            className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none"
+          />
+          {placeholder}
+        </span>
+      )}
       {shownStatus === lyricsLookupPlaceholders.failed && (
         <Button
           type="button"
