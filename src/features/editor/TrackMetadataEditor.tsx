@@ -544,7 +544,8 @@ function LyricsField({
   const refreshable =
     shownStatus === lyricsLookupPlaceholders.failed ||
     shownStatus === lyricsLookupPlaceholders.missing ||
-    shownStatus === lyricsLookupPlaceholders.instrumental;
+    shownStatus === lyricsLookupPlaceholders.instrumental ||
+    (lookup.findLyrics && shownStatus === DEFAULT_LYRICS_PLACEHOLDER);
 
   const searching =
     retrying ||

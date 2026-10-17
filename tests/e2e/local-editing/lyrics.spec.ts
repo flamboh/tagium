@@ -53,6 +53,10 @@ test("finds synced lyrics for an imported track and tags them on download", asyn
 
   const { metadata } = await inspectAudio(await downloadTrack(page));
   expect(metadata).toMatchObject({ title: track.title, lyrics: synced });
+
+  await field(page, "lyrics").fill("");
+  await page.getByRole("button", { name: "search lrclib again" }).click();
+  await expect(field(page, "lyrics")).toHaveValue(synced, SETTLE_TIMEOUT);
 });
 
 test("falls back to a duration matched search and rides out a busy lrclib", async ({

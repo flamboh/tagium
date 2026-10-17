@@ -72,7 +72,12 @@ function AudioTaggerViews({ controller, menuInViewHeader, mobileMenuButton }: Co
           findLyrics={settings.findLyrics}
           lyricsStatus={lyrics.statusOf(selectedFileId)}
           onRetryLyrics={() => {
-            if (selectedFileId !== null) lyrics.retry(selectedFileId);
+            if (selectedFileId === null) return;
+            const saved = editor.commands.flush([selectedFileId]);
+            const metadata = saved.find((file) => file.id === selectedFileId)?.metadata;
+
+            if (metadata) editor.form.reset(metadata);
+            lyrics.retry(selectedFileId);
           }}
           metadataLinks={getMetadataLinkState(settings, editor.selectedFileAlbum)}
           onPreviewMetadataChange={(field, event) =>
