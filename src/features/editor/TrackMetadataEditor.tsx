@@ -73,6 +73,8 @@ interface TrackMetadataEditorProps {
   keyNotation: KeyNotation;
   /** Whether tempo and key detection is still queued or running for the selected track. */
   analysisPending: boolean;
+  findLyrics: boolean;
+  lyricsPending: boolean;
   metadataLinks: MetadataLinkState;
   onPreviewMetadataChange: (
     field: "filename" | "title" | "artist",
@@ -490,18 +492,48 @@ function BpmField({
   );
 }
 
-function LyricsField({ registration }: { registration: UseFormRegisterReturn<"lyrics"> }) {
+function LyricsField({
+  registration,
+  control,
+  pending = false,
+  rows = 6,
+}: {
+  registration: UseFormRegisterReturn<"lyrics">;
+  control: Control<AudioMetadata>;
+  pending?: boolean;
+  rows?: number;
+}) {
+  const lyrics = useWatch({ control, name: "lyrics" }) ?? "";
+  const searching = pending && lyrics === "";
+
   return (
     <FloatingLabelTextarea
       {...registration}
       id="track-lyrics"
       label="lyrics"
-      rows={6}
-      placeholder="paste plain or synced lrc lyrics"
+      rows={rows}
+      aria-busy={searching}
+      placeholder={searching ? "searching lrclib" : "paste plain or synced lrc lyrics"}
       spellCheck={false}
       className="max-h-96"
     />
   );
+}
+
+function FoundLyricsField({
+  findLyrics,
+  advancedMetadata,
+  ...field
+}: {
+  findLyrics: boolean;
+  advancedMetadata: boolean;
+  registration: UseFormRegisterReturn<"lyrics">;
+  control: Control<AudioMetadata>;
+  pending: boolean;
+}) {
+  if (!findLyrics || advancedMetadata) return null;
+
+  return <LyricsField {...field} rows={3} />;
 }
 
 const alternateKeyLabels = { standard: "standard", camelot: "camelot" } as const;
@@ -546,18 +578,22 @@ function KeyField({
 
 function AdvancedTrackDetailsFields({
   registrations,
+  control,
   errors,
   albumArtistLinked,
   linkedArtistValue,
   showDjFields,
+  lyricsPending,
   onFieldsMount,
 }: {
   registrations: AdvancedFieldRegistrations;
+  control: Control<AudioMetadata>;
   errors: FieldErrors<AudioMetadata>;
   albumArtistLinked: boolean;
   linkedArtistValue: string;
   /** False when the dj fields have their own row outside the advanced pane. */
   showDjFields: boolean;
+  lyricsPending: boolean;
   onFieldsMount?: (node: HTMLDivElement | null) => void;
 }) {
   const albumArtistReason = getMetadataLinkDescriptor("albumArtist").disabledReason;
@@ -637,7 +673,7 @@ function AdvancedTrackDetailsFields({
         rows={2}
         placeholder="add a comment"
       />
-      <LyricsField registration={registrations.lyrics} />
+      <LyricsField registration={registrations.lyrics} control={control} pending={lyricsPending} />
     </>
   );
 }
@@ -995,6 +1031,8 @@ function LoadedTrackMetadataEditor({
   djAnalysis,
   keyNotation,
   analysisPending,
+  findLyrics,
+  lyricsPending,
   metadataLinks,
   onPreviewMetadataChange,
   editorMode,
@@ -1184,10 +1222,12 @@ function LoadedTrackMetadataEditor({
                   >
                     <AdvancedTrackDetailsFields
                       registrations={advancedFields.registrations}
+                      control={control}
                       errors={advancedFields.errors}
                       albumArtistLinked={metadataLinks.albumArtist}
                       linkedArtistValue={linkedAlbumArtistDisplay}
                       showDjFields={!djAnalysis}
+                      lyricsPending={lyricsPending}
                       onFieldsMount={focusPendingAdvancedField}
                     />
                   </div>
@@ -1207,6 +1247,13 @@ function LoadedTrackMetadataEditor({
                     analysisPending={analysisPending}
                   />
                 )}
+                <FoundLyricsField
+                  findLyrics={findLyrics}
+                  advancedMetadata={advancedMetadata}
+                  registration={advancedFields.registrations.lyrics}
+                  control={control}
+                  pending={lyricsPending}
+                />
                 <TrackWaveform
                   key={selectedFile.id}
                   active={viewActive ?? true}

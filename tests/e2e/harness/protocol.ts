@@ -30,6 +30,10 @@ export const FAKE_SOUNDCLOUD_CLIENT_ID = "e2eSoundCloudClientId00000000000";
 
 export const FAKE_SOUNDCLOUD_PLAYBACK_ORIGIN = "https://playback.media-streaming.soundcloud.cloud";
 
+export const FAKE_LRCLIB_APP_ID = "e2e-lrclib-app";
+
+export const FAKE_LRCLIB_API_KEY = "e2e-lrclib-key";
+
 export type Sequence<T> = T | readonly T[];
 
 export type Json =
@@ -138,6 +142,24 @@ export type SoundCloudSetScenario = {
   status?: number;
 };
 
+export type LrclibRecord = {
+  trackName: string;
+  artistName: string;
+  albumName: string;
+  duration: number;
+  instrumental: boolean;
+  plainLyrics: string | null;
+  syncedLyrics: string | null;
+};
+
+export type LyricsScenario = {
+  type: "lyrics";
+  key: string;
+  exact: LrclibRecord | null;
+  search: LrclibRecord[];
+  busy?: Sequence<429 | 503 | "ok">;
+};
+
 export type ShortLinkScenario = {
   type: "short-link";
   key: string;
@@ -149,6 +171,7 @@ export type Scenario =
   | PostScenario
   | YouTubePlaylistScenario
   | SoundCloudSetScenario
+  | LyricsScenario
   | ShortLinkScenario;
 
 export type RateLimitRule = {
@@ -191,6 +214,8 @@ export const soundcloudKey = (pathname: string) =>
 export const shortLinkKey = (url: URL) => `short:${url.hostname.toLowerCase()}${url.pathname}`;
 
 export const linkKey = (url: URL) => `url:${url.href}`;
+
+export const lyricsKey = (trackName: string) => `lrclib:${trackName.trim().toLowerCase()}`;
 
 export const mediaKeyFromUrl = (value: string) => {
   let url: URL;

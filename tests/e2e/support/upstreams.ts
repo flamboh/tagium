@@ -7,6 +7,7 @@ import type {
 import {
   E2E_CONTROL_URL,
   linkKey,
+  lyricsKey,
   mediaKeyFromUrl,
   shortLinkKey,
   soundcloudKey,
@@ -14,6 +15,8 @@ import {
   youtubeVideoKey,
   type CobaltBehavior,
   type Json,
+  type LrclibRecord,
+  type LyricsScenario,
   type MediaScenario,
   type MetadataBehavior,
   type PostMedia,
@@ -355,6 +358,33 @@ export const createUpstreams = (owner: string) => {
       hangTunnel: (url: string) => overrideTunnel(url, { kind: "hang" }),
       stallTunnel: (url: string, bytes?: number) => overrideTunnel(url, { kind: "stall", bytes }),
     },
+    async lyrics(
+      trackName: string,
+      options: Partial<Pick<LyricsScenario, "exact" | "search" | "busy">> = {},
+    ) {
+      const scenario: LyricsScenario = {
+        type: "lyrics",
+        key: lyricsKey(trackName),
+        exact: options.exact ?? null,
+        search: options.search ?? [],
+      };
+
+      if (options.busy !== undefined) scenario.busy = options.busy;
+
+      await register([scenario]);
+
+      return scenario.key;
+    },
+    lrclibRecord: (overrides: Partial<LrclibRecord> = {}): LrclibRecord => ({
+      trackName: "",
+      artistName: "",
+      albumName: "",
+      duration: 0,
+      instrumental: false,
+      plainLyrics: null,
+      syncedLyrics: null,
+      ...overrides,
+    }),
     rateLimits: {
       limit: (binding: string, key: string, limit: RateLimitRule["limit"]) =>
         post("/rate-limits", { rule: { binding, key, limit } }),

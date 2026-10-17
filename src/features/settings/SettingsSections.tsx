@@ -225,6 +225,26 @@ export function EditingSettingsSection({ settings, onChange }: SettingsSectionPr
         </span>
       </label>
       <DjAnalysisSettings settings={settings} onChange={onChange} />
+      <label className={checkboxRowClassName}>
+        <Checkbox
+          id="find-lyrics"
+          checked={settings.findLyrics}
+          onCheckedChange={(checked) =>
+            onChange({
+              ...settings,
+              findLyrics: checked === true,
+            })
+          }
+          className="mt-0.5"
+        />
+        <span className="space-y-0.5">
+          <span className="block text-sm font-medium leading-5">find lyrics</span>
+          <span className="block text-xs leading-5 text-muted-foreground">
+            looks up each track's title and artist on lrclib and fills its empty lyrics field,
+            synced when available.
+          </span>
+        </span>
+      </label>
     </section>
   );
 }
@@ -371,6 +391,17 @@ export function AboutSettingsSection() {
               </a>
               , for their incredible downloading api service. they're a huge inspiration for this
               tool!
+            </p>
+            <p>
+              <a
+                href="https://lrclib.net/"
+                target="_blank"
+                rel="noreferrer"
+                className="cursor-pointer text-brand underline-offset-4 hover:underline"
+              >
+                lrclib
+              </a>
+              , for the free, community-built lyrics database behind find lyrics.
             </p>
           </div>
         </div>

@@ -107,6 +107,11 @@ export const createInMemoryDownloadRequestAdmission = (
     enforce(request) ? { status: "limited", scope: "client" } : { status: "allowed" },
 });
 
+export type LyricsAdmissionRuntimeEnv = {
+  LYRICS_CLIENT_RATE_LIMITER?: CloudflareRateLimitBinding;
+  LYRICS_SESSION_RATE_LIMITER?: CloudflareRateLimitBinding;
+} & DevControlRuntimeEnv;
+
 /** Uses Tagium's provisioned admission policy in deployed environments and its dev policy locally. */
 const getDownloadRequestAdmission = (
   request: Request,
@@ -143,4 +148,15 @@ export const getSoundCloudRequestAdmission = (
     runtimeEnv,
     runtimeEnv.SOUNDCLOUD_SESSION_RATE_LIMITER,
     runtimeEnv.SOUNDCLOUD_CLIENT_RATE_LIMITER,
+  );
+
+export const getLyricsRequestAdmission = (
+  request: Request,
+  runtimeEnv: LyricsAdmissionRuntimeEnv,
+) =>
+  getDownloadRequestAdmission(
+    request,
+    runtimeEnv,
+    runtimeEnv.LYRICS_SESSION_RATE_LIMITER,
+    runtimeEnv.LYRICS_CLIENT_RATE_LIMITER,
   );
