@@ -62,6 +62,51 @@ const topLevelBoxes = (bytes: Uint8Array) => {
   return boxes;
 };
 
+const audioEndpoint = /^\/api\/(?:cobalt\/audio|soundcloud-stream)$/u;
+
+const recordAudioFailures = (page: Page) => {
+  const failures: Promise<string>[] = [];
+
+  page.on("response", (response) => {
+    const { pathname } = new URL(response.url());
+
+    if (response.ok() || !audioEndpoint.test(pathname)) return;
+
+    failures.push(
+      response
+        .text()
+        .catch(() => "")
+        .then((body) => `${response.status()} ${pathname} ${body}`.trim()),
+    );
+  });
+
+  return failures;
+};
+
+const expectDownloadReady = async (page: Page, audioFailures: Promise<string>[]) => {
+  const ready = page.getByRole("button", { name: "download track", disabled: false });
+  const failed = page.getByText("download failed", { exact: true }).first();
+
+  await expect(ready.or(failed).first()).toBeVisible();
+
+  if (await failed.isVisible()) {
+    const surfaced = await page
+      .locator("[aria-live=polite]")
+      .filter({ hasText: /\S/u })
+      .allInnerTexts();
+
+    const responses = await Promise.all(audioFailures);
+
+    throw new Error(
+      [
+        "track download failed",
+        `ui: ${surfaced.map((text) => text.replaceAll(/\s*\n\s*/gu, " / ")).join(" | ") || "none"}`,
+        `api: ${responses.join(" | ") || "none"}`,
+      ].join("\n"),
+    );
+  }
+};
+
 const useAudioFormat = (context: BrowserContext, audioFormat: AppSettings["audioFormat"]) =>
   context.addInitScript(
     ([key, settings]) => {
@@ -82,14 +127,15 @@ for (const source of sources) {
     page,
   }) => {
     await useAudioFormat(context, source.audioFormat);
+    const audioFailures = recordAudioFailures(page);
     await page.goto("/");
     await page.getByRole("textbox", { name: "media url" }).fill(source.url);
     await page.getByRole("button", { name: "start media import" }).click();
 
     await expect(page.getByLabel("title", { exact: true })).toHaveValue(source.title);
     await expect(page.getByLabel("artist", { exact: true })).toHaveValue(source.artist);
+    await expectDownloadReady(page, audioFailures);
     const download = page.getByRole("button", { name: "download track" });
-    await expect(download).toBeEnabled();
     await expect(page.getByText(new RegExp(`\\b${source.duration}\\b`, "u")).first()).toBeVisible();
 
     const exported = await captureDownload(page, () => download.click());
