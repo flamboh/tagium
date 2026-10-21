@@ -39,6 +39,21 @@ Deploy with:
 flyctl deploy --config fly.cobalt.toml
 ```
 
+### YouTube login required
+
+YouTube blocks some Fly egress IPs with `LOGIN_REQUIRED` ("sign in to confirm you're not a bot"),
+which Cobalt reports as `error.api.youtube.login`. The egress IP belongs to the Fly host, so
+restarting or suspending the Machine keeps the blocked IP, and no innertube client gets past it.
+To confirm, fetch `https://www.youtube.com/watch?v=<id>` from the Machine with a Machines API exec:
+a blocked IP gets `"playabilityStatus":{"status":"LOGIN_REQUIRED"` even in the plain watch page
+HTML.
+
+To recover, clone the Machine's config into a new Machine in the same region, which usually lands
+on another host. Repeat the watch-page check on the new Machine and retry if it is still blocked;
+blocks can cover a whole /24, so a new host in the same range doesn't help. Once the new Machine
+passes its health check, stop and destroy the old one. `flyctl deploy` updates Machines in place,
+so later deploys keep the new IP.
+
 ## Preview topology
 
 Alchemy preview stages don't share production Cobalt. `alchemy.run.ts` deploys
