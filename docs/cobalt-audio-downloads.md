@@ -44,15 +44,25 @@ flyctl deploy --config fly.cobalt.toml
 YouTube blocks some Fly egress IPs with `LOGIN_REQUIRED` ("sign in to confirm you're not a bot"),
 which Cobalt reports as `error.api.youtube.login`. The egress IP belongs to the Fly host, so
 restarting or suspending the Machine keeps the blocked IP, and no innertube client gets past it.
-To confirm, fetch `https://www.youtube.com/watch?v=<id>` from the Machine with a Machines API exec:
-a blocked IP gets `"playabilityStatus":{"status":"LOGIN_REQUIRED"` even in the plain watch page
-HTML.
+To confirm, run real resolves from the Machine with a Machines API exec: POST
+`{"url":"https://www.youtube.com/watch?v=<id>","downloadMode":"audio"}` to Cobalt on
+`http://127.0.0.1:9001/` for several videos, authenticating with the first key from
+`API_KEY_URL`. A blocked IP returns `error.api.youtube.login` for most of them. Don't rely on the
+plain watch page: a heavily blocked IP gets `"playabilityStatus":{"status":"LOGIN_REQUIRED"` there,
+but a partly blocked one serves `OK` while Cobalt's resolves still fail. Get the egress IP from
+`https://api.ipify.org` in the same exec.
 
 To recover, clone the Machine's config into a new Machine in the same region, which usually lands
-on another host. Repeat the watch-page check on the new Machine and retry if it is still blocked;
-blocks can cover a whole /24, so a new host in the same range doesn't help. Once the new Machine
-passes its health check, stop and destroy the old one. `flyctl deploy` updates Machines in place,
-so later deploys keep the new IP.
+on another host. Repeat the resolve check on the new Machine and retry if it is still blocked;
+blocks can cover a whole /24, so a new host in the same range doesn't help. In lax,
+`89.187.186.0/24` and `216.246.104.0/24` were both blocked in October 2026; destroy clones that land
+there without testing. Once the new Machine passes its health check, stop and destroy the old one.
+`flyctl deploy` updates Machines in place, so later deploys keep the new IP.
+
+A `YOUTUBE_SESSION_SERVER` ([yt-session-generator](https://github.com/imputnet/yt-session-generator))
+doesn't help here. Cobalt only uses its tokens for iOS video above 1080p, and audio downloads with
+`TV_SIMPLY` mint their own PO tokens. The generator also has to run from the blocked IP to mint
+tokens that pass there, so a separate Fly app wouldn't work either.
 
 ## Preview topology
 
