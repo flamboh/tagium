@@ -1,33 +1,4 @@
-FROM node:24.22.1-alpine3.24@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS base
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-
-FROM base AS build
-ARG COBALT_REPOSITORY=https://github.com/imputnet/cobalt.git
-ARG COBALT_COMMIT=df90872a17c751f9967d1e55174f0369901f65e2
-WORKDIR /app
-
-RUN corepack enable
-RUN apk add --no-cache python3 alpine-sdk
-
-RUN git init -q -b main . \
-    && git remote add origin "$COBALT_REPOSITORY" \
-    && git fetch -q --depth 1 origin "$COBALT_COMMIT" \
-    && git checkout -q -B main FETCH_HEAD \
-    && test "$(git rev-parse HEAD)" = "$COBALT_COMMIT"
-
-RUN pnpm install --frozen-lockfile
-RUN pnpm deploy --filter=@imput/cobalt-api --prod /prod/api
-
-FROM base
-WORKDIR /app
-
-COPY --from=build --chown=node:node /prod/api /app
-COPY --from=build --chown=node:node /app/.git /app/.git
-
-USER node
-
-EXPOSE 9000
+FROM registry.fly.io/tagium-cobalt@sha256:da74e9ae6221fd5b0dbdd24a0c3893ec140c4e8a067dd8cec59f0569e5883425
 
 COPY --chown=node:node cobalt-machine-proxy.mjs /app/cobalt-machine-proxy.mjs
 COPY --chown=node:node cobalt-soundcloud.mjs /app/src/processing/services/soundcloud.js
