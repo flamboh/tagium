@@ -132,9 +132,9 @@ for (const source of sources) {
     await page.getByRole("textbox", { name: "media url" }).fill(source.url);
     await page.getByRole("button", { name: "start media import" }).click();
 
+    await expectDownloadReady(page, audioFailures);
     await expect(page.getByLabel("title", { exact: true })).toHaveValue(source.title);
     await expect(page.getByLabel("artist", { exact: true })).toHaveValue(source.artist);
-    await expectDownloadReady(page, audioFailures);
     const download = page.getByRole("button", { name: "download track" });
     await expect(page.getByText(new RegExp(`\\b${source.duration}\\b`, "u")).first()).toBeVisible();
 
