@@ -1,4 +1,4 @@
-FROM registry.fly.io/tagium-cobalt@sha256:ed27935513f69bb6ed754daa7296a14dff85490f6c9623f11e197e40106101a0
+FROM registry.fly.io/tagium-cobalt@sha256:da74e9ae6221fd5b0dbdd24a0c3893ec140c4e8a067dd8cec59f0569e5883425
 
 COPY --chown=node:node cobalt-machine-proxy.mjs /app/cobalt-machine-proxy.mjs
 COPY --chown=node:node cobalt-soundcloud.mjs /app/src/processing/services/soundcloud.js
