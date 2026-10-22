@@ -382,6 +382,7 @@ const inspect = (source: ByteSource) =>
       discNumber: canonicalInteger(firstValue(comments, "DISCNUMBER")),
       bpm: canonicalInteger(firstValue(comments, "BPM")),
       musicalKey: firstValue(comments, "INITIALKEY") ?? firstValue(comments, "KEY") ?? "",
+      lyrics: firstValue(comments, "LYRICS") ?? firstValue(comments, "UNSYNCEDLYRICS") ?? "",
     };
 
     return { format, metadata } satisfies AudioInspection;
@@ -428,6 +429,11 @@ const encodeVorbis = (
   if (changes.musicalKey !== undefined) {
     replaceText("INITIALKEY", changes.musicalKey);
     replacements.set("KEY", []);
+  }
+
+  if (changes.lyrics !== undefined) {
+    replaceText("LYRICS", changes.lyrics);
+    replacements.set("UNSYNCEDLYRICS", []);
   }
 
   if (changes.comment !== undefined) {
@@ -577,6 +583,7 @@ const patch = (source: ByteSource, changes: MetadataChanges) => {
       "bpm",
       "musicalKey",
       "comment",
+      "lyrics",
       "picture",
       "dateText",
       "trackText",
@@ -607,7 +614,8 @@ const patch = (source: ByteSource, changes: MetadataChanges) => {
       changes.trackText !== undefined ||
       changes.discNumber !== undefined ||
       changes.bpm !== undefined ||
-      changes.musicalKey !== undefined;
+      changes.musicalKey !== undefined ||
+      changes.lyrics !== undefined;
 
     const vorbisBlocks = new Map<number, VorbisBlock>();
 

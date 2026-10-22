@@ -136,6 +136,8 @@ export const diffEditableMetadata = (
 
   if (current.comment !== next.comment) changes.comment = next.comment;
 
+  if (current.lyrics !== next.lyrics) changes.lyrics = next.lyrics;
+
   if (!artworkEqual(current.picture, next.picture)) {
     // The current UI edits the primary cover only. Keep secondary artwork unless the
     // caller explicitly supplies a complete multi-picture replacement.

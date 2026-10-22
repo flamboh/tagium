@@ -876,6 +876,11 @@ const encodeTags = (tags: OpusTags, changes: MetadataChanges) => {
     replacements.set("KEY", []);
   }
 
+  if (changes.lyrics !== undefined) {
+    replaceText("LYRICS", changes.lyrics);
+    replacements.set("UNSYNCEDLYRICS", []);
+  }
+
   if (changes.year !== undefined) {
     replacements.set(
       "DATE",
@@ -1120,6 +1125,7 @@ const inspect = (source: ByteSource) =>
       discNumber: canonicalInteger(firstValue(comments, "DISCNUMBER")),
       bpm: canonicalInteger(firstValue(comments, "BPM")),
       musicalKey: firstValue(comments, "INITIALKEY") ?? firstValue(comments, "KEY") ?? "",
+      lyrics: firstValue(comments, "LYRICS") ?? firstValue(comments, "UNSYNCEDLYRICS") ?? "",
     };
 
     return { format, metadata } satisfies AudioInspection;
@@ -1150,6 +1156,7 @@ const patch = (source: ByteSource, changes: MetadataChanges) => {
       "bpm",
       "musicalKey",
       "comment",
+      "lyrics",
       "copyright",
       "language",
       "picture",
