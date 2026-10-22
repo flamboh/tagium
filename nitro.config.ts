@@ -37,6 +37,16 @@ const wrangler = {
       namespace_id: "1042704",
       simple: { limit: 120, period: 60 },
     },
+    {
+      name: "LYRICS_SESSION_RATE_LIMITER",
+      namespace_id: "1042705",
+      simple: { limit: 120, period: 60 },
+    },
+    {
+      name: "LYRICS_CLIENT_RATE_LIMITER",
+      namespace_id: "1042706",
+      simple: { limit: 240, period: 60 },
+    },
   ],
 };
 

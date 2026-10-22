@@ -36,6 +36,7 @@ export const useWorkspaceSettings = ({
         previous.advancedMetadata !== nextSettings.advancedMetadata ||
         previous.djAnalysis !== nextSettings.djAnalysis ||
         previous.keyNotation !== nextSettings.keyNotation ||
+        previous.findLyrics !== nextSettings.findLyrics ||
         Object.values(previous.metadataLinks).some(
           (enabled, index) => enabled !== Object.values(nextSettings.metadataLinks)[index],
         );
@@ -59,6 +60,7 @@ export const useWorkspaceSettings = ({
           advancedMetadata: nextSettings.advancedMetadata,
           djAnalysis: nextSettings.djAnalysis,
           keyNotation: nextSettings.keyNotation,
+          findLyrics: nextSettings.findLyrics,
           metadataLinks: getMetadataLinkState(nextSettings),
         });
       }

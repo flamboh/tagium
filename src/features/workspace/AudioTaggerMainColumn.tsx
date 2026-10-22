@@ -19,6 +19,7 @@ function AudioTaggerViews({ controller, menuInViewHeader, mobileMenuButton }: Co
     editor,
     settings,
     analysis,
+    lyrics,
     activeView,
     importing,
     exporting,
@@ -68,6 +69,16 @@ function AudioTaggerViews({ controller, menuInViewHeader, mobileMenuButton }: Co
           djAnalysis={settings.djAnalysis}
           keyNotation={settings.keyNotation}
           analysisPending={selectedFileId !== null && analysis.pendingTrackIds.has(selectedFileId)}
+          findLyrics={settings.findLyrics}
+          lyricsStatus={lyrics.statusOf(selectedFileId)}
+          onRetryLyrics={() => {
+            if (selectedFileId === null) return;
+            const saved = editor.commands.flush([selectedFileId]);
+            const metadata = saved.find((file) => file.id === selectedFileId)?.metadata;
+
+            if (metadata) editor.form.reset(metadata);
+            lyrics.retry(selectedFileId);
+          }}
           metadataLinks={getMetadataLinkState(settings, editor.selectedFileAlbum)}
           onPreviewMetadataChange={(field, event) =>
             editor.commands.preview(field, event.target.value)

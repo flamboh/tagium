@@ -106,6 +106,8 @@ export const configureShareDeploymentBindings = (
       "COBALT_CLIENT_RATE_LIMITER",
       "SOUNDCLOUD_SESSION_RATE_LIMITER",
       "SOUNDCLOUD_CLIENT_RATE_LIMITER",
+      "LYRICS_SESSION_RATE_LIMITER",
+      "LYRICS_CLIENT_RATE_LIMITER",
     ].includes(binding.name ?? ""),
   );
 

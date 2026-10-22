@@ -1,5 +1,6 @@
 import type {
   CobaltBehavior,
+  LyricsScenario,
   MediaScenario,
   PostAsset,
   PostScenario,
@@ -15,7 +16,7 @@ const HANG_LIMIT_MS = 10 * 60_000;
 
 type Owned<T> = { value: T; owner: string };
 
-type Cursor = { cobalt: number; tunnel: number; stream: number };
+type Cursor = { cobalt: number; tunnel: number; stream: number; lyrics: number };
 
 export type CallFilter = {
   owner?: string;
@@ -57,7 +58,7 @@ export const createRegistry = () => {
     let value = cursors.get(key);
 
     if (!value) {
-      value = { cobalt: 0, tunnel: 0, stream: 0 };
+      value = { cobalt: 0, tunnel: 0, stream: 0, lyrics: 0 };
       cursors.set(key, value);
     }
 
@@ -125,6 +126,14 @@ export const createRegistry = () => {
       const scenario = key ? scenarios.get(key)?.value : undefined;
 
       return scenario?.type === "media" ? scenario : undefined;
+    },
+    lyrics(key: string | null): LyricsScenario | undefined {
+      const scenario = key ? scenarios.get(key)?.value : undefined;
+
+      return scenario?.type === "lyrics" ? scenario : undefined;
+    },
+    nextLyricsFault(key: string) {
+      return pick(this.lyrics(key)?.faults ?? "ok", cursor(key).lyrics++);
     },
     post(key: string | null): PostScenario | undefined {
       const scenario = key ? scenarios.get(key)?.value : undefined;
