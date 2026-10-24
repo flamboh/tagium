@@ -25,10 +25,12 @@
     "nitro.config.ts",
     "playwright.config.ts",
     "playwright.live.config.ts",
+    "playwright.extension.config.ts",
     "server",
     "scripts",
     "tests/e2e",
     "tests/live",
+    "tests/extension",
     "tests/server"
   ]
 }

@@ -265,7 +265,14 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ["**/node_modules/**", "**/.git/**", "**/.repos/**", "**/e2e/**", "tests/live/**"],
+    exclude: [
+      "**/node_modules/**",
+      "**/.git/**",
+      "**/.repos/**",
+      "**/e2e/**",
+      "tests/live/**",
+      "tests/extension/**",
+    ],
   },
   plugins: [react(), libavAssets(), ...(isTest ? [] : [nitro()])],
   optimizeDeps: {
