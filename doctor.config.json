@@ -4,6 +4,10 @@
     "files": [".agents/**", ".claude/**", ".repos/**"],
     "overrides": [
       {
+        "files": ["extensions/youtube/lib/acquire.ts"],
+        "rules": ["react-doctor/async-await-in-loop"]
+      },
+      {
         "files": [
           "server/api/dev/config.get.ts",
           "server/api/dev/config.post.ts",
