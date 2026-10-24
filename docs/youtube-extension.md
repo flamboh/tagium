@@ -10,7 +10,8 @@ helper first; this draft does not build that helper.
 
 ## Try it locally
 
-Use Bun and the repo's Vite+ setup. From the repository root:
+Use the repo's Vite+ setup for the app and Bun 1.4.2 for the separate extension
+package (its lockfile uses version 2). From the repository root:
 
 ```sh
 bun install --frozen-lockfile
