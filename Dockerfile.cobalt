@@ -1,5 +1,11 @@
 FROM registry.fly.io/tagium-cobalt@sha256:da74e9ae6221fd5b0dbdd24a0c3893ec140c4e8a067dd8cec59f0569e5883425
 
+COPY --chown=node:node cobalt-youtube/package.json cobalt-youtube/package-lock.json /app/cobalt-youtube/
+RUN cd /app/cobalt-youtube && npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+COPY --chown=node:node cobalt-youtube/*.mjs /app/cobalt-youtube/
+COPY --chown=node:node cobalt-patch-youtube.mjs /tmp/cobalt-patch-youtube.mjs
+RUN node /tmp/cobalt-patch-youtube.mjs /app/src/processing/services/youtube.js && rm /tmp/cobalt-patch-youtube.mjs
+
 COPY --chown=node:node cobalt-machine-proxy.mjs /app/cobalt-machine-proxy.mjs
 COPY --chown=node:node cobalt-soundcloud.mjs /app/src/processing/services/soundcloud.js
 COPY --chown=node:node cobalt-soundcloud-helpers.mjs /app/cobalt-soundcloud-helpers.mjs
