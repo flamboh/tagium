@@ -705,9 +705,6 @@ const useAdvancedMetadataFormBoundary = ({
   return { registrations, errors };
 };
 
-const getCoverUpload = (editorBody: HTMLElement | null) =>
-  editorBody?.querySelector<HTMLElement>("[data-cover-upload]") ?? null;
-
 function TrackFileSize({ selectedFile }: { selectedFile: LoadedTrack }) {
   return (
     <span data-track-file-size>
@@ -865,12 +862,9 @@ const useEditorModeLayoutAnimation = ({
   editorMode: MetadataEditorMode;
   onEditorModeChange: (mode: MetadataEditorMode) => void;
 }) => {
-  const editorBodyRef = useRef<HTMLDivElement>(null);
   const editorActionsRef = useRef<HTMLDivElement>(null);
   const editorActionsTopRef = useRef<number | null>(null);
   const editorActionsStartTopRef = useRef<number | null>(null);
-  const coverUploadHeightRef = useRef<number | null>(null);
-  const coverUploadStartHeightRef = useRef<number | null>(null);
 
   const changeEditorMode = useCallback(
     (mode: MetadataEditorMode) => {
@@ -881,13 +875,6 @@ const useEditorModeLayoutAnimation = ({
         actions.getAnimations().forEach((animation) => animation.cancel());
       }
 
-      const coverUpload = getCoverUpload(editorBodyRef.current);
-
-      if (coverUpload) {
-        coverUploadStartHeightRef.current = coverUpload.getBoundingClientRect().height;
-        coverUpload.getAnimations().forEach((animation) => animation.cancel());
-      }
-
       onEditorModeChange(mode);
     },
     [onEditorModeChange],
@@ -895,17 +882,11 @@ const useEditorModeLayoutAnimation = ({
 
   useLayoutEffect(() => {
     const actions = editorActionsRef.current;
-    const coverUpload = getCoverUpload(editorBodyRef.current);
 
     const targetTop = actions?.getBoundingClientRect().top ?? null;
     const startTop = editorActionsStartTopRef.current ?? editorActionsTopRef.current;
     editorActionsStartTopRef.current = null;
     editorActionsTopRef.current = targetTop;
-
-    const targetHeight = coverUpload?.getBoundingClientRect().height ?? null;
-    const startHeight = coverUploadStartHeightRef.current ?? coverUploadHeightRef.current;
-    coverUploadStartHeightRef.current = null;
-    coverUploadHeightRef.current = targetHeight;
 
     if (viewActive === false || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       return;
@@ -924,23 +905,9 @@ const useEditorModeLayoutAnimation = ({
         timing,
       );
     }
-
-    // The upload button stretches to meet the download button, so its height follows the
-    // same slide instead of snapping.
-    if (
-      coverUpload &&
-      startHeight !== null &&
-      targetHeight !== null &&
-      Math.abs(startHeight - targetHeight) >= 0.5
-    ) {
-      coverUpload.animate(
-        [{ flex: `0 0 ${startHeight}px` }, { flex: `0 0 ${targetHeight}px` }],
-        timing,
-      );
-    }
   }, [advancedMetadata, editorMode, viewActive]);
 
-  return { editorBodyRef, editorActionsRef, changeEditorMode };
+  return { editorActionsRef, changeEditorMode };
 };
 
 const getTrackFailure = (selectedFile: LoadedTrack): TrackFailure | null => {
@@ -1018,7 +985,7 @@ function LoadedTrackMetadataEditor({
 
   const pendingAdvancedFocusRef = useRef<"discNumber" | "bpm" | null>(null);
 
-  const { editorBodyRef, editorActionsRef, changeEditorMode } = useEditorModeLayoutAnimation({
+  const { editorActionsRef, changeEditorMode } = useEditorModeLayoutAnimation({
     viewActive,
     advancedMetadata,
     editorMode,
@@ -1102,10 +1069,7 @@ function LoadedTrackMetadataEditor({
           }
         />
         <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-3 max-lg:[@media(max-height:700px)]:p-2 lg:p-6 lg:pb-28">
-          <div
-            ref={editorBodyRef}
-            className="flex min-h-full flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:min-h-0 lg:flex-row lg:gap-4"
-          >
+          <div className="flex min-h-full flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:min-h-0 lg:flex-row lg:gap-4">
             <Controller
               name="picture"
               control={control}
