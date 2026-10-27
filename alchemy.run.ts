@@ -1,7 +1,7 @@
 import * as Alchemy from "alchemy";
-import * as Cloudflare from "alchemy/Cloudflare";
-import * as Docker from "alchemy/Docker";
-import * as Fly from "alchemy/Fly";
+import * as Cloudflare from "@alchemy.run/cloudflare";
+import * as Docker from "@alchemy.run/docker";
+import * as Fly from "@alchemy.run/fly";
 import * as Output from "alchemy/Output";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
