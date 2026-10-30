@@ -100,7 +100,9 @@ const streamNonEmptyBody = async (response: Response) => {
   let firstChunk: ReadableStreamReadResult<Uint8Array>;
 
   try {
-    firstChunk = await reader.read();
+    do {
+      firstChunk = await reader.read();
+    } while (!firstChunk.done && firstChunk.value.byteLength === 0);
   } catch (error) {
     reader.releaseLock();
     throw error;
