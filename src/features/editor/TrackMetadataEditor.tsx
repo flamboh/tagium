@@ -1,5 +1,6 @@
 "use client";
 
+import { Refresh04Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { describeProcessingTracks } from "@/features/analysis/analysisProgress";
@@ -20,6 +21,7 @@ import {
   type UseFormSetFocus,
 } from "react-hook-form";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { FloatingLabelInput, FloatingLabelTextarea } from "@/components/ui/floating-label-field";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CoverArt from "@/features/editor/coverArt";
@@ -40,6 +42,7 @@ import { getTrackFailureDisplay } from "@/shared/systemFailure";
 import type { AlbumGroup, AudioMetadata, TagiumFile, TrackClip } from "@/features/library/types";
 import { getAudioFormat } from "@/features/audio/audioFormat";
 import { getAlternateKeySpelling, type KeyNotation } from "@/features/analysis/musicalKey";
+import type { LyricsLookupStatus } from "@/features/lyrics/useTrackLyrics";
 import {
   getMetadataLinkDescriptor,
   type MetadataLinkState,
@@ -73,6 +76,9 @@ interface TrackMetadataEditorProps {
   keyNotation: KeyNotation;
   /** Whether tempo and key detection is still queued or running for the selected track. */
   analysisPending: boolean;
+  findLyrics: boolean;
+  lyricsStatus: LyricsLookupStatus | undefined;
+  onRetryLyrics: () => void;
   metadataLinks: MetadataLinkState;
   onPreviewMetadataChange: (
     field: "filename" | "title" | "artist",
@@ -490,18 +496,117 @@ function BpmField({
   );
 }
 
-function LyricsField({ registration }: { registration: UseFormRegisterReturn<"lyrics"> }) {
+const DEFAULT_LYRICS_PLACEHOLDER = "paste plain or synced lrc lyrics";
+
+const lyricsLookupPlaceholders = {
+  queued: "waiting to search lrclib",
+  searching: "searching lrclib",
+  busy: "lrclib is busy, retrying",
+  missing: "no lyrics found on lrclib",
+  instrumental: "instrumental on lrclib",
+  failed: "couldn't reach lrclib",
+} as const satisfies Record<LyricsLookupStatus, string>;
+
+interface LyricsLookupState {
+  findLyrics: boolean;
+  status: LyricsLookupStatus | undefined;
+  onRetry: () => void;
+}
+
+const getLyricsPlaceholder = (
+  lookup: LyricsLookupState,
+  [title, artist]: readonly [string | undefined, string | undefined],
+) => {
+  if (!lookup.findLyrics) return DEFAULT_LYRICS_PLACEHOLDER;
+
+  if (!title?.trim() || !artist?.trim()) return "add a title and artist to find lyrics";
+
+  return lookup.status ? lyricsLookupPlaceholders[lookup.status] : DEFAULT_LYRICS_PLACEHOLDER;
+};
+
+function LyricsField({
+  registration,
+  control,
+  lookup,
+  rows = 6,
+}: {
+  registration: UseFormRegisterReturn<"lyrics">;
+  control: Control<AudioMetadata>;
+  lookup: LyricsLookupState;
+  rows?: number;
+}) {
+  const [lyrics, title, artist] = useWatch({ control, name: ["lyrics", "title", "artist"] });
+  const placeholder = getLyricsPlaceholder(lookup, [title, artist]);
+  const shownStatus = (lyrics ?? "") === "" ? placeholder : undefined;
+
+  const retrying = shownStatus === lyricsLookupPlaceholders.busy;
+
+  const refreshable =
+    shownStatus === lyricsLookupPlaceholders.failed ||
+    shownStatus === lyricsLookupPlaceholders.missing ||
+    shownStatus === lyricsLookupPlaceholders.instrumental ||
+    (lookup.findLyrics && shownStatus === DEFAULT_LYRICS_PLACEHOLDER);
+
+  const searching =
+    retrying ||
+    shownStatus === lyricsLookupPlaceholders.queued ||
+    shownStatus === lyricsLookupPlaceholders.searching;
+
   return (
-    <FloatingLabelTextarea
-      {...registration}
-      id="track-lyrics"
-      label="lyrics"
-      rows={6}
-      placeholder="paste plain or synced lrc lyrics"
-      spellCheck={false}
-      className="max-h-96"
-    />
+    <div className="relative">
+      <FloatingLabelTextarea
+        {...registration}
+        id="track-lyrics"
+        label="lyrics"
+        rows={rows}
+        aria-busy={searching}
+        placeholder={placeholder}
+        spellCheck={false}
+        className={cn("max-h-96", (retrying || refreshable) && "placeholder:text-transparent")}
+      />
+      {(retrying || refreshable) && (
+        <span className="pointer-events-none absolute top-[33px] left-[13px] flex h-5 items-center gap-1.5 text-base text-muted-foreground md:text-sm">
+          {retrying ? (
+            <HugeiconsIcon
+              icon={loaderCircleIcon}
+              strokeWidth={2}
+              aria-hidden="true"
+              className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none"
+            />
+          ) : (
+            <button
+              type="button"
+              aria-label="search lrclib again"
+              onClick={lookup.onRetry}
+              className="pointer-events-auto -m-1 inline-flex size-5.5 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+            >
+              <HugeiconsIcon
+                icon={Refresh04Icon}
+                strokeWidth={2}
+                aria-hidden="true"
+                className="size-3.5"
+              />
+            </button>
+          )}
+          <span aria-hidden="true">{placeholder}</span>
+        </span>
+      )}
+    </div>
   );
+}
+
+function FoundLyricsField({
+  advancedMetadata,
+  ...field
+}: {
+  advancedMetadata: boolean;
+  registration: UseFormRegisterReturn<"lyrics">;
+  control: Control<AudioMetadata>;
+  lookup: LyricsLookupState;
+}) {
+  if (!field.lookup.findLyrics || advancedMetadata) return null;
+
+  return <LyricsField {...field} rows={3} />;
 }
 
 const alternateKeyLabels = { standard: "standard", camelot: "camelot" } as const;
@@ -546,18 +651,22 @@ function KeyField({
 
 function AdvancedTrackDetailsFields({
   registrations,
+  control,
   errors,
   albumArtistLinked,
   linkedArtistValue,
   showDjFields,
+  lyricsLookup,
   onFieldsMount,
 }: {
   registrations: AdvancedFieldRegistrations;
+  control: Control<AudioMetadata>;
   errors: FieldErrors<AudioMetadata>;
   albumArtistLinked: boolean;
   linkedArtistValue: string;
   /** False when the dj fields have their own row outside the advanced pane. */
   showDjFields: boolean;
+  lyricsLookup: LyricsLookupState;
   onFieldsMount?: (node: HTMLDivElement | null) => void;
 }) {
   const albumArtistReason = getMetadataLinkDescriptor("albumArtist").disabledReason;
@@ -637,7 +746,7 @@ function AdvancedTrackDetailsFields({
         rows={2}
         placeholder="add a comment"
       />
-      <LyricsField registration={registrations.lyrics} />
+      <LyricsField registration={registrations.lyrics} control={control} lookup={lyricsLookup} />
     </>
   );
 }
@@ -962,6 +1071,9 @@ function LoadedTrackMetadataEditor({
   djAnalysis,
   keyNotation,
   analysisPending,
+  findLyrics,
+  lyricsStatus,
+  onRetryLyrics,
   metadataLinks,
   onPreviewMetadataChange,
   editorMode,
@@ -992,6 +1104,8 @@ function LoadedTrackMetadataEditor({
     selectedFileAlbum || !watchedAlbumArtist || watchedAlbumArtist === selectedFile.metadata.artist
       ? watchedArtist
       : watchedAlbumArtist;
+
+  const lyricsLookup = { findLyrics, status: lyricsStatus, onRetry: onRetryLyrics };
 
   const advancedFields = useAdvancedMetadataFormBoundary({
     register,
@@ -1148,10 +1262,12 @@ function LoadedTrackMetadataEditor({
                   >
                     <AdvancedTrackDetailsFields
                       registrations={advancedFields.registrations}
+                      control={control}
                       errors={advancedFields.errors}
                       albumArtistLinked={metadataLinks.albumArtist}
                       linkedArtistValue={linkedAlbumArtistDisplay}
                       showDjFields={!djAnalysis}
+                      lyricsLookup={lyricsLookup}
                       onFieldsMount={focusPendingAdvancedField}
                     />
                   </div>
@@ -1171,6 +1287,12 @@ function LoadedTrackMetadataEditor({
                     analysisPending={analysisPending}
                   />
                 )}
+                <FoundLyricsField
+                  advancedMetadata={advancedMetadata}
+                  registration={advancedFields.registrations.lyrics}
+                  control={control}
+                  lookup={lyricsLookup}
+                />
                 <TrackWaveform
                   key={selectedFile.id}
                   active={viewActive ?? true}

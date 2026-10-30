@@ -16,6 +16,8 @@ env:
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
   FLY_API_TOKEN: ${{ secrets.FLY_PREVIEW_API_TOKEN }}
+  LRCLIB_APP_ID: ${{ secrets.LRCLIB_APP_ID }}
+  LRCLIB_API_KEY: ${{ secrets.LRCLIB_API_KEY }}
 
 jobs:
   deploy:
