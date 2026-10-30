@@ -474,3 +474,50 @@ describe("FLAC musical key", () => {
     expect(clearedInspection.metadata).toMatchObject({ title: "Title", musicalKey: "" });
   });
 });
+
+describe("FLAC lyrics", () => {
+  const tagged = (...comments: string[]) =>
+    concat(utf8("fLaC"), block(0, streamInfo()), block(4, vorbis(comments), true), audio);
+
+  it("writes LYRICS, drops UNSYNCEDLYRICS, and clears on empty", async () => {
+    const original = tagged("TITLE=Title", "UNSYNCEDLYRICS=old line", "X-private=opaque value");
+    const source = blobByteSource(new Blob([original]));
+    expect((await Effect.runPromise(flacDriver.inspect(source))).metadata.lyrics).toBe("old line");
+
+    const synced = "[00:01.00] first line\n[00:02.50] second line";
+
+    const patched = await outputBytes(
+      (await Effect.runPromise(flacDriver.patch(source, { lyrics: synced }))).parts,
+    );
+
+    const patchedText = new TextDecoder().decode(patched);
+    expect(patchedText).toContain(`LYRICS=${synced}`);
+    expect(patchedText).not.toContain("UNSYNCEDLYRICS");
+    expect(patchedText).toContain("X-private=opaque value");
+
+    const inspected = await Effect.runPromise(
+      flacDriver.inspect(blobByteSource(new Blob([patched]))),
+    );
+
+    expect(inspected.metadata).toMatchObject({ title: "Title", lyrics: synced });
+    expect([...patched.subarray(audioOffset(patched))]).toEqual([
+      ...original.subarray(audioOffset(original)),
+    ]);
+
+    const cleared = await outputBytes(
+      (
+        await Effect.runPromise(
+          flacDriver.patch(blobByteSource(new Blob([patched])), { lyrics: "" }),
+        )
+      ).parts,
+    );
+
+    expect(new TextDecoder().decode(cleared)).not.toContain("LYRICS");
+
+    const clearedInspection = await Effect.runPromise(
+      flacDriver.inspect(blobByteSource(new Blob([cleared]))),
+    );
+
+    expect(clearedInspection.metadata).toMatchObject({ title: "Title", lyrics: "" });
+  });
+});

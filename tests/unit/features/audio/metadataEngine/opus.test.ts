@@ -613,3 +613,55 @@ describe("Opus musical key", () => {
     expect(clearedInspection.metadata).toMatchObject({ title: "Title", musicalKey: "" });
   });
 });
+
+describe("Opus lyrics", () => {
+  it("writes LYRICS, drops UNSYNCEDLYRICS, and clears on empty", async () => {
+    const audioBodies = [Uint8Array.of(0xf8, 0xaa, 0xbb, 0xcc)];
+
+    const original = validOpusBytes({
+      comments: ["TITLE=Title", "UNSYNCEDLYRICS=old line", "X-private=opaque value"],
+      audioBodies,
+    });
+
+    const source = blobByteSource(new Blob([original]));
+    expect((await Effect.runPromise(opusDriver.inspect(source))).metadata.lyrics).toBe("old line");
+
+    const synced = "[00:01.00] first line\n[00:02.50] second line";
+
+    const patched = await outputBytes(
+      (await Effect.runPromise(opusDriver.patch(source, { lyrics: synced }))).parts,
+    );
+
+    const patchedText = new TextDecoder().decode(patched);
+    expect(patchedText).toContain(`LYRICS=${synced}`);
+    expect(patchedText).not.toContain("UNSYNCEDLYRICS");
+    expect(patchedText).toContain("X-private=opaque value");
+
+    const inspected = await Effect.runPromise(
+      opusDriver.inspect(blobByteSource(new Blob([patched]))),
+    );
+
+    expect(inspected.metadata).toMatchObject({ title: "Title", lyrics: synced });
+    expect(
+      fixturePages(patched)
+        .slice(-audioBodies.length)
+        .map((page) => page.body),
+    ).toEqual(audioBodies);
+
+    const cleared = await outputBytes(
+      (
+        await Effect.runPromise(
+          opusDriver.patch(blobByteSource(new Blob([patched])), { lyrics: "" }),
+        )
+      ).parts,
+    );
+
+    expect(new TextDecoder().decode(cleared)).not.toContain("LYRICS");
+
+    const clearedInspection = await Effect.runPromise(
+      opusDriver.inspect(blobByteSource(new Blob([cleared]))),
+    );
+
+    expect(clearedInspection.metadata).toMatchObject({ title: "Title", lyrics: "" });
+  });
+});

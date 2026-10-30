@@ -477,6 +477,7 @@ const parseMetadata = (
       "gnre",
       "©wrt",
       "©cmt",
+      "©lyr",
     ]);
 
     const knownFreeformItems = new Set(["TITLE", "ARTIST", "ALBUM", "DATE", "GENRE"]);
@@ -638,6 +639,7 @@ const parseMetadata = (
         trackTotal,
         composer: values.get("©wrt")?.[0] ?? "",
         comment: values.get("©cmt")?.[0] ?? "",
+        lyrics: values.get("©lyr")?.[0] ?? "",
         discNumber,
         bpm,
         musicalKey: itunesKeys.get("INITIALKEY") ?? itunesKeys.get("KEY") ?? "",
@@ -751,6 +753,7 @@ const replacementEntries = (
   text("©alb", changes.album);
   text("©wrt", changes.composer);
   text("©cmt", changes.comment);
+  text("©lyr", changes.lyrics);
 
   if (changes.year !== undefined)
     result.set("©day", changes.year === null ? null : makeTextItem("©day", [String(changes.year)]));
@@ -1006,6 +1009,7 @@ const patch = (
         "bpm",
         "musicalKey",
         "comment",
+        "lyrics",
         "picture",
         "dateText",
         "trackText",
