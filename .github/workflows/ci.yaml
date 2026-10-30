@@ -34,6 +34,7 @@ jobs:
           cache: true
 
       - run: vp install
+      - run: npm ci --prefix cobalt-youtube --ignore-scripts --no-audit --no-fund
       - run: vp check
       - run: vp run typecheck
       - run: vp test
@@ -103,6 +104,8 @@ jobs:
             cobalt-machine-proxy.mjs \
             cobalt-soundcloud.mjs \
             cobalt-soundcloud-helpers.mjs \
+            cobalt-youtube \
+            cobalt-patch-youtube.mjs \
             cobalt-patch-ffmpeg.mjs; then
             echo "should_deploy=false" >> "$GITHUB_OUTPUT"
           else
