@@ -63,8 +63,65 @@ const makeEvent = (request: RuntimeRequest) => {
 
 describe("cobalt tunnel endpoint", () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it("rejects a tunnel that returns only zero-byte chunks after bounded retries", async () => {
+    vi.useFakeTimers();
+
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new Uint8Array());
+              controller.enqueue(new Uint8Array());
+              controller.close();
+            },
+          }),
+          { headers: { "content-type": "audio/webm", "content-length": "123" } },
+        ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const pending = handler(makeEvent(makeTunnelRequest()));
+    await vi.runAllTimersAsync();
+    const response = await pending;
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe("Cobalt tunnel response was empty.");
+    expect(response.headers.get("X-Tagium-Tunnel-Outcome")).toBe("exhausted");
+    expect(fetchMock).toHaveBeenCalledTimes(7);
+  });
+
+  it("preserves media bytes after leading empty chunks without retrying", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new Uint8Array());
+              controller.enqueue(new Uint8Array());
+              controller.enqueue(new Uint8Array([1, 2]));
+              controller.enqueue(new Uint8Array([3, 4]));
+              controller.close();
+            },
+          }),
+          { headers: { "content-type": "audio/webm" } },
+        ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await handler(makeEvent(makeTunnelRequest()));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("audio/webm");
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3, 4]));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("never follows an upstream tunnel redirect", async () => {
