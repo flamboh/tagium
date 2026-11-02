@@ -517,6 +517,23 @@ test("imports a track whose audio stream starts out empty", async ({ page, upstr
   expect((await inspectAudio(exported)).metadata.title).toBe("Slow Start");
 });
 
+test("fetches a fresh cobalt link when an audio tunnel stays empty", async ({
+  page,
+  upstreams,
+}) => {
+  const video = await upstreams.youtube.video({ title: "Fresh Tunnel", cover: null });
+  await upstreams.cobalt.emptyTunnel(video.url, 7);
+
+  await page.goto("/");
+  await importUrl(page, video.url);
+  await waitForTrackReady(page);
+
+  expect(await upstreams.calls({ route: "cobalt.tunnel.audio" })).toHaveLength(8);
+  expect(await cobaltRequestCount(upstreams, video.url)).toBe(2);
+  const exported = await captureDownload(page, () => downloadTrackButton(page).click());
+  expect((await inspectAudio(exported)).metadata.title).toBe("Fresh Tunnel");
+});
+
 test("retries soundcloud stream segments that fail or arrive empty", async ({
   page,
   upstreams,
