@@ -59,6 +59,13 @@ const MAX_TUNNEL_ATTEMPTS = 7;
 
 type LocalAudioPlan = Extract<CobaltDownloadPlan, { status: "local-processing" }>;
 
+class ExhaustedTunnelError extends Error {
+  override readonly name = "ExhaustedTunnelError";
+}
+
+const isExhaustedTunnelFailure = (error: unknown) =>
+  error instanceof ImportStageError && error.cause instanceof ExhaustedTunnelError;
+
 export const getStableLastModified = (sourceUrl: string) =>
   Array.from(sourceUrl).reduce((hash, character) => {
     return (hash * 31 + character.charCodeAt(0)) % 2_147_483_647;
@@ -213,7 +220,13 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
         }
 
         if (!response.ok) {
-          throw new Error(await response.text());
+          const message = await response.text();
+
+          if (response.headers.get("X-Tagium-Tunnel-Outcome") === "exhausted") {
+            throw new ExhaustedTunnelError(message);
+          }
+
+          throw new Error(message);
         }
 
         let contentType = response.headers.get("Content-Type");
@@ -288,7 +301,7 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
         .pipe(Effect.mapError((error) => new ImportStageError("processing", error)));
     });
 
-  const runDownload = (request: AudioDownloadRequest) =>
+  const downloadOnce = (request: AudioDownloadRequest) =>
     Effect.gen(function* () {
       const plan = yield* fetchPlan(request);
       const lastModified = getStableLastModified(request.sourceUrl);
@@ -305,6 +318,11 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
         request.signal,
       );
     });
+
+  const runDownload = (request: AudioDownloadRequest) =>
+    downloadOnce(request).pipe(
+      Effect.catchIf(isExhaustedTunnelFailure, () => downloadOnce(request)),
+    );
 
   return CobaltAudio.of({
     download: (request) =>
