@@ -10,7 +10,11 @@ import {
   consumeTunnelDevFault,
   type CobaltRuntimeEnv as DevControlRuntimeEnv,
 } from "../../utils/dev-controls";
-import { reportDownloadFailure } from "../../utils/download-failure-report";
+import {
+  reportDownloadFailure,
+  toDownloadService,
+  type DownloadService,
+} from "../../utils/download-failure-report";
 
 type CobaltRuntimeEnv = {
   COBALT_API_URL?: string;
@@ -27,6 +31,7 @@ type CloudflareRequest = Request & {
 };
 
 type TunnelObservabilityContext = {
+  service?: DownloadService;
   parentRequestId?: string;
   importId?: string;
   sourceFingerprint?: string;
@@ -188,8 +193,13 @@ const getTunnelObservabilityContext = (requestUrl: URL) => {
   const importId = read("importId", /^[A-Za-z0-9_-]{1,128}$/);
   const sourceFingerprint = read("sourceFingerprint", /^sha256:[a-f0-9]{32}$/);
   const rawTrackIndex = read("trackIndex", /^\d{1,5}$/);
+  const rawService = requestUrl.searchParams.get("service");
+  const service = rawService === null ? undefined : toDownloadService(rawService);
+
+  if (rawService !== null && service === undefined) throw new Error("invalid service");
 
   return {
+    service,
     parentRequestId,
     importId,
     sourceFingerprint,
@@ -420,7 +430,18 @@ export default defineHandler(async (event) => {
   let upstreamAttempts = 0;
 
   const reportFailure = (stage: string, upstreamStatus?: number) =>
-    reportDownloadFailure({ route: "tunnel", stage, requestId, upstreamStatus, machineId });
+    reportDownloadFailure({
+      route: "tunnel",
+      stage,
+      requestId,
+      upstreamStatus,
+      machineId,
+      service: observability.service,
+      parentRequestId: observability.parentRequestId,
+      importId: observability.importId,
+      trackIndex: observability.trackIndex,
+      attempts: upstreamAttempts || undefined,
+    });
 
   try {
     const runtimeEnv = getRuntimeEnv(event.req);

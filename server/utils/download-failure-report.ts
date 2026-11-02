@@ -10,6 +10,11 @@ export type DownloadFailure = {
   sourceUrl?: string;
   upstreamStatus?: number;
   machineId?: string | null;
+  service?: DownloadService;
+  parentRequestId?: string;
+  importId?: string;
+  trackIndex?: number;
+  attempts?: number;
 };
 
 const userInputErrorCodes = new Set([
@@ -35,6 +40,17 @@ const warningErrorCodes = new Set([
 export const downloadServiceFromUrl = (sourceUrl: string | undefined) =>
   sourceUrl ? parseMediaLink(sourceUrl).provider : "unknown";
 
+export type DownloadService = ReturnType<typeof downloadServiceFromUrl>;
+
+const linkedDownloadServices = [
+  "youtube",
+  "soundcloud",
+  "other",
+] as const satisfies readonly DownloadService[];
+
+export const toDownloadService = (value: string) =>
+  linkedDownloadServices.find((service) => service === value);
+
 export const reportDownloadFailure = (failure: DownloadFailure) => {
   if (
     failure.stage === "cobalt.resolve_error" &&
@@ -44,7 +60,7 @@ export const reportDownloadFailure = (failure: DownloadFailure) => {
     return;
   }
 
-  const service = downloadServiceFromUrl(failure.sourceUrl);
+  const service = failure.service ?? downloadServiceFromUrl(failure.sourceUrl);
   const reason = failure.errorCode ?? failure.stage;
   Sentry.withScope((scope) => {
     scope.setTags({
@@ -55,6 +71,10 @@ export const reportDownloadFailure = (failure: DownloadFailure) => {
       upstream_status: failure.upstreamStatus,
       machine_id: failure.machineId ?? undefined,
       request_id: failure.requestId,
+      parent_request_id: failure.parentRequestId,
+      import_id: failure.importId,
+      track_index: failure.trackIndex,
+      attempts: failure.attempts,
     });
     scope.setFingerprint(["download-failure", failure.route, service, reason]);
     Sentry.captureMessage(
