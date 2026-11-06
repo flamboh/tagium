@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { GithubIcon, TwitterIcon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { msg, T, useGT, useLocaleSelector, useMessages } from "gt-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -22,50 +23,60 @@ interface SettingsSectionProps {
 const checkboxRowClassName = "flex cursor-pointer select-none items-start gap-3 py-1";
 
 const audioFormatLabels = {
-  best: "best compatible",
-  mp3: "mp3",
+  best: msg("best compatible"),
+  mp3: msg("mp3"),
 } as const satisfies Record<AppSettings["audioFormat"], string>;
 
 const audioFormatDescriptions = {
-  best: "keeps the original audio without converting it, usually opus from youtube and m4a from soundcloud.",
-  mp3: "converts every download to mp3 at the selected bitrate.",
+  best: msg(
+    "keeps the original audio without converting it, usually opus from youtube and m4a from soundcloud.",
+  ),
+  mp3: msg("converts every download to mp3 at the selected bitrate."),
 } as const satisfies Record<AppSettings["audioFormat"], string>;
 
 const keyNotationLabels = {
-  standard: "standard",
-  camelot: "camelot",
-  both: "standard and camelot",
+  standard: msg("standard"),
+  camelot: msg("camelot"),
+  both: msg("standard and camelot"),
 } as const satisfies Record<AppSettings["keyNotation"], string>;
 
 const keyNotationDescriptions = {
-  standard: "tags note names, with m for minor keys.",
-  camelot: "tags camelot wheel numbers, with a for minor and b for major.",
-  both: "tags the musical name and shows its camelot code beside it.",
+  standard: msg("tags note names, with m for minor keys."),
+  camelot: msg("tags camelot wheel numbers, with a for minor and b for major."),
+  both: msg("tags the musical name and shows its camelot code beside it."),
 } as const satisfies Record<AppSettings["keyNotation"], string>;
 
 export function ImportingSettingsSection({ settings, onChange }: SettingsSectionProps) {
+  const gt = useGT();
+  const m = useMessages();
   const [formatOpen, setFormatOpen] = useState(false);
   const [bitrateOpen, setBitrateOpen] = useState(false);
 
   return (
     <section className="flex max-w-xl flex-col gap-5">
-      <div className="space-y-1">
-        <h3 className="text-base font-semibold">importing</h3>
-        <p className="text-sm leading-5 text-muted-foreground">
-          choose what happens the moment audio lands in your library.
-        </p>
-      </div>
+      <T>
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold">importing</h3>
+          <p className="text-sm leading-5 text-muted-foreground">
+            choose what happens the moment audio lands in your library.
+          </p>
+        </div>
+      </T>
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">download format</span>
+        <T>
+          <span className="text-sm font-medium">download format</span>
+        </T>
         <Popover open={formatOpen} onOpenChange={setFormatOpen}>
           <PopoverTrigger asChild>
             <Button
               type="button"
               variant="outline"
               className="h-9 w-full justify-between px-2 font-normal"
-              aria-label={`download format, ${audioFormatLabels[settings.audioFormat]}`}
+              aria-label={gt("download format, {format}", {
+                format: m(audioFormatLabels[settings.audioFormat]),
+              })}
             >
-              <span>{audioFormatLabels[settings.audioFormat]}</span>
+              <span>{m(audioFormatLabels[settings.audioFormat])}</span>
               <HugeiconsIcon
                 icon={UnfoldMoreIcon}
                 strokeWidth={2}
@@ -77,7 +88,7 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
             align="start"
             className="w-(--radix-popover-trigger-width) p-1"
             role="group"
-            aria-label="download format"
+            aria-label={gt("download format")}
           >
             {AUDIO_FORMAT_OPTIONS.map((format) => (
               <Button
@@ -92,9 +103,9 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
                 }}
               >
                 <span className="min-w-0 space-y-0.5">
-                  <span className="block text-sm">{audioFormatLabels[format]}</span>
+                  <span className="block text-sm">{m(audioFormatLabels[format])}</span>
                   <span className="block text-xs leading-4 text-muted-foreground">
-                    {audioFormatDescriptions[format]}
+                    {m(audioFormatDescriptions[format])}
                   </span>
                 </span>
               </Button>
@@ -103,14 +114,16 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
         </Popover>
       </div>
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">mp3 bitrate</span>
+        <T>
+          <span className="text-sm font-medium">mp3 bitrate</span>
+        </T>
         <Popover open={bitrateOpen} onOpenChange={setBitrateOpen}>
           <PopoverTrigger asChild>
             <Button
               type="button"
               variant="outline"
               className="h-9 w-full justify-between px-2 font-normal"
-              aria-label={`mp3 bitrate, ${settings.audioBitrate} kbps`}
+              aria-label={gt("mp3 bitrate, {bitrate} kbps", { bitrate: settings.audioBitrate })}
             >
               <span>
                 {settings.audioBitrate} <span className="text-muted-foreground">kbps</span>
@@ -126,7 +139,7 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
             align="start"
             className="w-(--radix-popover-trigger-width) p-1"
             role="group"
-            aria-label="mp3 bitrate"
+            aria-label={gt("mp3 bitrate")}
           >
             {AUDIO_BITRATE_OPTIONS.map((bitrate) => (
               <Button
@@ -146,9 +159,11 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
           </PopoverContent>
         </Popover>
         <p className="text-xs leading-5 text-muted-foreground">
-          {settings.audioFormat === "best"
-            ? "used when a download falls back to mp3."
-            : "higher bitrates preserve more detail but result in larger files."}
+          {settings.audioFormat === "best" ? (
+            <T>used when a download falls back to mp3.</T>
+          ) : (
+            <T>higher bitrates preserve more detail but result in larger files.</T>
+          )}
         </p>
       </div>
       <label className={checkboxRowClassName}>
@@ -162,14 +177,16 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
           }
           className="mt-0.5"
         />
-        <span className="space-y-0.5">
-          <span className="block text-sm font-medium leading-5">
-            use the soundcloud album cover for every track
+        <T>
+          <span className="space-y-0.5">
+            <span className="block text-sm font-medium leading-5">
+              use the soundcloud album cover for every track
+            </span>
+            <span className="block text-xs leading-5 text-muted-foreground">
+              applied once at import. individual track covers stay editable afterwards.
+            </span>
           </span>
-          <span className="block text-xs leading-5 text-muted-foreground">
-            applied once at import. individual track covers stay editable afterwards.
-          </span>
-        </span>
+        </T>
       </label>
       <label className={checkboxRowClassName}>
         <Checkbox
@@ -182,14 +199,16 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
           }
           className="mt-0.5"
         />
-        <span className="space-y-0.5">
-          <span className="block text-sm font-medium leading-5">
-            start download immediately after import
+        <T>
+          <span className="space-y-0.5">
+            <span className="block text-sm font-medium leading-5">
+              start download immediately after import
+            </span>
+            <span className="block text-xs leading-5 text-muted-foreground">
+              useful if you don't need detailed tagging and want a faster download
+            </span>
           </span>
-          <span className="block text-xs leading-5 text-muted-foreground">
-            useful if you don't need detailed tagging and want a faster download
-          </span>
-        </span>
+        </T>
       </label>
     </section>
   );
@@ -198,12 +217,14 @@ export function ImportingSettingsSection({ settings, onChange }: SettingsSection
 export function EditingSettingsSection({ settings, onChange }: SettingsSectionProps) {
   return (
     <section className="flex max-w-xl flex-col gap-5">
-      <div className="space-y-1">
-        <h3 className="text-base font-semibold">editing</h3>
-        <p className="text-sm leading-5 text-muted-foreground">
-          choose which fields the track editor shows you and fills in for you.
-        </p>
-      </div>
+      <T>
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold">editing</h3>
+          <p className="text-sm leading-5 text-muted-foreground">
+            choose which fields the track editor shows you and fills in for you.
+          </p>
+        </div>
+      </T>
       <label className={checkboxRowClassName}>
         <Checkbox
           id="advanced-metadata"
@@ -216,12 +237,14 @@ export function EditingSettingsSection({ settings, onChange }: SettingsSectionPr
           }
           className="mt-0.5"
         />
-        <span className="space-y-0.5">
-          <span className="block text-sm font-medium leading-5">show advanced fields</span>
-          <span className="block text-xs leading-5 text-muted-foreground">
-            adds album artist, disc number, composer, bpm, key, and comments to the track editor.
+        <T>
+          <span className="space-y-0.5">
+            <span className="block text-sm font-medium leading-5">show advanced fields</span>
+            <span className="block text-xs leading-5 text-muted-foreground">
+              adds album artist, disc number, composer, bpm, key, and comments to the track editor.
+            </span>
           </span>
-        </span>
+        </T>
       </label>
       <DjAnalysisSettings settings={settings} onChange={onChange} />
     </section>
@@ -230,6 +253,8 @@ export function EditingSettingsSection({ settings, onChange }: SettingsSectionPr
 
 /** The tempo and key detection controls shown in the editing section. */
 function DjAnalysisSettings({ settings, onChange }: SettingsSectionProps) {
+  const gt = useGT();
+  const m = useMessages();
   const [notationOpen, setNotationOpen] = useState(false);
 
   return (
@@ -246,26 +271,32 @@ function DjAnalysisSettings({ settings, onChange }: SettingsSectionProps) {
           }
           className="mt-0.5"
         />
-        <span className="space-y-0.5">
-          <span className="block text-sm font-medium leading-5">detect bpm and key</span>
-          <span className="block text-xs leading-5 text-muted-foreground">
-            for dj software. analyzes each track on this device and fills its empty bpm and key
-            fields. tracks longer than 15 minutes are skipped.
+        <T>
+          <span className="space-y-0.5">
+            <span className="block text-sm font-medium leading-5">detect bpm and key</span>
+            <span className="block text-xs leading-5 text-muted-foreground">
+              for dj software. analyzes each track on this device and fills its empty bpm and key
+              fields. tracks longer than 15 minutes are skipped.
+            </span>
           </span>
-        </span>
+        </T>
       </label>
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">key notation</span>
+        <T>
+          <span className="text-sm font-medium">key notation</span>
+        </T>
         <Popover open={notationOpen} onOpenChange={setNotationOpen}>
           <PopoverTrigger asChild>
             <Button
               type="button"
               variant="outline"
               className="h-9 w-full justify-between px-2 font-normal"
-              aria-label={`key notation, ${keyNotationLabels[settings.keyNotation]}`}
+              aria-label={gt("key notation, {notation}", {
+                notation: m(keyNotationLabels[settings.keyNotation]),
+              })}
               disabled={!settings.djAnalysis}
             >
-              <span>{keyNotationLabels[settings.keyNotation]}</span>
+              <span>{m(keyNotationLabels[settings.keyNotation])}</span>
               <HugeiconsIcon
                 icon={UnfoldMoreIcon}
                 strokeWidth={2}
@@ -277,7 +308,7 @@ function DjAnalysisSettings({ settings, onChange }: SettingsSectionProps) {
             align="start"
             className="w-(--radix-popover-trigger-width) p-1"
             role="group"
-            aria-label="key notation"
+            aria-label={gt("key notation")}
           >
             {KEY_NOTATION_OPTIONS.map((notation) => (
               <Button
@@ -292,18 +323,20 @@ function DjAnalysisSettings({ settings, onChange }: SettingsSectionProps) {
                 }}
               >
                 <span className="min-w-0 space-y-0.5">
-                  <span className="block text-sm">{keyNotationLabels[notation]}</span>
+                  <span className="block text-sm">{m(keyNotationLabels[notation])}</span>
                   <span className="block text-xs leading-4 text-muted-foreground">
-                    {keyNotationDescriptions[notation]}
+                    {m(keyNotationDescriptions[notation])}
                   </span>
                 </span>
               </Button>
             ))}
           </PopoverContent>
         </Popover>
-        <p className="text-xs leading-5 text-muted-foreground">
-          applies to keys detected from now on. keys already on a track are left as they are.
-        </p>
+        <T>
+          <p className="text-xs leading-5 text-muted-foreground">
+            applies to keys detected from now on. keys already on a track are left as they are.
+          </p>
+        </T>
       </div>
     </>
   );
@@ -312,70 +345,148 @@ function DjAnalysisSettings({ settings, onChange }: SettingsSectionProps) {
 export function LinkingSettingsSection({ settings, onChange }: SettingsSectionProps) {
   return (
     <section className="flex max-w-2xl flex-col gap-6">
-      <div className="space-y-1">
-        <h3 className="text-base font-semibold">linking</h3>
-        <p className="max-w-[65ch] text-sm leading-5 text-muted-foreground">
-          linked fields are synced with their source. unlink a field to allow it to be freely
-          edited.
-        </p>
-      </div>
+      <T>
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold">linking</h3>
+          <p className="max-w-[65ch] text-sm leading-5 text-muted-foreground">
+            linked fields are synced with their source. unlink a field to allow it to be freely
+            edited.
+          </p>
+        </div>
+      </T>
       <SettingsLinkMap settings={settings} onChange={onChange} />
     </section>
   );
 }
 
+export function LanguageSettingsSection() {
+  const gt = useGT();
+  const { locale, locales, getLocaleProperties, setLocale } = useLocaleSelector();
+  const [languageOpen, setLanguageOpen] = useState(false);
+
+  const languageName = (code: string) =>
+    getLocaleProperties(code).nativeName.toLocaleLowerCase(code);
+
+  return (
+    <section className="flex max-w-xl flex-col gap-5">
+      <T>
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold">language</h3>
+          <p className="text-sm leading-5 text-muted-foreground">
+            choose the language tagium uses. your tracks and their metadata are never translated.
+          </p>
+        </div>
+      </T>
+      <div className="flex flex-col gap-2">
+        <T>
+          <span className="text-sm font-medium">display language</span>
+        </T>
+        <Popover open={languageOpen} onOpenChange={setLanguageOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9 w-full justify-between px-2 font-normal"
+              aria-label={gt("display language, {language}", { language: languageName(locale) })}
+            >
+              <span>{languageName(locale)}</span>
+              <HugeiconsIcon
+                icon={UnfoldMoreIcon}
+                strokeWidth={2}
+                className="size-4 text-muted-foreground"
+              />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="w-(--radix-popover-trigger-width) p-1"
+            role="group"
+            aria-label={gt("display language")}
+          >
+            {locales.map((code) => (
+              <Button
+                key={code}
+                type="button"
+                variant="ghost"
+                lang={code}
+                className={`h-8 w-full justify-start px-2 font-normal ${locale === code ? "bg-accent text-accent-foreground" : ""}`}
+                aria-pressed={locale === code}
+                onClick={() => {
+                  setLocale(code);
+                  setLanguageOpen(false);
+                }}
+              >
+                {languageName(code)}
+              </Button>
+            ))}
+          </PopoverContent>
+        </Popover>
+      </div>
+    </section>
+  );
+}
+
 export function AboutSettingsSection() {
+  const gt = useGT();
+
   return (
     <div className="flex max-w-xl flex-col gap-6">
       <section className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
-          <h3 className="text-base font-semibold">about</h3>
-          <p className="text-sm leading-6 text-muted-foreground">
-            tagium exists to make device-local music more accessible to everyone.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <h3 className="text-base font-semibold">ethics</h3>
-          <p className="text-sm leading-6 text-muted-foreground">
-            tagium is not a piracy tool and cannot be used as one. it only works with free, publicly
-            accessible audio. it cannot be used to bypass paywalls or access private content.
-          </p>
-          <p className="text-sm leading-6 text-muted-foreground">
-            you are responsible for the content you download and how you use it. credit original
-            creators, support artists, and don't violate any terms or licenses.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <h3 className="text-base font-semibold">acknowledgements</h3>
-          <div className="flex flex-col gap-2 text-sm leading-6 text-muted-foreground">
-            <p>
-              <a
-                href="https://cobalt.tools/"
-                target="_blank"
-                rel="noreferrer"
-                className="cursor-pointer text-brand underline-offset-4 hover:underline"
-              >
-                cobalt
-              </a>{" "}
-              and{" "}
-              <a
-                href="https://imput.net/"
-                target="_blank"
-                rel="noreferrer"
-                className="cursor-pointer text-brand underline-offset-4 hover:underline"
-              >
-                imput
-              </a>
-              , for their incredible downloading api service. they're a huge inspiration for this
-              tool!
+        <T>
+          <div className="flex flex-col gap-2">
+            <h3 className="text-base font-semibold">about</h3>
+            <p className="text-sm leading-6 text-muted-foreground">
+              tagium exists to make device-local music more accessible to everyone.
             </p>
           </div>
-        </div>
+        </T>
+
+        <T>
+          <div className="flex flex-col gap-2">
+            <h3 className="text-base font-semibold">ethics</h3>
+            <p className="text-sm leading-6 text-muted-foreground">
+              tagium is not a piracy tool and cannot be used as one. it only works with free,
+              publicly accessible audio. it cannot be used to bypass paywalls or access private
+              content.
+            </p>
+            <p className="text-sm leading-6 text-muted-foreground">
+              you are responsible for the content you download and how you use it. credit original
+              creators, support artists, and don't violate any terms or licenses.
+            </p>
+          </div>
+        </T>
+
+        <T>
+          <div className="flex flex-col gap-2">
+            <h3 className="text-base font-semibold">acknowledgements</h3>
+            <div className="flex flex-col gap-2 text-sm leading-6 text-muted-foreground">
+              <p>
+                <a
+                  href="https://cobalt.tools/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="cursor-pointer text-brand underline-offset-4 hover:underline"
+                >
+                  cobalt
+                </a>{" "}
+                and{" "}
+                <a
+                  href="https://imput.net/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="cursor-pointer text-brand underline-offset-4 hover:underline"
+                >
+                  imput
+                </a>
+                , for their incredible downloading api service. they're a huge inspiration for this
+                tool!
+              </p>
+            </div>
+          </div>
+        </T>
       </section>
 
-      <nav className="flex items-center gap-3" aria-label="social links">
+      <nav className="flex items-center gap-3" aria-label={gt("social links")}>
         <a
           href="https://github.com/flamboh/tagium"
           target="_blank"

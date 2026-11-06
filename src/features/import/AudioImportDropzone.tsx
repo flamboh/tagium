@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MusicNote01Icon, Upload01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { T } from "gt-react";
 import { AUDIO_UPLOAD_ACCEPT } from "@/features/audio/audioFormat";
 import { cn } from "@/lib/utils";
 import { TagiumBrand } from "@/shared/brand/TagiumBrand";
@@ -128,11 +129,13 @@ export default function AudioImportDropzone({
         )}
         <div className="select-none text-center">
           <p className="text-lg font-semibold text-foreground">
-            {isDragging ? "drop to import" : "drop your audio here"}
+            {isDragging ? <T>drop to import</T> : <T>drop your audio here</T>}
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            mp3, flac, m4a/mp4, and opus · or click to browse
-          </p>
+          <T>
+            <p className="mt-1 text-sm text-muted-foreground">
+              mp3, flac, m4a/mp4, and opus · or click to browse
+            </p>
+          </T>
         </div>
       </button>
     </div>

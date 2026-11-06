@@ -1,6 +1,6 @@
 "use client";
 
-import { describeProcessingTracks } from "@/features/analysis/analysisProgress";
+import { ProcessingTracksLabel } from "@/features/analysis/ProcessingTracksLabel";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { useDroppable } from "@dnd-kit/core";
@@ -454,11 +454,13 @@ export function SortableAlbumCard({
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            {!canDownload
-              ? "album tracks need files, metadata, and filenames"
-              : processingCount > 0
-                ? describeProcessingTracks(processingCount)
-                : "download album"}
+            {!canDownload ? (
+              "album tracks need files, metadata, and filenames"
+            ) : processingCount > 0 ? (
+              <ProcessingTracksLabel count={processingCount} />
+            ) : (
+              "download album"
+            )}
           </TooltipContent>
         </Tooltip>
         <SpotlitActionMenu
