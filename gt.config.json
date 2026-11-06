@@ -1,9 +1,14 @@
 {
   "defaultLocale": "en",
-  "locales": ["es", "fr"],
+  "locales": ["es", "fr", "pt-BR", "ja", "ko", "zh-CN"],
   "files": {
     "gt": {
       "output": "src/i18n/translations/[locale].json"
+    }
+  },
+  "customMapping": {
+    "zh-CN": {
+      "nativeName": "简体中文"
     }
   }
 }

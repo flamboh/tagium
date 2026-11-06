@@ -1,0 +1,458 @@
+{
+  "30430296d32b38c1": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " faixa ainda está analisando tom/bpm"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " faixas ainda estão analisando tom/bpm"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "85640798a4f3767d": "faixas de {albumTitle}",
+  "cd66bd37a52f823a": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " faixa"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " faixas"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "3d77be8464ae9787": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "baixar ",
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " faixa"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "baixar ",
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " faixas"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "ac701ecffb63e1c1": "o download mudou. confirme o download atualizado de novo.",
+  "28aacf961719bba3": "este download não está mais disponível. cancele e tente de novo quando todas as faixas estiverem prontas.",
+  "de36e8073b449873": "cancelar",
+  "a6bc37f75c8f0894": "preparando…",
+  "4534b0aaa6a40859": [
+    "baixar ~",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "2fffb7ac83253d5d": "baixar",
+  "984a6561f5fd2ce0": "solte para importar",
+  "d4154567ec1ebaee": "solte seu áudio aqui",
+  "989110375c4655d0": {
+    "t": "p",
+    "i": 1,
+    "c": "mp3, flac, m4a/mp4 e opus · ou clique para procurar"
+  },
+  "f2c1b6c58cc1ca16": "baixar {albumTitle}",
+  "cf9b722006cd9532": "as faixas do álbum precisam de arquivos, metadados e nomes de arquivo",
+  "96da55354b2944ea": "baixar álbum",
+  "ef50e2834e6f1753": "limpar a seleção de faixas e voltar ao editor",
+  "d35d1cb26f44c1f2": [
+    {
+      "t": "p",
+      "i": 1,
+      "c": "nenhuma faixa ainda"
+    },
+    {
+      "t": "p",
+      "i": 2,
+      "c": "crie um álbum vazio ou envie faixas"
+    }
+  ],
+  "ffb80776b52e6fee": "adicionar álbum",
+  "c962bb137fe36a97": "limpeza de títulos",
+  "be7277b98a7e8e7a": [
+    "revise as mudanças de título sugeridas para ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ". mantenha as alterações que você gostar e desmarque as outras"
+  ],
+  "52ceaaf9f140cc0d": "encontramos ruído nos títulos das suas faixas. mantenha as alterações que você gostar e desmarque as outras",
+  "e9ad7dfe8f69a836": {
+    "t": "p",
+    "i": 1,
+    "c": "nada mais para limpar"
+  },
+  "ec307296f6593711": "desmarcar tudo",
+  "ff217e41d0e27f43": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "aplicar ",
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " alteração"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "aplicar ",
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " alterações"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "f3d91af688c33b73": "download em andamento",
+  "b066531e8b7e2033": "adicione faixas primeiro",
+  "55173efcf8055e1c": "cada faixa precisa de um nome de arquivo",
+  "b3c75d7d298f8248": "as faixas precisam de arquivos e metadados",
+  "dd4689f16cff6940": "baixando...",
+  "ff6963d3d059a787": "baixar tudo",
+  "8e4f7fdad62f921d": "configurações",
+  "ddc7186db9da7060": "importação",
+  "9d61c540cf5abfe8": "edição",
+  "952975d3c4f8f4b9": "vinculação",
+  "84707efb0b42e929": "idioma",
+  "28ea5348fb2ef427": "sobre",
+  "43d3dafa307c021a": "voltar ao espaço de trabalho",
+  "c05bec8fddb25762": "seções das configurações",
+  "a28c7ec2dbf8c58b": {
+    "t": "h2",
+    "i": 1,
+    "c": "configurações"
+  },
+  "30b53c4f470c69de": "mais compatível",
+  "2e1d3f646f62319a": "mp3",
+  "2aa871790f9bda75": "mantém o áudio original sem converter, geralmente opus do youtube e m4a do soundcloud.",
+  "88518af009774a07": "converte cada download para mp3 na taxa de bits escolhida.",
+  "a3d84f433920e45d": "padrão",
+  "d8b44fe442e59f65": "camelot",
+  "17a596f117a181af": "padrão e camelot",
+  "2bb10bc2bb461fb0": "marca os nomes das notas, com m para tons menores.",
+  "4cdfd8a394ece390": "marca os números da roda camelot, com a para menor e b para maior.",
+  "361dbc88dd74c0a3": "marca o nome musical e mostra o código camelot ao lado.",
+  "d068a3160c2408bd": "formato de download, {format}",
+  "56146f0d04bbaa75": "formato de download",
+  "ca16486f5d26cc8d": "taxa de bits do mp3, {bitrate} kbps",
+  "f5631b19e400408f": "taxa de bits do mp3",
+  "c50faea32156f565": "notação de tom, {notation}",
+  "8905c6bb6b065f3e": "notação de tom",
+  "561abd1e07dd66fc": "idioma da interface, {language}",
+  "ad6aa2a68b3084ca": "idioma da interface",
+  "3bcfc95d51bb5f03": "redes sociais",
+  "183cfe96d1b45187": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "importação"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "escolha o que acontece assim que o áudio chega à sua biblioteca."
+      }
+    ]
+  },
+  "3d2308111d76d0f0": {
+    "t": "span",
+    "i": 1,
+    "c": "formato de download"
+  },
+  "eb780a289c9e3e45": {
+    "t": "span",
+    "i": 1,
+    "c": "taxa de bits do mp3"
+  },
+  "8af23ff4529d6fae": "usada quando um download volta para mp3.",
+  "9ca58131d053218b": "taxas de bits mais altas preservam mais detalhes, mas geram arquivos maiores.",
+  "21ae5284c54983d3": {
+    "t": "span",
+    "i": 1,
+    "c": [
+      {
+        "t": "span",
+        "i": 2,
+        "c": "usar a capa do álbum do soundcloud em todas as faixas"
+      },
+      {
+        "t": "span",
+        "i": 3,
+        "c": "aplicada uma vez na importação. a capa de cada faixa continua editável depois."
+      }
+    ]
+  },
+  "1b12d24f5bf19199": {
+    "t": "span",
+    "i": 1,
+    "c": [
+      {
+        "t": "span",
+        "i": 2,
+        "c": "começar o download logo após importar"
+      },
+      {
+        "t": "span",
+        "i": 3,
+        "c": "útil se você não precisa de tags detalhadas e quer um download mais rápido"
+      }
+    ]
+  },
+  "d976f17103d18eeb": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "edição"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "escolha quais campos o editor de faixas mostra e preenche para você."
+      }
+    ]
+  },
+  "2e4b5432b34b6381": {
+    "t": "span",
+    "i": 1,
+    "c": [
+      {
+        "t": "span",
+        "i": 2,
+        "c": "mostrar campos avançados"
+      },
+      {
+        "t": "span",
+        "i": 3,
+        "c": "adiciona artista do álbum, número do disco, compositor, bpm, tom e comentários ao editor de faixas."
+      }
+    ]
+  },
+  "c3b56b2575646573": {
+    "t": "span",
+    "i": 1,
+    "c": [
+      {
+        "t": "span",
+        "i": 2,
+        "c": "detectar bpm e tom"
+      },
+      {
+        "t": "span",
+        "i": 3,
+        "c": "para softwares de dj. analisa cada faixa neste dispositivo e preenche os campos de bpm e tom vazios. faixas com mais de 15 minutos são ignoradas."
+      }
+    ]
+  },
+  "e93963218485468c": {
+    "t": "span",
+    "i": 1,
+    "c": "notação de tom"
+  },
+  "cd1559caa72e901b": {
+    "t": "p",
+    "i": 1,
+    "c": "vale para os tons detectados daqui em diante. os tons que já estão em uma faixa não mudam."
+  },
+  "ef3c9eab35c712bf": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "vinculação"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "campos vinculados ficam sincronizados com a origem. desvincule um campo para editá-lo livremente."
+      }
+    ]
+  },
+  "ed0b41352bdf7f41": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "idioma"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "escolha o idioma do tagium. suas faixas e os metadados delas nunca são traduzidos."
+      }
+    ]
+  },
+  "db4b67b60019a1e8": {
+    "t": "span",
+    "i": 1,
+    "c": "idioma da interface"
+  },
+  "ee2691d8d1c1c459": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "sobre"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "o tagium existe para tornar a música guardada no seu dispositivo mais acessível para todos."
+      }
+    ]
+  },
+  "1603db21c4df7df9": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "ética"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "o tagium não é uma ferramenta de pirataria e não pode ser usado como uma. ele só funciona com áudio gratuito e de acesso público. não serve para burlar paywalls nem para acessar conteúdo privado."
+      },
+      {
+        "t": "p",
+        "i": 4,
+        "c": "você é responsável pelo conteúdo que baixa e por como o usa. dê crédito aos criadores originais, apoie os artistas e não viole nenhum termo ou licença."
+      }
+    ]
+  },
+  "19541be6878b2198": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "agradecimentos"
+      },
+      {
+        "t": "div",
+        "i": 3,
+        "c": {
+          "t": "p",
+          "i": 4,
+          "c": [
+            {
+              "t": "a",
+              "i": 5,
+              "c": "cobalt"
+            },
+            " ",
+            "e",
+            " ",
+            {
+              "t": "a",
+              "i": 6,
+              "c": "imput"
+            },
+            ", pelo incrível serviço de api de download. eles são uma grande inspiração para esta ferramenta!"
+          ]
+        }
+      }
+    ]
+  }
+}

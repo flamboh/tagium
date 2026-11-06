@@ -2,6 +2,8 @@ import { useSyncExternalStore } from "react";
 import { getTranslationsSnapshot, initializeGTSPA, useLocale } from "gt-react";
 import gtConfig from "../../gt.config.json";
 
+export const displayLocales = [gtConfig.defaultLocale, ...gtConfig.locales];
+
 const translationFiles = import.meta.glob(["./translations/*.json", "!./translations/en.json"], {
   import: "default",
 });
@@ -43,6 +45,7 @@ export const initializeI18n = () =>
   initializeGTSPA({
     defaultLocale: gtConfig.defaultLocale,
     locales: gtConfig.locales,
+    customMapping: gtConfig.customMapping,
     loadTranslations,
     _reload: ({ locale }) => void showLocale(locale),
   });

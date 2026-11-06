@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { AppSettings } from "@/features/library/types";
 import SettingsLinkMap from "@/features/settings/SettingsLinkMap";
+import { displayLocales } from "@/i18n/i18n";
 import {
   AUDIO_BITRATE_OPTIONS,
   AUDIO_FORMAT_OPTIONS,
@@ -361,7 +362,7 @@ export function LinkingSettingsSection({ settings, onChange }: SettingsSectionPr
 
 export function LanguageSettingsSection() {
   const gt = useGT();
-  const { locale, locales, getLocaleProperties, setLocale } = useLocaleSelector();
+  const { locale, getLocaleProperties, setLocale } = useLocaleSelector();
   const [languageOpen, setLanguageOpen] = useState(false);
 
   const languageName = (code: string) =>
@@ -403,7 +404,7 @@ export function LanguageSettingsSection() {
             role="group"
             aria-label={gt("display language")}
           >
-            {locales.map((code) => (
+            {displayLocales.map((code) => (
               <Button
                 key={code}
                 type="button"
