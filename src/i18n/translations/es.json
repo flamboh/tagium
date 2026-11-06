@@ -121,6 +121,9 @@
     "i": 1,
     "c": "mp3, flac, m4a/mp4 y opus · o haz clic para buscar"
   },
+  "f2c1b6c58cc1ca16": "descargar {albumTitle}",
+  "cf9b722006cd9532": "las pistas del álbum necesitan archivos, metadatos y nombres de archivo",
+  "96da55354b2944ea": "descargar álbum",
   "ef50e2834e6f1753": "quitar la selección de pistas y volver al editor",
   "d35d1cb26f44c1f2": [
     {

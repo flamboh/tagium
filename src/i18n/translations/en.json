@@ -121,6 +121,9 @@
     "i": 1,
     "c": "mp3, flac, m4a/mp4, and opus · or click to browse"
   },
+  "f2c1b6c58cc1ca16": "download {albumTitle}",
+  "cf9b722006cd9532": "album tracks need files, metadata, and filenames",
+  "96da55354b2944ea": "download album",
   "ef50e2834e6f1753": "clear track selection and return to editor",
   "d35d1cb26f44c1f2": [
     {

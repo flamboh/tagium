@@ -1,8 +1,10 @@
 import { useSyncExternalStore } from "react";
-import { getTranslationsSnapshot, initializeGTSPA } from "gt-react";
+import { getTranslationsSnapshot, initializeGTSPA, useLocale } from "gt-react";
 import gtConfig from "../../gt.config.json";
 
-const translationFiles = import.meta.glob("./translations/*.json", { import: "default" });
+const translationFiles = import.meta.glob(["./translations/*.json", "!./translations/en.json"], {
+  import: "default",
+});
 
 const loadTranslations = async (locale: string) => {
   const loadFile = translationFiles[`./translations/${locale}.json`];
@@ -31,8 +33,11 @@ const subscribeToLocaleChanges = (notify: () => void) => {
 
 const getLocaleRevision = () => localeRevision;
 
-export const useLocaleRevision = () =>
+export const useDisplayedLocale = () => {
   useSyncExternalStore(subscribeToLocaleChanges, getLocaleRevision);
+
+  return useLocale();
+};
 
 export const initializeI18n = () =>
   initializeGTSPA({

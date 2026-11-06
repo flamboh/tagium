@@ -5,6 +5,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
+import { T, useGT } from "gt-react";
 import {
   AlertCircleIcon,
   BanIcon,
@@ -382,6 +383,7 @@ export function SortableAlbumCard({
   onFileDragOver,
   onFileDrop,
 }: AlbumCardProps) {
+  const gt = useGT();
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
 
   const {
@@ -438,7 +440,7 @@ export function SortableAlbumCard({
                 className="h-7 w-7 [@media(pointer:coarse)]:size-11"
                 onClick={onDownload}
                 disabled={!canDownload}
-                aria-label={`download ${album.title}`}
+                aria-label={gt("download {albumTitle}", { albumTitle: album.title })}
               >
                 <HugeiconsIcon
                   icon={canDownload && processingCount > 0 ? loaderCircleIcon : Download01Icon}
@@ -455,11 +457,11 @@ export function SortableAlbumCard({
           </TooltipTrigger>
           <TooltipContent>
             {!canDownload ? (
-              "album tracks need files, metadata, and filenames"
+              <T>album tracks need files, metadata, and filenames</T>
             ) : processingCount > 0 ? (
               <ProcessingTracksLabel count={processingCount} />
             ) : (
-              "download album"
+              <T>download album</T>
             )}
           </TooltipContent>
         </Tooltip>

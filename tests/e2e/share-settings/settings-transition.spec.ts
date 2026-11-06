@@ -181,3 +181,21 @@ test.describe("on a phone", () => {
     await expect(page.getByText("library (1)", { exact: true })).toBeAttached();
   });
 });
+
+test("switching language keeps library work and survives a reload", async ({ page }) => {
+  await uploadTrack(page);
+  await page.getByLabel("title", { exact: true }).fill("Kept across languages");
+
+  await page.getByRole("button", { name: "settings", exact: true }).click();
+  await page.getByRole("button", { name: "language", exact: true }).click();
+  await page.getByRole("button", { name: "display language, english" }).click();
+  await page.getByRole("button", { name: "español", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "es");
+
+  await page.getByRole("button", { name: "Kept across languages.mp3", exact: true }).click();
+  await expectActiveView(page, "editor");
+  await expect(page.getByLabel("title", { exact: true })).toHaveValue("Kept across languages");
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("lang", "es");
+});
