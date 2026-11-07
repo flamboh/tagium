@@ -390,44 +390,12 @@
     "c": "mp3, flac, m4a/mp4 et opus · ou clique pour parcourir"
   },
   "6e29cecd8abcd6a8": "progression du téléchargement de la playlist",
+  "41c108157dfcd7fe": "{count, plural, one {# piste n’a pas pu être enregistrée. sélectionne-la pour voir pourquoi.} other {# pistes n’ont pas pu être enregistrées. sélectionnes-en une pour voir pourquoi.}}",
   "abee8164920b4ff0": "relancer les téléchargements de la playlist",
   "9f78ceee5819aef2": "annuler les téléchargements de la playlist",
   "079af5af7fc1d398": "masquer la progression de la playlist",
   "bde9957ade0fd9eb": "en attente pour lancer d’autres téléchargements...",
   "f8802c0113da1789": "pistes restantes annulées",
-  "c0c2dfcf20c1d502": {
-    "t": "Plural",
-    "i": 1,
-    "d": {
-      "b": {
-        "one": {
-          "t": "C2",
-          "i": 2,
-          "c": [
-            {
-              "i": 3,
-              "k": "_gt_n_3",
-              "v": "n"
-            },
-            " piste n’a pas pu être enregistrée. sélectionne-la pour voir pourquoi."
-          ]
-        },
-        "other": {
-          "t": "C2",
-          "i": 2,
-          "c": [
-            {
-              "i": 3,
-              "k": "_gt_n_3",
-              "v": "n"
-            },
-            " pistes n’ont pas pu être enregistrées. sélectionnes-en une pour voir pourquoi."
-          ]
-        }
-      },
-      "t": "p"
-    }
-  },
   "2bb82284766794d6": [
     "échec ",
     {

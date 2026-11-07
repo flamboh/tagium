@@ -390,44 +390,12 @@
     "c": "mp3, flac, m4a/mp4, and opus · or click to browse"
   },
   "6e29cecd8abcd6a8": "playlist download progress",
+  "41c108157dfcd7fe": "{count, plural, one {# track couldn't be saved. select it to see why.} other {# tracks couldn't be saved. select one to see why.}}",
   "abee8164920b4ff0": "retry playlist downloads",
   "9f78ceee5819aef2": "cancel playlist downloads",
   "079af5af7fc1d398": "dismiss playlist download progress",
   "bde9957ade0fd9eb": "waiting to start more downloads...",
   "f8802c0113da1789": "remaining tracks canceled",
-  "c0c2dfcf20c1d502": {
-    "t": "Plural",
-    "i": 1,
-    "d": {
-      "b": {
-        "one": {
-          "t": "C2",
-          "i": 2,
-          "c": [
-            {
-              "i": 3,
-              "k": "_gt_n_3",
-              "v": "n"
-            },
-            " track couldn't be saved. select it to see why."
-          ]
-        },
-        "other": {
-          "t": "C2",
-          "i": 2,
-          "c": [
-            {
-              "i": 3,
-              "k": "_gt_n_3",
-              "v": "n"
-            },
-            " tracks couldn't be saved. select one to see why."
-          ]
-        }
-      },
-      "t": "p"
-    }
-  },
   "2bb82284766794d6": [
     "failed ",
     {

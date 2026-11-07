@@ -390,44 +390,12 @@
     "c": "mp3, flac, m4a/mp4 e opus · ou clique para procurar"
   },
   "6e29cecd8abcd6a8": "progresso do download da playlist",
+  "41c108157dfcd7fe": "{count, plural, one {# faixa não pôde ser salva. selecione-a para ver o motivo.} other {# faixas não puderam ser salvas. selecione uma para ver o motivo.}}",
   "abee8164920b4ff0": "tentar de novo os downloads da playlist",
   "9f78ceee5819aef2": "cancelar downloads da playlist",
   "079af5af7fc1d398": "fechar o progresso do download da playlist",
   "bde9957ade0fd9eb": "aguardando para iniciar mais downloads...",
   "f8802c0113da1789": "faixas restantes canceladas",
-  "c0c2dfcf20c1d502": {
-    "t": "Plural",
-    "i": 1,
-    "d": {
-      "b": {
-        "one": {
-          "t": "C2",
-          "i": 2,
-          "c": [
-            {
-              "i": 3,
-              "k": "_gt_n_3",
-              "v": "n"
-            },
-            " faixa não pôde ser salva. selecione-a para ver o motivo."
-          ]
-        },
-        "other": {
-          "t": "C2",
-          "i": 2,
-          "c": [
-            {
-              "i": 3,
-              "k": "_gt_n_3",
-              "v": "n"
-            },
-            " faixas não puderam ser salvas. selecione uma para ver o motivo."
-          ]
-        }
-      },
-      "t": "p"
-    }
-  },
   "2bb82284766794d6": [
     "com falha ",
     {

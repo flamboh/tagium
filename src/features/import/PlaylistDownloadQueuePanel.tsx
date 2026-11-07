@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Num, Plural, T, useGT } from "gt-react";
+import { Num, T, useGT } from "gt-react";
 import { Cancel01Icon, Refresh04Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
@@ -115,22 +115,11 @@ export default function PlaylistDownloadQueuePanel({
 }
 
 function FailureSummary({ failedCount }: { failedCount: number }) {
-  return (
-    <T>
-      <Plural
-        n={failedCount}
-        one={
-          <>
-            <Num>{failedCount}</Num> track couldn't be saved. select it to see why.
-          </>
-        }
-        other={
-          <>
-            <Num>{failedCount}</Num> tracks couldn't be saved. select one to see why.
-          </>
-        }
-      />
-    </T>
+  const gt = useGT();
+
+  return gt(
+    "{count, plural, one {# track couldn't be saved. select it to see why.} other {# tracks couldn't be saved. select one to see why.}}",
+    { count: failedCount },
   );
 }
 
