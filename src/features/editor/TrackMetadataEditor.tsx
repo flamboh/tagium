@@ -2,7 +2,7 @@
 
 import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
-import { describeProcessingTracks } from "@/features/analysis/analysisProgress";
+import { ProcessingTracksLabel } from "@/features/analysis/ProcessingTracksLabel";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode, RefObject, TransitionEvent } from "react";
 import {
@@ -760,7 +760,9 @@ function DownloadTrackButton({
         {showProcessing ? (
           <Tooltip>
             <TooltipTrigger asChild>{button}</TooltipTrigger>
-            <TooltipContent>{describeProcessingTracks(1)}</TooltipContent>
+            <TooltipContent>
+              <ProcessingTracksLabel count={1} />
+            </TooltipContent>
           </Tooltip>
         ) : (
           button

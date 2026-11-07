@@ -1,5 +1,6 @@
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { Num, Plural, T, useGT, Var } from "gt-react";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +26,7 @@ export interface ExportConfirmationDialogProps {
 }
 
 export function ExportPlanDisclosure({ group }: { group: ExportPlanGroup }) {
+  const gt = useGT();
   const [open, setOpen] = useState(false);
   const contentId = useId();
 
@@ -40,7 +42,21 @@ export function ExportPlanDisclosure({ group }: { group: ExportPlanGroup }) {
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium">{group.title}</span>
           <span className="text-xs text-muted-foreground">
-            {group.tracks.length} {group.tracks.length === 1 ? "track" : "tracks"}
+            <T>
+              <Plural
+                n={group.tracks.length}
+                one={
+                  <>
+                    <Num>{group.tracks.length}</Num> track
+                  </>
+                }
+                other={
+                  <>
+                    <Num>{group.tracks.length}</Num> tracks
+                  </>
+                }
+              />
+            </T>
           </span>
         </span>
         <HugeiconsIcon
@@ -53,7 +69,7 @@ export function ExportPlanDisclosure({ group }: { group: ExportPlanGroup }) {
       <div
         id={contentId}
         role="region"
-        aria-label={`${group.title} tracks`}
+        aria-label={gt("{albumTitle} tracks", { albumTitle: group.title })}
         aria-hidden={!open}
         inert={!open}
         className="grid grid-rows-[0fr] opacity-0 transition-[grid-template-rows,opacity] duration-200 ease-out group-data-[state=open]/disclosure:grid-rows-[1fr] group-data-[state=open]/disclosure:opacity-100 motion-reduce:transition-none"
@@ -83,8 +99,7 @@ export function ExportConfirmationDialogView({
   onRestoreFocus,
   open,
 }: ExportConfirmationDialogViewProps) {
-  const noun = plan?.trackCount === 1 ? "track" : "tracks";
-  const downloadLabel = plan ? `download ~${formatMegabyteSize(plan.totalSizeBytes)}` : "download";
+  const trackCount = plan?.trackCount ?? 0;
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && !busy && onCancel()}>
@@ -108,16 +123,35 @@ export function ExportConfirmationDialogView({
       >
         <DialogHeader>
           <DialogTitle>
-            download {plan?.trackCount ?? 0} {noun}
+            <T>
+              <Plural
+                n={trackCount}
+                one={
+                  <>
+                    download <Num>{trackCount}</Num> track
+                  </>
+                }
+                other={
+                  <>
+                    download <Num>{trackCount}</Num> tracks
+                  </>
+                }
+              />
+            </T>
           </DialogTitle>
           {status !== "ready" && (
             <p
               role="alert"
               className="rounded-md bg-accent px-3 py-2 text-sm text-accent-foreground"
             >
-              {status === "changed"
-                ? "the download changed. confirm the updated download again."
-                : "this download is no longer available. cancel and try again when every track is ready."}
+              {status === "changed" ? (
+                <T>the download changed. confirm the updated download again.</T>
+              ) : (
+                <T>
+                  this download is no longer available. cancel and try again when every track is
+                  ready.
+                </T>
+              )}
             </p>
           )}
         </DialogHeader>
@@ -143,7 +177,7 @@ export function ExportConfirmationDialogView({
             disabled={busy}
             data-export-cancel
           >
-            cancel
+            <T>cancel</T>
           </Button>
           <Button
             type="button"
@@ -152,7 +186,15 @@ export function ExportConfirmationDialogView({
             aria-busy={busy}
             className="min-w-44 justify-center tabular-nums"
           >
-            {busy ? "preparing…" : downloadLabel}
+            {busy ? (
+              <T>preparing…</T>
+            ) : plan ? (
+              <T>
+                download ~<Var>{formatMegabyteSize(plan.totalSizeBytes)}</Var>
+              </T>
+            ) : (
+              <T>download</T>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

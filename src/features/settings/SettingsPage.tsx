@@ -4,11 +4,13 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { ArrowLeft02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { msg, T, useGT, useMessages } from "gt-react";
 import type { AppSettings } from "@/features/library/types";
 import {
   AboutSettingsSection,
   EditingSettingsSection,
   ImportingSettingsSection,
+  LanguageSettingsSection,
   LinkingSettingsSection,
 } from "@/features/settings/SettingsSections";
 import { cn } from "@/lib/utils";
@@ -21,10 +23,11 @@ export interface SettingsPageProps {
 }
 
 const sections = [
-  { id: "importing", label: "importing", ordinal: "1" },
-  { id: "editing", label: "editing", ordinal: "2" },
-  { id: "linking", label: "linking", ordinal: "3" },
-  { id: "about", label: "about" },
+  { id: "importing", label: msg("importing"), ordinal: "1" },
+  { id: "editing", label: msg("editing"), ordinal: "2" },
+  { id: "linking", label: msg("linking"), ordinal: "3" },
+  { id: "language", label: msg("language"), ordinal: "4" },
+  { id: "about", label: msg("about") },
 ] as const;
 
 type SettingsSectionId = (typeof sections)[number]["id"];
@@ -35,6 +38,8 @@ export default function SettingsPage({
   onBack,
   headerLeadingAction,
 }: SettingsPageProps) {
+  const gt = useGT();
+  const m = useMessages();
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("importing");
   const activeSectionLabelId = `settings-section-${activeSection}`;
 
@@ -47,18 +52,20 @@ export default function SettingsPage({
             type="button"
             className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center text-brand/80 transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             onClick={onBack}
-            aria-label="back to workspace"
+            aria-label={gt("back to workspace")}
           >
             <HugeiconsIcon icon={ArrowLeft02Icon} strokeWidth={2} className="size-5" />
           </button>
-          <h2 className="relative -top-px truncate text-lg font-semibold leading-tight">
-            settings
-          </h2>
+          <T>
+            <h2 className="relative -top-px truncate text-lg font-semibold leading-tight">
+              settings
+            </h2>
+          </T>
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
         <nav
-          aria-label="settings sections"
+          aria-label={gt("settings sections")}
           className="flex shrink-0 items-center gap-1 overflow-x-auto border-b p-2 sm:w-48 sm:flex-col sm:items-stretch sm:overflow-visible sm:border-r sm:border-b-0 sm:p-3"
         >
           {sections.map((section) => {
@@ -90,7 +97,7 @@ export default function SettingsPage({
                   >
                     {"ordinal" in section ? section.ordinal : ""}
                   </span>
-                  {section.label}
+                  {m(section.label)}
                 </button>
               </div>
             );
@@ -110,6 +117,7 @@ export default function SettingsPage({
           {activeSection === "linking" && (
             <LinkingSettingsSection settings={settings} onChange={onChange} />
           )}
+          {activeSection === "language" && <LanguageSettingsSection />}
           {activeSection === "about" && <AboutSettingsSection />}
         </div>
       </div>

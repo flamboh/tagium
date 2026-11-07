@@ -1,0 +1,458 @@
+{
+  "30430296d32b38c1": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " piste est encore en cours d’analyse tonalité/bpm"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " pistes sont encore en cours d’analyse tonalité/bpm"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "85640798a4f3767d": "pistes de {albumTitle}",
+  "cd66bd37a52f823a": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " piste"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " pistes"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "3d77be8464ae9787": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "télécharger ",
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " piste"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "télécharger ",
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " pistes"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "ac701ecffb63e1c1": "le téléchargement a changé. confirme à nouveau le téléchargement mis à jour.",
+  "28aacf961719bba3": "ce téléchargement n’est plus disponible. annule et réessaie quand toutes les pistes sont prêtes.",
+  "de36e8073b449873": "annuler",
+  "a6bc37f75c8f0894": "préparation…",
+  "4534b0aaa6a40859": [
+    "télécharger ~",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "2fffb7ac83253d5d": "télécharger",
+  "984a6561f5fd2ce0": "dépose pour importer",
+  "d4154567ec1ebaee": "dépose ton audio ici",
+  "989110375c4655d0": {
+    "t": "p",
+    "i": 1,
+    "c": "mp3, flac, m4a/mp4 et opus · ou clique pour parcourir"
+  },
+  "f2c1b6c58cc1ca16": "télécharger {albumTitle}",
+  "cf9b722006cd9532": "les pistes de l’album ont besoin de fichiers, de métadonnées et de noms de fichier",
+  "96da55354b2944ea": "télécharger l’album",
+  "ef50e2834e6f1753": "effacer la sélection de pistes et revenir à l’éditeur",
+  "d35d1cb26f44c1f2": [
+    {
+      "t": "p",
+      "i": 1,
+      "c": "aucune piste pour l’instant"
+    },
+    {
+      "t": "p",
+      "i": 2,
+      "c": "crée un album vide ou importe des pistes"
+    }
+  ],
+  "ffb80776b52e6fee": "ajouter un album",
+  "c962bb137fe36a97": "nettoyage des titres",
+  "be7277b98a7e8e7a": [
+    "vérifie les titres suggérés pour ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ". garde les modifications qui te plaisent, décoche les autres"
+  ],
+  "52ceaaf9f140cc0d": "nous avons trouvé du bruit dans les titres de tes pistes. garde les modifications qui te plaisent, décoche les autres",
+  "e9ad7dfe8f69a836": {
+    "t": "p",
+    "i": 1,
+    "c": "plus rien à nettoyer"
+  },
+  "ec307296f6593711": "tout décocher",
+  "ff217e41d0e27f43": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "appliquer ",
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " modification"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "appliquer ",
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " modifications"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "f3d91af688c33b73": "téléchargement en cours",
+  "b066531e8b7e2033": "ajoute d’abord des pistes",
+  "55173efcf8055e1c": "chaque piste a besoin d’un nom de fichier",
+  "b3c75d7d298f8248": "les pistes ont besoin de fichiers et de métadonnées",
+  "dd4689f16cff6940": "téléchargement...",
+  "ff6963d3d059a787": "tout télécharger",
+  "8e4f7fdad62f921d": "réglages",
+  "ddc7186db9da7060": "import",
+  "9d61c540cf5abfe8": "édition",
+  "952975d3c4f8f4b9": "liaison",
+  "84707efb0b42e929": "langue",
+  "28ea5348fb2ef427": "à propos",
+  "43d3dafa307c021a": "retour à l’espace de travail",
+  "c05bec8fddb25762": "sections des réglages",
+  "a28c7ec2dbf8c58b": {
+    "t": "h2",
+    "i": 1,
+    "c": "réglages"
+  },
+  "30b53c4f470c69de": "la plus compatible",
+  "2e1d3f646f62319a": "mp3",
+  "2aa871790f9bda75": "garde l’audio d’origine sans le convertir, en général opus depuis youtube et m4a depuis soundcloud.",
+  "88518af009774a07": "convertit chaque téléchargement en mp3 au débit choisi.",
+  "a3d84f433920e45d": "standard",
+  "d8b44fe442e59f65": "camelot",
+  "17a596f117a181af": "standard et camelot",
+  "2bb10bc2bb461fb0": "inscrit le nom des notes, avec m pour les tonalités mineures.",
+  "4cdfd8a394ece390": "inscrit les numéros de la roue camelot, avec a pour mineur et b pour majeur.",
+  "361dbc88dd74c0a3": "inscrit le nom musical et affiche son code camelot à côté.",
+  "d068a3160c2408bd": "format de téléchargement, {format}",
+  "56146f0d04bbaa75": "format de téléchargement",
+  "ca16486f5d26cc8d": "débit mp3, {bitrate} kbps",
+  "f5631b19e400408f": "débit mp3",
+  "c50faea32156f565": "notation de la tonalité, {notation}",
+  "8905c6bb6b065f3e": "notation de la tonalité",
+  "561abd1e07dd66fc": "langue de l’interface, {language}",
+  "ad6aa2a68b3084ca": "langue de l’interface",
+  "3bcfc95d51bb5f03": "réseaux sociaux",
+  "183cfe96d1b45187": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "import"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "choisis ce qui se passe dès que l’audio arrive dans ta bibliothèque."
+      }
+    ]
+  },
+  "3d2308111d76d0f0": {
+    "t": "span",
+    "i": 1,
+    "c": "format de téléchargement"
+  },
+  "eb780a289c9e3e45": {
+    "t": "span",
+    "i": 1,
+    "c": "débit mp3"
+  },
+  "8af23ff4529d6fae": "utilisé quand un téléchargement repasse en mp3.",
+  "9ca58131d053218b": "un débit plus élevé conserve plus de détails, mais produit des fichiers plus lourds.",
+  "21ae5284c54983d3": {
+    "t": "span",
+    "i": 1,
+    "c": [
+      {
+        "t": "span",
+        "i": 2,
+        "c": "utiliser la pochette de l’album soundcloud pour chaque piste"
+      },
+      {
+        "t": "span",
+        "i": 3,
+        "c": "appliquée une fois à l’import. la pochette de chaque piste reste modifiable ensuite."
+      }
+    ]
+  },
+  "1b12d24f5bf19199": {
+    "t": "span",
+    "i": 1,
+    "c": [
+      {
+        "t": "span",
+        "i": 2,
+        "c": "lancer le téléchargement juste après l’import"
+      },
+      {
+        "t": "span",
+        "i": 3,
+        "c": "utile si tu n’as pas besoin d’un étiquetage détaillé et veux un téléchargement plus rapide"
+      }
+    ]
+  },
+  "d976f17103d18eeb": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "édition"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "choisis les champs que l’éditeur de pistes affiche et remplit pour toi."
+      }
+    ]
+  },
+  "2e4b5432b34b6381": {
+    "t": "span",
+    "i": 1,
+    "c": [
+      {
+        "t": "span",
+        "i": 2,
+        "c": "afficher les champs avancés"
+      },
+      {
+        "t": "span",
+        "i": 3,
+        "c": "ajoute l’artiste de l’album, le numéro de disque, le compositeur, le bpm, la tonalité et les commentaires à l’éditeur de pistes."
+      }
+    ]
+  },
+  "c3b56b2575646573": {
+    "t": "span",
+    "i": 1,
+    "c": [
+      {
+        "t": "span",
+        "i": 2,
+        "c": "détecter le bpm et la tonalité"
+      },
+      {
+        "t": "span",
+        "i": 3,
+        "c": "pour les logiciels de dj. analyse chaque piste sur cet appareil et remplit ses champs bpm et tonalité vides. les pistes de plus de 15 minutes sont ignorées."
+      }
+    ]
+  },
+  "e93963218485468c": {
+    "t": "span",
+    "i": 1,
+    "c": "notation de la tonalité"
+  },
+  "cd1559caa72e901b": {
+    "t": "p",
+    "i": 1,
+    "c": "s’applique aux tonalités détectées à partir de maintenant. celles déjà présentes sur une piste ne changent pas."
+  },
+  "ef3c9eab35c712bf": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "liaison"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "les champs liés sont synchronisés avec leur source. délie un champ pour le modifier librement."
+      }
+    ]
+  },
+  "ed0b41352bdf7f41": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "langue"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "choisis la langue de tagium. tes pistes et leurs métadonnées ne sont jamais traduites."
+      }
+    ]
+  },
+  "db4b67b60019a1e8": {
+    "t": "span",
+    "i": 1,
+    "c": "langue de l’interface"
+  },
+  "ee2691d8d1c1c459": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "à propos"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "tagium existe pour rendre la musique stockée sur ton appareil plus accessible à tous."
+      }
+    ]
+  },
+  "1603db21c4df7df9": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "éthique"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "tagium n’est pas un outil de piratage et ne peut pas servir comme tel. il ne fonctionne qu’avec de l’audio gratuit et public. il ne permet pas de contourner un paywall ni d’accéder à du contenu privé."
+      },
+      {
+        "t": "p",
+        "i": 4,
+        "c": "tu es responsable du contenu que tu télécharges et de son usage. cite les créateurs originaux, soutiens les artistes et ne viole aucune condition ni licence."
+      }
+    ]
+  },
+  "19541be6878b2198": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "remerciements"
+      },
+      {
+        "t": "div",
+        "i": 3,
+        "c": {
+          "t": "p",
+          "i": 4,
+          "c": [
+            {
+              "t": "a",
+              "i": 5,
+              "c": "cobalt"
+            },
+            " ",
+            "et",
+            " ",
+            {
+              "t": "a",
+              "i": 6,
+              "c": "imput"
+            },
+            ", pour leur incroyable service d’api de téléchargement. ils sont une énorme source d’inspiration pour cet outil !"
+          ]
+        }
+      }
+    ]
+  }
+}

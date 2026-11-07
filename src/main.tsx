@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { initializeAnalytics } from "./analytics";
+import { initializeI18n } from "./i18n/i18n";
 import { startTemporaryStorageSession } from "./apps/tagium-save/download/storage";
 import AppRoot from "./runtime/AppRoot";
 import { holdForFonts } from "./runtime/holdForFonts";
@@ -16,6 +17,8 @@ initializeAnalytics(appId);
 if (appId === "tagium-save") void startTemporaryStorageSession();
 
 document.title = getAppTitle(appId);
+
+await initializeI18n();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

@@ -181,3 +181,44 @@ test.describe("on a phone", () => {
     await expect(page.getByText("library (1)", { exact: true })).toBeAttached();
   });
 });
+
+test("switching language keeps library work and survives a reload", async ({ page }) => {
+  await uploadTrack(page);
+  await page.getByLabel("title", { exact: true }).fill("Kept across languages");
+
+  await page.getByRole("button", { name: "settings", exact: true }).click();
+  await page.getByRole("button", { name: "language", exact: true }).click();
+  await page.getByRole("button", { name: "display language, english" }).click();
+  await page.getByRole("button", { name: "español", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "es");
+
+  await page.getByRole("button", { name: "Kept across languages.mp3", exact: true }).click();
+  await expectActiveView(page, "editor");
+  await expect(page.getByLabel("title", { exact: true })).toHaveValue("Kept across languages");
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("lang", "es");
+});
+
+test.describe("in a spanish browser", () => {
+  test.use({ locale: "es-ES" });
+
+  test("tagium stays english until a language is chosen", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.getByText("drop your audio here")).toBeVisible();
+  });
+});
+
+test("a chosen language stays translated after a few minutes", async ({ page }) => {
+  await page.clock.install();
+  await page.goto("/");
+  await page.getByRole("button", { name: "settings", exact: true }).click();
+  await page.getByRole("button", { name: "language", exact: true }).click();
+  await page.getByRole("button", { name: "display language, english" }).click();
+  await page.getByRole("button", { name: "español", exact: true }).click();
+  await page.clock.runFor("05:00");
+  await page.getByRole("button", { name: "acerca de", exact: true }).click();
+  await page.getByRole("button", { name: "idioma", exact: true }).click();
+  await expect(page.getByText("elige el idioma de tagium.", { exact: false })).toBeVisible();
+});
