@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { T, useGT } from "gt-react";
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from "react-image-crop";
 import { Button } from "./button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
@@ -29,6 +30,7 @@ function centerAspectCrop(mediaWidth: number, mediaHeight: number, aspect: numbe
 }
 
 export default function ImageCropper({ src, onCrop, onCancel }: ImageCropperProps) {
+  const gt = useGT();
   const imgRef = useRef<HTMLImageElement>(null);
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
@@ -104,7 +106,7 @@ export default function ImageCropper({ src, onCrop, onCancel }: ImageCropperProp
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             ref={imgRef}
-            alt="crop preview"
+            alt={gt("crop preview")}
             style={{ maxWidth: "100%", maxHeight: "100%" }}
             src={src}
             onLoad={onImageLoad}
@@ -113,10 +115,12 @@ export default function ImageCropper({ src, onCrop, onCancel }: ImageCropperProp
       </div>
       <div className="flex gap-2 justify-end">
         <Button variant="outline" onClick={onCancel}>
-          cancel
+          <T>cancel</T>
         </Button>
         {completedCrop ? (
-          <Button onClick={handleCrop}>apply crop</Button>
+          <Button onClick={handleCrop}>
+            <T>apply crop</T>
+          </Button>
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -126,7 +130,9 @@ export default function ImageCropper({ src, onCrop, onCancel }: ImageCropperProp
                 </Button>
               </span>
             </TooltipTrigger>
-            <TooltipContent>select a crop area first</TooltipContent>
+            <TooltipContent>
+              <T>select a crop area first</T>
+            </TooltipContent>
           </Tooltip>
         )}
       </div>

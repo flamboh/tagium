@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { T } from "gt-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -34,7 +35,10 @@ function InsetFieldLabel({ htmlFor, label, required }: InsetFieldLabelProps) {
           <span className="shrink-0 text-destructive" aria-hidden="true">
             *
           </span>
-          <span className="sr-only"> required</span>
+          <span className="sr-only">
+            {" "}
+            <T>required</T>
+          </span>
         </>
       )}
     </label>
