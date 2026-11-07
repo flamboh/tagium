@@ -199,3 +199,13 @@ test("switching language keeps library work and survives a reload", async ({ pag
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "es");
 });
+
+test.describe("in a spanish browser", () => {
+  test.use({ locale: "es-ES" });
+
+  test("tagium stays english until a language is chosen", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.getByText("drop your audio here")).toBeVisible();
+  });
+});

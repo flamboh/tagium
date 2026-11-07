@@ -35,6 +35,12 @@ const subscribeToLocaleChanges = (notify: () => void) => {
 
 const getLocaleRevision = () => localeRevision;
 
+const readChosenLocale = () =>
+  document.cookie
+    .split("; ")
+    .find((cookie) => cookie.startsWith("generaltranslation.locale="))
+    ?.slice("generaltranslation.locale=".length);
+
 export const useDisplayedLocale = () => {
   useSyncExternalStore(subscribeToLocaleChanges, getLocaleRevision);
 
@@ -46,6 +52,7 @@ export const initializeI18n = () =>
     defaultLocale: gtConfig.defaultLocale,
     locales: gtConfig.locales,
     customMapping: gtConfig.customMapping,
+    locale: [readChosenLocale(), gtConfig.defaultLocale].filter((locale) => locale !== undefined),
     loadTranslations,
     _reload: ({ locale }) => void showLocale(locale),
   });
