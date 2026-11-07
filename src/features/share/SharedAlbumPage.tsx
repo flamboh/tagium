@@ -10,7 +10,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { toast } from "sonner";
-import { Num, Plural, t, T, useGT, useLocale, Var } from "gt-react";
+import { t, T, useGT, useLocale, Var } from "gt-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -278,21 +278,7 @@ function TrackList({
   return (
     <section className="mt-8" aria-labelledby="shared-track-list-title">
       <h2 id="shared-track-list-title" className="mb-3 text-sm font-semibold">
-        <T>
-          <Plural
-            n={tracks.length}
-            one={
-              <>
-                <Num>{tracks.length}</Num> track
-              </>
-            }
-            other={
-              <>
-                <Num>{tracks.length}</Num> tracks
-              </>
-            }
-          />
-        </T>
+        {gt("{count, plural, one {# track} other {# tracks}}", { count: tracks.length })}
       </h2>
       <ol className="overflow-hidden rounded-lg border">
         {rows.map(({ track, index, key }) => {
@@ -403,8 +389,8 @@ function RecipientContext({
       {expiresAt === null
         ? null
         : gt(" · link expires {date}", {
-            date: new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" })
-              .format(new Date(expiresAt))
+            date: new Date(expiresAt)
+              .toLocaleDateString(locale, { month: "short", day: "numeric" })
               .toLocaleLowerCase(locale),
           })}
     </p>

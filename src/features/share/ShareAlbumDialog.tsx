@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Copy01Icon, MusicNote04Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { T, useGT, useLocale, useMessages } from "gt-react";
+import { msg, T, useGT, useLocale, useMessages } from "gt-react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { Button } from "@/components/ui/button";
 import {
@@ -371,6 +371,12 @@ function SharePreview({ preview }: { preview: SharePreview }) {
   );
 }
 
+const publishLabels = {
+  create: { idle: msg("create share link"), busy: msg("creating link…") },
+  album: { idle: msg("update shared album"), busy: msg("updating shared album…") },
+  track: { idle: msg("update shared track"), busy: msg("updating shared track…") },
+};
+
 function ShareDialogFooterActions({
   state,
   targetName,
@@ -390,7 +396,7 @@ function ShareDialogFooterActions({
   onClose: () => void;
   onPublish: () => void;
 }) {
-  const gt = useGT();
+  const m = useMessages();
 
   if (state.status === "published") {
     return (
@@ -474,17 +480,7 @@ function ShareDialogFooterActions({
             className="animate-spin motion-reduce:animate-none"
           />
         )}
-        {publishing
-          ? updating
-            ? targetName === "album"
-              ? gt("updating shared album…")
-              : gt("updating shared track…")
-            : gt("creating link…")
-          : updating
-            ? targetName === "album"
-              ? gt("update shared album")
-              : gt("update shared track")
-            : gt("create share link")}
+        {m(publishLabels[updating ? targetName : "create"][publishing ? "busy" : "idle"])}
       </Button>
     </div>
   );
