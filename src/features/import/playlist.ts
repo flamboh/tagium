@@ -64,13 +64,23 @@ export const decodePlaylist = async (input: unknown, providerName: string) => {
   }
 };
 
-export const playlistImportNotice = ({ tracks, skippedCount, truncated }: PlaylistResponse) => {
-  if (truncated) return { title: `added the first ${tracks.length} tracks of this playlist` };
+type PlaylistImportNotice =
+  | { kind: "truncated"; addedCount: number }
+  | { kind: "skipped"; addedCount: number; totalCount: number; skippedCount: number };
+
+export const playlistImportNotice = ({
+  tracks,
+  skippedCount,
+  truncated,
+}: PlaylistResponse): PlaylistImportNotice | null => {
+  if (truncated) return { kind: "truncated", addedCount: tracks.length };
 
   if (skippedCount === 0) return null;
 
   return {
-    title: `added ${tracks.length} of ${tracks.length + skippedCount} tracks`,
-    description: `${skippedCount} ${skippedCount === 1 ? "was" : "were"} private or unavailable.`,
+    kind: "skipped",
+    addedCount: tracks.length,
+    totalCount: tracks.length + skippedCount,
+    skippedCount,
   };
 };

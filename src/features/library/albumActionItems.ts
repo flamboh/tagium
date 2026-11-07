@@ -1,3 +1,4 @@
+import { msg } from "gt-react";
 import type { ShareActionState } from "@/features/share/sharePublication";
 
 export type AlbumActionItemId = "edit" | "cleanup" | "share" | "delete";
@@ -9,7 +10,7 @@ export interface AlbumActionInvocation {
 export interface AlbumActionItem {
   id: AlbumActionItemId;
   label: string;
-  trailingText?: string;
+  cleanupSuggestionCount?: number;
   description?: string;
   disabled: boolean;
   destructive?: boolean;
@@ -41,17 +42,14 @@ export function createAlbumActionItems({
   return [
     {
       id: "edit",
-      label: "edit album",
+      label: msg("edit album"),
       disabled: false,
       onSelect: onEdit,
     },
     {
       id: "cleanup",
-      label: "clean up tracks",
-      trailingText:
-        cleanupSuggestionCount === 0
-          ? "none needed"
-          : `${cleanupSuggestionCount} track${cleanupSuggestionCount === 1 ? "" : "s"}`,
+      label: msg("clean up tracks"),
+      cleanupSuggestionCount,
       disabled: cleanupSuggestionCount === 0,
       onSelect: onReviewCleanup,
     },
@@ -65,7 +63,7 @@ export function createAlbumActionItems({
     },
     {
       id: "delete",
-      label: "delete album",
+      label: msg("delete album"),
       disabled: false,
       destructive: true,
       onSelect: onDelete,

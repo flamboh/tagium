@@ -29,6 +29,7 @@ export function ExportPlanDisclosure({ group }: { group: ExportPlanGroup }) {
   const gt = useGT();
   const [open, setOpen] = useState(false);
   const contentId = useId();
+  const groupTitle = group.id === "loose" ? gt("singles") : group.title;
 
   return (
     <div className="group/disclosure px-3 py-2.5" data-state={open ? "open" : "closed"}>
@@ -40,7 +41,7 @@ export function ExportPlanDisclosure({ group }: { group: ExportPlanGroup }) {
         onClick={() => setOpen((current) => !current)}
       >
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium">{group.title}</span>
+          <span className="block truncate font-medium">{groupTitle}</span>
           <span className="text-xs text-muted-foreground">
             <T>
               <Plural
@@ -69,7 +70,11 @@ export function ExportPlanDisclosure({ group }: { group: ExportPlanGroup }) {
       <div
         id={contentId}
         role="region"
-        aria-label={gt("{albumTitle} tracks", { albumTitle: group.title })}
+        aria-label={
+          group.id === "loose"
+            ? gt("singles tracks")
+            : gt("{albumTitle} tracks", { albumTitle: group.title })
+        }
         aria-hidden={!open}
         inert={!open}
         className="grid grid-rows-[0fr] opacity-0 transition-[grid-template-rows,opacity] duration-200 ease-out group-data-[state=open]/disclosure:grid-rows-[1fr] group-data-[state=open]/disclosure:opacity-100 motion-reduce:transition-none"

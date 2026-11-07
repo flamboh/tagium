@@ -1,6 +1,7 @@
 "use client";
 
 import { HugeiconsIcon } from "@hugeicons/react";
+import { msg, Num, T, useGT, useMessages } from "gt-react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { ProcessingTracksLabel } from "@/features/analysis/ProcessingTracksLabel";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -152,6 +153,9 @@ function TrackFilenameHeader({
   extension: string;
   actions?: ReactNode;
 }) {
+  const gt = useGT();
+  const m = useMessages();
+
   return (
     <div
       data-track-filename-header
@@ -168,7 +172,9 @@ function TrackFilenameHeader({
                     {sanitizedFilename || filenamePlaceholder}
                   </span>
                 </TooltipTrigger>
-                <TooltipContent>filename is synced with the title</TooltipContent>
+                <TooltipContent>
+                  <T>filename is synced with the title</T>
+                </TooltipContent>
               </Tooltip>
               <span className="shrink-0 select-none text-muted-foreground/70">.{extension}</span>
             </h2>
@@ -180,7 +186,7 @@ function TrackFilenameHeader({
                 </span>
                 <input
                   {...filenameRegistration}
-                  aria-label="filename"
+                  aria-label={gt("filename")}
                   aria-invalid={filenameInvalid}
                   aria-describedby={filenameInvalid ? "track-filename-error" : undefined}
                   size={1}
@@ -208,7 +214,7 @@ function TrackFilenameHeader({
               className="min-w-0 truncate font-medium"
               aria-live="polite"
             >
-              filename is required
+              <T>filename is required</T>
             </p>
             {failure && (
               <Tooltip>
@@ -216,22 +222,25 @@ function TrackFilenameHeader({
                   <button
                     type="button"
                     className="shrink-0 underline decoration-dotted underline-offset-2"
-                    aria-label={`${failure.title}: ${failure.description}`}
+                    aria-label={gt("{title}: {description}", {
+                      title: m(failure.title),
+                      description: m(failure.description),
+                    })}
                   >
-                    track error
+                    <T>track error</T>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p className="font-medium">{failure.title}</p>
-                  <p>{failure.description}</p>
+                  <p className="font-medium">{m(failure.title)}</p>
+                  <p>{m(failure.description)}</p>
                 </TooltipContent>
               </Tooltip>
             )}
           </div>
         ) : failure ? (
           <div className="min-w-0 text-xs text-destructive" aria-live="polite">
-            <p className="truncate font-medium">{failure.title}</p>
-            <p className="sr-only truncate lg:not-sr-only">{failure.description}</p>
+            <p className="truncate font-medium">{m(failure.title)}</p>
+            <p className="sr-only truncate lg:not-sr-only">{m(failure.description)}</p>
           </div>
         ) : null}
       </div>
@@ -277,11 +286,13 @@ function TrackAlbumField({
   linkedAlbumValue: string;
   placeholder: string;
 }) {
+  const gt = useGT();
+  const m = useMessages();
   const albumLinked = inAlbum || singleAlbumLinked;
 
   const albumFieldReason = singleAlbumLinked
-    ? getMetadataLinkDescriptor("singleAlbum").disabledReason
-    : "album title is synced with the album.";
+    ? m(getMetadataLinkDescriptor("singleAlbum").disabledReason)
+    : gt("album title is synced with the album.");
 
   const albumFieldReasonId = "track-album-sync-reason";
 
@@ -292,7 +303,7 @@ function TrackAlbumField({
           key={singleAlbumLinked ? "linked" : "unlinked"}
           {...(singleAlbumLinked ? { name: registration.name } : registration)}
           id="track-album"
-          label="album"
+          label={gt("album")}
           aria-describedby={albumLinked ? albumFieldReasonId : undefined}
           placeholder={placeholder}
           disabled={albumLinked}
@@ -335,6 +346,9 @@ function TrackDetailsFields({
   onPreviewMetadataChange: TrackMetadataEditorProps["onPreviewMetadataChange"];
   autoFocus: boolean;
 }) {
+  const gt = useGT();
+  const m = useMessages();
+
   const titleRegistration = register("title", {
     onChange: (event) => onPreviewMetadataChange("title", event),
   });
@@ -357,7 +371,7 @@ function TrackDetailsFields({
       <FloatingLabelInput
         {...titleInputRegistration}
         id="track-title"
-        label="title"
+        label={gt("title")}
         ref={titleInputRef}
         aria-invalid={syncFilenames && filenameInvalid}
         aria-describedby={syncFilenames && filenameInvalid ? "track-filename-error" : undefined}
@@ -365,12 +379,12 @@ function TrackDetailsFields({
       />
       <DisabledReason
         disabled={inAlbum && metadataLinks.artist}
-        reason={getMetadataLinkDescriptor("artist").disabledReason}
+        reason={m(getMetadataLinkDescriptor("artist").disabledReason)}
       >
         <FloatingLabelInput
           {...artistRegistration}
           id="track-artist"
-          label="artist"
+          label={gt("artist")}
           placeholder={placeholder.artist}
           disabled={inAlbum && metadataLinks.artist}
           className={syncedInputClassName}
@@ -386,7 +400,7 @@ function TrackDetailsFields({
       <div className="grid grid-cols-[minmax(4.5rem,0.8fr)_minmax(0,1.4fr)_minmax(4.5rem,0.8fr)] gap-2">
         <DisabledReason
           disabled={inAlbum && metadataLinks.year}
-          reason={getMetadataLinkDescriptor("year").disabledReason}
+          reason={m(getMetadataLinkDescriptor("year").disabledReason)}
         >
           <FloatingLabelInput
             type="number"
@@ -395,7 +409,7 @@ function TrackDetailsFields({
             step={1}
             {...register("year", { valueAsNumber: true })}
             id="track-year"
-            label="year"
+            label={gt("year")}
             placeholder={placeholder.year}
             disabled={inAlbum && metadataLinks.year}
             className={`${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
@@ -403,12 +417,12 @@ function TrackDetailsFields({
         </DisabledReason>
         <DisabledReason
           disabled={inAlbum && metadataLinks.genre}
-          reason={getMetadataLinkDescriptor("genre").disabledReason}
+          reason={m(getMetadataLinkDescriptor("genre").disabledReason)}
         >
           <FloatingLabelInput
             {...register("genre")}
             id="track-genre"
-            label="genre"
+            label={gt("genre")}
             placeholder={placeholder.genre}
             disabled={inAlbum && metadataLinks.genre}
             className={syncedInputClassName}
@@ -416,7 +430,7 @@ function TrackDetailsFields({
         </DisabledReason>
         <DisabledReason
           disabled={inAlbum && metadataLinks.trackNumber}
-          reason={getMetadataLinkDescriptor("trackNumber").disabledReason}
+          reason={m(getMetadataLinkDescriptor("trackNumber").disabledReason)}
         >
           <FloatingLabelInput
             type="number"
@@ -425,7 +439,7 @@ function TrackDetailsFields({
             step={1}
             {...register("trackNumber", { valueAsNumber: true })}
             id="track-number"
-            label="track"
+            label={gt("track")}
             placeholder={placeholder.trackNumber}
             disabled={inAlbum && metadataLinks.trackNumber}
             className={`${syncedInputClassName} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
@@ -459,6 +473,9 @@ function BpmField({
   error: string | undefined;
   detecting?: boolean;
 }) {
+  const gt = useGT();
+  const m = useMessages();
+
   return (
     <div>
       <FloatingLabelInput
@@ -469,11 +486,11 @@ function BpmField({
         step={1}
         {...registration}
         id="track-bpm"
-        label="bpm"
+        label={gt("bpm")}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? "track-bpm-error" : undefined}
         aria-busy={detecting}
-        placeholder={detecting ? "detecting" : "120"}
+        placeholder={detecting ? gt("detecting") : "120"}
         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
       />
       {error && (
@@ -482,14 +499,17 @@ function BpmField({
           className="mt-1 text-xs leading-5 text-destructive"
           aria-live="polite"
         >
-          {error}
+          {m(error)}
         </p>
       )}
     </div>
   );
 }
 
-const alternateKeyLabels = { standard: "standard", camelot: "camelot" } as const;
+const alternateKeyLabels = {
+  standard: msg("standard notation"),
+  camelot: msg("camelot notation"),
+} as const;
 
 function KeyField({
   registration,
@@ -501,15 +521,18 @@ function KeyField({
   /** The key's other notation, shown beside the tagged spelling. */
   alternate?: ReturnType<typeof getAlternateKeySpelling>;
 }) {
+  const gt = useGT();
+  const m = useMessages();
+
   return (
     <div className="relative">
       <FloatingLabelInput
         {...registration}
         id="track-key"
-        label="key"
+        label={gt("key")}
         aria-busy={detecting}
         aria-describedby={alternate ? "track-key-alternate" : undefined}
-        placeholder={detecting ? "detecting" : "Am"}
+        placeholder={detecting ? gt("detecting") : "Am"}
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
@@ -521,7 +544,7 @@ function KeyField({
           data-key-alternate
           className="pointer-events-none absolute right-3 bottom-2 text-sm text-muted-foreground"
         >
-          <span className="sr-only">{alternateKeyLabels[alternate.style]} notation </span>
+          <span className="sr-only">{m(alternateKeyLabels[alternate.style])} </span>
           {alternate.text}
         </span>
       )}
@@ -545,7 +568,9 @@ function AdvancedTrackDetailsFields({
   showDjFields: boolean;
   onFieldsMount?: (node: HTMLDivElement | null) => void;
 }) {
-  const albumArtistReason = getMetadataLinkDescriptor("albumArtist").disabledReason;
+  const gt = useGT();
+  const m = useMessages();
+  const albumArtistReason = m(getMetadataLinkDescriptor("albumArtist").disabledReason);
   const albumArtistReasonId = "track-album-artist-sync-reason";
 
   return (
@@ -558,12 +583,12 @@ function AdvancedTrackDetailsFields({
               ? { name: registrations.albumArtist.name }
               : registrations.albumArtist)}
             id="track-album-artist"
-            label="album artist"
+            label={gt("album artist")}
             aria-describedby={albumArtistLinked ? albumArtistReasonId : undefined}
             disabled={albumArtistLinked}
             readOnly={albumArtistLinked}
             value={albumArtistLinked ? linkedArtistValue : undefined}
-            placeholder="album artist"
+            placeholder={gt("album artist")}
             className={syncedInputClassName}
           />
         </DisabledReason>
@@ -586,7 +611,7 @@ function AdvancedTrackDetailsFields({
             step={1}
             {...registrations.discNumber}
             id="track-disc-number"
-            label="disc number"
+            label={gt("disc number")}
             aria-invalid={Boolean(errors.discNumber)}
             aria-describedby={errors.discNumber ? "track-disc-number-error" : undefined}
             placeholder="1"
@@ -598,7 +623,7 @@ function AdvancedTrackDetailsFields({
               className="mt-1 text-xs leading-5 text-destructive"
               aria-live="polite"
             >
-              {errors.discNumber.message}
+              {errors.discNumber.message && m(errors.discNumber.message)}
             </p>
           )}
         </div>
@@ -612,15 +637,15 @@ function AdvancedTrackDetailsFields({
       <FloatingLabelInput
         {...registrations.composer}
         id="track-composer"
-        label="composer"
-        placeholder="composer"
+        label={gt("composer")}
+        placeholder={gt("composer")}
       />
       <FloatingLabelTextarea
         {...registrations.comment}
         id="track-comment"
-        label="comment"
+        label={gt("comment")}
         rows={2}
-        placeholder="add a comment"
+        placeholder={gt("add a comment")}
       />
     </>
   );
@@ -705,18 +730,26 @@ const useAdvancedMetadataFormBoundary = ({
   return { registrations, errors };
 };
 
+const fileSizeFormat = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+
 function TrackFileSize({ selectedFile }: { selectedFile: LoadedTrack }) {
+  const sizeInMegabytes = selectedFile.file ? selectedFile.file.size / (1024 * 1024) : 0;
+
   return (
     <span data-track-file-size>
-      {selectedFile.file &&
-        selectedFile.status !== "error" &&
-        `${(selectedFile.file.size / (1024 * 1024)).toFixed(2)} mb`}
-      {selectedFile.file &&
-        selectedFile.status === "error" &&
-        `${(selectedFile.file.size / (1024 * 1024)).toFixed(2)} mb (metadata failed)`}
-      {!selectedFile.file && selectedFile.downloadStatus === "downloading" && "downloading"}
-      {!selectedFile.file && selectedFile.downloadStatus === "error" && "download failed"}
-      {!selectedFile.file && selectedFile.downloadStatus === "canceled" && "download canceled"}
+      {selectedFile.file && selectedFile.status !== "error" && (
+        <T>
+          <Num options={fileSizeFormat}>{sizeInMegabytes}</Num> mb
+        </T>
+      )}
+      {selectedFile.file && selectedFile.status === "error" && (
+        <T>
+          <Num options={fileSizeFormat}>{sizeInMegabytes}</Num> mb (metadata failed)
+        </T>
+      )}
+      {!selectedFile.file && selectedFile.downloadStatus === "downloading" && <T>downloading</T>}
+      {!selectedFile.file && selectedFile.downloadStatus === "error" && <T>download failed</T>}
+      {!selectedFile.file && selectedFile.downloadStatus === "canceled" && <T>download canceled</T>}
     </span>
   );
 }
@@ -733,6 +766,7 @@ function DownloadTrackButton({
   /** The track's bpm and key detection hasn't finished; downloading still works. */
   processing: boolean;
 }) {
+  const m = useMessages();
   const showProcessing = processing && !disabled;
 
   const button = (
@@ -750,13 +784,13 @@ function DownloadTrackButton({
           className="animate-spin motion-reduce:animate-none"
         />
       )}
-      download track
+      <T>download track</T>
     </Button>
   );
 
   return (
     <div className="flex items-center justify-end gap-2">
-      <DisabledReason disabled={disabled} reason={disabledReason}>
+      <DisabledReason disabled={disabled} reason={m(disabledReason)}>
         {showProcessing ? (
           <Tooltip>
             <TooltipTrigger asChild>{button}</TooltipTrigger>
@@ -772,6 +806,11 @@ function DownloadTrackButton({
   );
 }
 
+const editorModeLabels = {
+  normal: msg("normal"),
+  advanced: msg("advanced"),
+} as const satisfies Record<MetadataEditorMode, string>;
+
 export function MetadataEditorModeToggle({
   mode,
   onChange,
@@ -779,11 +818,14 @@ export function MetadataEditorModeToggle({
   mode: MetadataEditorMode;
   onChange: (mode: MetadataEditorMode) => void;
 }) {
+  const gt = useGT();
+  const m = useMessages();
+
   return (
     <div
       className="relative isolate inline-grid h-7 w-[8.5rem] shrink-0 grid-cols-2 rounded-md bg-muted p-0.5"
       role="group"
-      aria-label="metadata fields"
+      aria-label={gt("metadata fields")}
     >
       <span
         data-metadata-mode-indicator
@@ -802,7 +844,7 @@ export function MetadataEditorModeToggle({
             mode === option ? "text-foreground" : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          {option}
+          {m(editorModeLabels[option])}
         </button>
       ))}
     </div>
@@ -816,16 +858,18 @@ function PendingTrackMetadataEditor({
   editorMode,
   onEditorModeChange,
 }: PendingTrackMetadataEditorProps) {
+  const gt = useGT();
+
   if (!selectedFile) return null;
 
   const trackState =
     selectedFile.downloadStatus === "error"
-      ? "download failed"
+      ? gt("download failed")
       : selectedFile.downloadStatus === "canceled"
-        ? "download canceled"
+        ? gt("download canceled")
         : selectedFile.status === "error"
-          ? "metadata failed"
-          : "loading metadata";
+          ? gt("metadata failed")
+          : gt("loading metadata");
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -919,9 +963,9 @@ const getTrackFailure = (selectedFile: LoadedTrack): TrackFailure | null => {
 };
 
 const getDownloadDisabledReason = (isTrackCoverProcessing: boolean, filenameInvalid: boolean) => {
-  if (isTrackCoverProcessing) return "cover art is still processing";
+  if (isTrackCoverProcessing) return msg("cover art is still processing");
 
-  return filenameInvalid ? "filename is required" : "track file is not ready";
+  return filenameInvalid ? msg("filename is required") : msg("track file is not ready");
 };
 
 function LoadedTrackMetadataEditor({
@@ -953,6 +997,8 @@ function LoadedTrackMetadataEditor({
   onEditorModeChange,
   onTrackClipChange,
 }: LoadedTrackMetadataEditorProps) {
+  const m = useMessages();
+
   const watchedTitle = useWatch({
     control,
     name: "title",
@@ -1082,7 +1128,7 @@ function LoadedTrackMetadataEditor({
                   onCoverUpload={onTrackCoverUpload}
                   onProcessingChange={onTrackCoverProcessingChange}
                   disabled={Boolean(selectedFileAlbum) && metadataLinks.artwork}
-                  disabledReason={getMetadataLinkDescriptor("artwork").disabledReason}
+                  disabledReason={m(getMetadataLinkDescriptor("artwork").disabledReason)}
                 />
               )}
             />

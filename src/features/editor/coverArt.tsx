@@ -3,6 +3,7 @@
 import { useEffect, useId, useReducer, useRef, useState } from "react";
 import { CropIcon, Upload01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -75,6 +76,7 @@ export default function CoverArt({
   disabled = false,
   disabledReason,
 }: CoverArtProps) {
+  const gt = useGT();
   const [state, dispatch] = useReducer(coverArtReducer, initialCoverArtState);
 
   const {
@@ -110,7 +112,7 @@ export default function CoverArt({
       dispatch({
         type: "uploadFailed",
         uploadId,
-        message: error instanceof Error ? error.message : "could not load cover art.",
+        message: error instanceof Error ? error.message : msg("could not load cover art."),
       });
     } finally {
       if (uploadId === coverUploadIdRef.current) processingChangeRef.current?.(false);
@@ -189,9 +191,11 @@ export default function CoverArt({
     <div className={className ? `${classes.container} ${className}` : classes.container}>
       <div className={classes.frame}>
         {coverSrc ? (
-          <img src={coverSrc} alt="album cover" className={classes.image} />
+          <img src={coverSrc} alt={gt("album cover")} className={classes.image} />
         ) : (
-          <div className={classes.placeholder}>no cover</div>
+          <div className={classes.placeholder}>
+            <T>no cover</T>
+          </div>
         )}
         {coverSrc && (
           <Popover
@@ -217,7 +221,7 @@ export default function CoverArt({
                     type="button"
                     size="sm"
                     variant="secondary"
-                    aria-label="crop cover art"
+                    aria-label={gt("crop cover art")}
                     disabled={isProcessing || disabled}
                     aria-describedby={disabled && disabledReason ? disabledReasonId : undefined}
                     className="absolute top-2 right-2 size-10 p-0 max-lg:[@media(max-height:700px)]:top-1.5 max-lg:[@media(max-height:700px)]:right-1.5"
@@ -226,7 +230,9 @@ export default function CoverArt({
                   </Button>
                 </TooltipTrigger>
               </PopoverTrigger>
-              <TooltipContent>crop cover art</TooltipContent>
+              <TooltipContent>
+                <T>crop cover art</T>
+              </TooltipContent>
             </Tooltip>
             <PopoverContent
               className="w-auto max-w-[calc(100svw-1rem)] p-3 md:p-4"
@@ -281,16 +287,23 @@ function CoverUploadRow({
   onErrorOpenChange: (open: boolean) => void;
   onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
+  const gt = useGT();
+  const m = useMessages();
   const coverErrorId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const linkedReason = disabled ? disabledReason : undefined;
-  const tooltip = coverError ?? linkedReason;
+  const coverErrorText = coverError === null ? null : m(coverError);
+  const tooltip = coverErrorText ?? linkedReason;
 
   const describedBy = [coverError ? coverErrorId : null, linkedReason ? disabledReasonId : null]
     .filter(Boolean)
     .join(" ");
 
-  const label = isProcessing ? "processing cover" : disabled ? "cover linked" : "upload cover";
+  const label = isProcessing
+    ? gt("processing cover")
+    : disabled
+      ? gt("cover linked")
+      : gt("upload cover");
 
   return (
     <div className={classes.uploadRow}>
@@ -324,7 +337,7 @@ function CoverUploadRow({
         {tooltip && <TooltipContent side="bottom">{tooltip}</TooltipContent>}
       </Tooltip>
       <p id={coverErrorId} className="sr-only" aria-live="polite">
-        {coverError ?? ""}
+        {coverErrorText ?? ""}
       </p>
       {linkedReason && (
         <p id={disabledReasonId} className="sr-only">

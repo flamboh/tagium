@@ -1,3 +1,4 @@
+import { msg } from "gt-react";
 import type { AudioMetadata } from "@/features/library/types";
 
 export const MAX_COVER_ART_EDGE = 1_600;
@@ -45,11 +46,11 @@ export const getCoverArtTargetSize = (
 
 export const validateCoverArtUpload = (file: File) => {
   if (!supportedCoverArtTypes.has(file.type.toLowerCase())) {
-    throw new Error("cover art image must be a jpeg or png.");
+    throw new Error(msg("cover art image must be a jpeg or png."));
   }
 
   if (file.size > MAX_COVER_ART_UPLOAD_BYTES) {
-    throw new Error("cover art must be 25 mb or smaller.");
+    throw new Error(msg("cover art must be 25 mb or smaller."));
   }
 };
 
@@ -57,7 +58,7 @@ export const normalizeCoverArtType = (contentType: string) => {
   const normalized = contentType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
 
   if (!supportedCoverArtTypes.has(normalized)) {
-    throw new Error("cover art image must be a jpeg or png.");
+    throw new Error(msg("cover art image must be a jpeg or png."));
   }
 
   return normalized === "image/jpg" ? "image/jpeg" : normalized;
@@ -65,7 +66,7 @@ export const normalizeCoverArtType = (contentType: string) => {
 
 export const validateCoverArtDimensions = (width: number, height: number) => {
   if (width <= 0 || height <= 0 || width * height > MAX_COVER_ART_PIXELS) {
-    throw new Error("cover art must be 16 megapixels or smaller.");
+    throw new Error(msg("cover art must be 16 megapixels or smaller."));
   }
 };
 
@@ -117,7 +118,7 @@ export const readCoverArtDimensions = async (file: File) => {
   const dimensions =
     file.type.toLowerCase() === "image/png" ? readPngDimensions(bytes) : readJpegDimensions(bytes);
 
-  if (!dimensions) throw new Error("cover art has an invalid or unsupported image header.");
+  if (!dimensions) throw new Error(msg("cover art has an invalid or unsupported image header."));
 
   return dimensions;
 };
@@ -132,7 +133,7 @@ const canvasToBlob = (canvas: HTMLCanvasElement, type: "image/jpeg" | "image/png
           return;
         }
 
-        reject(new Error("could not optimize cover art."));
+        reject(new Error(msg("could not optimize cover art.")));
       },
       type,
       0.9,
@@ -160,7 +161,7 @@ export const optimizeCoverArt = async (file: File) => {
     canvas.height = target.height;
     const context = canvas.getContext("2d");
 
-    if (!context) throw new Error("could not optimize cover art.");
+    if (!context) throw new Error(msg("could not optimize cover art."));
     context.drawImage(image, 0, 0, target.width, target.height);
 
     const outputType = file.type.toLowerCase() === "image/png" ? "image/png" : "image/jpeg";
@@ -184,7 +185,7 @@ export const cropCoverArtToSquare = async (file: File, edge = CROPPED_COVER_ART_
     canvas.height = edge;
     const context = canvas.getContext("2d");
 
-    if (!context) throw new Error("could not crop cover art.");
+    if (!context) throw new Error(msg("could not crop cover art."));
     context.drawImage(
       image,
       (image.width - side) / 2,

@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { ArrowRight02Icon, Link02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { T, useGT, useMessages } from "gt-react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -152,10 +153,12 @@ export default function MediaUrlEntry({
   layout,
   controller,
   leadingAction,
-  placeholder = "soundcloud, youtube, or tagium share link",
-  submitAriaLabel = "start media import",
+  placeholder,
+  submitAriaLabel,
   animateSubmitIcon = false,
 }: MediaUrlEntryProps) {
+  const gt = useGT();
+  const m = useMessages();
   const { anchorRef, motionRef, showValidationFeedback } = useMediaUrlEntryMotion(layout);
 
   const canSubmit = controller.sourceUrl.trim().length > 0 && !controller.submitting;
@@ -165,7 +168,9 @@ export default function MediaUrlEntry({
       {layout === "landing" && (
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <div className="h-px flex-1 bg-border" />
-          <span>or import from a url</span>
+          <T>
+            <span>or import from a url</span>
+          </T>
           <div className="h-px flex-1 bg-border" />
         </div>
       )}
@@ -199,11 +204,11 @@ export default function MediaUrlEntry({
                   name="media-url"
                   autoComplete="url"
                   value={controller.sourceUrl}
-                  aria-label="media url"
+                  aria-label={gt("media url")}
                   aria-invalid={Boolean(controller.validationError)}
                   aria-describedby={controller.validationError ? "media-url-error" : undefined}
                   onChange={(event) => controller.setSourceUrl(event.target.value)}
-                  placeholder={placeholder}
+                  placeholder={placeholder ?? gt("soundcloud, youtube, or tagium share link")}
                   disabled={controller.submitting}
                   className="h-10 rounded-lg pl-9 placeholder:text-muted-foreground/45"
                 />
@@ -217,14 +222,14 @@ export default function MediaUrlEntry({
                 )}
                 aria-live="polite"
               >
-                {controller.validationError ?? ""}
+                {controller.validationError ? m(controller.validationError) : ""}
               </p>
             </div>
             <Button
               type="submit"
               size="icon"
               disabled={!canSubmit}
-              aria-label={submitAriaLabel}
+              aria-label={submitAriaLabel ?? gt("start media import")}
               aria-busy={controller.submitting || undefined}
               className={cn(
                 "size-10 rounded-lg",

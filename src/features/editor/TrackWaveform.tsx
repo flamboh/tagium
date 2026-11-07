@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 
 import type { KeyboardEvent, PointerEvent, ReactNode, Ref, RefObject } from "react";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { T, useGT, Var } from "gt-react";
 import { Button } from "@/components/ui/button";
 import { IconSwap } from "@/components/ui/icon-swap";
 import {
@@ -57,6 +58,7 @@ function useTrackWaveform({
   onClipChange,
   trailing,
 }: TrackWaveformProps) {
+  const gt = useGT();
   const audioRef = useRef<HTMLAudioElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ kind: "seek" } | { kind: "edge"; edge: ClipEdge } | null>(null);
@@ -275,9 +277,9 @@ function useTrackWaveform({
   };
 
   const statusMessage = playbackFailed
-    ? "this audio format can't be previewed here"
+    ? gt("this audio format can't be previewed here")
     : status === "unavailable"
-      ? "waveform unavailable for this track"
+      ? gt("waveform unavailable for this track")
       : null;
 
   const barCount = barCountForWidth(width);
@@ -329,6 +331,8 @@ function useTrackWaveform({
 }
 
 export default function TrackWaveform(props: TrackWaveformProps) {
+  const gt = useGT();
+
   const {
     trailing,
     audioRef,
@@ -367,12 +371,14 @@ export default function TrackWaveform(props: TrackWaveformProps) {
       data-track-waveform
       data-waveform-status={status}
       data-waveform-loading={loading || undefined}
-      aria-label="audio preview"
+      aria-label={gt("audio preview")}
       className="relative flex min-w-0 flex-col px-3 pt-4.5"
     >
       {/* Caption mirrors the inset labels on the metadata fields above. */}
       <div className="absolute top-0 right-3 left-3 flex items-center gap-3 text-[0.6875rem] leading-tight tracking-widest text-muted-foreground">
-        <span>preview</span>
+        <span>
+          <T>preview</T>
+        </span>
         <span role="status" className="ml-auto truncate text-right">
           {statusMessage ?? trailing}
         </span>
@@ -410,7 +416,7 @@ export default function TrackWaveform(props: TrackWaveformProps) {
           className="size-9 shrink-0 rounded-full"
           onClick={() => void togglePlayback()}
           disabled={!canPlay}
-          aria-label={playing ? "pause" : "play"}
+          aria-label={playing ? gt("pause") : gt("play")}
         >
           <IconSwap
             switched={playing}
@@ -438,12 +444,14 @@ export default function TrackWaveform(props: TrackWaveformProps) {
           >
             <span className="inline-flex items-center gap-1 rounded-full bg-muted py-px pr-0.5 pl-2 text-foreground/80">
               <span className="tabular-nums">
-                clip {formatClipPoint(labelRange.start, duration)}–
-                {formatClipPoint(labelRange.end, duration)}
+                <T>
+                  clip <Var>{formatClipPoint(labelRange.start, duration)}</Var>–
+                  <Var>{formatClipPoint(labelRange.end, duration)}</Var>
+                </T>
               </span>
               <button
                 type="button"
-                aria-label="reset clip"
+                aria-label={gt("reset clip")}
                 className="inline-flex size-4 cursor-pointer items-center justify-center rounded-full transition-colors outline-none text-muted-foreground hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
                 onClick={resetClip}
               >
@@ -455,11 +463,14 @@ export default function TrackWaveform(props: TrackWaveformProps) {
             ref={surfaceRef}
             role="slider"
             tabIndex={canPlay ? 0 : -1}
-            aria-label="playback position"
+            aria-label={gt("playback position")}
             aria-valuemin={0}
             aria-valuemax={Math.round(duration)}
             aria-valuenow={Math.round(position)}
-            aria-valuetext={`${formatTimestamp(position)} of ${formatTimestamp(duration)}`}
+            aria-valuetext={gt("{position} of {duration}", {
+              position: formatTimestamp(position),
+              duration: formatTimestamp(duration),
+            })}
             aria-disabled={!canPlay}
             onPointerDown={(event) => startDrag(event)}
             onPointerMove={handlePointerMove}
@@ -669,11 +680,13 @@ function ClipHandle({
   onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
 }) {
+  const gt = useGT();
+
   return (
     <div
       role="slider"
       tabIndex={0}
-      aria-label={edge === "start" ? "clip start" : "clip end"}
+      aria-label={edge === "start" ? gt("clip start") : gt("clip end")}
       aria-valuemin={0}
       aria-valuemax={duration > 0 ? Math.round(duration) : 100}
       aria-valuenow={Math.round(ratio * (duration > 0 ? duration : 100))}

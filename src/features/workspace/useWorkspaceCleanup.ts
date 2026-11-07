@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { t } from "gt-react";
 import { toast } from "sonner";
 import {
   applyMetadataCleanupSuggestions,
@@ -115,19 +116,24 @@ export const useWorkspaceCleanup = ({
     });
 
     if (newSuggestions.length === 0) return;
-    const noun = newSuggestions.length === 1 ? "track" : "tracks";
-    toast(`we found ${newSuggestions.length} ${noun} that could be cleaned up`, {
-      description: `${newSuggestions[0].beforeTitle} → ${newSuggestions[0].afterTitle}`,
-      action: {
-        label: "review",
-        onClick: () => {
-          openDialog({
-            type: "tracks",
-            trackIds: new Set(newSuggestions.map(({ trackId }) => trackId)),
-          });
+    toast(
+      t(
+        "{count, plural, one {we found # track that could be cleaned up} other {we found # tracks that could be cleaned up}}",
+        { count: newSuggestions.length },
+      ),
+      {
+        description: `${newSuggestions[0].beforeTitle} → ${newSuggestions[0].afterTitle}`,
+        action: {
+          label: t("review"),
+          onClick: () => {
+            openDialog({
+              type: "tracks",
+              trackIds: new Set(newSuggestions.map(({ trackId }) => trackId)),
+            });
+          },
         },
       },
-    });
+    );
   }, [availableSuggestions, busy, openDialog]);
 
   const apply = useCallback(
@@ -161,29 +167,33 @@ export const useWorkspaceCleanup = ({
       );
 
       if (selected?.metadata) editorRef.current.form.reset(selected.metadata);
-      const noun = currentSelectedSuggestions.length === 1 ? "track" : "tracks";
-      toast.success(`cleaned up ${currentSelectedSuggestions.length} ${noun}`, {
-        description: settingsRef.current.syncFilenames
-          ? "titles and synced filenames were updated"
-          : "titles were updated",
-        action: {
-          label: "undo",
-          onClick: () => {
-            const restoredFiles = undoMetadataCleanupSuggestions(
-              library.getSnapshot().files,
-              result.undoEntries,
-            );
+      toast.success(
+        t("{count, plural, one {cleaned up # track} other {cleaned up # tracks}}", {
+          count: currentSelectedSuggestions.length,
+        }),
+        {
+          description: settingsRef.current.syncFilenames
+            ? t("titles and synced filenames were updated")
+            : t("titles were updated"),
+          action: {
+            label: t("undo"),
+            onClick: () => {
+              const restoredFiles = undoMetadataCleanupSuggestions(
+                library.getSnapshot().files,
+                result.undoEntries,
+              );
 
-            library.dispatch({ type: "content-replaced", files: restoredFiles });
+              library.dispatch({ type: "content-replaced", files: restoredFiles });
 
-            const restored = restoredFiles.find(
-              (file) => file.id === library.getSnapshot().selectedFileId,
-            );
+              const restored = restoredFiles.find(
+                (file) => file.id === library.getSnapshot().selectedFileId,
+              );
 
-            if (restored?.metadata) editorRef.current.form.reset(restored.metadata);
+              if (restored?.metadata) editorRef.current.form.reset(restored.metadata);
+            },
           },
         },
-      });
+      );
     },
     [dialogScope, library],
   );

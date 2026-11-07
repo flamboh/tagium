@@ -7,6 +7,7 @@ import {
   type CobaltVideoQuality,
   type VideoDownloadPhase,
 } from "./download";
+import { msg } from "gt-react";
 import {
   getSystemFailurePresentation,
   type SystemFailurePresentation,
@@ -59,16 +60,14 @@ export const updateVideoDownloadSettings = (
 };
 
 const phaseLabels = {
-  planning: "preparing",
-  "waiting-for-tunnel": "waiting",
-  downloading: "downloading",
-  processing: "processing",
-  finalizing: "finalizing",
-} as const satisfies Record<VideoDownloadPhase, string>;
+  planning: msg("preparing"),
+  "waiting-for-tunnel": msg("waiting"),
+  downloading: msg("downloading"),
+  processing: msg("processing"),
+  finalizing: msg("finalizing"),
+} satisfies Record<VideoDownloadPhase, string>;
 
 export const getVideoDownloadPhaseLabel = (phase: VideoDownloadPhase) => phaseLabels[phase];
-
-export const getDownloadReadyAnnouncement = (filename: string) => `download ready: ${filename}`;
 
 export const presentVideoDownloadFailure = (error: Error): SystemFailurePresentation =>
   getSystemFailurePresentation(error, "download");

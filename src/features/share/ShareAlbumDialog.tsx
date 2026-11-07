@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Copy01Icon, MusicNote04Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { msg, T, useGT, useLocale, useMessages } from "gt-react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,8 +33,13 @@ export type ShareDialogState =
       status: "error";
       preview: SharePreview;
       intent?: "create" | "update";
-      message: string;
+      failure: ShareDialogFailure;
     };
+
+type ShareDialogFailure =
+  | { kind: "update-failed"; reason: string }
+  | { kind: "create-failed"; reason: string }
+  | { kind: "link-failed" };
 
 interface ShareAlbumDialogProps {
   state: ShareDialogState;
@@ -56,9 +62,10 @@ function ShareAlbumDialogSession({
 }: Omit<ShareAlbumDialogProps, "state"> & {
   state: Exclude<ShareDialogState, { status: "closed" }>;
 }) {
+  const gt = useGT();
   const [confirmStop, setConfirmStop] = useState(false);
   const [stopping, setStopping] = useState(false);
-  const [stopError, setStopError] = useState<string | null>(null);
+  const [stopFailed, setStopFailed] = useState(false);
   const open = true;
 
   const targetName = state.preview.kind;
@@ -66,20 +73,20 @@ function ShareAlbumDialogSession({
 
   const closeDialog = () => {
     setConfirmStop(false);
-    setStopError(null);
+    setStopFailed(false);
     setStopping(false);
     onClose();
   };
 
   const stopSharing = async () => {
     setStopping(true);
-    setStopError(null);
+    setStopFailed(false);
 
     try {
       await onStopSharing();
       setConfirmStop(false);
     } catch {
-      setStopError("sharing could not be stopped. check your connection and try again.");
+      setStopFailed(true);
     } finally {
       setStopping(false);
     }
@@ -103,7 +110,11 @@ function ShareAlbumDialogSession({
         <>
           <DialogHeader className="min-w-0 border-b px-5 py-4 pr-12">
             <DialogTitle className="truncate text-left">
-              {`share ${targetName}: ${state.preview.title}`}
+              {targetName === "album"
+                ? gt("share album: {title}", { title: state.preview.title })
+                : gt("share track: {title}", {
+                    title: state.preview.title || gt("untitled track"),
+                  })}
             </DialogTitle>
           </DialogHeader>
 
@@ -119,7 +130,7 @@ function ShareAlbumDialogSession({
             <PublishedShareNote
               expiresAt={state.receipt.expiresAt}
               confirmStop={confirmStop}
-              stopError={stopError}
+              stopFailed={stopFailed}
             />
           )}
 
@@ -142,6 +153,7 @@ function ShareAlbumDialogSession({
 }
 
 function ShareLinkField({ url }: { url: string }) {
+  const gt = useGT();
   const inputRef = useRef<HTMLInputElement>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "manual">("idle");
@@ -175,10 +187,10 @@ function ShareLinkField({ url }: { url: string }) {
     <div className="space-y-2 px-5 py-4">
       <div className="flex min-h-5 items-center justify-between gap-3">
         <label htmlFor="share-link" className="text-sm font-medium">
-          share link
+          <T>share link</T>
         </label>
         <span role="status" aria-live="polite" className="text-xs text-muted-foreground">
-          {copyStatus === "manual" ? "select and copy the link" : null}
+          {copyStatus === "manual" ? gt("select and copy the link") : null}
         </span>
       </div>
       <div className="flex gap-2">
@@ -196,7 +208,7 @@ function ShareLinkField({ url }: { url: string }) {
           ) : (
             <HugeiconsIcon icon={Copy01Icon} strokeWidth={2} aria-hidden="true" />
           )}
-          {copyStatus === "copied" ? "copied" : "copy link"}
+          {copyStatus === "copied" ? gt("copied") : gt("copy link")}
         </Button>
       </div>
     </div>
@@ -208,67 +220,88 @@ function ShareCreatorDetails({
 }: {
   state: Extract<ShareDialogState, { status: "confirm" | "publishing" | "error" }>;
 }) {
+  const gt = useGT();
+
   return (
     <div className="space-y-2 px-5 pb-4 pt-1">
       <p className="text-sm leading-6 text-foreground">
         {state.preview.kind === "album"
-          ? "anyone with the link can add this album. tracks are added from their original sources with these shared tags."
-          : "anyone with the link can add this track. it is downloaded from its original source with these shared tags."}
+          ? gt(
+              "anyone with the link can add this album. tracks are added from their original sources with these shared tags.",
+            )
+          : gt(
+              "anyone with the link can add this track. it is downloaded from its original source with these shared tags.",
+            )}
       </p>
       <p className="text-sm text-muted-foreground">
         {state.intent === "update"
-          ? "the link keeps its current expiration."
-          : "expires in 90 days."}
+          ? gt("the link keeps its current expiration.")
+          : gt("expires in 90 days.")}
       </p>
       {state.status === "error" && (
         <p role="alert" className="text-sm text-destructive">
-          {state.message}
+          <ShareFailureMessage failure={state.failure} />
         </p>
       )}
     </div>
   );
 }
 
+function ShareFailureMessage({ failure }: { failure: ShareDialogFailure }) {
+  const gt = useGT();
+  const m = useMessages();
+
+  if (failure.kind === "link-failed") return gt("the share link could not be created.");
+  const reason = m(failure.reason).replace(/[.!?。！？]+$/u, "");
+
+  return failure.kind === "update-failed"
+    ? gt("{reason}. the link still has the previous version.", { reason })
+    : gt("{reason}. no link was created.", { reason });
+}
+
 function PublishedShareNote({
   expiresAt,
   confirmStop,
-  stopError,
+  stopFailed,
 }: {
   expiresAt: string;
   confirmStop: boolean;
-  stopError: string | null;
+  stopFailed: boolean;
 }) {
+  const gt = useGT();
+  const locale = useLocale();
+  const date = new Date(expiresAt);
+
   return (
     <div className="px-5 pb-4 text-left text-sm text-muted-foreground">
       {confirmStop ? (
         <>
-          the link will stop working immediately.
-          {stopError && (
+          {gt("the link will stop working immediately.")}
+          {stopFailed && (
             <span role="alert" className="mt-1 block text-destructive">
-              {stopError}
+              {gt("sharing could not be stopped. check your connection and try again.")}
             </span>
           )}
         </>
+      ) : Number.isNaN(date.getTime()) ? (
+        gt("expires in 90 days · stop sharing to turn the link off at any time")
       ) : (
-        `expires ${formatExpiry(expiresAt)} · stop sharing to turn the link off at any time`
+        gt("expires {date} · stop sharing to turn the link off at any time", {
+          date: date
+            .toLocaleDateString(locale, {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
+            .toLocaleLowerCase(locale),
+        })
       )}
     </div>
   );
 }
 
-const formatExpiry = (expiresAt: string) => {
-  const date = new Date(expiresAt);
-
-  return Number.isNaN(date.getTime())
-    ? "in 90 days"
-    : date.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-};
-
 function SharePreview({ preview }: { preview: SharePreview }) {
+  const gt = useGT();
   const cover = preview.cover;
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
 
@@ -290,9 +323,13 @@ function SharePreview({ preview }: { preview: SharePreview }) {
       <div
         className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted sm:size-32"
         aria-label={
-          preview.cover
-            ? `${preview.kind} ${preview.kind === "album" ? "cover" : "artwork"}`
-            : `no ${preview.kind} ${preview.kind === "album" ? "cover" : "artwork"}`
+          preview.kind === "album"
+            ? preview.cover
+              ? gt("album cover")
+              : gt("no album cover")
+            : preview.cover
+              ? gt("track artwork")
+              : gt("no track artwork")
         }
       >
         {coverUrl ? (
@@ -308,25 +345,37 @@ function SharePreview({ preview }: { preview: SharePreview }) {
       </div>
       <ol
         tabIndex={0}
-        aria-label="track preview"
+        aria-label={gt("track preview")}
         className="h-24 min-w-0 flex-1 overflow-x-hidden overflow-y-auto rounded-md border p-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:h-32 [&>li+li]:mt-1"
       >
         {preview.tracks.length ? (
           preview.tracks.map((track, index) => (
-            <li key={track.key} className="flex min-w-0 gap-2 leading-5" title={track.title}>
+            <li
+              key={track.key}
+              className="flex min-w-0 gap-2 leading-5"
+              title={track.title || gt("untitled track")}
+            >
               <span className="w-5 shrink-0 text-right text-muted-foreground" aria-hidden="true">
                 {index + 1}.
               </span>
-              <span className="min-w-0 truncate">{track.title}</span>
+              <span className="min-w-0 truncate">{track.title || gt("untitled track")}</span>
             </li>
           ))
         ) : (
-          <li className="list-none p-1 text-muted-foreground">no tracks</li>
+          <li className="list-none p-1 text-muted-foreground">
+            <T>no tracks</T>
+          </li>
         )}
       </ol>
     </div>
   );
 }
+
+const publishLabels = {
+  create: { idle: msg("create share link"), busy: msg("creating link…") },
+  album: { idle: msg("update shared album"), busy: msg("updating shared album…") },
+  track: { idle: msg("update shared track"), busy: msg("updating shared track…") },
+};
 
 function ShareDialogFooterActions({
   state,
@@ -347,6 +396,8 @@ function ShareDialogFooterActions({
   onClose: () => void;
   onPublish: () => void;
 }) {
+  const m = useMessages();
+
   if (state.status === "published") {
     return (
       <div className="grid w-full grid-cols-2 gap-2">
@@ -358,7 +409,7 @@ function ShareDialogFooterActions({
               className="h-9 w-full"
               onClick={() => onConfirmStopChange(false)}
             >
-              keep sharing
+              <T>keep sharing</T>
             </Button>
           ) : (
             <Button
@@ -367,7 +418,7 @@ function ShareDialogFooterActions({
               className="h-9 w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
               onClick={() => onConfirmStopChange(true)}
             >
-              stop sharing
+              <T>stop sharing</T>
             </Button>
           )}
         </div>
@@ -387,11 +438,11 @@ function ShareDialogFooterActions({
                 className="animate-spin motion-reduce:animate-none"
               />
             )}
-            stop sharing
+            <T>stop sharing</T>
           </Button>
         ) : (
           <Button type="button" className="h-9 w-full" onClick={onClose}>
-            done
+            <T>done</T>
           </Button>
         )}
       </div>
@@ -401,7 +452,7 @@ function ShareDialogFooterActions({
   if (state.status === "link") {
     return (
       <Button type="button" className="h-9 w-full" onClick={onClose}>
-        done
+        <T>done</T>
       </Button>
     );
   }
@@ -418,7 +469,7 @@ function ShareDialogFooterActions({
         disabled={publishing}
         onClick={onClose}
       >
-        cancel
+        <T>cancel</T>
       </Button>
       <Button type="button" className="h-9 w-full" disabled={publishing} onClick={onPublish}>
         {publishing && (
@@ -429,13 +480,7 @@ function ShareDialogFooterActions({
             className="animate-spin motion-reduce:animate-none"
           />
         )}
-        {publishing
-          ? updating
-            ? `updating shared ${targetName}…`
-            : "creating link…"
-          : updating
-            ? `update shared ${targetName}`
-            : "create share link"}
+        {m(publishLabels[updating ? targetName : "create"][publishing ? "busy" : "idle"])}
       </Button>
     </div>
   );

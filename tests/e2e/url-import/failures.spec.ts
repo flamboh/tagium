@@ -554,3 +554,23 @@ test("fetches a fresh soundcloud stream when its segment links expire", async ({
   const exported = await captureDownload(page, () => downloadTrackButton(page).click());
   expect((await inspectAudio(exported)).metadata.title).toBe("Fresh Link");
 });
+
+test.describe("in a spanish browser", () => {
+  test.use({ locale: "es-ES" });
+
+  test("explains an import outage in spanish", async ({ page, upstreams }) => {
+    const set = await upstreams.soundcloud.set({ tracks: [{}], status: 503 });
+
+    await page.goto("/");
+
+    const url = page.getByRole("textbox", { name: "url multimedia" });
+
+    await url.fill(set.url);
+    await url.press("Enter");
+    await expect(
+      page
+        .getByRole("region", { name: /^notificaciones/u })
+        .getByText("tagium no pudo importar este contenido. vuelve a intentarlo en un momento."),
+    ).toBeVisible();
+  });
+});

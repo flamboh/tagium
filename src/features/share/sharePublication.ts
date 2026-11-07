@@ -5,6 +5,7 @@ import type {
   TagiumFile,
 } from "@/features/library/types";
 import { Schema } from "effect";
+import { msg } from "gt-react";
 import {
   projectAlbumManifest,
   projectTrackManifest,
@@ -118,12 +119,7 @@ export const projectTrackShareSnapshot = async (file: TagiumFile): Promise<Share
 
 export interface ShareActionState {
   enabled: boolean;
-  label:
-    | "share album"
-    | "share track"
-    | "view share link"
-    | "update shared album"
-    | "update shared track";
+  label: string;
   reason: string;
   variant: "create" | "view" | "update";
 }
@@ -144,14 +140,15 @@ const shareActionState = (
   hasCapability: boolean,
   now = Date.now(),
 ): ShareActionState => {
-  const createLabel = kind === "album" ? "share album" : "share track";
-  const updateLabel = kind === "album" ? "update shared album" : "update shared track";
+  const createLabel = kind === "album" ? msg("share album") : msg("share track");
+  const updateLabel = kind === "album" ? msg("update shared album") : msg("update shared track");
+  const viewLabel = msg("view share link");
 
   if (sourceManifestSlug) {
     return {
       enabled: true,
-      label: "view share link",
-      reason: "view share link",
+      label: viewLabel,
+      reason: viewLabel,
       variant: "view",
     };
   }
@@ -163,7 +160,7 @@ const shareActionState = (
     return {
       enabled: true,
       label: createLabel,
-      reason: "create a new share link",
+      reason: msg("create a new share link"),
       variant: "create",
     };
   }
@@ -172,7 +169,10 @@ const shareActionState = (
     return {
       enabled: false,
       label: updateLabel,
-      reason: `this browser cannot update the shared ${kind}`,
+      reason:
+        kind === "album"
+          ? msg("this browser cannot update the shared album")
+          : msg("this browser cannot update the shared track"),
       variant: "update",
     };
   }
@@ -180,8 +180,8 @@ const shareActionState = (
   if (!currentFingerprint || currentFingerprint === publication.publishedFingerprint) {
     return {
       enabled: true,
-      label: "view share link",
-      reason: "view share link",
+      label: viewLabel,
+      reason: viewLabel,
       variant: "view",
     };
   }

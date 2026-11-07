@@ -1,3 +1,4 @@
+import { msg } from "gt-react";
 import { SHARE_SLUG_PATTERN } from "@/features/share/shareSlug";
 
 const PRODUCTION_ORIGINS = new Set(["https://tagium.app", "https://www.tagium.app"]);
@@ -50,14 +51,14 @@ export const shareLinkForSlug = (
 
 export class InvalidShareLinkError extends Error {
   constructor() {
-    super("that isn’t a tagium share link");
+    super(msg("that isn’t a tagium share link"));
     this.name = "InvalidShareLinkError";
   }
 }
 
 export class ShareLinksDisabledError extends Error {
   constructor() {
-    super("share links are not available right now");
+    super(msg("share links are not available right now"));
     this.name = "ShareLinksDisabledError";
   }
 }

@@ -19,6 +19,7 @@ import {
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import {
   analytics,
@@ -50,7 +51,6 @@ import {
 } from "@/apps/tagium-save/download";
 import {
   buildVideoDownloadRequest,
-  getDownloadReadyAnnouncement,
   getVideoDownloadPhaseLabel,
   presentVideoDownloadFailure,
   updateVideoDownloadSettings,
@@ -76,9 +76,9 @@ import { mediaLinkKindFromUrl } from "@/lib/media-link";
  */
 
 const modeOptions = [
-  { value: "auto", label: "video with audio" },
-  { value: "audio", label: "audio only" },
-  { value: "mute", label: "video only" },
+  { value: "auto", label: msg("video with audio") },
+  { value: "audio", label: msg("audio only") },
+  { value: "mute", label: msg("video only") },
 ] as const satisfies ReadonlyArray<{
   value: VideoDownloadSettings["mode"];
   label: string;
@@ -111,7 +111,7 @@ const codecOptions = cobaltVideoCodecs.map((value) => ({
 }>;
 
 const audioFormatOptions = [
-  { value: "best", label: "source" },
+  { value: "best", label: msg("source") },
   { value: "opus", label: "opus" },
   { value: "mp3", label: "mp3" },
 ] as const satisfies ReadonlyArray<{
@@ -162,8 +162,14 @@ const prefersReducedMotion = () =>
   typeof window !== "undefined" &&
   (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
 
+const pickerItemLabels = {
+  photo: msg("photo"),
+  video: msg("video"),
+  gif: msg("gif"),
+} as const satisfies Record<CobaltPickerItem["type"], string>;
+
 const validateSourceUrl = (value: string) => {
-  if (!value) return "enter a media url";
+  if (!value) return msg("enter a media url");
 
   try {
     const url = new URL(value);
@@ -173,7 +179,7 @@ const validateSourceUrl = (value: string) => {
     // The shared media entry shows this message beside the field.
   }
 
-  return "enter a complete http or https url";
+  return msg("enter a complete http or https url");
 };
 
 const normaliseProgress = (progress: VideoDownloadProgress["progress"]) => {
@@ -198,6 +204,8 @@ function SelectField<Value extends string>({
   options,
   onChange,
 }: SelectFieldProps<Value>) {
+  const m = useMessages();
+
   return (
     <div className="min-w-0">
       <Label htmlFor={id} className="mb-1.5 text-xs text-muted-foreground">
@@ -215,7 +223,7 @@ function SelectField<Value extends string>({
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
-            {option.label}
+            {m(option.label)}
           </option>
         ))}
       </select>
@@ -232,6 +240,8 @@ function DownloadSettings({
   onChange: (update: VideoDownloadSettingsUpdate) => void;
   disabled: boolean;
 }) {
+  const gt = useGT();
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -240,7 +250,7 @@ function DownloadSettings({
           variant="outline"
           size="icon"
           className="group size-10 shrink-0 rounded-lg active:scale-[0.97] motion-reduce:active:scale-100"
-          aria-label="download settings"
+          aria-label={gt("download settings")}
           disabled={disabled}
         >
           <span
@@ -268,7 +278,7 @@ function DownloadSettings({
         <div className="grid grid-cols-2 gap-3">
           <SelectField
             id="video-mode"
-            label="mode"
+            label={gt("mode")}
             value={settings.mode}
             options={modeOptions}
             onChange={(value) => onChange({ key: "mode", value })}
@@ -277,21 +287,21 @@ function DownloadSettings({
             <>
               <SelectField
                 id="video-quality"
-                label="quality"
+                label={gt("quality")}
                 value={settings.quality}
                 options={qualityOptions}
                 onChange={(value) => onChange({ key: "quality", value })}
               />
               <SelectField
                 id="video-container"
-                label="container"
+                label={gt("container")}
                 value={settings.container}
                 options={containerOptions}
                 onChange={(value) => onChange({ key: "container", value })}
               />
               <SelectField
                 id="video-codec"
-                label="codec"
+                label={gt("codec")}
                 value={settings.codec}
                 options={codecOptions}
                 onChange={(value) => onChange({ key: "codec", value })}
@@ -301,7 +311,7 @@ function DownloadSettings({
           {settings.mode !== "mute" && (
             <SelectField
               id="video-audio"
-              label="audio"
+              label={gt("audio")}
               value={settings.audioFormat}
               options={audioFormatOptions}
               onChange={(value) => onChange({ key: "audioFormat", value })}
@@ -322,6 +332,10 @@ function ProgressRow({
   progress: number | undefined;
   onCancel: () => void;
 }) {
+  const gt = useGT();
+  const m = useMessages();
+  const phaseLabel = m(getVideoDownloadPhaseLabel(phase));
+
   return (
     <div className="mt-1 flex items-center gap-2" role="status" aria-live="polite">
       <HugeiconsIcon
@@ -330,19 +344,17 @@ function ProgressRow({
         className="size-4 shrink-0 animate-spin text-muted-foreground"
         aria-hidden="true"
       />
-      <span className="w-20 shrink-0 text-xs text-muted-foreground">
-        {getVideoDownloadPhaseLabel(phase)}
-      </span>
+      <span className="w-20 shrink-0 text-xs text-muted-foreground">{phaseLabel}</span>
       <div
         role="progressbar"
-        aria-label="download progress"
+        aria-label={gt("download progress")}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={progress}
         aria-valuetext={
           progress === undefined
-            ? getVideoDownloadPhaseLabel(phase)
-            : `${getVideoDownloadPhaseLabel(phase)} ${progress}%`
+            ? phaseLabel
+            : gt("{phase} {progress}%", { phase: phaseLabel, progress })
         }
         className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-lg bg-muted"
       >
@@ -359,7 +371,7 @@ function ProgressRow({
         variant="ghost"
         size="icon"
         className="size-8 shrink-0 active:scale-[0.97] motion-reduce:active:scale-100"
-        aria-label="cancel download"
+        aria-label={gt("cancel download")}
         onClick={onCancel}
       >
         <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden="true" />
@@ -379,19 +391,25 @@ function PickerChoices({
   onSelectAudio: () => void;
   onReset: () => void;
 }) {
+  const gt = useGT();
+  const m = useMessages();
+
   return (
     <div className="mt-1 flex w-full items-start gap-2">
-      <div className="grid min-w-0 flex-1 grid-cols-2 gap-2" aria-label="media choices">
+      <div className="grid min-w-0 flex-1 grid-cols-2 gap-2" aria-label={gt("media choices")}>
         {result.picker.map((item, index) => (
           <Button
             key={`${item.type}-${item.url}`}
             type="button"
             variant="outline"
             className="h-9 min-w-0 justify-between px-3 text-xs active:scale-[0.97] motion-reduce:active:scale-100"
-            aria-label={`download ${item.type} ${index + 1}`}
+            aria-label={gt("download {item} {number}", {
+              item: m(pickerItemLabels[item.type]),
+              number: index + 1,
+            })}
             onClick={() => onSelect(item)}
           >
-            <span className="truncate">{item.type}</span>
+            <span className="truncate">{m(pickerItemLabels[item.type])}</span>
             <span aria-hidden="true">{index + 1}</span>
           </Button>
         ))}
@@ -400,10 +418,16 @@ function PickerChoices({
             type="button"
             variant="outline"
             className="h-9 min-w-0 justify-between px-3 text-xs active:scale-[0.97] motion-reduce:active:scale-100"
-            aria-label={`download ${result.audioFilename ?? "audio"}`}
+            aria-label={
+              result.audioFilename
+                ? gt("download {filename}", { filename: result.audioFilename })
+                : gt("download audio")
+            }
             onClick={onSelectAudio}
           >
-            <span className="truncate">audio</span>
+            <T>
+              <span className="truncate">audio</span>
+            </T>
             <HugeiconsIcon
               icon={Download01Icon}
               strokeWidth={2}
@@ -418,7 +442,7 @@ function PickerChoices({
         variant="ghost"
         size="icon"
         className="size-8 shrink-0 active:scale-[0.97] motion-reduce:active:scale-100"
-        aria-label="reset download"
+        aria-label={gt("reset download")}
         onClick={onReset}
       >
         <HugeiconsIcon icon={Refresh04Icon} strokeWidth={2} aria-hidden="true" />
@@ -438,6 +462,7 @@ function RecentDownloadRow({
   const contentRef = useRef<HTMLDivElement>(null);
   const confirmationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const gt = useGT();
 
   useLayoutEffect(() => {
     const item = itemRef.current;
@@ -502,7 +527,7 @@ function RecentDownloadRow({
           variant="ghost"
           size="icon"
           className="size-10 shrink-0 active:scale-[0.97] motion-reduce:active:scale-100"
-          aria-label={`download ${download.file.name}`}
+          aria-label={gt("download {filename}", { filename: download.file.name })}
           onClick={handleDownload}
         >
           <IconSwap
@@ -563,10 +588,15 @@ function RecentDownloads({
   downloads: ReadonlyArray<RecentDownload>;
   onDownload: (download: RecentDownload) => void;
 }) {
+  const gt = useGT();
+
   if (downloads.length === 0) return null;
 
   return (
-    <ul className="relative z-0 mt-3 flex w-full flex-col gap-0.5" aria-label="recent downloads">
+    <ul
+      className="relative z-0 mt-3 flex w-full flex-col gap-0.5"
+      aria-label={gt("recent downloads")}
+    >
       {downloads.map((download) => (
         <RecentDownloadRow key={download.id} download={download} onDownload={onDownload} />
       ))}
@@ -583,13 +613,17 @@ function ErrorRow({
   onRetry?: () => void;
   onReset: () => void;
 }) {
+  const gt = useGT();
+  const m = useMessages();
+  const translatedMessage = m(message);
+
   return (
     <div
       role="alert"
       className="flex h-full min-w-0 items-center gap-2 text-xs text-destructive motion-safe:animate-[enter_300ms_ease] motion-safe:fade-in"
     >
-      <span className="min-w-0 flex-1 truncate" title={message}>
-        {message}
+      <span className="min-w-0 flex-1 truncate" title={translatedMessage}>
+        {translatedMessage}
       </span>
       {onRetry && (
         <Button
@@ -597,7 +631,7 @@ function ErrorRow({
           variant="ghost"
           size="icon"
           className="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
-          aria-label="retry download"
+          aria-label={gt("retry download")}
           onClick={onRetry}
         >
           <HugeiconsIcon icon={Refresh04Icon} strokeWidth={2} aria-hidden="true" />
@@ -608,7 +642,7 @@ function ErrorRow({
         variant="ghost"
         size="icon"
         className="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-[0.97] motion-reduce:active:scale-100"
-        aria-label="reset download"
+        aria-label={gt("reset download")}
         onClick={onReset}
       >
         <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden="true" />
@@ -619,12 +653,13 @@ function ErrorRow({
 
 function SaveThemeToggle() {
   const { theme, toggleTheme } = useTheme();
+  const gt = useGT();
 
   return (
     <button
       type="button"
       className="page-enter absolute top-4 left-1/2 inline-flex size-11 -translate-x-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none transition-[color,scale] hover:text-foreground active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:active:scale-100 sm:top-8"
-      aria-label={`switch to ${theme === "light" ? "dark" : "light"} mode`}
+      aria-label={theme === "light" ? gt("switch to dark mode") : gt("switch to light mode")}
       onClick={toggleTheme}
     >
       <IconSwap
@@ -856,12 +891,14 @@ function TagiumSaveView({
   settings,
   state,
 }: TagiumSaveViewProps) {
+  const gt = useGT();
+
   return (
     <main className="relative flex h-svh min-h-0 flex-col items-center overflow-y-auto p-8 max-sm:pb-4 max-lg:[@media(max-height:700px)]:p-4">
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {completionAnnouncement && (
           <span key={completionAnnouncement.id}>
-            {getDownloadReadyAnnouncement(completionAnnouncement.filename)}
+            {gt("download ready: {filename}", { filename: completionAnnouncement.filename })}
           </span>
         )}
       </span>
@@ -885,8 +922,8 @@ function TagiumSaveView({
                 onChange={onSettingsChange}
               />
             }
-            placeholder="paste a media link"
-            submitAriaLabel="start video download"
+            placeholder={gt("paste a media link")}
+            submitAriaLabel={gt("start video download")}
             animateSubmitIcon
           />
         </div>
@@ -922,24 +959,26 @@ function TagiumSaveView({
         data-save-attribution
         className="page-enter [--page-enter-delay:60ms] w-full shrink-0 text-center text-xs leading-5 text-muted-foreground"
       >
-        made by{" "}
-        <a
-          href="https://x.com/flambohh"
-          target="_blank"
-          rel="noreferrer"
-          className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          flamboh
-        </a>
-        , powered by{" "}
-        <a
-          href="https://cobalt.tools/"
-          target="_blank"
-          rel="noreferrer"
-          className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          cobalt
-        </a>
+        <T>
+          made by{" "}
+          <a
+            href="https://x.com/flambohh"
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            flamboh
+          </a>
+          , powered by{" "}
+          <a
+            href="https://cobalt.tools/"
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-4 transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            cobalt
+          </a>
+        </T>
       </footer>
     </main>
   );

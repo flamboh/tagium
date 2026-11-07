@@ -1,4 +1,6 @@
+import { msg } from "gt-react";
 import { toast } from "sonner";
+import { translated } from "@/i18n/TranslatedText";
 
 export type SystemFailureContext =
   | "download"
@@ -59,177 +61,183 @@ const lastDownloadNotificationAt = new Map<string, number>();
 const KNOWN_FAILURES = {
   capacity: {
     code: "capacity",
-    title: "downloads are busy",
-    description: "too many downloads are running right now. try again in a moment.",
-    trackDescription: "downloads are busy. try again in a moment.",
+    title: msg("downloads are busy"),
+    description: msg("too many downloads are running right now. try again in a moment."),
+    trackDescription: msg("downloads are busy. try again in a moment."),
     retryable: true,
     dedupeKey: "system-download-capacity",
   },
   rate_limited: {
     code: "rate_limited",
-    title: "too many download requests",
-    description: "wait a moment, then try the download again.",
-    trackDescription: "too many download requests. try again shortly.",
+    title: msg("too many download requests"),
+    description: msg("wait a moment, then try the download again."),
+    trackDescription: msg("too many download requests. try again shortly."),
     retryable: true,
     dedupeKey: "system-download-rate-limited",
   },
   timeout: {
     code: "timeout",
-    title: "the download took too long",
-    description: "try again. if it keeps failing, try another link.",
-    trackDescription: "download timed out. try again.",
+    title: msg("the download took too long"),
+    description: msg("try again. if it keeps failing, try another link."),
+    trackDescription: msg("download timed out. try again."),
     retryable: true,
     dedupeKey: "system-download-timeout",
   },
   service_unavailable: {
     code: "service_unavailable",
-    title: "downloads are temporarily unavailable",
-    description: "tagium could not reach the download service. try again soon.",
-    trackDescription: "downloads are temporarily unavailable.",
+    title: msg("downloads are temporarily unavailable"),
+    description: msg("tagium could not reach the download service. try again soon."),
+    trackDescription: msg("downloads are temporarily unavailable."),
     retryable: true,
     dedupeKey: "system-download-service-unavailable",
   },
   unsupported_source: {
     code: "unsupported_source",
-    title: "this link is not supported",
-    description: "paste a public soundcloud or youtube track, set, or playlist link.",
-    trackDescription: "this link is not supported.",
+    title: msg("this link is not supported"),
+    description: msg("paste a public soundcloud or youtube track, set, or playlist link."),
+    trackDescription: msg("this link is not supported."),
     retryable: false,
     dedupeKey: "system-download-unsupported-source",
   },
   drm_protected: {
     code: "drm_protected",
-    title: "this media is drm-protected",
-    description: "tagium can't download drm-protected media. try another link.",
-    trackDescription: "this media is drm-protected and can't be downloaded.",
+    title: msg("this media is drm-protected"),
+    description: msg("tagium can't download drm-protected media. try another link."),
+    trackDescription: msg("this media is drm-protected and can't be downloaded."),
     retryable: false,
     dedupeKey: "system-download-drm-protected",
   },
   no_stream: {
     code: "no_stream",
-    title: "soundcloud has no downloadable stream for this track",
-    description: "try another track.",
-    trackDescription: "soundcloud has no downloadable stream for this track.",
+    title: msg("soundcloud has no downloadable stream for this track"),
+    description: msg("try another track."),
+    trackDescription: msg("soundcloud has no downloadable stream for this track."),
     retryable: false,
     dedupeKey: "system-download-no-stream",
   },
   paid_preview: {
     code: "paid_preview",
-    title: "this track is a go+ preview",
-    description: "soundcloud only streams a preview of this track, so tagium can't save it.",
-    trackDescription: "only a go+ preview is available.",
+    title: msg("this track is a go+ preview"),
+    description: msg("soundcloud only streams a preview of this track, so tagium can't save it."),
+    trackDescription: msg("only a go+ preview is available."),
     retryable: false,
     dedupeKey: "system-download-paid-preview",
   },
   region_locked: {
     code: "region_locked",
-    title: "this media is region-locked",
-    description: "the provider blocks it where our servers are. try another link.",
-    trackDescription: "region-locked.",
+    title: msg("this media is region-locked"),
+    description: msg("the provider blocks it where our servers are. try another link."),
+    trackDescription: msg("region-locked."),
     retryable: false,
     dedupeKey: "system-download-region-locked",
   },
   too_long: {
     code: "too_long",
-    title: "this media is too long",
-    description: "tagium can save media up to 3 hours long.",
-    trackDescription: "longer than 3 hours.",
+    title: msg("this media is too long"),
+    description: msg("tagium can save media up to 3 hours long."),
+    trackDescription: msg("longer than 3 hours."),
     retryable: false,
     dedupeKey: "system-download-too-long",
   },
   live_stream: {
     code: "live_stream",
-    title: "live streams can't be saved",
-    description: "wait until the stream ends, then try again.",
-    trackDescription: "live streams can't be saved.",
+    title: msg("live streams can't be saved"),
+    description: msg("wait until the stream ends, then try again."),
+    trackDescription: msg("live streams can't be saved."),
     retryable: false,
     dedupeKey: "system-download-live-stream",
   },
   age_restricted: {
     code: "age_restricted",
-    title: "this media is age-restricted",
-    description: "tagium can't sign in to download age-restricted media.",
-    trackDescription: "age-restricted.",
+    title: msg("this media is age-restricted"),
+    description: msg("tagium can't sign in to download age-restricted media."),
+    trackDescription: msg("age-restricted."),
     retryable: false,
     dedupeKey: "system-download-age-restricted",
   },
   private_or_missing: {
     code: "private_or_missing",
-    title: "we could not access this media",
-    description: "check that the link is public and still available.",
-    trackDescription: "media is private, unavailable, or no longer exists.",
+    title: msg("we could not access this media"),
+    description: msg("check that the link is public and still available."),
+    trackDescription: msg("media is private, unavailable, or no longer exists."),
     retryable: false,
     dedupeKey: "system-download-private-or-missing",
   },
   playlist_empty: {
     code: "playlist_empty",
-    title: "this playlist has nothing to save",
-    description: "none of this playlist's tracks can be saved. they may be private or removed.",
-    trackDescription: "none of this playlist's tracks can be saved.",
+    title: msg("this playlist has nothing to save"),
+    description: msg(
+      "none of this playlist's tracks can be saved. they may be private or removed.",
+    ),
+    trackDescription: msg("none of this playlist's tracks can be saved."),
     retryable: false,
     dedupeKey: "system-download-playlist-empty",
   },
   short_link_unresolved: {
     code: "short_link_unresolved",
-    title: "this short link doesn't lead anywhere",
-    description: "this soundcloud short link doesn't lead to a track or playlist.",
-    trackDescription: "this soundcloud short link doesn't lead to a track or playlist.",
+    title: msg("this short link doesn't lead anywhere"),
+    description: msg("this soundcloud short link doesn't lead to a track or playlist."),
+    trackDescription: msg("this soundcloud short link doesn't lead to a track or playlist."),
     retryable: false,
     dedupeKey: "system-download-short-link-unresolved",
   },
   video_unavailable: {
     code: "video_unavailable",
-    title: "this video is unavailable",
-    description: "it may be private, removed, or temporarily blocked by youtube.",
-    trackDescription: "unavailable or blocked by youtube.",
+    title: msg("this video is unavailable"),
+    description: msg("it may be private, removed, or temporarily blocked by youtube."),
+    trackDescription: msg("unavailable or blocked by youtube."),
     retryable: false,
     dedupeKey: "system-download-video-unavailable",
   },
   provider_blocked: {
     code: "provider_blocked",
-    title: "youtube is blocking downloads right now",
-    description: "this isn't a problem with your link. try again later.",
-    trackDescription: "youtube is blocking downloads. try again later.",
+    title: msg("youtube is blocking downloads right now"),
+    description: msg("this isn't a problem with your link. try again later."),
+    trackDescription: msg("youtube is blocking downloads. try again later."),
     retryable: true,
     dedupeKey: "system-download-provider-blocked",
   },
   link_expired: {
     code: "link_expired",
-    title: "the download link expired",
-    description: "try again to get a fresh link.",
-    trackDescription: "download link expired. try again.",
+    title: msg("the download link expired"),
+    description: msg("try again to get a fresh link."),
+    trackDescription: msg("download link expired. try again."),
     retryable: true,
     dedupeKey: "system-download-link-expired",
   },
   parse_failed: {
     code: "parse_failed",
-    title: "tagium couldn't read the downloaded audio",
-    description: "switch the audio format in settings, then try again.",
-    trackDescription: "tagium couldn't read the downloaded audio.",
+    title: msg("tagium couldn't read the downloaded audio"),
+    description: msg("switch the audio format in settings, then try again."),
+    trackDescription: msg("tagium couldn't read the downloaded audio."),
     retryable: false,
     dedupeKey: "system-download-parse-failed",
   },
   processing_failed: {
     code: "processing_failed",
-    title: "tagium couldn't convert this audio",
-    description: "switch the audio format in settings or try another browser.",
-    trackDescription: "tagium couldn't convert this audio.",
+    title: msg("tagium couldn't convert this audio"),
+    description: msg("switch the audio format in settings or try another browser."),
+    trackDescription: msg("tagium couldn't convert this audio."),
     retryable: true,
     dedupeKey: "system-download-processing-failed",
   },
   browser_unsupported: {
     code: "browser_unsupported",
-    title: "this browser can't process video",
-    description: "try a recent chrome, edge, or firefox.",
-    trackDescription: "this browser can't process video. try a recent chrome, edge, or firefox.",
+    title: msg("this browser can't process video"),
+    description: msg("try a recent chrome, edge, or firefox."),
+    trackDescription: msg(
+      "this browser can't process video. try a recent chrome, edge, or firefox.",
+    ),
     retryable: false,
     dedupeKey: "system-download-browser-unsupported",
   },
   invalid_response: {
     code: "invalid_response",
-    title: "we could not read this media",
-    description: "the provider returned an unexpected response. try again or use another link.",
-    trackDescription: "the media provider returned an unexpected response.",
+    title: msg("we could not read this media"),
+    description: msg(
+      "the provider returned an unexpected response. try again or use another link.",
+    ),
+    trackDescription: msg("the media provider returned an unexpected response."),
     retryable: true,
     dedupeKey: "system-download-invalid-response",
   },
@@ -237,45 +245,48 @@ const KNOWN_FAILURES = {
 
 const FALLBACKS = {
   download: {
-    title: "download failed",
-    description: "tagium could not download this track. try again or use another link.",
-    trackDescription: "download failed. try again or use another link.",
+    title: msg("download failed"),
+    description: msg("tagium could not download this track. try again or use another link."),
+    trackDescription: msg("download failed. try again or use another link."),
   },
   import: {
-    title: "import failed",
-    description: "tagium could not import this media. try again in a moment.",
-    trackDescription: "import failed. try again.",
+    title: msg("import failed"),
+    description: msg("tagium could not import this media. try again in a moment."),
+    trackDescription: msg("import failed. try again."),
   },
   upload: {
-    title: "some files could not be imported",
-    description:
+    title: msg("some files could not be imported"),
+    description: msg(
       "tagium could not read one or more audio files. try a valid mp3, flac, m4a, or opus file.",
-    trackDescription: "one or more audio files could not be read.",
+    ),
+    trackDescription: msg("one or more audio files could not be read."),
   },
   export: {
-    title: "export failed",
-    description: "tagium could not prepare your download. your tracks are still in the library.",
-    trackDescription: "export failed. your tracks are still in the library.",
+    title: msg("export failed"),
+    description: msg(
+      "tagium could not prepare your download. your tracks are still in the library.",
+    ),
+    trackDescription: msg("export failed. your tracks are still in the library."),
   },
   "cover-art": {
-    title: "cover art failed",
-    description: "tagium could not process this cover image. try another jpeg or png.",
-    trackDescription: "cover art could not be processed.",
+    title: msg("cover art failed"),
+    description: msg("tagium could not process this cover image. try another jpeg or png."),
+    trackDescription: msg("cover art could not be processed."),
   },
   "cover-import": {
-    title: "cover art was not imported",
-    description: "the tracks were imported without cover art. upload a jpeg or png manually.",
-    trackDescription: "cover art was not imported. upload an image manually.",
+    title: msg("cover art was not imported"),
+    description: msg("the tracks were imported without cover art. upload a jpeg or png manually."),
+    trackDescription: msg("cover art was not imported. upload an image manually."),
   },
   metadata: {
-    title: "metadata could not be saved",
-    description: "your edits are still visible. try the action again.",
-    trackDescription: "metadata could not be saved. try again.",
+    title: msg("metadata could not be saved"),
+    description: msg("your edits are still visible. try the action again."),
+    trackDescription: msg("metadata could not be saved. try again."),
   },
   storage: {
-    title: "settings could not be saved",
-    description: "your browser did not allow tagium to store these settings.",
-    trackDescription: "settings could not be saved.",
+    title: msg("settings could not be saved"),
+    description: msg("your browser did not allow tagium to store these settings."),
+    trackDescription: msg("settings could not be saved."),
   },
 } as const satisfies Record<
   SystemFailureContext,
@@ -469,15 +480,17 @@ export const reportSystemFailure = (
     }
 
     lastDownloadNotificationAt.set(presentation.dedupeKey, now);
-    toast.error(presentation.title, {
+    toast.error(translated(presentation.title), {
       id: presentation.dedupeKey,
-      description: presentation.description,
+      description: translated(presentation.description),
     });
 
     return presentation;
   }
 
-  toast.error(presentation.title, { description: presentation.description });
+  toast.error(translated(presentation.title), {
+    description: translated(presentation.description),
+  });
 
   return presentation;
 };
@@ -514,8 +527,8 @@ export const getTrackFailureDisplay = (message: string): TrackFailureDisplay => 
   }
 
   return {
-    title: "track error",
-    description: "this track needs attention before it can be exported.",
+    title: msg("track error"),
+    description: msg("this track needs attention before it can be exported."),
     retryable: true,
   };
 };

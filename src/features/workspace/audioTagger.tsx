@@ -2,6 +2,7 @@
 
 import { Menu01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useGT } from "gt-react";
 import { Button } from "@/components/ui/button";
 import SharedAlbumPage from "@/features/share/SharedAlbumPage";
 import { shareLinksEnabled } from "@/features/share/shareFeature";
@@ -12,6 +13,7 @@ import AudioTaggerSidebar from "@/features/workspace/AudioTaggerSidebar";
 import { useAudioTaggerController } from "@/features/workspace/useAudioTaggerController";
 
 export default function AudioTagger() {
+  const gt = useGT();
   const controller = useAudioTaggerController();
   const { library, editor, activeView, sharing, mobile } = controller;
   const { navigation: mobileNavigation, menuButtonRef } = mobile;
@@ -31,7 +33,7 @@ export default function AudioTagger() {
         mobileNavigation.drawerOpen && "pointer-events-none opacity-0",
       )}
       tabIndex={mobileNavigation.drawerOpen ? -1 : 0}
-      aria-label="open library"
+      aria-label={gt("open library")}
       data-export-focus-fallback
       onClick={(event) => mobileNavigation.openDrawer(event.currentTarget)}
     >

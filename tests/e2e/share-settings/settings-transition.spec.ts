@@ -194,7 +194,7 @@ test("switching language keeps library work and survives a reload", async ({ pag
 
   await page.getByRole("button", { name: "Kept across languages.mp3", exact: true }).click();
   await expectActiveView(page, "editor");
-  await expect(page.getByLabel("title", { exact: true })).toHaveValue("Kept across languages");
+  await expect(page.getByLabel("título", { exact: true })).toHaveValue("Kept across languages");
 
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "es");
@@ -203,10 +203,10 @@ test("switching language keeps library work and survives a reload", async ({ pag
 test.describe("in a spanish browser", () => {
   test.use({ locale: "es-ES" });
 
-  test("tagium stays english until a language is chosen", async ({ page }) => {
+  test("tagium opens in spanish", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await expect(page.getByText("drop your audio here")).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+    await expect(page.getByText("suelta tu audio aquí")).toBeVisible();
   });
 });
 

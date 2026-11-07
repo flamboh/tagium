@@ -5,7 +5,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
-import { T, useGT } from "gt-react";
+import { T, useGT, useMessages } from "gt-react";
 import {
   AlertCircleIcon,
   BanIcon,
@@ -42,7 +42,24 @@ import {
   useTrackFilenamePreview,
 } from "@/features/library/trackFilenamePreview";
 
-const artistLabel = (artist: string) => (artist ? artist : "unknown");
+function AlbumSummary({ album }: { album: AlbumGroup }) {
+  const gt = useGT();
+
+  const tracks = gt("{count, plural, one {# track} other {# tracks}}", {
+    count: album.trackIds.length,
+  });
+
+  return `${album.artist || gt("unknown")} · ${tracks}`;
+}
+
+const useCleanupSuggestionLabel = () => {
+  const gt = useGT();
+
+  return (count: number) =>
+    count === 0
+      ? gt("none needed")
+      : gt("{count, plural, one {# track} other {# tracks}}", { count });
+};
 
 type TrackRowBaseProps = {
   track: TagiumFile;
@@ -110,6 +127,8 @@ function TrackRowStatusIcons({
   track: TagiumFile;
   showSavedCheck: boolean;
 }) {
+  const gt = useGT();
+
   return (
     <>
       {track.downloadStatus === "downloading" && (
@@ -131,7 +150,7 @@ function TrackRowStatusIcons({
         <HugeiconsIcon
           icon={AlertCircleIcon}
           strokeWidth={2}
-          aria-label="track has an error"
+          aria-label={gt("track has an error")}
           className="h-3 w-3 shrink-0 text-destructive"
         />
       )}
@@ -158,6 +177,8 @@ export function SortableTrackRow({
   spotlight,
   onSelect,
 }: TrackRowProps) {
+  const gt = useGT();
+  const m = useMessages();
   const filename = useTrackFilenamePreview(filenamePreviewStore, track.id, track.filename);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const showSavedCheck = useSavedCheck(track.status);
@@ -222,7 +243,7 @@ export function SortableTrackRow({
       </Button>
       {showSavedCheck && (
         <span role="status" aria-live="polite" className="sr-only">
-          track saved
+          <T>track saved</T>
         </span>
       )}
       <SpotlitActionMenu
@@ -234,14 +255,16 @@ export function SortableTrackRow({
             variant="ghost"
             size="icon"
             className="absolute right-2 top-1/2 size-7 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100 [@media(pointer:coarse)]:right-0 [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:opacity-100"
-            aria-label={`track actions for ${filename}`}
+            aria-label={gt("track actions for {filename}", { filename })}
           >
             <HugeiconsIcon icon={MoreVerticalIcon} strokeWidth={2} className="size-3.5" />
           </Button>
         }
       >
         {actions.map((action) => {
-          const accessibleLabel = [action.label, action.description].filter(Boolean).join(", ");
+          const accessibleLabel = [m(action.label), action.description && m(action.description)]
+            .filter(Boolean)
+            .join(", ");
 
           return (
             <Fragment key={action.id}>
@@ -249,7 +272,7 @@ export function SortableTrackRow({
               <DropdownMenuItem
                 disabled={action.disabled}
                 aria-label={accessibleLabel}
-                title={action.description}
+                title={action.description && m(action.description)}
                 data-spotlight={spotlight?.actionId === action.id ? "active" : undefined}
                 className={cn(
                   "[@media(pointer:coarse)]:min-h-10",
@@ -277,19 +300,21 @@ const trackActionIcon = (action: TrackActionItem) => {
 };
 
 function ActionItemLabel({ action }: { action: TrackActionItem | AlbumActionItem }) {
+  const m = useMessages();
+
   if (!action.disabled || !action.description) {
     return (
       <>
-        <span className="min-w-0 flex-1 truncate">{action.label}</span>
-        {action.description && <span className="sr-only">{action.description}</span>}
+        <span className="min-w-0 flex-1 truncate">{m(action.label)}</span>
+        {action.description && <span className="sr-only">{m(action.description)}</span>}
       </>
     );
   }
 
   return (
     <span className="flex min-w-0 flex-1 flex-col">
-      <span className="truncate">{action.label}</span>
-      <span className="text-xs leading-snug text-muted-foreground">{action.description}</span>
+      <span className="truncate">{m(action.label)}</span>
+      <span className="text-xs leading-snug text-muted-foreground">{m(action.description)}</span>
     </span>
   );
 }
@@ -340,6 +365,7 @@ const albumActionIcon = (
 };
 
 export function AlbumActionItemContent({ action }: { action: AlbumActionItem }) {
+  const cleanupSuggestionLabel = useCleanupSuggestionLabel();
   const actionIcon = albumActionIcon(action.id, action.shareVariant);
 
   return (
@@ -354,7 +380,7 @@ export function AlbumActionItemContent({ action }: { action: AlbumActionItem }) 
         )}
       />
       <ActionItemLabel action={action} />
-      {action.trailingText && (
+      {action.cleanupSuggestionCount !== undefined && (
         <span
           aria-hidden="true"
           className={cn(
@@ -362,7 +388,7 @@ export function AlbumActionItemContent({ action }: { action: AlbumActionItem }) 
             action.id === "cleanup" && "tabular-nums",
           )}
         >
-          {action.trailingText}
+          {cleanupSuggestionLabel(action.cleanupSuggestionCount)}
         </span>
       )}
     </>
@@ -384,6 +410,8 @@ export function SortableAlbumCard({
   onFileDrop,
 }: AlbumCardProps) {
   const gt = useGT();
+  const m = useMessages();
+  const cleanupSuggestionLabel = useCleanupSuggestionLabel();
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
 
   const {
@@ -425,8 +453,7 @@ export function SortableAlbumCard({
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium truncate leading-tight">{album.title}</div>
             <div className="text-xs text-muted-foreground truncate leading-tight">
-              {artistLabel(album.artist)} &middot; {album.trackIds.length} track
-              {album.trackIds.length !== 1 ? "s" : ""}
+              <AlbumSummary album={album} />
             </div>
           </div>
         </button>
@@ -474,9 +501,13 @@ export function SortableAlbumCard({
               variant="ghost"
               size="icon"
               className="relative h-7 w-7 [@media(pointer:coarse)]:size-11"
-              aria-label={`album actions for ${album.title}${
-                cleanupSuggestionCount > 0 ? ", cleanup suggested" : ""
-              }`}
+              aria-label={
+                cleanupSuggestionCount > 0
+                  ? gt("album actions for {albumTitle}, cleanup suggested", {
+                      albumTitle: album.title,
+                    })
+                  : gt("album actions for {albumTitle}", { albumTitle: album.title })
+              }
             >
               <HugeiconsIcon icon={MoreVerticalIcon} strokeWidth={2} className="h-3.5 w-3.5" />
               {cleanupSuggestionCount > 0 && (
@@ -489,7 +520,13 @@ export function SortableAlbumCard({
           }
         >
           {actions.map((action) => {
-            const accessibleLabel = [action.label, action.trailingText, action.description]
+            const accessibleLabel = [
+              m(action.label),
+              action.cleanupSuggestionCount === undefined
+                ? undefined
+                : cleanupSuggestionLabel(action.cleanupSuggestionCount),
+              action.description === undefined ? undefined : m(action.description),
+            ]
               .filter(Boolean)
               .join(", ");
 
@@ -499,7 +536,7 @@ export function SortableAlbumCard({
                 <DropdownMenuItem
                   disabled={action.disabled}
                   aria-label={accessibleLabel}
-                  title={action.description}
+                  title={action.description && m(action.description)}
                   data-spotlight={spotlight?.actionId === action.id ? "active" : undefined}
                   className={cn(
                     "[@media(pointer:coarse)]:min-h-10",
@@ -563,8 +600,7 @@ export function SidebarDragPreview({
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium leading-tight">{album.title}</div>
           <div className="truncate text-xs text-muted-foreground leading-tight">
-            {artistLabel(album.artist)} &middot; {album.trackIds.length} track
-            {album.trackIds.length !== 1 ? "s" : ""}
+            <AlbumSummary album={album} />
           </div>
         </div>
       </div>

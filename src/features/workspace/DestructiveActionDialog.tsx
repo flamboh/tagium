@@ -1,4 +1,4 @@
-import { Match } from "effect";
+import { useGT } from "gt-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,23 +25,33 @@ export type DestructiveActionDialogProps = DestructiveActionDialogBaseProps &
 export default function DestructiveActionDialog(props: DestructiveActionDialogProps) {
   const { open, returnFocusTarget, onCancel, onConfirm } = props;
 
+  const gt = useGT();
+
   const copy =
     props.kind === "remove-tracks"
       ? {
-          title: `remove ${props.itemCount !== 1 ? `${props.itemCount} tracks` : "track"}?`,
-          description: `this removes the ${props.itemCount === 1 ? "track" : "tracks"} from the current session. this cannot be undone.`,
-          cancelLabel: `keep ${props.itemCount === 1 ? "track" : "tracks"}`,
-          confirmLabel: `remove ${props.itemCount === 1 ? "track" : "tracks"}`,
+          title: gt("{count, plural, one {remove track?} other {remove # tracks?}}", {
+            count: props.itemCount,
+          }),
+          description: gt(
+            "{count, plural, one {this removes the track from the current session. this cannot be undone.} other {this removes the tracks from the current session. this cannot be undone.}}",
+            { count: props.itemCount },
+          ),
+          cancelLabel: gt("{count, plural, one {keep track} other {keep tracks}}", {
+            count: props.itemCount,
+          }),
+          confirmLabel: gt("{count, plural, one {remove track} other {remove tracks}}", {
+            count: props.itemCount,
+          }),
         }
       : {
-          title: `delete ${props.albumTitle}?`,
-          description: `this deletes the album${Match.value(props.trackCount).pipe(
-            Match.when(0, () => ""),
-            Match.when(1, () => " and its track"),
-            Match.orElse((count) => ` and all ${count} tracks`),
-          )} from the current session. this cannot be undone.`,
-          cancelLabel: "keep album",
-          confirmLabel: "delete album",
+          title: gt("delete {albumTitle}?", { albumTitle: props.albumTitle }),
+          description: gt(
+            "{count, plural, =0 {this deletes the album from the current session. this cannot be undone.} one {this deletes the album and its track from the current session. this cannot be undone.} other {this deletes the album and all # tracks from the current session. this cannot be undone.}}",
+            { count: props.trackCount },
+          ),
+          cancelLabel: gt("keep album"),
+          confirmLabel: gt("delete album"),
         };
 
   return (

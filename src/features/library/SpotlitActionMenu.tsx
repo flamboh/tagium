@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { T, useMessages } from "gt-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,6 +34,7 @@ export function SpotlitActionMenu({
   trigger: ReactNode;
   children: ReactNode;
 }) {
+  const m = useMessages();
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -58,17 +60,17 @@ export function SpotlitActionMenu({
         </DropdownMenuContent>
       </DropdownMenu>
       {spotlight && (
-        <SpotlightContent aria-label={spotlight.title}>
-          <SpotlightTitle>{spotlight.title}</SpotlightTitle>
-          <SpotlightDescription>{spotlight.description}</SpotlightDescription>
+        <SpotlightContent aria-label={m(spotlight.title)}>
+          <SpotlightTitle>{m(spotlight.title)}</SpotlightTitle>
+          <SpotlightDescription>{m(spotlight.description)}</SpotlightDescription>
           <SpotlightFooter>
             <SpotlightClose asChild>
               <Button type="button" variant="ghost" size="sm">
-                got it
+                <T>got it</T>
               </Button>
             </SpotlightClose>
             <Button type="button" size="sm" onClick={() => setMenuOpen(true)}>
-              show me
+              <T>show me</T>
             </Button>
           </SpotlightFooter>
         </SpotlightContent>
