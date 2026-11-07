@@ -6,8 +6,9 @@ import {
   type Manifest,
 } from "@/features/share/shareManifest";
 import { Option, Schema } from "effect";
+import { msg } from "gt-react";
 
-const UNAVAILABLE_MESSAGE = "this share is no longer available";
+const UNAVAILABLE_MESSAGE = msg("this share is no longer available");
 
 const SHARE_METADATA_TOO_LARGE_MESSAGE = "this share contains too much metadata to publish.";
 
@@ -20,7 +21,7 @@ export class SharedContentUnavailableError extends Error {
 
 export class SharedContentVersionError extends Error {
   constructor() {
-    super("this link was made by a newer tagium version");
+    super(msg("this link was made by a newer tagium version"));
     this.name = "SharedContentVersionError";
   }
 }

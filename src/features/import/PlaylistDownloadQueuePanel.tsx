@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Num, Plural, T, useGT } from "gt-react";
 import { Cancel01Icon, Refresh04Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ export interface PlaylistDownloadQueuePanelState {
   canceledCount: number;
   currentTracks: PlaylistDownloadQueueTrack[];
   progress: number;
-  eta?: string;
+  etaMs?: number;
   canCancel?: boolean;
   canRetry?: boolean;
 }
@@ -42,6 +43,7 @@ export default function PlaylistDownloadQueuePanel({
   onCancel,
   onRetry,
 }: PlaylistDownloadQueuePanelProps) {
+  const gt = useGT();
   const [dismissedQueueId, setDismissedQueueId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -61,19 +63,23 @@ export default function PlaylistDownloadQueuePanel({
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
-            <p className="truncate text-xs font-medium">{queueLabel(queue)}</p>
-            {queue.eta && (
-              <span className="shrink-0 text-[11px] text-muted-foreground">{queue.eta}</span>
+            <p className="truncate text-xs font-medium">
+              <QueueLabel queue={queue} />
+            </p>
+            {queue.etaMs !== undefined && (
+              <span className="shrink-0 text-[11px] text-muted-foreground">
+                <QueueEta etaMs={queue.etaMs} />
+              </span>
             )}
           </div>
           {queue.status === "waiting" && (
             <p className="mt-1 truncate text-[11px] text-muted-foreground">
-              waiting to start more downloads...
+              <T>waiting to start more downloads...</T>
             </p>
           )}
           {queue.status === "canceled" && (
             <p className="mt-1 truncate text-[11px] text-muted-foreground">
-              remaining tracks canceled
+              <T>remaining tracks canceled</T>
             </p>
           )}
         </div>
@@ -91,7 +97,7 @@ export default function PlaylistDownloadQueuePanel({
       <div
         className="mt-2 h-1.5 overflow-hidden rounded-lg bg-background"
         role="progressbar"
-        aria-label="playlist download progress"
+        aria-label={gt("playlist download progress")}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(progress)}
@@ -100,29 +106,93 @@ export default function PlaylistDownloadQueuePanel({
       </div>
 
       {queue.status === "error" && (
-        <p className="mt-2 text-[11px] text-destructive">{failureSummary(queue.failedCount)}</p>
+        <p className="mt-2 text-[11px] text-destructive">
+          <FailureSummary failedCount={queue.failedCount} />
+        </p>
       )}
     </section>
   );
 }
 
-const failureSummary = (failedCount: number) =>
-  failedCount === 1
-    ? "1 track couldn't be saved. select it to see why."
-    : `${failedCount} tracks couldn't be saved. select one to see why.`;
+function FailureSummary({ failedCount }: { failedCount: number }) {
+  return (
+    <T>
+      <Plural
+        n={failedCount}
+        one={
+          <>
+            <Num>{failedCount}</Num> track couldn't be saved. select it to see why.
+          </>
+        }
+        other={
+          <>
+            <Num>{failedCount}</Num> tracks couldn't be saved. select one to see why.
+          </>
+        }
+      />
+    </T>
+  );
+}
 
-const queueLabel = (queue: PlaylistDownloadQueuePanelState) => {
+function QueueLabel({ queue }: { queue: PlaylistDownloadQueuePanelState }) {
   switch (queue.status) {
     case "error":
-      return `failed ${queue.failedCount}/${queue.totalCount}`;
+      return (
+        <T>
+          failed <Num>{queue.failedCount}</Num>/<Num>{queue.totalCount}</Num>
+        </T>
+      );
     case "canceled":
-      return `canceled ${queue.canceledCount}/${queue.totalCount}`;
+      return (
+        <T>
+          canceled <Num>{queue.canceledCount}</Num>/<Num>{queue.totalCount}</Num>
+        </T>
+      );
     case "complete":
-      return `downloaded ${queue.downloadedCount}/${queue.totalCount}`;
+      return (
+        <T>
+          downloaded <Num>{queue.downloadedCount}</Num>/<Num>{queue.totalCount}</Num>
+        </T>
+      );
     default:
-      return `downloading ${queue.downloadedCount}/${queue.totalCount}`;
+      return (
+        <T>
+          downloading <Num>{queue.downloadedCount}</Num>/<Num>{queue.totalCount}</Num>
+        </T>
+      );
   }
-};
+}
+
+function QueueEta({ etaMs }: { etaMs: number }) {
+  const minutes = Math.ceil(etaMs / 60_000);
+
+  if (minutes <= 1) return <T>eta &lt;1 min</T>;
+
+  if (minutes < 60) {
+    return (
+      <T>
+        eta <Num>{minutes}</Num> min
+      </T>
+    );
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const leftoverMinutes = minutes % 60;
+
+  if (leftoverMinutes === 0) {
+    return (
+      <T>
+        eta <Num>{hours}</Num> hr
+      </T>
+    );
+  }
+
+  return (
+    <T>
+      eta <Num>{hours}</Num> hr <Num>{leftoverMinutes}</Num> min
+    </T>
+  );
+}
 
 function PlaylistQueueActions({
   queue,
@@ -135,6 +205,7 @@ function PlaylistQueueActions({
   onRetry?: () => void;
   onDismiss: () => void;
 }) {
+  const gt = useGT();
   const showCancel = Boolean(onCancel && queue.canCancel !== false);
   const showRetry = Boolean(onRetry && queue.canRetry !== false);
 
@@ -149,7 +220,7 @@ function PlaylistQueueActions({
           size="icon"
           className="size-7"
           onClick={onRetry}
-          aria-label="retry playlist downloads"
+          aria-label={gt("retry playlist downloads")}
         >
           <HugeiconsIcon icon={Refresh04Icon} strokeWidth={2} className="size-3.5" />
         </Button>
@@ -161,7 +232,7 @@ function PlaylistQueueActions({
           size="icon"
           className="size-7"
           onClick={onCancel}
-          aria-label="cancel playlist downloads"
+          aria-label={gt("cancel playlist downloads")}
         >
           <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-3.5" />
         </Button>
@@ -172,7 +243,7 @@ function PlaylistQueueActions({
           size="icon"
           className="size-7"
           onClick={onDismiss}
-          aria-label="dismiss playlist download progress"
+          aria-label={gt("dismiss playlist download progress")}
         >
           <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-3.5" />
         </Button>
@@ -195,7 +266,11 @@ function PlaylistQueueTracks({ tracks }: { tracks: PlaylistDownloadQueueTrack[] 
         </p>
       ))}
       {hiddenTrackCount > 0 && (
-        <p className="text-[11px] text-muted-foreground">+{hiddenTrackCount} more</p>
+        <p className="text-[11px] text-muted-foreground">
+          <T>
+            +<Num>{hiddenTrackCount}</Num> more
+          </T>
+        </p>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import { analytics } from "@/analytics";
 import { Option, Schema } from "effect";
+import { t } from "gt-react";
 import { toast } from "sonner";
 import { toPublicAudioError } from "@/features/audio/audioErrors";
 import type {
@@ -647,7 +648,28 @@ export const createAudioUrlImportSession = ({
             );
             const notice = playlistImportNotice(playlist);
 
-            if (notice) toast(notice.title, { description: notice.description });
+            if (notice?.kind === "truncated") {
+              toast(
+                t("added the first {count} tracks of this playlist", {
+                  count: notice.addedCount,
+                }),
+              );
+            }
+
+            if (notice?.kind === "skipped") {
+              toast(
+                t("added {addedCount} of {totalCount} tracks", {
+                  addedCount: notice.addedCount,
+                  totalCount: notice.totalCount,
+                }),
+                {
+                  description: t(
+                    "{count, plural, one {# was private or unavailable.} other {# were private or unavailable.}}",
+                    { count: notice.skippedCount },
+                  ),
+                },
+              );
+            }
           } catch (error) {
             importLifecycleTracker.fail(importOperationId, toPublicAudioError(error));
             throw error;

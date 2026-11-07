@@ -10,6 +10,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { toast } from "sonner";
+import { Num, Plural, t, T, useGT, useLocale, Var } from "gt-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -46,11 +47,6 @@ export type SharedContentPageState =
 type ReadySharedContentPageState = Extract<SharedContentPageState, { status: "ready" }>;
 
 const skeletonRows = ["one", "two", "three", "four", "five", "six"] as const;
-
-const shortExpiryFormatter = new Intl.DateTimeFormat("en", {
-  month: "short",
-  day: "numeric",
-});
 
 function Header({
   canStopSharing = false,
@@ -90,7 +86,7 @@ function Header({
             className="ml-auto text-destructive hover:bg-destructive/10 hover:text-destructive"
             onClick={onStop}
           >
-            stop sharing
+            <T>stop sharing</T>
           </Button>
         )}
       </div>
@@ -99,12 +95,14 @@ function Header({
 }
 
 function SharedContentSkeleton({ onOpenTagium }: { onOpenTagium: () => void }) {
+  const gt = useGT();
+
   return (
     <div className="min-h-svh bg-background">
       <Header onOpenTagium={onOpenTagium} />
       <main
         aria-busy="true"
-        aria-label="opening shared link"
+        aria-label={gt("opening shared link")}
         className="mx-auto w-full max-w-3xl px-5 pb-10 pt-9 sm:px-8 sm:pt-12"
       >
         <div className="mb-5 h-4 w-56 animate-pulse rounded bg-muted motion-reduce:animate-none" />
@@ -132,13 +130,16 @@ function SharedContentSkeleton({ onOpenTagium }: { onOpenTagium: () => void }) {
             ))}
           </div>
         </div>
-        <span className="sr-only">opening shared album…</span>
+        <span className="sr-only">
+          <T>opening shared album…</T>
+        </span>
       </main>
     </div>
   );
 }
 
 function Artwork({ slug, title }: { slug: string; title: string }) {
+  const gt = useGT();
   const [status, setStatus] = useState<"loading" | "loaded" | "failed">("loading");
 
   return (
@@ -154,7 +155,9 @@ function Artwork({ slug, title }: { slug: string; title: string }) {
             className="size-6"
             aria-hidden="true"
           />
-          <span className="max-sm:sr-only">cover art unavailable</span>
+          <span className="max-sm:sr-only">
+            <T>cover art unavailable</T>
+          </span>
         </div>
       ) : (
         <>
@@ -166,12 +169,14 @@ function Artwork({ slug, title }: { slug: string; title: string }) {
                 className="size-6 animate-spin motion-reduce:animate-none"
                 aria-hidden="true"
               />
-              <span className="sr-only">loading cover art…</span>
+              <span className="sr-only">
+                <T>loading cover art…</T>
+              </span>
             </div>
           )}
           <img
             src={sharedArtworkUrl(slug)}
-            alt={`${title} cover`}
+            alt={gt("{title} cover", { title })}
             className={`absolute inset-0 size-full object-cover transition-opacity duration-200 motion-reduce:transition-none ${
               status === "loaded" ? "opacity-100" : "opacity-0"
             }`}
@@ -185,15 +190,17 @@ function Artwork({ slug, title }: { slug: string; title: string }) {
 }
 
 function ContentHero({ manifest, slug }: { manifest: Manifest; slug: string }) {
+  const gt = useGT();
+
   const content =
     manifest.kind === "album"
       ? {
-          title: manifest.album.title || "untitled album",
+          title: manifest.album.title || gt("untitled album"),
           artist: manifest.album.artist,
           sourceUrl: manifest.album.sourceUrl,
         }
       : {
-          title: manifest.track.metadata.title || "untitled track",
+          title: manifest.track.metadata.title || gt("untitled track"),
           artist: manifest.track.metadata.artist,
           sourceUrl: manifest.track.sourceUrl,
         };
@@ -214,7 +221,9 @@ function ContentHero({ manifest, slug }: { manifest: Manifest; slug: string }) {
             className="size-9 text-muted-foreground"
             aria-hidden="true"
           />
-          <span className="sr-only">no cover art</span>
+          <span className="sr-only">
+            <T>no cover art</T>
+          </span>
         </div>
       )}
       <div className="min-w-0 py-1">
@@ -222,7 +231,7 @@ function ContentHero({ manifest, slug }: { manifest: Manifest; slug: string }) {
           {content.title}
         </h1>
         <p className="mt-2 text-lg text-muted-foreground max-sm:text-sm">
-          {content.artist || "unknown artist"}
+          {content.artist || gt("unknown artist")}
         </p>
         {content.sourceUrl && sourceLabel && (
           <a
@@ -230,9 +239,11 @@ function ContentHero({ manifest, slug }: { manifest: Manifest; slug: string }) {
             target="_blank"
             rel="noopener noreferrer"
             className="mt-3 inline-flex items-center gap-1 rounded-sm text-sm text-muted-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:text-foreground hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={`from ${sourceLabel} (opens in a new tab)`}
+            aria-label={gt("from {source} (opens in a new tab)", { source: sourceLabel })}
           >
-            from {sourceLabel}
+            <T>
+              from <Var>{sourceLabel}</Var>
+            </T>
             <HugeiconsIcon
               icon={LinkSquare02Icon}
               strokeWidth={2}
@@ -253,6 +264,7 @@ function TrackList({
   tracks: readonly ManifestTrack[];
   albumArtist: string;
 }) {
+  const gt = useGT();
   const occurrences = new Map<string, number>();
 
   const rows = tracks.map((track, index) => {
@@ -266,7 +278,21 @@ function TrackList({
   return (
     <section className="mt-8" aria-labelledby="shared-track-list-title">
       <h2 id="shared-track-list-title" className="mb-3 text-sm font-semibold">
-        {tracks.length} {tracks.length === 1 ? "track" : "tracks"}
+        <T>
+          <Plural
+            n={tracks.length}
+            one={
+              <>
+                <Num>{tracks.length}</Num> track
+              </>
+            }
+            other={
+              <>
+                <Num>{tracks.length}</Num> tracks
+              </>
+            }
+          />
+        </T>
       </h2>
       <ol className="overflow-hidden rounded-lg border">
         {rows.map(({ track, index, key }) => {
@@ -283,7 +309,7 @@ function TrackList({
               </span>
               <div className="min-w-0">
                 <p className="break-words text-sm font-medium [overflow-wrap:anywhere]">
-                  {track.metadata.title || "untitled track"}
+                  {track.metadata.title || gt("untitled track")}
                 </p>
                 {showArtist && (
                   <p className="mt-0.5 break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">
@@ -315,21 +341,27 @@ function AnotherTabToast({
     const copyShareLink = async () => {
       try {
         await navigator.clipboard.writeText(link);
-        toast.success("share link copied");
+        toast.success(t("share link copied"));
       } catch {
-        toast.error("copy failed", {
-          description: `copy this link and paste it in the other tab: ${link}`,
+        toast.error(t("copy failed"), {
+          description: t("copy this link and paste it in the other tab: {link}", { link }),
         });
       }
     };
 
     const timeout = globalThis.setTimeout(() => {
       toast(
-        `tagium is already open in another tab. copy the link and add the ${kind} there instead.`,
+        kind === "album"
+          ? t(
+              "tagium is already open in another tab. copy the link and add the album there instead.",
+            )
+          : t(
+              "tagium is already open in another tab. copy the link and add the track there instead.",
+            ),
         {
           duration: 12_000,
           action: {
-            label: "copy link",
+            label: t("copy link"),
             onClick: () => void copyShareLink(),
           },
         },
@@ -342,10 +374,6 @@ function AnotherTabToast({
   return null;
 }
 
-function formatExpiry(expiresAt: string) {
-  return shortExpiryFormatter.format(new Date(expiresAt)).toLowerCase();
-}
-
 function RecipientContext({
   kind,
   trackCount,
@@ -355,22 +383,42 @@ function RecipientContext({
   trackCount: number;
   expiresAt: string | null;
 }) {
-  const noun = trackCount === 1 ? "track" : "tracks";
+  const gt = useGT();
+  const locale = useLocale();
+
+  const summary =
+    kind === "album"
+      ? gt(
+          "{count, plural, one {shared album · {count} track} other {shared album · {count} tracks}}",
+          { count: trackCount },
+        )
+      : gt(
+          "{count, plural, one {shared track · {count} track} other {shared track · {count} tracks}}",
+          { count: trackCount },
+        );
 
   return (
     <p className="mb-5 text-sm text-muted-foreground">
-      shared {kind} · {trackCount} {noun}
-      {expiresAt === null ? null : ` · link expires ${formatExpiry(expiresAt)}`}
+      {summary}
+      {expiresAt === null
+        ? null
+        : gt(" · link expires {date}", {
+            date: new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" })
+              .format(new Date(expiresAt))
+              .toLocaleLowerCase(locale),
+          })}
     </p>
   );
 }
 
 function AddingExplanation({ kind }: { kind: Manifest["kind"] }) {
+  const gt = useGT();
+
   return (
     <p className="mt-7 max-w-lg text-sm leading-6 text-muted-foreground">
       {kind === "album"
-        ? "adding downloads each track from its original source with the shared tags."
-        : "adding downloads this track from its original source with the shared tags."}
+        ? gt("adding downloads each track from its original source with the shared tags.")
+        : gt("adding downloads this track from its original source with the shared tags.")}
     </p>
   );
 }
@@ -390,13 +438,23 @@ function StopSharingDialog({
   kind: Manifest["kind"];
   onStop: () => void;
 }) {
+  const gt = useGT();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{`stop sharing this ${kind}?`}</DialogTitle>
+          <DialogTitle>
+            {kind === "album" ? gt("stop sharing this album?") : gt("stop sharing this track?")}
+          </DialogTitle>
           <DialogDescription>
-            {`the link will stop working immediately. anyone who already added the ${kind} keeps their copy.`}
+            {kind === "album"
+              ? gt(
+                  "the link will stop working immediately. anyone who already added the album keeps their copy.",
+                )
+              : gt(
+                  "the link will stop working immediately. anyone who already added the track keeps their copy.",
+                )}
           </DialogDescription>
           {stopError && (
             <p role="alert" className="text-sm text-destructive">
@@ -406,7 +464,7 @@ function StopSharingDialog({
         </DialogHeader>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            keep sharing
+            <T>keep sharing</T>
           </Button>
           <Button
             type="button"
@@ -423,7 +481,7 @@ function StopSharingDialog({
                 aria-hidden="true"
               />
             )}
-            stop sharing
+            <T>stop sharing</T>
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -446,6 +504,8 @@ function ActionBar({
   onAdd: (allowDuplicate?: boolean) => void;
   onViewAdded: () => void;
 }) {
+  const gt = useGT();
+
   return (
     <div className="mt-8 flex flex-wrap items-center gap-2">
       <div className="flex shrink-0 items-center gap-4 max-sm:w-full max-sm:flex-col max-sm:items-stretch">
@@ -467,7 +527,7 @@ function ActionBar({
           ) : (
             <HugeiconsIcon icon={PlusSignIcon} strokeWidth={2} aria-hidden="true" />
           )}
-          {adding ? `adding ${kind}…` : primaryLabel}
+          {adding ? (kind === "album" ? gt("adding album…") : gt("adding track…")) : primaryLabel}
         </Button>
         {alreadyAddedTargetId && (
           <Button
@@ -477,7 +537,7 @@ function ActionBar({
             onClick={() => onAdd(true)}
             disabled={adding}
           >
-            add another copy
+            <T>add another copy</T>
           </Button>
         )}
       </div>
@@ -507,22 +567,23 @@ function SharedContentReadyPage({
   onViewAdded: () => void;
   onStopSharing: () => Promise<void>;
 }) {
+  const gt = useGT();
   const [showStopConfirmation, setShowStopConfirmation] = useState(false);
   const [stopping, setStopping] = useState(false);
-  const [stopError, setStopError] = useState<string | null>(null);
+  const [stopFailed, setStopFailed] = useState(false);
   const { manifest, slug } = state;
   const tracks = manifestTracks(manifest);
-  const primaryLabel = alreadyAddedTargetId ? "open in tagium" : "add to library";
+  const primaryLabel = alreadyAddedTargetId ? gt("open in tagium") : gt("add to library");
 
   const stopSharing = async () => {
     setStopping(true);
-    setStopError(null);
+    setStopFailed(false);
 
     try {
       await onStopSharing();
       setShowStopConfirmation(false);
     } catch {
-      setStopError("sharing could not be stopped. check your connection and try again.");
+      setStopFailed(true);
     } finally {
       setStopping(false);
     }
@@ -532,7 +593,7 @@ function SharedContentReadyPage({
     setShowStopConfirmation(open);
 
     if (!open) {
-      setStopError(null);
+      setStopFailed(false);
       setStopping(false);
     }
   };
@@ -569,7 +630,11 @@ function SharedContentReadyPage({
         open={showStopConfirmation}
         onOpenChange={setStopDialogOpen}
         stopping={stopping}
-        stopError={stopError}
+        stopError={
+          stopFailed
+            ? gt("sharing could not be stopped. check your connection and try again.")
+            : null
+        }
         kind={manifest.kind}
         onStop={() => void stopSharing()}
       />
@@ -619,14 +684,18 @@ export default function SharedAlbumPage(props: {
               )}
             </div>
             <h1 className="text-2xl font-semibold tracking-tight">
-              {newerVersion
-                ? "this link needs a newer version of tagium"
-                : "this share is no longer available"}
+              {newerVersion ? (
+                <T>this link needs a newer version of tagium</T>
+              ) : (
+                <T>this share is no longer available</T>
+              )}
             </h1>
             <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
-              {newerVersion
-                ? "reload the page to update, then open the link again. nothing has been added."
-                : "the link may have expired, or sharing was stopped."}
+              {newerVersion ? (
+                <T>reload the page to update, then open the link again. nothing has been added.</T>
+              ) : (
+                <T>the link may have expired, or sharing was stopped.</T>
+              )}
             </p>
           </div>
         </main>

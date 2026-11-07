@@ -1,3 +1,4 @@
+import { msg } from "gt-react";
 import type { ShareActionState } from "@/features/share/sharePublication";
 
 export type TrackActionItemId = "retry" | "share" | "remove";
@@ -36,7 +37,7 @@ export function createTrackActionItems({
       ? [
           {
             id: "retry" as const,
-            label: "retry download",
+            label: msg("retry download"),
             disabled: false,
             onSelect: onRetry,
           },
@@ -52,7 +53,7 @@ export function createTrackActionItems({
     },
     {
       id: "remove",
-      label: "remove track",
+      label: msg("remove track"),
       disabled: false,
       destructive: true,
       onSelect: onRemove,

@@ -6,6 +6,7 @@ import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { msg, Num, T, useGT } from "gt-react";
 import { Button } from "@/components/ui/button";
 import { AlbumSidebarEmptyState } from "@/features/library/AlbumSidebarEmptyState";
 import {
@@ -120,6 +121,7 @@ export default function AlbumSidebar({
   onReorderAlbums,
   onAudioUpload,
 }: AlbumSidebarProps) {
+  const gt = useGT();
   const filesById = new Map(files.map((file) => [file.id, file]));
   const hasValidFilename = useLiveTrackFilenameValidity(filenamePreviewStore);
 
@@ -174,18 +176,18 @@ export default function AlbumSidebar({
       (shareAction?.enabled ?? true);
 
     const contentDisabledReason = track.downloadRequest
-      ? "track metadata is still loading"
-      : "local tracks cannot be shared";
+      ? msg("track metadata is still loading")
+      : msg("local tracks cannot be shared");
 
     const shareDisabledReason =
       shareAction?.reason ??
-      (onShareTrack ? contentDisabledReason : "track sharing is unavailable");
+      (onShareTrack ? contentDisabledReason : msg("track sharing is unavailable"));
 
     return createTrackActionItems({
       retryable: isRetryableError(track),
       canShare: canShareTrack,
       shareDisabledReason,
-      shareLabel: shareAction?.label ?? "share track",
+      shareLabel: shareAction?.label ?? msg("share track"),
       shareVariant,
       onRetry: () => onRetryDownload(track.id),
       onShare: () => onShareTrack?.(track.id),
@@ -201,7 +203,9 @@ export default function AlbumSidebar({
     <div className="w-full flex-1 min-h-0 flex flex-col">
       <div className="h-12 px-4 border-b flex items-center justify-between flex-shrink-0">
         <span className="font-semibold text-sm leading-none text-muted-foreground">
-          library ({files.length})
+          <T>
+            library (<Num>{files.length}</Num>)
+          </T>
         </span>
         <Button
           type="button"
@@ -209,7 +213,7 @@ export default function AlbumSidebar({
           size="icon"
           className="size-8 [@media(pointer:coarse)]:size-11"
           onClick={onAddAlbum}
-          aria-label="add album"
+          aria-label={gt("add album")}
         >
           <HugeiconsIcon icon={PlusSignIcon} strokeWidth={2} className="h-4 w-4" />
         </Button>
@@ -266,8 +270,8 @@ export default function AlbumSidebar({
 
               const contentDisabledReason =
                 album.trackIds.length === 0
-                  ? "add imported tracks first"
-                  : "albums with local tracks cannot be shared";
+                  ? msg("add imported tracks first")
+                  : msg("albums with local tracks cannot be shared");
 
               const shareAction = shareAlbumActions[album.id];
               const retrievesExistingLink = shareAction?.variant === "view";
@@ -284,7 +288,7 @@ export default function AlbumSidebar({
                 cleanupSuggestionCount,
                 canShare: canShareAlbum,
                 shareDisabledReason,
-                shareLabel: shareAction?.label ?? "share album",
+                shareLabel: shareAction?.label ?? msg("share album"),
                 shareVariant: shareAction?.variant ?? "create",
                 onEdit: () => onEditAlbum(album.id),
                 onReviewCleanup: ({ returnFocusTarget }) =>
@@ -320,7 +324,7 @@ export default function AlbumSidebar({
                     >
                       {album.trackIds.length === 0 ? (
                         <div className="text-xs text-muted-foreground px-4 py-3 text-center">
-                          drag tracks here
+                          <T>drag tracks here</T>
                         </div>
                       ) : (
                         album.trackIds.map((trackId, index) => {
@@ -359,7 +363,7 @@ export default function AlbumSidebar({
             <button
               type="button"
               tabIndex={-1}
-              aria-label="clear track selection and return to editor"
+              aria-label={gt("clear track selection and return to editor")}
               className="min-h-16 flex-1 cursor-default"
               onClick={onClearSelection}
             />

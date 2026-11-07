@@ -1,3 +1,4 @@
+import { msg } from "gt-react";
 import type { AudioMetadata, MetadataPatch } from "@/features/audio/metadata";
 
 export const EDITABLE_METADATA_FIELDS = [
@@ -28,9 +29,9 @@ export const NULLABLE_NUMERIC_METADATA_FIELDS = [
 
 export type AdvancedNumericMetadataField = "discNumber" | "bpm";
 
-const advancedNumberLabels = {
-  discNumber: "disc number",
-  bpm: "bpm",
+const advancedNumberErrors = {
+  discNumber: msg("disc number must be a whole number from 1 to 999."),
+  bpm: msg("bpm must be a whole number from 1 to 999."),
 } as const satisfies Record<AdvancedNumericMetadataField, string>;
 
 export const validateAdvancedMetadataNumber = (
@@ -45,7 +46,7 @@ export const validateAdvancedMetadataNumber = (
     return undefined;
   }
 
-  return `${advancedNumberLabels[field]} must be a whole number from 1 to 999.`;
+  return advancedNumberErrors[field];
 };
 
 export const getAdvancedMetadataValidationErrors = (

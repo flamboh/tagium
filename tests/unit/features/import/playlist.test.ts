@@ -26,17 +26,17 @@ describe("playlist import notice", () => {
 
   it("explains skipped tracks", () => {
     expect(playlistImportNotice(playlist(9, 3))).toEqual({
-      title: "added 9 of 12 tracks",
-      description: "3 were private or unavailable.",
+      kind: "skipped",
+      addedCount: 9,
+      totalCount: 12,
+      skippedCount: 3,
     });
-    expect(playlistImportNotice(playlist(11, 1))?.description).toBe(
-      "1 was private or unavailable.",
-    );
   });
 
   it("explains a playlist cut short", () => {
     expect(playlistImportNotice(playlist(200, 0, true))).toEqual({
-      title: "added the first 200 tracks of this playlist",
+      kind: "truncated",
+      addedCount: 200,
     });
   });
 });

@@ -1,11 +1,15 @@
 import type { TrackSourceMix } from "@/analytics";
+import { t } from "gt-react";
 import type { FieldNamesMarkedBoolean } from "react-hook-form";
 import {
   EDITABLE_METADATA_FIELDS,
   getAdvancedMetadataValidationErrors,
   validateAdvancedMetadataNumber,
 } from "@/features/audio/metadataFields";
-import { getPublicAudioImportError } from "@/features/audio/audioErrors";
+import {
+  AUDIO_IMPORT_ERROR_MESSAGES,
+  getPublicAudioImportError,
+} from "@/features/audio/audioErrors";
 import { sanitizeFilenameBase } from "@/features/library/filename";
 import type { UploadedTrack } from "@/features/audio/mp3Utils";
 import type { AudioMetadata, MetadataPatch, TagiumFile } from "@/features/library/types";
@@ -41,15 +45,29 @@ export const getAcceptedUploadParseResult = (uploads: UploadedTrack[]) => {
   };
 };
 
+const describeUploadRejection = (filename: string, error: string | undefined) => {
+  switch (getPublicAudioImportError(error)) {
+    case AUDIO_IMPORT_ERROR_MESSAGES.vorbisOgg:
+      return t("{filename} could not be imported. this ogg file uses vorbis audio.", { filename });
+    case AUDIO_IMPORT_ERROR_MESSAGES.unsupportedOgg:
+      return t("{filename} could not be imported. this ogg file does not use opus audio.", {
+        filename,
+      });
+    case AUDIO_IMPORT_ERROR_MESSAGES.wav:
+      return t("{filename} could not be imported. wav files are not supported.", { filename });
+    case AUDIO_IMPORT_ERROR_MESSAGES.aiff:
+      return t("{filename} could not be imported. aiff files are not supported.", { filename });
+    default:
+      return t(
+        "{filename} could not be imported. try a valid mp3, flac, unencrypted m4a/mp4, or opus file.",
+        { filename },
+      );
+  }
+};
+
 export const getUploadRejectionMessage = (rejectedUploads: UploadedTrack[]) =>
   rejectedUploads
-    .map((upload) => {
-      const recovery =
-        getPublicAudioImportError(upload.file.downloadError) ??
-        "try a valid mp3, flac, unencrypted m4a/mp4, or opus file.";
-
-      return `${upload.file.filename} could not be imported. ${recovery}`;
-    })
+    .map((upload) => describeUploadRejection(upload.file.filename, upload.file.downloadError))
     .join("\n");
 
 export const getNullableNumericMetadataValue = (

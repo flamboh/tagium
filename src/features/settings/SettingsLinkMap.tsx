@@ -2,6 +2,7 @@
 
 import { Link05Icon, Unlink05Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { msg, useMessages } from "gt-react";
 import { Button } from "@/components/ui/button";
 import {
   METADATA_LINK_DESCRIPTORS,
@@ -22,10 +23,24 @@ interface SettingsLinkMapProps {
 // `source` names what a row reads from, `synced` what it writes to. Both column headers are
 // prefixed with their role so the direction of every wire is readable without clicking one.
 const linkGroups = [
-  { id: "fromAlbum", source: "album", synced: "track" },
-  { id: "fromTrack", source: "track", synced: "track" },
+  {
+    id: "fromAlbum",
+    label: msg("album field synced to track field"),
+    direction: msg("album field → track field"),
+    source: msg("source album field"),
+    synced: msg("synced track field"),
+  },
+  {
+    id: "fromTrack",
+    label: msg("track field synced to track field"),
+    direction: msg("track field → track field"),
+    source: msg("source track field"),
+    synced: msg("synced track field"),
+  },
 ] as const satisfies ReadonlyArray<{
   id: MetadataLinkGroup;
+  label: string;
+  direction: string;
   source: string;
   synced: string;
 }>;
@@ -35,6 +50,7 @@ function LinkRow({
   settings,
   onChange,
 }: SettingsLinkMapProps & { descriptor: MetadataLinkDescriptor }) {
+  const m = useMessages();
   const linked = isMetadataLinkEnabled(settings, descriptor);
   const nodeClassName = "hidden min-h-11 items-center text-sm sm:flex";
 
@@ -53,16 +69,16 @@ function LinkRow({
           !linked && "text-muted-foreground",
         )}
       >
-        {descriptor.label}
+        {m(descriptor.label)}
       </span>
-      <div className={cn(nodeClassName, "pr-3")}>{descriptor.map.source}</div>
+      <div className={cn(nodeClassName, "pr-3")}>{m(descriptor.map.source)}</div>
       <div className="flex items-center justify-center sm:min-h-11">
         <span className={cn(wireClassName, "origin-right")} aria-hidden="true" />
         <Button
           type="button"
           role="switch"
           aria-checked={linked}
-          aria-label={descriptor.label}
+          aria-label={m(descriptor.label)}
           variant={linked ? "default" : "outline"}
           size="icon"
           className={cn(
@@ -87,13 +103,15 @@ function LinkRow({
           !linked && "text-muted-foreground",
         )}
       >
-        {descriptor.map.target}
+        {m(descriptor.map.target)}
       </div>
     </div>
   );
 }
 
 export default function SettingsLinkMap({ settings, onChange }: SettingsLinkMapProps) {
+  const m = useMessages();
+
   const visibleDescriptors = METADATA_LINK_DESCRIPTORS.filter((descriptor) =>
     isMetadataLinkVisible(descriptor, settings),
   );
@@ -110,14 +128,14 @@ export default function SettingsLinkMap({ settings, onChange }: SettingsLinkMapP
         return (
           <section
             key={group.id}
-            aria-label={`${group.source} field synced to ${group.synced} field`}
+            aria-label={m(group.label)}
             className="sm:col-span-3 sm:grid sm:grid-cols-subgrid"
           >
             <div className="mb-2 text-[0.6875rem] tracking-widest text-muted-foreground sm:hidden">
-              {group.source} field → {group.synced} field
+              {m(group.direction)}
             </div>
             <span className="mb-3 hidden pr-3 text-[0.6875rem] tracking-widest text-muted-foreground sm:block">
-              source {group.source} field
+              {m(group.source)}
             </span>
             <span
               aria-hidden="true"
@@ -126,7 +144,7 @@ export default function SettingsLinkMap({ settings, onChange }: SettingsLinkMapP
               →
             </span>
             <span className="mb-3 hidden pl-3 text-[0.6875rem] tracking-widest text-muted-foreground sm:block">
-              synced {group.synced} field
+              {m(group.synced)}
             </span>
             <div className="border-y sm:col-span-3 sm:grid sm:grid-cols-subgrid sm:border-0">
               {descriptors.map((descriptor) => (

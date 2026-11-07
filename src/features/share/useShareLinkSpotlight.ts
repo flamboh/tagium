@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { msg } from "gt-react";
 import type { AlbumGroup, TagiumFile } from "@/features/library/types";
 import { useFeatureDiscovery } from "@/features/discovery/featureDiscovery";
 import type { ShareActionState } from "@/features/share/sharePublication";
@@ -37,8 +38,11 @@ export const shareLinkSpotlightTarget = ({
 };
 
 export const shareLinkSpotlightCopy = (kind: ShareLinkSpotlightTarget["kind"]) => ({
-  title: "share your edits with a link",
-  description: `anyone with the link gets this ${kind} with your tags and artwork.`,
+  title: msg("share your edits with a link"),
+  description:
+    kind === "album"
+      ? msg("anyone with the link gets this album with your tags and artwork.")
+      : msg("anyone with the link gets this track with your tags and artwork."),
 });
 
 export const useShareLinkSpotlight = ({

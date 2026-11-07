@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createElement, useCallback, useEffect, useRef, useState } from "react";
+import { msg, t } from "gt-react";
 import { toast } from "sonner";
 import { analytics } from "@/analytics";
 import { coverArtFileToPicture } from "@/features/editor/coverArtProcessing";
@@ -6,6 +7,7 @@ import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession
 import type { AlbumGroup, SharePublication } from "@/features/library/types";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type { AudioImportSession } from "@/features/workspace/useAudioImportSession";
+import { TranslatedText } from "@/i18n/TranslatedText";
 import {
   fetchSharedArtwork,
   fetchSharedContent,
@@ -65,11 +67,30 @@ const safelyGetRevocationReceipt = (slug: string) => {
   }
 };
 
-const sharedContentAddedDescription = (manifest: Manifest) => {
+const translated = (message: string) => createElement(TranslatedText, null, message);
+
+const sharedContentAddedToast = (manifest: Manifest) => {
   const count = manifestTrackCount(manifest);
 
-  return `downloading ${count} ${count === 1 ? "track" : "tracks"} — watch progress in the sidebar.`;
+  toast.success(
+    manifest.kind === "album" ? t("album added to your library") : t("track added to your library"),
+    {
+      description: t(
+        "{count, plural, one {downloading {count} track — watch progress in the sidebar.} other {downloading {count} tracks — watch progress in the sidebar.}}",
+        { count },
+      ),
+    },
+  );
 };
+
+const shareUnavailableToast = (kind: ShareTarget["kind"], reason: string) =>
+  toast.error(
+    kind === "album" ? t("this album cannot be shared") : t("this track cannot be shared"),
+    { description: translated(reason) },
+  );
+
+const sharingStoppedToast = () =>
+  toast.success(t("sharing stopped"), { description: t("the link no longer works.") });
 
 const albumForTrack = (albums: readonly AlbumGroup[], trackId: string) =>
   albums.find((album) => album.trackIds.includes(trackId));
@@ -321,7 +342,7 @@ export const useShareWorkflow = ({
           album.id,
           {
             enabled: false,
-            label: "share album",
+            label: msg("share album"),
             reason: eligibilityReason,
             variant: "create",
           },
@@ -354,7 +375,7 @@ export const useShareWorkflow = ({
           file.id,
           {
             enabled: false,
-            label: "share track",
+            label: msg("share track"),
             reason: eligibilityReason,
             variant: "create",
           },
@@ -497,9 +518,7 @@ export const useShareWorkflow = ({
           shareKind: fresh.manifest.kind,
           trackCount: manifestTrackCount(fresh.manifest),
         });
-        toast.success(`${fresh.manifest.kind} added to your library`, {
-          description: sharedContentAddedDescription(fresh.manifest),
-        });
+        sharedContentAddedToast(fresh.manifest);
       } catch (error) {
         if (error instanceof SharedContentVersionError) throw error;
         throw new SharedContentUnavailableError();
@@ -560,7 +579,7 @@ export const useShareWorkflow = ({
         : shareTrackEligibility(file!);
 
       if (ineligibleReason) {
-        toast.error(`this ${target.kind} cannot be shared`, { description: ineligibleReason });
+        shareUnavailableToast(target.kind, ineligibleReason);
 
         return;
       }
@@ -579,12 +598,13 @@ export const useShareWorkflow = ({
             ).fingerprint
           : (await projectTrackShareSnapshot(file!)).fingerprint;
       } catch (error) {
-        toast.error(`this ${target.kind} cannot be shared`, {
-          description: sharePublicationErrorMessage(
+        shareUnavailableToast(
+          target.kind,
+          sharePublicationErrorMessage(
             error instanceof Error ? error : new Error("unknown share publication failure"),
             target.kind,
           ),
-        });
+        );
 
         return;
       }
@@ -602,7 +622,7 @@ export const useShareWorkflow = ({
           );
 
       if (!action.enabled) {
-        toast.error(action.reason);
+        toast.error(translated(action.reason));
 
         return;
       }
@@ -613,8 +633,8 @@ export const useShareWorkflow = ({
         const capability = getPublicationCapability(publication.slug);
 
         if (!capability) {
-          toast.error("share link permission unavailable", {
-            description: "try the browser that created this link",
+          toast.error(t("share link permission unavailable"), {
+            description: t("try the browser that created this link"),
           });
 
           return;
@@ -812,23 +832,25 @@ export const useShareWorkflow = ({
       const createError = sharePublicationErrorMessage(
         error instanceof Error ? error : new Error("unknown share publication failure"),
         target.kind,
-      ).replace(/[.!?]+$/, "");
+      );
 
       const updateError =
         error instanceof ShareIneligibleError
           ? createError
-          : `the shared ${target.kind} could not be updated`;
+          : target.kind === "album"
+            ? msg("the shared album could not be updated")
+            : msg("the shared track could not be updated");
 
       setDialog({
         status: "error",
         preview: currentDialog.preview,
         intent: attemptedIntent,
-        message:
+        failure:
           attemptedIntent === "update"
-            ? `${updateError}. the link still has the previous version.`
+            ? { kind: "update-failed", reason: updateError }
             : createError === "the share link could not be created"
-              ? `${createError}.`
-              : `${createError}. no link was created.`,
+              ? { kind: "link-failed" }
+              : { kind: "create-failed", reason: createError },
       });
     } finally {
       publicationActionInFlightRef.current = false;
@@ -858,7 +880,7 @@ export const useShareWorkflow = ({
     }
 
     setDialog({ status: "closed" });
-    toast.success("sharing stopped", { description: "the link no longer works." });
+    sharingStoppedToast();
   }, [creatorTarget, dialog, library, setTargetPublication]);
 
   const stopPageShare = useCallback(async () => {
@@ -886,7 +908,7 @@ export const useShareWorkflow = ({
     }
 
     setPage({ status: "unavailable", slug: page.slug, reason: "unavailable" });
-    toast.success("sharing stopped", { description: "the link no longer works." });
+    sharingStoppedToast();
   }, [getPublicationCapability, library, page, setTargetPublication]);
 
   const addSharedContent = useCallback(
@@ -932,16 +954,17 @@ export const useShareWorkflow = ({
         history.replaceState({}, "", "/");
         document.title = "tagium";
         setPage(null);
-        toast.success(`${fresh.manifest.kind} added to your library`, {
-          description: sharedContentAddedDescription(fresh.manifest),
-        });
+        sharedContentAddedToast(fresh.manifest);
       } catch (error) {
         if (error instanceof SharedContentUnavailableError) {
           setPage({ status: "unavailable", slug: page.slug, reason: "unavailable" });
         } else {
-          toast.error(`${page.manifest.kind} could not be added`, {
-            description: "your current workspace is unchanged. try again.",
-          });
+          toast.error(
+            page.manifest.kind === "album"
+              ? t("album could not be added")
+              : t("track could not be added"),
+            { description: t("your current workspace is unchanged. try again.") },
+          );
         }
       } finally {
         setAdding(false);

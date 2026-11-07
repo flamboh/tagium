@@ -1,4 +1,5 @@
 import { analytics } from "@/analytics";
+import { t } from "gt-react";
 import { toast } from "sonner";
 import { mergeUploadedTracksIntoAlbums } from "@/features/library/albumOps";
 import { parseUploads, runAudioBackendEffect } from "@/features/audio/audioBackend";
@@ -116,7 +117,10 @@ export const createAudioUploadSession = ({
 
         if (rejectedUploads.length > 0) {
           toast.error(
-            `${rejectedUploads.length} ${rejectedUploads.length === 1 ? "file" : "files"} could not be imported`,
+            t(
+              "{count, plural, one {# file could not be imported} other {# files could not be imported}}",
+              { count: rejectedUploads.length },
+            ),
             { description: getUploadRejectionMessage(rejectedUploads) },
           );
         }

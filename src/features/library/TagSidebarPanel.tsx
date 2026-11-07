@@ -2,6 +2,7 @@
 
 import type { MouseEvent as ReactMouseEvent, RefObject } from "react";
 import { useRef, useState } from "react";
+import { useGT } from "gt-react";
 import { cn } from "@/lib/utils";
 import AlbumSidebar from "@/features/library/AlbumSidebar";
 import PlaylistDownloadQueuePanel, {
@@ -121,6 +122,7 @@ export default function TagSidebarPanel({
   onCancelPlaylistDownloadQueue,
   onRetryPlaylistDownloadQueue,
 }: TagSidebarPanelProps) {
+  const gt = useGT();
   const dragCounterRef = useRef(0);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
@@ -161,7 +163,7 @@ export default function TagSidebarPanel({
       tabIndex={mobileOpen ? -1 : undefined}
       role={mobileOpen ? "dialog" : undefined}
       aria-modal={mobileOpen ? "true" : undefined}
-      aria-label={mobileOpen ? "library" : undefined}
+      aria-label={mobileOpen ? gt("library") : undefined}
       className={cn(
         `order-2 h-svh w-full flex-shrink-0 flex flex-col border-t bg-background text-foreground overflow-hidden ${MOBILE_DRAWER_TRANSITION_CLASSES} md:page-slide-in md:order-none md:h-auto md:min-h-0 md:w-72 md:translate-x-0 md:border-t-0 md:border-r`,
         "fixed inset-y-0 left-0 z-50 w-[min(88vw,22rem)] border-r shadow-xl md:static md:visible md:opacity-100 md:shadow-none",

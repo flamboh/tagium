@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useId, useRef } from "react";
 import { Upload01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { T, useGT } from "gt-react";
 import { AUDIO_UPLOAD_ACCEPT } from "@/features/audio/audioFormat";
 
 interface AudioUploadProps {
@@ -12,6 +13,7 @@ interface AudioUploadProps {
 }
 
 export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
+  const gt = useGT();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
 
@@ -47,16 +49,18 @@ export default function AudioUpload({ onAudioUpload }: AudioUploadProps) {
         variant="outline"
         className="w-full cursor-pointer border-dashed border-2 h-12 hover:bg-accent/50 flex flex-col gap-2"
         onClick={handleButtonClick}
-        aria-label="upload audio files"
+        aria-label={gt("upload audio files")}
       >
         <HugeiconsIcon
           icon={Upload01Icon}
           strokeWidth={2}
           className="h-6 w-6 text-muted-foreground"
         />
-        <span className="text-xs text-muted-foreground">
-          upload mp3, flac, m4a/mp4, or opus files
-        </span>
+        <T>
+          <span className="text-xs text-muted-foreground">
+            upload mp3, flac, m4a/mp4, or opus files
+          </span>
+        </T>
       </Button>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { msg } from "gt-react";
 import {
   SharedContentUnavailableError,
   SharedContentVersionError,
@@ -11,15 +12,17 @@ import {
   type SystemFailureCode,
 } from "@/shared/systemFailure";
 
-const INLINE_FAILURE_CODES = new Set<SystemFailureCode>([
-  "unsupported_source",
-  "private_or_missing",
-  "playlist_empty",
-  "short_link_unresolved",
-]);
+const INLINE_FAILURE_MESSAGES: Partial<Record<SystemFailureCode, string>> = {
+  unsupported_source: msg("paste a public soundcloud or youtube track, set, or playlist link"),
+  private_or_missing: msg("check that the link is public and still available"),
+  playlist_empty: msg(
+    "none of this playlist's tracks can be saved. they may be private or removed",
+  ),
+  short_link_unresolved: msg("this soundcloud short link doesn't lead to a track or playlist"),
+};
 
 const validateMediaUrl = (value: string) => {
-  if (!value) return "enter a media url";
+  if (!value) return msg("enter a media url");
 
   try {
     const url = new URL(value);
@@ -29,7 +32,7 @@ const validateMediaUrl = (value: string) => {
     // The local validation message below is intentionally more useful than URL's exception.
   }
 
-  return "enter a complete http or https url";
+  return msg("enter a complete http or https url");
 };
 
 /** Owns Tagium-specific URL import validation and failure presentation. */
@@ -71,15 +74,16 @@ export function useMediaUrlEntryController(
       }
 
       if (error instanceof SharedContentVersionError) {
-        setValidationError("this link was made by a newer tagium version");
+        setValidationError(msg("this link was made by a newer tagium version"));
 
         return false;
       }
 
-      const presentation = getSystemFailurePresentation(error, "import");
+      const inlineFailure =
+        INLINE_FAILURE_MESSAGES[getSystemFailurePresentation(error, "import").code];
 
-      if (INLINE_FAILURE_CODES.has(presentation.code)) {
-        setValidationError(presentation.description.toLowerCase().replace(/\.$/, ""));
+      if (inlineFailure) {
+        setValidationError(inlineFailure);
 
         return false;
       }

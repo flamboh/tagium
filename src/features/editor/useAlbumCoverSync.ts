@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useGT } from "gt-react";
 
 interface AlbumCoverSyncOptions {
   disabled: boolean;
@@ -8,6 +9,7 @@ interface AlbumCoverSyncOptions {
 }
 
 export function useAlbumCoverSync({ disabled, onSync }: AlbumCoverSyncOptions) {
+  const gt = useGT();
   const [isSyncing, setIsSyncing] = useState(false);
   const [rotation, setRotation] = useState(0);
   const timerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
@@ -58,7 +60,7 @@ export function useAlbumCoverSync({ disabled, onSync }: AlbumCoverSyncOptions) {
   return {
     cancel: () => cancel(true),
     isSyncing,
-    label: isSyncing ? "syncing cover to tracks" : "sync cover to tracks",
+    label: isSyncing ? gt("syncing cover to tracks") : gt("sync cover to tracks"),
     rotation,
     start,
   };

@@ -3,19 +3,6 @@ import type { PlaylistDownloadQueuePanelState } from "@/features/import/Playlist
 import type { TagiumFile } from "@/features/library/types";
 import { getTrackFailureDisplay } from "@/shared/systemFailure";
 
-const formatEta = (etaMs?: number) => {
-  if (etaMs === undefined) return null;
-  const minutes = Math.ceil(etaMs / 60_000);
-
-  if (minutes <= 1) return "<1 min";
-
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const leftoverMinutes = minutes % 60;
-
-  return leftoverMinutes === 0 ? `${hours} hr` : `${hours} hr ${leftoverMinutes} min`;
-};
-
 export const getImportQueuePresentation = (
   snapshot: PlaylistDownloadControllerSnapshot | null,
   files: TagiumFile[],
@@ -41,7 +28,6 @@ export const getImportQueuePresentation = (
 
   if (snapshot.canceled && snapshot.failed === 0) status = "canceled";
   const settled = snapshot.completed + snapshot.failed + snapshot.canceledCount;
-  const eta = formatEta(snapshot.etaMs);
 
   const presentation: PlaylistDownloadQueuePanelState = {
     id: snapshot.id,
@@ -58,7 +44,7 @@ export const getImportQueuePresentation = (
     ),
   };
 
-  if (eta) presentation.eta = `eta ${eta}`;
+  if (snapshot.etaMs !== undefined) presentation.etaMs = snapshot.etaMs;
 
   return presentation;
 };

@@ -1,4 +1,5 @@
 import { Cause, Effect, Exit } from "effect";
+import { msg } from "gt-react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { parseUploads, runAudioBackendEffect, writeTags } from "@/features/audio/audioBackend";
@@ -617,7 +618,7 @@ export const useTrackEditorSession = ({
           yield* Effect.sync(() => signal.throwIfAborted());
 
           if (!parsedUpload || parsedUpload.file.status === "error") {
-            return yield* Effect.fail(new Error("downloaded track could not be parsed."));
+            return yield* Effect.fail(new Error(msg("downloaded track could not be parsed.")));
           }
 
           const hydrationState = yield* Effect.sync(() => {
@@ -723,7 +724,7 @@ export const useTrackEditorSession = ({
               const message =
                 error instanceof Error
                   ? error.message
-                  : "downloaded, but metadata could not be applied.";
+                  : msg("downloaded, but metadata could not be applied.");
 
               return resolveDownloadedTrackHydrationWriteError(
                 currentFileWithPendingPatch,

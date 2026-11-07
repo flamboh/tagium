@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { Refresh04Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { T, useGT } from "gt-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -50,6 +51,7 @@ export default function AlbumMetadataDialog({
   onSyncCoverToTracks,
   placeholder,
 }: AlbumMetadataDialogProps) {
+  const gt = useGT();
   const [touchedFields, setTouchedFields] = useState({ title: false, artist: false });
   const [isProcessingCover, setIsProcessingCover] = useState(false);
 
@@ -101,9 +103,9 @@ export default function AlbumMetadataDialog({
           }}
         >
           <DialogHeader className="border-b p-5">
-            <DialogTitle>{mode === "create" ? "create album" : "edit album"}</DialogTitle>
+            <DialogTitle>{mode === "create" ? gt("create album") : gt("edit album")}</DialogTitle>
             <DialogDescription className="sr-only">
-              edit album metadata including cover art.
+              <T>edit album metadata including cover art.</T>
             </DialogDescription>
           </DialogHeader>
           <div className="p-5 overflow-y-auto">
@@ -112,26 +114,28 @@ export default function AlbumMetadataDialog({
                 <div className="flex flex-col gap-0">
                   <RequiredAlbumField
                     id="album-title"
-                    label="album title"
+                    label={gt("album title")}
                     value={draft.title}
                     placeholder={placeholder.title}
-                    error={touchedFields.title && titleInvalid ? "album title is required" : null}
+                    error={
+                      touchedFields.title && titleInvalid ? gt("album title is required") : null
+                    }
                     onChange={(title) => onChange({ ...draft, title })}
                     onBlur={() => setTouchedFields((current) => ({ ...current, title: true }))}
                   />
                   <RequiredAlbumField
                     id="album-artist"
-                    label="artist"
+                    label={gt("artist")}
                     value={draft.artist}
                     placeholder={placeholder.artist}
-                    error={touchedFields.artist && artistInvalid ? "artist is required" : null}
+                    error={touchedFields.artist && artistInvalid ? gt("artist is required") : null}
                     onChange={(artist) => onChange({ ...draft, artist })}
                     onBlur={() => setTouchedFields((current) => ({ ...current, artist: true }))}
                   />
                   <div className="mb-3">
                     <FloatingLabelInput
                       id="album-genre"
-                      label="genre"
+                      label={gt("genre")}
                       value={draft.genre}
                       onChange={(event) =>
                         onChange({
@@ -144,7 +148,7 @@ export default function AlbumMetadataDialog({
                   </div>
                   <FloatingLabelInput
                     id="album-year"
-                    label="year"
+                    label={gt("year")}
                     type="number"
                     min={0}
                     max={9999}
@@ -274,19 +278,20 @@ function AlbumDialogFooter({
   formInvalid: boolean;
   onCancel: () => void;
 }) {
-  const submitLabel = mode === "create" ? "create album" : "save album";
+  const gt = useGT();
+  const submitLabel = mode === "create" ? gt("create album") : gt("save album");
 
   return (
     <DialogFooter className="border-t p-5 flex items-center justify-end gap-2">
       <Button type="button" variant="outline" disabled={processingCover} onClick={onCancel}>
-        cancel
+        <T>cancel</T>
       </Button>
       <Button
         type="submit"
         disabled={processingCover || formInvalid}
         aria-busy={processingCover || undefined}
       >
-        {processingCover ? "processing cover" : submitLabel}
+        {processingCover ? gt("processing cover") : submitLabel}
       </Button>
     </DialogFooter>
   );
