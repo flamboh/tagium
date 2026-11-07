@@ -209,3 +209,16 @@ test.describe("in a spanish browser", () => {
     await expect(page.getByText("drop your audio here")).toBeVisible();
   });
 });
+
+test("a chosen language stays translated after a few minutes", async ({ page }) => {
+  await page.clock.install();
+  await page.goto("/");
+  await page.getByRole("button", { name: "settings", exact: true }).click();
+  await page.getByRole("button", { name: "language", exact: true }).click();
+  await page.getByRole("button", { name: "display language, english" }).click();
+  await page.getByRole("button", { name: "español", exact: true }).click();
+  await page.clock.runFor("05:00");
+  await page.getByRole("button", { name: "acerca de", exact: true }).click();
+  await page.getByRole("button", { name: "idioma", exact: true }).click();
+  await expect(page.getByText("elige el idioma de tagium.", { exact: false })).toBeVisible();
+});

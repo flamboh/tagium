@@ -54,5 +54,6 @@ export const initializeI18n = () =>
     customMapping: gtConfig.customMapping,
     locale: [readChosenLocale(), gtConfig.defaultLocale].filter((locale) => locale !== undefined),
     loadTranslations,
+    cacheExpiryTime: null,
     _reload: ({ locale }) => void showLocale(locale),
   });
