@@ -1,7 +1,6 @@
-import { createElement } from "react";
 import { msg } from "gt-react";
 import { toast } from "sonner";
-import { TranslatedText } from "@/i18n/TranslatedText";
+import { translated } from "@/i18n/TranslatedText";
 
 export type SystemFailureContext =
   | "download"
@@ -481,16 +480,16 @@ export const reportSystemFailure = (
     }
 
     lastDownloadNotificationAt.set(presentation.dedupeKey, now);
-    toast.error(createElement(TranslatedText, null, presentation.title), {
+    toast.error(translated(presentation.title), {
       id: presentation.dedupeKey,
-      description: createElement(TranslatedText, null, presentation.description),
+      description: translated(presentation.description),
     });
 
     return presentation;
   }
 
-  toast.error(createElement(TranslatedText, null, presentation.title), {
-    description: createElement(TranslatedText, null, presentation.description),
+  toast.error(translated(presentation.title), {
+    description: translated(presentation.description),
   });
 
   return presentation;

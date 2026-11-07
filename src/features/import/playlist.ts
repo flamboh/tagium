@@ -64,7 +64,7 @@ export const decodePlaylist = async (input: unknown, providerName: string) => {
   }
 };
 
-export type PlaylistImportNotice =
+type PlaylistImportNotice =
   | { kind: "truncated"; addedCount: number }
   | { kind: "skipped"; addedCount: number; totalCount: number; skippedCount: number };
 

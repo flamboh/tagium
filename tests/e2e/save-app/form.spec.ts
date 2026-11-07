@@ -1,5 +1,5 @@
 import { expect, IMPORT_TIMEOUT, test } from "../support/test";
-import { saveApp } from "./save";
+import { SAVE_PATH, saveApp } from "./save";
 
 for (const mode of ["audio", "mute"] as const) {
   test(`only shows settings that apply to ${mode} mode`, async ({ page }) => {
@@ -87,4 +87,22 @@ test("sends a pasted list of links as one link", async ({
   await expect(save.retry).toHaveCount(0);
   const resolves = await upstreams.calls({ route: "cobalt.resolve" });
   expect(resolves.map((call) => JSON.parse(call.requestBody!).url)).toEqual([pasted]);
+});
+
+test.describe("in a spanish browser", () => {
+  test.use({ locale: "es-ES" });
+
+  test("rejects an incomplete url in spanish", async ({ page }) => {
+    await page.goto(SAVE_PATH);
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+
+    const url = page.getByRole("textbox", { name: "url multimedia" });
+
+    await expect(url).toHaveAttribute("placeholder", "pega un enlace multimedia");
+    await url.fill("abc");
+    await url.press("Enter");
+    await expect(page.locator("#media-url-error")).toHaveText(
+      "introduce una url http o https completa",
+    );
+  });
 });

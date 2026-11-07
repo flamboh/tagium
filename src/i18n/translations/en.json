@@ -1,6 +1,4 @@
 {
-  "f9274ff95bc68823": "notifications, alt+t",
-  "2c44f153d008e237": "close notification",
   "2d9bf23ea424d2d8": "downloads are busy",
   "aaa5a54a5f0e7a89": "too many downloads are running right now. try again in a moment.",
   "7c610b9ed8a14447": "downloads are busy. try again in a moment.",
@@ -148,6 +146,8 @@
   "c85d558b9b692fd1": "downloading",
   "183f329786ceaaf1": "processing",
   "1d74a28692883c9b": "finalizing",
+  "ef05868317f2e91b": "notifications alt+t",
+  "2c44f153d008e237": "close notification",
   "30430296d32b38c1": {
     "t": "Plural",
     "i": 1,
@@ -556,92 +556,14 @@
     ")"
   ],
   "45aa011dc81fa226": "drag tracks here",
-  "e58a767100a9d293": "none needed",
   "8c2f1a1d020a5442": "{count, plural, one {# track} other {# tracks}}",
+  "7244886f22266d63": "unknown",
+  "e58a767100a9d293": "none needed",
   "f347226bed92e155": "track has an error",
   "68cddabef89f607f": "track actions for {filename}",
   "f2c1b6c58cc1ca16": "download {albumTitle}",
   "94a9c678ef67675e": "album actions for {albumTitle}, cleanup suggested",
   "ff24cbdafcf3a9f3": "album actions for {albumTitle}",
-  "314eb19fdbea9d5a": [
-    "unknown ·",
-    " ",
-    {
-      "t": "Plural",
-      "i": 1,
-      "d": {
-        "b": {
-          "one": {
-            "t": "C2",
-            "i": 2,
-            "c": [
-              {
-                "i": 3,
-                "k": "_gt_n_3",
-                "v": "n"
-              },
-              " track"
-            ]
-          },
-          "other": {
-            "t": "C2",
-            "i": 2,
-            "c": [
-              {
-                "i": 3,
-                "k": "_gt_n_3",
-                "v": "n"
-              },
-              " tracks"
-            ]
-          }
-        },
-        "t": "p"
-      }
-    }
-  ],
-  "875392cc30fa4c52": [
-    {
-      "i": 1,
-      "k": "_gt_value_1",
-      "v": "v"
-    },
-    " ·",
-    " ",
-    {
-      "t": "Plural",
-      "i": 2,
-      "d": {
-        "b": {
-          "one": {
-            "t": "C3",
-            "i": 3,
-            "c": [
-              {
-                "i": 4,
-                "k": "_gt_n_4",
-                "v": "n"
-              },
-              " track"
-            ]
-          },
-          "other": {
-            "t": "C3",
-            "i": 3,
-            "c": [
-              {
-                "i": 4,
-                "k": "_gt_n_4",
-                "v": "n"
-              },
-              " tracks"
-            ]
-          }
-        },
-        "t": "p"
-      }
-    }
-  ],
   "12b725a00ecd35ea": "track saved",
   "cf9b722006cd9532": "album tracks need files, metadata, and filenames",
   "96da55354b2944ea": "download album",

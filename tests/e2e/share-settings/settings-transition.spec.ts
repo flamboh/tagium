@@ -194,7 +194,7 @@ test("switching language keeps library work and survives a reload", async ({ pag
 
   await page.getByRole("button", { name: "Kept across languages.mp3", exact: true }).click();
   await expectActiveView(page, "editor");
-  await expect(page.getByLabel("title", { exact: true })).toHaveValue("Kept across languages");
+  await expect(page.getByLabel("título", { exact: true })).toHaveValue("Kept across languages");
 
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "es");

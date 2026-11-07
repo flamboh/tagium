@@ -5,7 +5,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
-import { Num, Plural, T, useGT, useMessages, Var } from "gt-react";
+import { T, useGT, useMessages } from "gt-react";
 import {
   AlertCircleIcon,
   BanIcon,
@@ -43,47 +43,13 @@ import {
 } from "@/features/library/trackFilenamePreview";
 
 function AlbumSummary({ album }: { album: AlbumGroup }) {
-  const trackCount = album.trackIds.length;
+  const gt = useGT();
 
-  if (!album.artist) {
-    return (
-      <T>
-        unknown ·{" "}
-        <Plural
-          n={trackCount}
-          one={
-            <>
-              <Num>{trackCount}</Num> track
-            </>
-          }
-          other={
-            <>
-              <Num>{trackCount}</Num> tracks
-            </>
-          }
-        />
-      </T>
-    );
-  }
+  const tracks = gt("{count, plural, one {# track} other {# tracks}}", {
+    count: album.trackIds.length,
+  });
 
-  return (
-    <T>
-      <Var>{album.artist}</Var> ·{" "}
-      <Plural
-        n={trackCount}
-        one={
-          <>
-            <Num>{trackCount}</Num> track
-          </>
-        }
-        other={
-          <>
-            <Num>{trackCount}</Num> tracks
-          </>
-        }
-      />
-    </T>
-  );
+  return `${album.artist || gt("unknown")} · ${tracks}`;
 }
 
 const useCleanupSuggestionLabel = () => {

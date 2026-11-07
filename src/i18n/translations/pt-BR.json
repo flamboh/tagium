@@ -1,6 +1,4 @@
 {
-  "f9274ff95bc68823": "notificações, alt+t",
-  "2c44f153d008e237": "fechar notificação",
   "2d9bf23ea424d2d8": "os downloads estão sobrecarregados",
   "aaa5a54a5f0e7a89": "há downloads demais em andamento agora. tente de novo em instantes.",
   "7c610b9ed8a14447": "os downloads estão sobrecarregados. tente de novo em instantes.",
@@ -148,6 +146,8 @@
   "c85d558b9b692fd1": "baixando",
   "183f329786ceaaf1": "processando",
   "1d74a28692883c9b": "finalizando",
+  "ef05868317f2e91b": "notificações alt+t",
+  "2c44f153d008e237": "fechar notificação",
   "30430296d32b38c1": {
     "t": "Plural",
     "i": 1,
@@ -556,116 +556,14 @@
     ")"
   ],
   "45aa011dc81fa226": "arraste faixas para cá",
+  "8c2f1a1d020a5442": "{count, plural, =0 {0 faixas} one {# faixa} other {# faixas}}",
+  "7244886f22266d63": "desconhecido",
   "e58a767100a9d293": "nada para limpar",
-  "8c2f1a1d020a5442": "{count, plural, one {# faixa} other {# faixas}}",
   "f347226bed92e155": "a faixa tem um erro",
   "68cddabef89f607f": "ações da faixa {filename}",
   "f2c1b6c58cc1ca16": "baixar {albumTitle}",
   "94a9c678ef67675e": "ações do álbum {albumTitle}, limpeza sugerida",
   "ff24cbdafcf3a9f3": "ações do álbum {albumTitle}",
-  "314eb19fdbea9d5a": [
-    "desconhecido ·",
-    " ",
-    {
-      "t": "Plural",
-      "i": 1,
-      "d": {
-        "b": {
-          "zero": {
-            "t": "C2",
-            "i": 2,
-            "c": [
-              {
-                "i": 3,
-                "k": "_gt_n_3",
-                "v": "n"
-              },
-              " faixas"
-            ]
-          },
-          "one": {
-            "t": "C2",
-            "i": 2,
-            "c": [
-              {
-                "i": 3,
-                "k": "_gt_n_3",
-                "v": "n"
-              },
-              " faixa"
-            ]
-          },
-          "other": {
-            "t": "C2",
-            "i": 2,
-            "c": [
-              {
-                "i": 3,
-                "k": "_gt_n_3",
-                "v": "n"
-              },
-              " faixas"
-            ]
-          }
-        },
-        "t": "p"
-      }
-    }
-  ],
-  "875392cc30fa4c52": [
-    {
-      "i": 1,
-      "k": "_gt_value_1",
-      "v": "v"
-    },
-    " ·",
-    " ",
-    {
-      "t": "Plural",
-      "i": 2,
-      "d": {
-        "b": {
-          "zero": {
-            "t": "C3",
-            "i": 3,
-            "c": [
-              {
-                "i": 4,
-                "k": "_gt_n_4",
-                "v": "n"
-              },
-              " faixas"
-            ]
-          },
-          "one": {
-            "t": "C3",
-            "i": 3,
-            "c": [
-              {
-                "i": 4,
-                "k": "_gt_n_4",
-                "v": "n"
-              },
-              " faixa"
-            ]
-          },
-          "other": {
-            "t": "C3",
-            "i": 3,
-            "c": [
-              {
-                "i": 4,
-                "k": "_gt_n_4",
-                "v": "n"
-              },
-              " faixas"
-            ]
-          }
-        },
-        "t": "p"
-      }
-    }
-  ],
   "12b725a00ecd35ea": "faixa salva",
   "cf9b722006cd9532": "as faixas do álbum precisam de arquivos, metadados e nomes de arquivo",
   "96da55354b2944ea": "baixar álbum",

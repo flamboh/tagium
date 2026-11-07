@@ -1,7 +1,10 @@
+import { createElement } from "react";
 import { useMessages } from "gt-react";
 
-export function TranslatedText({ children }: { children: string }) {
+function TranslatedText({ children }: { children: string }) {
   const m = useMessages();
 
   return m(children);
 }
+
+export const translated = (message: string) => createElement(TranslatedText, null, message);

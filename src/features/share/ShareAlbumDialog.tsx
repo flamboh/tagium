@@ -36,7 +36,7 @@ export type ShareDialogState =
       failure: ShareDialogFailure;
     };
 
-export type ShareDialogFailure =
+type ShareDialogFailure =
   | { kind: "update-failed"; reason: string }
   | { kind: "create-failed"; reason: string }
   | { kind: "link-failed" };
@@ -287,11 +287,13 @@ function PublishedShareNote({
         gt("expires in 90 days · stop sharing to turn the link off at any time")
       ) : (
         gt("expires {date} · stop sharing to turn the link off at any time", {
-          date: date.toLocaleDateString(locale, {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          }),
+          date: date
+            .toLocaleDateString(locale, {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
+            .toLocaleLowerCase(locale),
         })
       )}
     </div>

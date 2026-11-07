@@ -1,6 +1,4 @@
 {
-  "f9274ff95bc68823": "notificaciones, alt+t",
-  "2c44f153d008e237": "cerrar notificación",
   "2d9bf23ea424d2d8": "las descargas están saturadas",
   "aaa5a54a5f0e7a89": "hay demasiadas descargas en curso ahora mismo. vuelve a intentarlo en un momento.",
   "7c610b9ed8a14447": "las descargas están saturadas. vuelve a intentarlo en un momento.",
@@ -148,6 +146,8 @@
   "c85d558b9b692fd1": "descargando",
   "183f329786ceaaf1": "procesando",
   "1d74a28692883c9b": "finalizando",
+  "ef05868317f2e91b": "notificaciones alt+t",
+  "2c44f153d008e237": "cerrar notificación",
   "30430296d32b38c1": {
     "t": "Plural",
     "i": 1,
@@ -556,92 +556,14 @@
     ")"
   ],
   "45aa011dc81fa226": "arrastra pistas aquí",
-  "e58a767100a9d293": "nada que limpiar",
   "8c2f1a1d020a5442": "{count, plural, one {# pista} other {# pistas}}",
+  "7244886f22266d63": "desconocido",
+  "e58a767100a9d293": "nada que limpiar",
   "f347226bed92e155": "la pista tiene un error",
   "68cddabef89f607f": "acciones de la pista {filename}",
   "f2c1b6c58cc1ca16": "descargar {albumTitle}",
   "94a9c678ef67675e": "acciones del álbum {albumTitle}, se sugiere limpieza",
   "ff24cbdafcf3a9f3": "acciones del álbum {albumTitle}",
-  "314eb19fdbea9d5a": [
-    "desconocido ·",
-    " ",
-    {
-      "t": "Plural",
-      "i": 1,
-      "d": {
-        "b": {
-          "one": {
-            "t": "C2",
-            "i": 2,
-            "c": [
-              {
-                "i": 3,
-                "k": "_gt_n_3",
-                "v": "n"
-              },
-              " pista"
-            ]
-          },
-          "other": {
-            "t": "C2",
-            "i": 2,
-            "c": [
-              {
-                "i": 3,
-                "k": "_gt_n_3",
-                "v": "n"
-              },
-              " pistas"
-            ]
-          }
-        },
-        "t": "p"
-      }
-    }
-  ],
-  "875392cc30fa4c52": [
-    {
-      "i": 1,
-      "k": "_gt_value_1",
-      "v": "v"
-    },
-    " ·",
-    " ",
-    {
-      "t": "Plural",
-      "i": 2,
-      "d": {
-        "b": {
-          "one": {
-            "t": "C3",
-            "i": 3,
-            "c": [
-              {
-                "i": 4,
-                "k": "_gt_n_4",
-                "v": "n"
-              },
-              " pista"
-            ]
-          },
-          "other": {
-            "t": "C3",
-            "i": 3,
-            "c": [
-              {
-                "i": 4,
-                "k": "_gt_n_4",
-                "v": "n"
-              },
-              " pistas"
-            ]
-          }
-        },
-        "t": "p"
-      }
-    }
-  ],
   "12b725a00ecd35ea": "pista guardada",
   "cf9b722006cd9532": "las pistas del álbum necesitan archivos, metadatos y nombres de archivo",
   "96da55354b2944ea": "descargar álbum",

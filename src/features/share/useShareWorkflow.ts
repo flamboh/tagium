@@ -1,4 +1,4 @@
-import { createElement, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { msg, t } from "gt-react";
 import { toast } from "sonner";
 import { analytics } from "@/analytics";
@@ -7,7 +7,7 @@ import type { TrackEditorSession } from "@/features/editor/useTrackEditorSession
 import type { AlbumGroup, SharePublication } from "@/features/library/types";
 import type { LibraryStore } from "@/features/library/useLibraryStore";
 import type { AudioImportSession } from "@/features/workspace/useAudioImportSession";
-import { TranslatedText } from "@/i18n/TranslatedText";
+import { translated } from "@/i18n/TranslatedText";
 import {
   fetchSharedArtwork,
   fetchSharedContent,
@@ -66,8 +66,6 @@ const safelyGetRevocationReceipt = (slug: string) => {
     return null;
   }
 };
-
-const translated = (message: string) => createElement(TranslatedText, null, message);
 
 const sharedContentAddedToast = (manifest: Manifest) => {
   const count = manifestTrackCount(manifest);

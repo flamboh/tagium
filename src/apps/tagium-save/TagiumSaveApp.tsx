@@ -1000,7 +1000,6 @@ export default function TagiumSaveApp({
   const [settings, setSettings] = useState(initialSettings);
   const [state, setState] = useState<DownloadState>({ kind: "idle" });
   const lastSourceUrlRef = useRef<string | null>(null);
-  const m = useMessages();
 
   const {
     activeLifecycleRef,
@@ -1180,7 +1179,7 @@ export default function TagiumSaveApp({
   const controller: MediaUrlEntryController = {
     sourceUrl,
     submitting: state.kind === "working" || state.kind === "picker",
-    validationError: validationError === null ? null : m(validationError),
+    validationError,
     setSourceUrl: (value) => {
       setSourceUrl(value);
       setValidationError(null);

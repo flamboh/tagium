@@ -81,8 +81,8 @@ export const buildShareTrackPreview = (
 
   return {
     kind: "track",
-    title: title || "",
-    tracks: [{ key: `${file.id}:0`, title: title || "" }],
+    title,
+    tracks: [{ key: `${file.id}:0`, title }],
     cover,
   };
 };
