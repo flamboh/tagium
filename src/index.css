@@ -203,7 +203,7 @@
   }
 
   html {
-    font-size: clamp(1rem, min(100vw / 120, 100svh / 60), 2rem);
+    font-size: clamp(1rem, min(100vw / 80, 100svh / 45), 3rem);
   }
 
   html,

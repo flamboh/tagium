@@ -51,12 +51,12 @@ const coverArtClasses = {
   default: {
     container: "flex-shrink-0 flex flex-col items-center gap-2 lg:items-start",
     frame:
-      "relative size-[min(80vw,clamp(7.5rem,calc(75svh-25.3125rem),19.25rem))] max-lg:[@media(max-height:700px)]:size-24 lg:size-auto",
+      "relative size-[min(80vw,clamp(7.5rem,calc(75svh-25.3125rem),26rem))] max-lg:[@media(max-height:700px)]:size-24 lg:size-auto",
     image: "size-full object-cover rounded-lg border lg:size-64",
     placeholder:
       "size-full bg-muted rounded-lg border flex items-center justify-center text-muted-foreground text-xs lg:size-64",
     uploadRow:
-      "flex w-[min(80vw,clamp(7.5rem,calc(75svh-25.3125rem),19.25rem))] max-lg:[@media(max-height:700px)]:w-24 lg:w-auto lg:flex-1 lg:flex-col lg:gap-2",
+      "flex w-[min(80vw,clamp(7.5rem,calc(75svh-25.3125rem),26rem))] max-lg:[@media(max-height:700px)]:w-24 lg:w-auto lg:flex-1 lg:flex-col lg:gap-2",
     uploadButton:
       "h-10 w-full border-dashed border-2 flex gap-2 px-3 hover:bg-accent/50 cursor-pointer max-lg:[@media(max-height:700px)]:gap-1 lg:h-29.5 lg:w-64 lg:flex-col",
     uploadIcon:
