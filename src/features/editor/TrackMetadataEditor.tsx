@@ -155,7 +155,7 @@ function TrackFilenameHeader({
   return (
     <div
       data-track-filename-header
-      className="relative h-16 border-b flex-shrink-0 px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6"
+      className="relative h-16 border-b flex-shrink-0 px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-26 lg:px-6"
     >
       <div className="flex h-full min-w-0 items-center gap-3">
         {headerLeadingAction}
@@ -829,7 +829,7 @@ function PendingTrackMetadataEditor({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div
         data-track-filename-header
-        className="flex h-16 shrink-0 items-center gap-3 border-b px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-[104px] lg:px-6"
+        className="flex h-16 shrink-0 items-center gap-3 border-b px-4 max-lg:[@media(max-height:700px)]:h-14 max-lg:[@media(max-height:700px)]:px-3 lg:h-26 lg:px-6"
       >
         {headerLeadingAction}
         <div className="min-w-0 flex-1">

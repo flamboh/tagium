@@ -212,7 +212,7 @@ export function SortableTrackRow({
                 className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
               />
             ) : (
-              <span className="min-w-3 text-[11px] text-muted-foreground">{index}</span>
+              <span className="min-w-3 text-[0.6875rem] text-muted-foreground">{index}</span>
             )}
             <span className="truncate text-sm flex-1">{filename}</span>
             <TrackRowStatusIcons track={track} showSavedCheck={showSavedCheck} />

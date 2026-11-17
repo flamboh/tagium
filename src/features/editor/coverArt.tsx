@@ -316,7 +316,7 @@ function CoverUploadRow({
             onClick={() => fileInputRef.current?.click()}
           >
             <HugeiconsIcon icon={Upload01Icon} strokeWidth={2} className={classes.uploadIcon} />
-            <span className="text-muted-foreground whitespace-nowrap text-[10px] md:text-xs">
+            <span className="text-muted-foreground whitespace-nowrap text-[0.625rem] md:text-xs">
               {label}
             </span>
           </Button>

@@ -18,6 +18,7 @@ import {
 import {
   WAVEFORM_HEIGHT,
   barCountForWidth,
+  toBaseRemPx,
   barsViewBox,
   useWaveformBars,
 } from "@/features/editor/waveformBars";
@@ -93,10 +94,10 @@ function useTrackWaveform({
     const surface = surfaceRef.current;
 
     if (!surface) return;
-    setWidth(surface.clientWidth);
+    setWidth(toBaseRemPx(surface.clientWidth));
 
     const observer = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(entry.contentRect.width);
+      if (entry) setWidth(toBaseRemPx(entry.contentRect.width));
     });
 
     observer.observe(surface);
@@ -470,7 +471,7 @@ export default function TrackWaveform(props: TrackWaveformProps) {
               "relative min-w-0 touch-none select-none rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
               canPlay ? "cursor-pointer" : "cursor-default",
             )}
-            style={{ height: WAVEFORM_HEIGHT }}
+            style={{ height: `${WAVEFORM_HEIGHT / 16}rem` }}
           >
             <div
               className={cn(
