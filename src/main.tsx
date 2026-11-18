@@ -4,10 +4,13 @@ import { initializeAnalytics } from "./analytics";
 import { startTemporaryStorageSession } from "./apps/tagium-save/download/storage";
 import AppRoot from "./runtime/AppRoot";
 import { holdForFonts } from "./runtime/holdForFonts";
+import { startInterfaceScale } from "./runtime/interfaceScale";
 import { getAppTitle, resolveApp } from "./runtime/resolveApp";
 import "./index.css";
 
 holdForFonts();
+
+startInterfaceScale();
 
 const appId = resolveApp(window.location);
 
