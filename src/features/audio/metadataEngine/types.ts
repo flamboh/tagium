@@ -43,6 +43,7 @@ export interface MetadataChanges {
   albumArtist?: string;
   composer?: string;
   comment?: string;
+  lyrics?: string;
   copyright?: string;
   language?: string;
 }

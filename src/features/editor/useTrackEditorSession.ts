@@ -65,6 +65,7 @@ const createSubmittedMetadataPatch = (metadata: AudioMetadata): MetadataPatch =>
   bpm: getNullableNumericPatchValue(metadata.bpm),
   musicalKey: metadata.musicalKey,
   comment: metadata.comment,
+  lyrics: metadata.lyrics,
 });
 
 const applyMetadataPatch = (metadata: AudioMetadata, patch: MetadataPatch): AudioMetadata => {
@@ -101,6 +102,8 @@ const applyMetadataPatch = (metadata: AudioMetadata, patch: MetadataPatch): Audi
   if (patch.musicalKey !== undefined) next.musicalKey = patch.musicalKey;
 
   if (patch.comment !== undefined) next.comment = patch.comment;
+
+  if (patch.lyrics !== undefined) next.lyrics = patch.lyrics;
 
   return next;
 };

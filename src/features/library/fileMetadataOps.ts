@@ -80,6 +80,10 @@ export const sanitizePendingMetadataPatch = (
     sanitized.comment = patch.comment;
   }
 
+  if (hasOwn(patch, "lyrics") && patch.lyrics !== undefined) {
+    sanitized.lyrics = patch.lyrics;
+  }
+
   if (
     !dropLegacyNumericFields &&
     hasOwn(patch, "discNumber") &&
@@ -132,6 +136,7 @@ const createMetadataPatch = (metadata: AudioMetadata): DownloadedTrackMetadataPa
   bpm: metadata.bpm,
   musicalKey: metadata.musicalKey,
   comment: metadata.comment,
+  lyrics: metadata.lyrics,
 });
 
 const mergeLatestMetadataWithHydratedTechnicalFields = (
@@ -186,7 +191,8 @@ const areWritableMetadataFieldsEqual = (
   firstMetadata.composer === secondMetadata.composer &&
   firstMetadata.bpm === secondMetadata.bpm &&
   firstMetadata.musicalKey === secondMetadata.musicalKey &&
-  firstMetadata.comment === secondMetadata.comment;
+  firstMetadata.comment === secondMetadata.comment &&
+  firstMetadata.lyrics === secondMetadata.lyrics;
 
 const applyProviderDisplayMetadata = (
   parsedMetadata: AudioMetadata,

@@ -448,6 +448,7 @@ interface AdvancedFieldRegistrations {
   bpm: UseFormRegisterReturn<"bpm">;
   musicalKey: UseFormRegisterReturn<"musicalKey">;
   comment: UseFormRegisterReturn<"comment">;
+  lyrics: UseFormRegisterReturn<"lyrics">;
 }
 
 function BpmField({
@@ -486,6 +487,20 @@ function BpmField({
         </p>
       )}
     </div>
+  );
+}
+
+function LyricsField({ registration }: { registration: UseFormRegisterReturn<"lyrics"> }) {
+  return (
+    <FloatingLabelTextarea
+      {...registration}
+      id="track-lyrics"
+      label="lyrics"
+      rows={6}
+      placeholder="paste plain or synced lrc lyrics"
+      spellCheck={false}
+      className="max-h-96"
+    />
   );
 }
 
@@ -622,6 +637,7 @@ function AdvancedTrackDetailsFields({
         rows={2}
         placeholder="add a comment"
       />
+      <LyricsField registration={registrations.lyrics} />
     </>
   );
 }
@@ -698,6 +714,7 @@ const useAdvancedMetadataFormBoundary = ({
     }),
     musicalKey: register("musicalKey", { setValueAs: (value: string) => value.trim() }),
     comment: register("comment"),
+    lyrics: register("lyrics"),
   };
 
   const { errors } = useFormState({ control, name: ["discNumber", "bpm"] });

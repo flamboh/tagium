@@ -26,6 +26,7 @@ const metadata = (overrides: Partial<AudioMetadata> = {}): AudioMetadata => ({
   discNumber: null,
   bpm: null,
   musicalKey: "",
+  lyrics: "",
   ...overrides,
 });
 

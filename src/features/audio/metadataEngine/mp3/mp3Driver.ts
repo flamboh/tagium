@@ -334,6 +334,7 @@ const ids = {
   albumArtist: ["TPE2", "TP2"],
   composer: ["TCOM", "TCM"],
   comment: ["COMM", "COM"],
+  lyrics: ["USLT", "ULT"],
   copyright: ["TCOP", "TCR"],
   language: ["TLAN", "TLA"],
 } as const;
@@ -354,6 +355,7 @@ const idSets = {
   albumArtist: new Set(ids.albumArtist),
   composer: new Set(ids.composer),
   comment: new Set<string>(ids.comment),
+  lyrics: new Set<string>(ids.lyrics),
   copyright: new Set(ids.copyright),
   language: new Set(ids.language),
 } as const;
@@ -421,6 +423,12 @@ const userCommentValue = (frame: RawFrame, version: Id3Version) => {
   }
 
   return userTextIds.has(frame.id) ? userTextComment(frame, version) : undefined;
+};
+
+const readLyrics = (tag: ParsedTag | undefined) => {
+  const frame = tag?.frames.find((candidate) => idSets.lyrics.has(candidate.id));
+
+  return frame && parseComment(frame, tag!.version).value;
 };
 
 const readUserComment = (tag: ParsedTag | undefined) => {
@@ -583,6 +591,7 @@ const apeKeys = {
   discNumber: ["disc", "discnumber"],
   bpm: ["bpm"],
   musicalKey: ["initialkey", "key"],
+  lyrics: ["lyrics", "unsyncedlyrics"],
 } as const;
 
 const firstApeValue = (ape: ParsedApe, keys: readonly string[]) => {
@@ -768,7 +777,7 @@ const encodePicture = (picture: ArtworkEntry, version: Id3Version) => {
   );
 };
 
-const encodeComment = (value: string, version: Id3Version) => {
+const encodeLanguageText = (value: string, version: Id3Version) => {
   const encoding = version === 4 ? 3 : 1;
   const terminator = encoding === 1 ? Uint8Array.of(0, 0) : Uint8Array.of(0);
 
@@ -789,7 +798,7 @@ const buildTag = (parsed: ParsedTag | undefined, changes: MetadataChanges) => {
 
   // SAFETY: MetadataChanges owns every enumerable key in this closed application object.
   for (const key of Object.keys(changes) as Array<keyof MetadataChanges>) {
-    if (key !== "comment" && key in ids) {
+    if (key !== "comment" && key !== "lyrics" && key in ids) {
       // SAFETY: the key-in-ids check establishes that this MetadataChanges key is an ID3 text key.
       for (const id of ids[key as keyof typeof ids]) changedIds.add(id);
     }
@@ -797,8 +806,23 @@ const buildTag = (parsed: ParsedTag | undefined, changes: MetadataChanges) => {
 
   const frames: Uint8Array[] = [];
 
+  const lyricsFrames =
+    changes.lyrics === undefined || changes.lyrics.length === 0
+      ? []
+      : [makeFrame(idFor("lyrics", version), encodeLanguageText(changes.lyrics, version), version)];
+
+  let lyricsPending = changes.lyrics !== undefined;
+
   for (const frame of parsed?.frames ?? []) {
     if (changedIds.has(frame.id)) continue;
+
+    if (changes.lyrics === "" && idSets.lyrics.has(frame.id)) continue;
+
+    if (lyricsPending && idSets.lyrics.has(frame.id)) {
+      frames.push(...lyricsFrames);
+      lyricsPending = false;
+      continue;
+    }
 
     if (changes.comment !== undefined && userCommentValue(frame, version) !== undefined) continue;
     frames.push(frame.bytes);
@@ -861,9 +885,11 @@ const buildTag = (parsed: ParsedTag | undefined, changes: MetadataChanges) => {
 
   if (changes.comment !== undefined && changes.comment.length > 0) {
     frames.push(
-      makeFrame(idFor("comment", version), encodeComment(changes.comment, version), version),
+      makeFrame(idFor("comment", version), encodeLanguageText(changes.comment, version), version),
     );
   }
+
+  if (lyricsPending) frames.push(...lyricsFrames);
 
   if (changes.copyright !== undefined) addText("copyright", changes.copyright);
 
@@ -1089,6 +1115,7 @@ export const mp3Driver: FormatDriver = {
             firstText(parsed, idSets.composer) ?? firstApeValue(ape, apeKeys.composer) ?? "",
           ),
           comment: readUserComment(parsed) ?? firstApeValue(ape, apeKeys.comment) ?? "",
+          lyrics: readLyrics(parsed) ?? firstApeValue(ape, apeKeys.lyrics) ?? "",
           discNumber: canonicalInteger(discText, true),
           bpm: canonicalInteger(bpmText),
           musicalKey: String(
@@ -1125,6 +1152,7 @@ export const mp3Driver: FormatDriver = {
         "albumArtist",
         "composer",
         "comment",
+        "lyrics",
         "copyright",
         "language",
       ]),

@@ -43,6 +43,7 @@ for (const format of formats) {
     await field(page, "key").fill("F#m");
     await field(page, "composer").fill("Zoë Nova");
     await field(page, "comment").fill("Edited comment\nSecond line é 🦊");
+    await field(page, "lyrics").fill("[00:01.00] edited lyric é 🦊\n[00:02.50] second lyric");
     await expect(page.getByRole("heading", { level: 2 })).toHaveText(`${title}.${format}`);
     await expect(trackRow(page, `${title}.${format}`)).toBeVisible();
 
@@ -64,6 +65,7 @@ for (const format of formats) {
       musicalKey: "F#m",
       composer: "Zoë Nova",
       comment: "Edited comment\nSecond line é 🦊",
+      lyrics: "[00:01.00] edited lyric é 🦊\n[00:02.50] second lyric",
     });
     expect(Buffer.from(exported.bytes).includes("first line"), "stale comment alias").toBe(false);
     await expectLosslessAudio(exported, source.file);

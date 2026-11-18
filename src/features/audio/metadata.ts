@@ -54,6 +54,7 @@ const metadataSnapshotSchema = Schema.Struct({
   discNumber: Schema.mutableKey(Schema.NullOr(advancedNumberSchema)),
   bpm: Schema.mutableKey(Schema.NullOr(advancedNumberSchema)),
   musicalKey: Schema.mutableKey(Schema.String),
+  lyrics: Schema.mutableKey(Schema.String),
 });
 
 const metadataPatchSchema = Schema.Struct({
@@ -71,6 +72,7 @@ const metadataPatchSchema = Schema.Struct({
   discNumber: optionalMutableKey(Schema.NullOr(advancedNumberSchema)),
   bpm: optionalMutableKey(Schema.NullOr(advancedNumberSchema)),
   musicalKey: optionalMutableKey(Schema.String),
+  lyrics: optionalMutableKey(Schema.String),
 });
 
 export const audioMetadataSchema = metadataSnapshotSchema;
