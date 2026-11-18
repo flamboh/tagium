@@ -1,0 +1,176 @@
+import { randomUUID } from "node:crypto";
+import { inspectAudio, retaggedAudioFixture } from "../support/audio";
+import { expect, SETTLE_TIMEOUT, test } from "../support/test";
+import {
+  backToWorkspace,
+  downloadTrack,
+  editorMode,
+  field,
+  openSettings,
+  pickFiles,
+  seedSettings,
+} from "./workspace";
+
+const synced = "[00:01.00] first lyric\n[00:02.50] second lyric";
+
+const uniqueTrack = async () => {
+  const title = `lyrics ${randomUUID().slice(0, 8)}`;
+
+  const { upload } = await retaggedAudioFixture("mp3", `${title}.mp3`, {
+    title,
+    artist: "lyrics artist",
+    album: "",
+    lyrics: "",
+  });
+
+  return { title, upload };
+};
+
+test("finds synced lyrics for an imported track and tags them on download", async ({
+  page,
+  upstreams,
+}) => {
+  const track = await uniqueTrack();
+
+  const key = await upstreams.lyrics(track.title, {
+    exact: upstreams.lrclibRecord({
+      trackName: track.title,
+      artistName: "lyrics artist",
+      plainLyrics: "first lyric\nsecond lyric",
+      syncedLyrics: synced,
+    }),
+  });
+
+  await seedSettings(page, { findLyrics: true });
+  await page.goto("/");
+  await pickFiles(page, [track.upload]);
+
+  await expect(field(page, "lyrics")).toHaveValue(synced, SETTLE_TIMEOUT);
+
+  const [lookup] = await upstreams.calls({ key, route: "lrclib.get" });
+  expect(new URL(lookup!.url).searchParams.has("album_name")).toBe(false);
+  expect(lookup!.requestHeaders["lrclib-app-id"]).toBeTruthy();
+
+  const { metadata } = await inspectAudio(await downloadTrack(page));
+  expect(metadata).toMatchObject({ title: track.title, lyrics: synced });
+
+  await field(page, "lyrics").fill("");
+  await page.getByRole("button", { name: "search lrclib again" }).click();
+  await expect(field(page, "lyrics")).toHaveValue(synced, SETTLE_TIMEOUT);
+});
+
+test("falls back to a duration matched search and rides out a busy lrclib", async ({
+  page,
+  upstreams,
+}) => {
+  const track = await uniqueTrack();
+  await seedSettings(page, { findLyrics: true, advancedMetadata: true });
+  await page.goto("/");
+
+  const { metadata: source } = await inspectAudio({
+    filename: track.upload.name,
+    bytes: new Uint8Array(track.upload.buffer),
+  });
+
+  const key = await upstreams.lyrics(track.title, {
+    faults: [503, "ok"],
+    search: [
+      upstreams.lrclibRecord({ duration: source.duration + 30, plainLyrics: "wrong length" }),
+      upstreams.lrclibRecord({ duration: source.duration, plainLyrics: "plain lyric" }),
+    ],
+  });
+
+  await pickFiles(page, [track.upload]);
+  await editorMode(page, "advanced").click();
+  await expect(field(page, "lyrics")).toHaveValue("plain lyric", SETTLE_TIMEOUT);
+  expect((await upstreams.calls({ key })).map((call) => [call.route, call.status])).toEqual([
+    ["lrclib.get", 503],
+    ["lrclib.get", 404],
+    ["lrclib.search", 200],
+    ["lrclib.search", 200],
+  ]);
+});
+
+test("leaves lyrics alone until find lyrics is turned on in settings", async ({
+  page,
+  upstreams,
+}) => {
+  const track = await uniqueTrack();
+  const key = await upstreams.lyrics(track.title);
+  await seedSettings(page, { advancedMetadata: true });
+  await page.goto("/");
+  await pickFiles(page, [track.upload]);
+  await expect(field(page, "title")).toHaveValue(track.title);
+  expect(await upstreams.calls({ key })).toEqual([]);
+
+  await openSettings(page, "editing");
+  await page.getByRole("checkbox", { name: /^find lyrics/u }).click();
+  await backToWorkspace(page);
+
+  await expect.poll(async () => (await upstreams.calls({ key })).length).toBe(3);
+  await editorMode(page, "advanced").click();
+  await expect(field(page, "lyrics")).toHaveValue("");
+  await expect(field(page, "lyrics")).toHaveAttribute("placeholder", "no lyrics found on lrclib");
+
+  await page.reload();
+  await openSettings(page, "editing");
+  await expect(page.getByRole("checkbox", { name: /^find lyrics/u })).toBeChecked();
+});
+
+test("says when lrclib can't be reached and searches again on retry", async ({
+  page,
+  upstreams,
+}) => {
+  const track = await uniqueTrack();
+  await upstreams.lyrics(track.title, {
+    faults: [500, "ok"],
+    exact: upstreams.lrclibRecord({ trackName: track.title, syncedLyrics: synced }),
+  });
+  await seedSettings(page, { findLyrics: true });
+  await page.goto("/");
+  await pickFiles(page, [track.upload]);
+
+  await expect(field(page, "lyrics")).toHaveAttribute(
+    "placeholder",
+    "couldn't reach lrclib",
+    SETTLE_TIMEOUT,
+  );
+  await page.getByRole("button", { name: "search lrclib again" }).click();
+  await expect(field(page, "lyrics")).toHaveValue(synced, SETTLE_TIMEOUT);
+  await expect(page.getByRole("button", { name: "search lrclib again" })).toHaveCount(0);
+});
+
+test("asks for a title and artist before it can search", async ({ page, upstreams }) => {
+  const track = await uniqueTrack();
+  await upstreams.lyrics(track.title);
+  await seedSettings(page, { findLyrics: true });
+  await page.goto("/");
+  await pickFiles(page, [track.upload]);
+  await field(page, "artist").fill("");
+
+  await expect(field(page, "lyrics")).toHaveAttribute(
+    "placeholder",
+    "add a title and artist to find lyrics",
+  );
+});
+
+test("searches again once the title is corrected in the editor", async ({ page, upstreams }) => {
+  const track = await uniqueTrack();
+  const corrected = `${track.title} corrected`;
+  const missingKey = await upstreams.lyrics(track.title);
+  await upstreams.lyrics(corrected, {
+    exact: upstreams.lrclibRecord({ trackName: corrected, syncedLyrics: synced }),
+  });
+  await seedSettings(page, { findLyrics: true });
+  await page.goto("/");
+  await pickFiles(page, [track.upload]);
+
+  await expect(field(page, "lyrics")).toHaveAttribute(
+    "placeholder",
+    "no lyrics found on lrclib",
+    SETTLE_TIMEOUT,
+  );
+  await field(page, "title").fill(corrected);
+  await expect(field(page, "lyrics")).toHaveValue(synced, SETTLE_TIMEOUT);
+  expect((await upstreams.calls({ key: missingKey })).length).toBe(3);
+});

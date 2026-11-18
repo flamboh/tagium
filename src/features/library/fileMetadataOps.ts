@@ -301,11 +301,10 @@ export function applyTrackOrderNumbersToFiles(
   });
 }
 
-/** Fills a track's empty tempo and key with detected values; values already present win. */
 export function applyDetectedTrackTagsToFiles(
   files: TagiumFile[],
   fileId: string,
-  detected: Pick<AudioMetadata, "bpm" | "musicalKey">,
+  detected: Partial<Pick<AudioMetadata, "bpm" | "musicalKey" | "lyrics">>,
 ) {
   let changed = false;
 
@@ -313,11 +312,13 @@ export function applyDetectedTrackTagsToFiles(
     if (file.id !== fileId || !file.metadata) return file;
     const patch: MetadataPatch = {};
 
-    if (file.metadata.bpm === null && detected.bpm !== null) patch.bpm = detected.bpm;
+    if (file.metadata.bpm === null && detected.bpm != null) patch.bpm = detected.bpm;
 
-    if (file.metadata.musicalKey === "" && detected.musicalKey !== "") {
+    if (file.metadata.musicalKey === "" && detected.musicalKey) {
       patch.musicalKey = detected.musicalKey;
     }
+
+    if (file.metadata.lyrics === "" && detected.lyrics) patch.lyrics = detected.lyrics;
 
     if (Object.keys(patch).length === 0) return file;
     changed = true;

@@ -7,6 +7,7 @@ import {
 } from "../protocol.ts";
 import type { Registry } from "../registry.ts";
 import { fontResponse } from "./assets.ts";
+import { fakeLrclib } from "./lrclib.ts";
 import { fakeCobalt, fakeDirectMedia } from "./cobalt.ts";
 import {
   fakeSoundCloudApi,
@@ -70,6 +71,8 @@ const dispatch = (request: FakeRequest): FakeResult => {
   if (host === "on.soundcloud.com" || host === "snd.sc") return fakeSoundCloudShortLink(request);
 
   if (host === "api.fontshare.com") return fakeFontshare(request);
+
+  if (host === "lrclib.net") return fakeLrclib(request);
 
   if (host === postHogHost) return fakePostHog(request);
 

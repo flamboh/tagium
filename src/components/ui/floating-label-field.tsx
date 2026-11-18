@@ -74,13 +74,18 @@ type FloatingLabelTextareaProps = Omit<React.ComponentProps<"textarea">, "id"> &
   containerClassName?: string;
 };
 
-/* There is no textarea primitive in the app, so the surface below mirrors `Input`. */
-const textareaSurfaceClassName = cn(
-  "border-input flex w-full min-w-0 resize-y rounded-md border bg-transparent text-base shadow-xs",
-  "transition-[color,box-shadow] outline-none placeholder:text-muted-foreground selection:bg-brand selection:text-background",
-  "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30",
-  "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-  "aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40",
+/* There is no textarea primitive in the app, so the frame below mirrors `Input` and holds the
+ * label in its own strip, letting the text scroll beneath it instead of under the label. */
+const textareaFrameClassName = cn(
+  "relative flex flex-col rounded-md border border-input bg-transparent pt-6 shadow-xs transition-[color,box-shadow] dark:bg-input/30",
+  "has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-[3px] has-[textarea:focus-visible]:ring-ring/50",
+  "has-[textarea[aria-invalid=true]]:border-destructive has-[textarea[aria-invalid=true]]:ring-destructive/20 dark:has-[textarea[aria-invalid=true]]:ring-destructive/40",
+  "has-[textarea:disabled]:cursor-not-allowed has-[textarea:disabled]:border-dashed has-[textarea:disabled]:opacity-50",
+);
+
+const textareaClassName = cn(
+  "peer field-scrollbar [mask-image:linear-gradient(to_bottom,transparent_0.125rem,black_0.5rem,black_calc(100%-0.5rem),transparent)] [--field-scrollbar-inset:0.5rem] flex w-full min-w-0 resize-y rounded-b-md bg-transparent px-3 pt-2 pb-2 text-base outline-none md:text-sm",
+  "placeholder:text-muted-foreground selection:bg-brand selection:text-background disabled:pointer-events-none",
 );
 
 function FloatingLabelTextarea({
@@ -92,11 +97,14 @@ function FloatingLabelTextarea({
   ...props
 }: FloatingLabelTextareaProps) {
   return (
-    <div data-slot="floating-label-field" className={cn("relative", containerClassName)}>
+    <div
+      data-slot="floating-label-field"
+      className={cn(textareaFrameClassName, containerClassName)}
+    >
       <textarea
         id={id}
         required={required}
-        className={cn(textareaSurfaceClassName, insetFieldClassName, "min-h-20 pb-2", className)}
+        className={cn(textareaClassName, "min-h-12", className)}
         {...props}
       />
       <InsetFieldLabel htmlFor={id} label={label} required={required} />

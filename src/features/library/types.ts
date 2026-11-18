@@ -88,6 +88,7 @@ export interface AppSettings {
   advancedMetadata: boolean;
   djAnalysis: boolean;
   keyNotation: KeyNotation;
+  findLyrics: boolean;
   metadataLinks: MetadataLinks;
 }
 

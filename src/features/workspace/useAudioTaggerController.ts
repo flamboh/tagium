@@ -2,6 +2,7 @@ import { useState } from "react";
 import { getMediaUrlEntryPresentation } from "@/features/import/mediaUrlEntryPresentation";
 import { useMediaUrlEntryController } from "@/features/import/useMediaUrlEntryController";
 import { useTrackAnalysis } from "@/features/analysis/useTrackAnalysis";
+import { useTrackLyrics } from "@/features/lyrics/useTrackLyrics";
 import { useExportSession } from "@/features/export/useExportSession";
 import { useLibraryStore } from "@/features/library/useLibraryStore";
 import { useTrackEditorSession } from "@/features/editor/useTrackEditorSession";
@@ -46,6 +47,15 @@ export function useAudioTaggerController() {
 
   const analysis = useTrackAnalysis({
     library,
+    settings,
+    exporting: exporting.exporting,
+    isExportRunning: exporting.isExportRunning,
+  });
+
+  const lyrics = useTrackLyrics({
+    library,
+    projectFiles: editor.commands.projectFiles,
+    subscribeToEdits: editor.form.subscribe,
     settings,
     exporting: exporting.exporting,
     isExportRunning: exporting.isExportRunning,
@@ -116,6 +126,7 @@ export function useAudioTaggerController() {
     settings,
     editor,
     analysis,
+    lyrics,
     activeView,
     exporting,
     importing,

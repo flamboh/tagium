@@ -172,6 +172,7 @@ export type AnalyticsEvent =
       advancedMetadata: boolean;
       djAnalysis: boolean;
       keyNotation: "standard" | "camelot" | "both";
+      findLyrics: boolean;
       metadataLinks: MetadataLinkState;
     }
   | {
@@ -1199,6 +1200,7 @@ const serializeEvent = (event: AnalyticsEvent, config: AnalyticsConfig, appId: A
           advanced_metadata: event.advancedMetadata,
           dj_analysis: event.djAnalysis,
           key_notation: event.keyNotation,
+          find_lyrics: event.findLyrics,
           ...serializeMetadataLinkAnalytics(event.metadataLinks),
         },
       };

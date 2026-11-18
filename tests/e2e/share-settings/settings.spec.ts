@@ -485,6 +485,10 @@ test("the about section credits cobalt and links to the project", async ({ page 
     "href",
     "https://imput.net/",
   );
+  await expect(about.getByRole("link", { name: "lrclib" })).toHaveAttribute(
+    "href",
+    "https://lrclib.net/",
+  );
   const social = about.getByRole("navigation", { name: "social links" });
   await expect(social.getByRole("link", { name: "github" })).toHaveAttribute(
     "href",

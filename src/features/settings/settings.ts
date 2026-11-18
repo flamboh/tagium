@@ -32,6 +32,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   advancedMetadata: false,
   djAnalysis: false,
   keyNotation: "standard",
+  findLyrics: false,
   metadataLinks: {
     singleAlbum: true,
     artist: true,
@@ -71,6 +72,7 @@ const storedAppSettingsSchema = Schema.Struct({
     Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_APP_SETTINGS.keyNotation))),
     Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_APP_SETTINGS.keyNotation)),
   ),
+  findLyrics: booleanWithDefault(DEFAULT_APP_SETTINGS.findLyrics),
   metadataLinks: Schema.Struct({
     singleAlbum: booleanWithDefault(DEFAULT_APP_SETTINGS.metadataLinks.singleAlbum),
     artist: booleanWithDefault(DEFAULT_APP_SETTINGS.metadataLinks.artist),
