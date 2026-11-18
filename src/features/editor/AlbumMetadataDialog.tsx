@@ -107,7 +107,7 @@ export default function AlbumMetadataDialog({
             </DialogDescription>
           </DialogHeader>
           <div className="p-5 overflow-y-auto">
-            <div className="grid grid-cols-1 md:grid-cols-[11rem_minmax(0,1fr)] gap-4 md:min-h-[236px] items-stretch">
+            <div className="grid grid-cols-1 md:grid-cols-[11rem_minmax(0,1fr)] gap-4 md:min-h-59 items-stretch">
               <div className="order-2 min-w-0 h-full flex flex-col justify-between gap-3 md:order-2">
                 <div className="flex flex-col gap-0">
                   <RequiredAlbumField

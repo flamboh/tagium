@@ -20,6 +20,9 @@ const PLACEHOLDER_PEAKS = Array.from({ length: 256 }, (_, index) => {
   return Math.min(1, Math.max(0.12, swell + Math.abs(jitter) * 0.35));
 });
 
+export const toBaseRemPx = (width: number) =>
+  (width * 16) / (Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16);
+
 export const barCountForWidth = (width: number) =>
   Math.max(0, Math.floor((width + BAR_GAP) / (BAR_WIDTH + BAR_GAP)));
 

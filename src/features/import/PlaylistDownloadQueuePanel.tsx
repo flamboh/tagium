@@ -63,16 +63,16 @@ export default function PlaylistDownloadQueuePanel({
           <div className="flex min-w-0 items-center gap-2">
             <p className="truncate text-xs font-medium">{queueLabel(queue)}</p>
             {queue.eta && (
-              <span className="shrink-0 text-[11px] text-muted-foreground">{queue.eta}</span>
+              <span className="shrink-0 text-[0.6875rem] text-muted-foreground">{queue.eta}</span>
             )}
           </div>
           {queue.status === "waiting" && (
-            <p className="mt-1 truncate text-[11px] text-muted-foreground">
+            <p className="mt-1 truncate text-[0.6875rem] text-muted-foreground">
               waiting to start more downloads...
             </p>
           )}
           {queue.status === "canceled" && (
-            <p className="mt-1 truncate text-[11px] text-muted-foreground">
+            <p className="mt-1 truncate text-[0.6875rem] text-muted-foreground">
               remaining tracks canceled
             </p>
           )}
@@ -100,7 +100,9 @@ export default function PlaylistDownloadQueuePanel({
       </div>
 
       {queue.status === "error" && (
-        <p className="mt-2 text-[11px] text-destructive">{failureSummary(queue.failedCount)}</p>
+        <p className="mt-2 text-[0.6875rem] text-destructive">
+          {failureSummary(queue.failedCount)}
+        </p>
       )}
     </section>
   );
@@ -195,7 +197,7 @@ function PlaylistQueueTracks({ tracks }: { tracks: PlaylistDownloadQueueTrack[] 
         </p>
       ))}
       {hiddenTrackCount > 0 && (
-        <p className="text-[11px] text-muted-foreground">+{hiddenTrackCount} more</p>
+        <p className="text-[0.6875rem] text-muted-foreground">+{hiddenTrackCount} more</p>
       )}
     </div>
   );
