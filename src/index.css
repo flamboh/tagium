@@ -203,7 +203,7 @@
   }
 
   html {
-    font-size: clamp(1rem, min(100vw / 80, 100svh / 45), 3rem);
+    font-size: calc(1rem * var(--ui-scale, 1));
   }
 
   html,
