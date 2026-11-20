@@ -21,7 +21,7 @@ import {
 import { decodeRequestBody } from "../../utils/schema";
 import { enforceSameOrigin } from "../../utils/same-origin";
 import { publicCobaltErrorCode } from "../../utils/cobalt-error-code";
-import { reportDownloadFailure } from "../../utils/download-failure-report";
+import { downloadServiceFromUrl, reportDownloadFailure } from "../../utils/download-failure-report";
 import type { CobaltRuntimeEnv as DevControlRuntimeEnv } from "../../utils/dev-controls";
 
 type CobaltRuntimeEnv = {
@@ -362,6 +362,7 @@ export default defineHandler(async (event) => {
       importId: context.importId,
       trackIndex: context.trackIndex,
       sourceFingerprint: requestSourceFingerprint,
+      service: downloadServiceFromUrl(body.url),
     });
 
     return respond(Response.json(proxiedResponse));

@@ -85,10 +85,12 @@ describe("cobalt audio endpoint", () => {
     {
       sourceUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
       expectedFormat: "best",
+      expectedService: "youtube",
     },
     {
       sourceUrl: "https://soundcloud.com/artist/track",
       expectedFormat: "mp3",
+      expectedService: "soundcloud",
     },
   ])("applies the compatible best format policy for $sourceUrl", async (testCase) => {
     let cobaltBody: Schema.Schema.Type<typeof cobaltRequestSchema> | undefined;
@@ -120,6 +122,14 @@ describe("cobalt audio endpoint", () => {
       audioFormat: testCase.expectedFormat,
       youtubeHLS: false,
     });
+
+    const { url } = Schema.decodeUnknownSync(Schema.Struct({ url: Schema.String }))(
+      await response.json(),
+    );
+
+    expect(new URL(url, "https://tagium.test").searchParams.get("service")).toBe(
+      testCase.expectedService,
+    );
   });
 
   it("correlates and logs structured Cobalt failures without the source URL", async () => {

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { mockEvent } from "h3";
 import handler from "../../../server/api/cobalt/tunnel.get";
 import { signCobaltResource } from "../../../server/utils/cobalt-machine-affinity";
+import { captureSentryEvents } from "../sentry-events";
 
 type RuntimeRequest = Request & {
   runtime: {
@@ -20,10 +21,12 @@ const machineAffinitySecret = "test-machine-affinity-secret";
 const tunnelUrl =
   "https://cobalt.test/tunnel?id=123456789012345678901&exp=1234567890123&sig=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&sec=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&iv=cccccccccccccccccccccc";
 
-const makeTunnelRequest = () => {
-  const request = new Request(
-    `https://tagium.test/api/cobalt/tunnel?url=${encodeURIComponent(tunnelUrl)}`,
-  ) as RuntimeRequest;
+const makeTunnelRequest = (params: Record<string, string> = {}) => {
+  const url = new URL("https://tagium.test/api/cobalt/tunnel");
+  url.searchParams.set("url", tunnelUrl);
+
+  for (const [name, value] of Object.entries(params)) url.searchParams.set(name, value);
+  const request = new Request(url) as RuntimeRequest;
 
   request.runtime = {
     cloudflare: {
@@ -86,15 +89,53 @@ describe("cobalt tunnel endpoint", () => {
     );
 
     vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-    const pending = handler(makeEvent(makeTunnelRequest()));
-    await vi.runAllTimersAsync();
-    const response = await pending;
+    let response = new Response();
+
+    const events = await captureSentryEvents(async () => {
+      const pending = handler(
+        makeEvent(
+          makeTunnelRequest({
+            service: "youtube",
+            parentRequestId: "plan-request-1",
+            importId: "import-1",
+            trackIndex: "3",
+          }),
+        ),
+      );
+
+      await vi.runAllTimersAsync();
+      response = await pending;
+    });
 
     expect(response.status).toBe(502);
     expect(await response.text()).toBe("Cobalt tunnel response was empty.");
     expect(response.headers.get("X-Tagium-Tunnel-Outcome")).toBe("exhausted");
     expect(fetchMock).toHaveBeenCalledTimes(7);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      message: "youtube tunnel failed: upstream empty body",
+      fingerprint: ["download-failure", "tunnel", "youtube", "upstream empty body"],
+      tags: {
+        service: "youtube",
+        parent_request_id: "plan-request-1",
+        import_id: "import-1",
+        track_index: 3,
+        attempts: 7,
+      },
+    });
+  });
+
+  it("rejects a tunnel with an unknown service", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await handler(makeEvent(makeTunnelRequest({ service: "vimeo" })));
+
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("preserves media bytes after leading empty chunks without retrying", async () => {

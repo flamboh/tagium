@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect";
 import { signCobaltMachine, signCobaltResource } from "./cobalt-machine-affinity";
+import type { DownloadService } from "./download-failure-report";
 import { urlStringSchema } from "./schema";
 
 const httpUrlSchema = urlStringSchema.check(
@@ -126,6 +127,7 @@ export type CobaltDownloadProxyContext = {
   importId: string | undefined;
   trackIndex: number | undefined;
   sourceFingerprint: string;
+  service: DownloadService;
 };
 
 export const decodeCobaltDownloadResponse = async (response: Response) => {
@@ -173,6 +175,7 @@ const toCobaltTunnelProxyUrl = (value: string, context: CobaltDownloadProxyConte
 
   proxyUrl.searchParams.set("parentRequestId", context.parentRequestId);
   proxyUrl.searchParams.set("sourceFingerprint", context.sourceFingerprint);
+  proxyUrl.searchParams.set("service", context.service);
 
   if (context.importId) proxyUrl.searchParams.set("importId", context.importId);
 
@@ -197,6 +200,7 @@ const toCobaltPickerResourceProxyUrl = (value: string, context: CobaltDownloadPr
   proxyUrl.searchParams.set("signature", signCobaltResource(context.runtimeEnv, value, expiresAt));
   proxyUrl.searchParams.set("parentRequestId", context.parentRequestId);
   proxyUrl.searchParams.set("sourceFingerprint", context.sourceFingerprint);
+  proxyUrl.searchParams.set("service", context.service);
 
   if (context.importId) proxyUrl.searchParams.set("importId", context.importId);
 

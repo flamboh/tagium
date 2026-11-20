@@ -26,7 +26,7 @@ import {
 import { decodeRequestBody, urlStringSchema } from "../../utils/schema";
 import { enforceSameOrigin } from "../../utils/same-origin";
 import { publicCobaltErrorCode } from "../../utils/cobalt-error-code";
-import { reportDownloadFailure } from "../../utils/download-failure-report";
+import { downloadServiceFromUrl, reportDownloadFailure } from "../../utils/download-failure-report";
 import { getYouTubeVideoId, resolveYouTubeUploadYear } from "../../utils/youtube";
 
 enum CobaltResponseType {
@@ -391,6 +391,7 @@ const toTunnelProxyUrl = (
 
   proxyUrl.searchParams.set("parentRequestId", context.requestId);
   proxyUrl.searchParams.set("sourceFingerprint", sourceFingerprint);
+  proxyUrl.searchParams.set("service", downloadServiceFromUrl(context.url));
 
   if (context.importId) proxyUrl.searchParams.set("importId", context.importId);
 
