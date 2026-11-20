@@ -3,3 +3,9 @@
 !cobalt-soundcloud.mjs
 !cobalt-soundcloud-helpers.mjs
 !cobalt-patch-ffmpeg.mjs
+!cobalt-patch-youtube.mjs
+!cobalt-youtube/
+!cobalt-youtube/*.mjs
+!cobalt-youtube/package.json
+!cobalt-youtube/package-lock.json
+cobalt-youtube/node_modules
