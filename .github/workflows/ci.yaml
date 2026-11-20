@@ -36,6 +36,11 @@ jobs:
       - run: vp install
       - run: vp check
       - run: vp run typecheck
+      - name: Check translation files are up to date
+        run: |
+          vp run i18n:generate
+          git status --porcelain -- src/i18n
+          test -z "$(git status --porcelain -- src/i18n)"
       - run: vp test
       - run: vp build
 

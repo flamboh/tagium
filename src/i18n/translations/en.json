@@ -1,0 +1,458 @@
+{
+  "30430296d32b38c1": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " track is still processing key/bpm"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " tracks are still processing key/bpm"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "85640798a4f3767d": "{albumTitle} tracks",
+  "cd66bd37a52f823a": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " track"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " tracks"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "3d77be8464ae9787": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "download ",
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " track"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "download ",
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " tracks"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "ac701ecffb63e1c1": "the download changed. confirm the updated download again.",
+  "28aacf961719bba3": "this download is no longer available. cancel and try again when every track is ready.",
+  "de36e8073b449873": "cancel",
+  "a6bc37f75c8f0894": "preparing…",
+  "4534b0aaa6a40859": [
+    "download ~",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "2fffb7ac83253d5d": "download",
+  "984a6561f5fd2ce0": "drop to import",
+  "d4154567ec1ebaee": "drop your audio here",
+  "989110375c4655d0": {
+    "t": "p",
+    "i": 1,
+    "c": "mp3, flac, m4a/mp4, and opus · or click to browse"
+  },
+  "f2c1b6c58cc1ca16": "download {albumTitle}",
+  "cf9b722006cd9532": "album tracks need files, metadata, and filenames",
+  "96da55354b2944ea": "download album",
+  "ef50e2834e6f1753": "clear track selection and return to editor",
+  "d35d1cb26f44c1f2": [
+    {
+      "t": "p",
+      "i": 1,
+      "c": "no tracks yet"
+    },
+    {
+      "t": "p",
+      "i": 2,
+      "c": "create an empty album or upload tracks"
+    }
+  ],
+  "ffb80776b52e6fee": "add album",
+  "c962bb137fe36a97": "track title clean up",
+  "be7277b98a7e8e7a": [
+    "review suggested title changes for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ". keep the changes you like, deselect the ones you don't"
+  ],
+  "52ceaaf9f140cc0d": "we found some noise in your track titles. keep the changes you like, deselect the ones you don't",
+  "e9ad7dfe8f69a836": {
+    "t": "p",
+    "i": 1,
+    "c": "nothing left to clean up"
+  },
+  "ec307296f6593711": "clear all",
+  "ff217e41d0e27f43": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "apply ",
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " change"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "apply ",
+            {
+              "i": 3,
+              "k": "_gt_n_3",
+              "v": "n"
+            },
+            " changes"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "f3d91af688c33b73": "download in progress",
+  "b066531e8b7e2033": "add tracks first",
+  "55173efcf8055e1c": "every track needs a filename",
+  "b3c75d7d298f8248": "tracks need files and metadata",
+  "dd4689f16cff6940": "downloading...",
+  "ff6963d3d059a787": "download all",
+  "8e4f7fdad62f921d": "settings",
+  "ddc7186db9da7060": "importing",
+  "9d61c540cf5abfe8": "editing",
+  "952975d3c4f8f4b9": "linking",
+  "84707efb0b42e929": "language",
+  "28ea5348fb2ef427": "about",
+  "43d3dafa307c021a": "back to workspace",
+  "c05bec8fddb25762": "settings sections",
+  "a28c7ec2dbf8c58b": {
+    "t": "h2",
+    "i": 1,
+    "c": "settings"
+  },
+  "30b53c4f470c69de": "best compatible",
+  "2e1d3f646f62319a": "mp3",
+  "2aa871790f9bda75": "keeps the original audio without converting it, usually opus from youtube and m4a from soundcloud.",
+  "88518af009774a07": "converts every download to mp3 at the selected bitrate.",
+  "a3d84f433920e45d": "standard",
+  "d8b44fe442e59f65": "camelot",
+  "17a596f117a181af": "standard and camelot",
+  "2bb10bc2bb461fb0": "tags note names, with m for minor keys.",
+  "4cdfd8a394ece390": "tags camelot wheel numbers, with a for minor and b for major.",
+  "361dbc88dd74c0a3": "tags the musical name and shows its camelot code beside it.",
+  "d068a3160c2408bd": "download format, {format}",
+  "56146f0d04bbaa75": "download format",
+  "ca16486f5d26cc8d": "mp3 bitrate, {bitrate} kbps",
+  "f5631b19e400408f": "mp3 bitrate",
+  "c50faea32156f565": "key notation, {notation}",
+  "8905c6bb6b065f3e": "key notation",
+  "561abd1e07dd66fc": "display language, {language}",
+  "ad6aa2a68b3084ca": "display language",
+  "3bcfc95d51bb5f03": "social links",
+  "183cfe96d1b45187": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "importing"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "choose what happens the moment audio lands in your library."
+      }
+    ]
+  },
+  "3d2308111d76d0f0": {
+    "t": "span",
+    "i": 1,
+    "c": "download format"
+  },
+  "eb780a289c9e3e45": {
+    "t": "span",
+    "i": 1,
+    "c": "mp3 bitrate"
+  },
+  "8af23ff4529d6fae": "used when a download falls back to mp3.",
+  "9ca58131d053218b": "higher bitrates preserve more detail but result in larger files.",
+  "21ae5284c54983d3": {
+    "t": "span",
+    "i": 1,
+    "c": [
+      {
+        "t": "span",
+        "i": 2,
+        "c": "use the soundcloud album cover for every track"
+      },
+      {
+        "t": "span",
+        "i": 3,
+        "c": "applied once at import. individual track covers stay editable afterwards."
+      }
+    ]
+  },
+  "1b12d24f5bf19199": {
+    "t": "span",
+    "i": 1,
+    "c": [
+      {
+        "t": "span",
+        "i": 2,
+        "c": "start download immediately after import"
+      },
+      {
+        "t": "span",
+        "i": 3,
+        "c": "useful if you don't need detailed tagging and want a faster download"
+      }
+    ]
+  },
+  "d976f17103d18eeb": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "editing"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "choose which fields the track editor shows you and fills in for you."
+      }
+    ]
+  },
+  "2e4b5432b34b6381": {
+    "t": "span",
+    "i": 1,
+    "c": [
+      {
+        "t": "span",
+        "i": 2,
+        "c": "show advanced fields"
+      },
+      {
+        "t": "span",
+        "i": 3,
+        "c": "adds album artist, disc number, composer, bpm, key, and comments to the track editor."
+      }
+    ]
+  },
+  "c3b56b2575646573": {
+    "t": "span",
+    "i": 1,
+    "c": [
+      {
+        "t": "span",
+        "i": 2,
+        "c": "detect bpm and key"
+      },
+      {
+        "t": "span",
+        "i": 3,
+        "c": "for dj software. analyzes each track on this device and fills its empty bpm and key fields. tracks longer than 15 minutes are skipped."
+      }
+    ]
+  },
+  "e93963218485468c": {
+    "t": "span",
+    "i": 1,
+    "c": "key notation"
+  },
+  "cd1559caa72e901b": {
+    "t": "p",
+    "i": 1,
+    "c": "applies to keys detected from now on. keys already on a track are left as they are."
+  },
+  "ef3c9eab35c712bf": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "linking"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "linked fields are synced with their source. unlink a field to allow it to be freely edited."
+      }
+    ]
+  },
+  "ed0b41352bdf7f41": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "language"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "choose the language tagium uses. your tracks and their metadata are never translated."
+      }
+    ]
+  },
+  "db4b67b60019a1e8": {
+    "t": "span",
+    "i": 1,
+    "c": "display language"
+  },
+  "ee2691d8d1c1c459": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "about"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "tagium exists to make device-local music more accessible to everyone."
+      }
+    ]
+  },
+  "1603db21c4df7df9": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "ethics"
+      },
+      {
+        "t": "p",
+        "i": 3,
+        "c": "tagium is not a piracy tool and cannot be used as one. it only works with free, publicly accessible audio. it cannot be used to bypass paywalls or access private content."
+      },
+      {
+        "t": "p",
+        "i": 4,
+        "c": "you are responsible for the content you download and how you use it. credit original creators, support artists, and don't violate any terms or licenses."
+      }
+    ]
+  },
+  "19541be6878b2198": {
+    "t": "div",
+    "i": 1,
+    "c": [
+      {
+        "t": "h3",
+        "i": 2,
+        "c": "acknowledgements"
+      },
+      {
+        "t": "div",
+        "i": 3,
+        "c": {
+          "t": "p",
+          "i": 4,
+          "c": [
+            {
+              "t": "a",
+              "i": 5,
+              "c": "cobalt"
+            },
+            " ",
+            "and",
+            " ",
+            {
+              "t": "a",
+              "i": 6,
+              "c": "imput"
+            },
+            ", for their incredible downloading api service. they're a huge inspiration for this tool!"
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,12 +1,11 @@
 import { Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { T, useGT } from "gt-react";
 import { loaderCircleIcon } from "@/components/icons/loaderCircle";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  countProcessingTracks,
-  describeProcessingTracks,
-} from "@/features/analysis/analysisProgress";
+import { countProcessingTracks } from "@/features/analysis/analysisProgress";
+import { ProcessingTracksLabel } from "@/features/analysis/ProcessingTracksLabel";
 import type { TagSidebarPanelProps } from "@/features/library/TagSidebarPanel";
 import { useLiveTrackFilenameValidity } from "@/features/library/trackFilenamePreview";
 import { cn } from "@/lib/utils";
@@ -52,7 +51,7 @@ function DownloadAllButton({
           className="animate-spin motion-reduce:animate-none"
         />
       )}
-      {loading ? "downloading..." : "download all"}
+      {loading ? <T>downloading...</T> : <T>download all</T>}
     </Button>
   );
 
@@ -64,7 +63,7 @@ function DownloadAllButton({
         {enabled ? button : <span className="block">{button}</span>}
       </TooltipTrigger>
       <TooltipContent>
-        {processing ? describeProcessingTracks(processingCount) : disabledReason}
+        {processing ? <ProcessingTracksLabel count={processingCount} /> : disabledReason}
       </TooltipContent>
     </Tooltip>
   );
@@ -79,6 +78,8 @@ export default function TagSidebarFooter({
   onDownloadAll,
   onOpenSettings,
 }: FooterProps) {
+  const gt = useGT();
+
   const processingCount = countProcessingTracks(
     files.map((file) => file.id),
     analysisPendingTrackIds,
@@ -91,12 +92,12 @@ export default function TagSidebarFooter({
     files.length > 0 && files.every((file) => Boolean(file.file) && hasValidFilename(file));
 
   const downloadAllReason = loading
-    ? "download in progress"
+    ? gt("download in progress")
     : files.length === 0
-      ? "add tracks first"
+      ? gt("add tracks first")
       : hasInvalidFilename
-        ? "every track needs a filename"
-        : "tracks need files and metadata";
+        ? gt("every track needs a filename")
+        : gt("tracks need files and metadata");
 
   return (
     <div className="px-3 py-3 border-t flex-shrink-0 flex flex-col gap-2">
@@ -118,7 +119,7 @@ export default function TagSidebarFooter({
         onClick={onOpenSettings}
       >
         <HugeiconsIcon icon={Settings01Icon} strokeWidth={2} />
-        settings
+        <T>settings</T>
       </Button>
     </div>
   );

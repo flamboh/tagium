@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { ArrowRight02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { Num, Plural, T, Var } from "gt-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -61,18 +62,30 @@ function MetadataCleanupDialogSession({
         }
       >
         <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
-          <DialogTitle>track title clean up</DialogTitle>
+          <DialogTitle>
+            <T>track title clean up</T>
+          </DialogTitle>
           <DialogDescription>
-            {albumTitle
-              ? `review suggested title changes for ${albumTitle}. keep the changes you like, deselect the ones you don't`
-              : "we found some noise in your track titles. keep the changes you like, deselect the ones you don't"}
+            {albumTitle ? (
+              <T>
+                review suggested title changes for <Var>{albumTitle}</Var>. keep the changes you
+                like, deselect the ones you don't
+              </T>
+            ) : (
+              <T>
+                we found some noise in your track titles. keep the changes you like, deselect the
+                ones you don't
+              </T>
+            )}
           </DialogDescription>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto border-y px-6">
           {visibleSuggestions.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              nothing left to clean up
-            </p>
+            <T>
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                nothing left to clean up
+              </p>
+            </T>
           ) : (
             <div className="divide-y">
               {visibleSuggestions.map((suggestion) => (
@@ -113,13 +126,27 @@ function MetadataCleanupDialogSession({
         </div>
         <DialogFooter className="shrink-0 items-center justify-between px-6 py-4 sm:justify-between">
           <Button variant="ghost" onClick={() => setSelectedIds(new Set())}>
-            clear all
+            <T>clear all</T>
           </Button>
           <Button
             disabled={selectedSuggestions.length === 0}
             onClick={() => onApply(selectedSuggestions)}
           >
-            apply {selectedSuggestions.length} change{selectedSuggestions.length === 1 ? "" : "s"}
+            <T>
+              <Plural
+                n={selectedSuggestions.length}
+                one={
+                  <>
+                    apply <Num>{selectedSuggestions.length}</Num> change
+                  </>
+                }
+                other={
+                  <>
+                    apply <Num>{selectedSuggestions.length}</Num> changes
+                  </>
+                }
+              />
+            </T>
           </Button>
         </DialogFooter>
       </DialogContent>
