@@ -36,6 +36,7 @@ export interface TagiumFile {
     trackIndex?: number;
     year?: number;
     fallbackYear?: number;
+    singleAlbum?: boolean;
   };
   pendingMetadataPatch?: MetadataPatch;
   // Compatibility for UI/status consumers that still render a buffered flag.

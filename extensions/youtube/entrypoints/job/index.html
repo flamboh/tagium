@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tagium audio import</title>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">tagium · extension prototype</p>
+      <h1>use your connection</h1>
+      <p>
+        download this youtube audio directly to tagium. this uses your internet connection, without
+        google account cookies.
+      </p>
+      <p id="video"></p>
+      <p>keep this tab and tagium open. only import audio you have permission to save.</p>
+      <div>
+        <button id="start" disabled>allow this download</button><button id="cancel">cancel</button>
+      </div>
+      <p id="status" role="status">connecting to tagium…</p>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

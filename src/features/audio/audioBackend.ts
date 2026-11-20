@@ -10,6 +10,11 @@ import { makeAudioRuntime } from "@/features/audio/audioRuntime";
 import type { AudioMetadata, TagiumFile } from "@/features/library/types";
 import type { UploadedTrack } from "@/features/audio/mp3Utils";
 import { parseMediaLink } from "@/lib/media-link";
+import {
+  YouTubeExtensionAudio,
+  YouTubeExtensionAudioLive,
+} from "@/features/import/youtubeExtensionAudio";
+import { extensionState, updateExtensionState } from "@/features/import/youtubeExtensionBridge";
 
 interface AudioBackendService {
   readonly downloadAudio: (request: AudioDownloadRequest) => Effect.Effect<File, Error>;
@@ -24,12 +29,35 @@ const makeAudioBackend = Effect.gen(function* () {
   const cobaltAudio = yield* CobaltAudio;
   const soundCloudAudio = yield* SoundCloudAudio;
   const metadataIO = yield* AudioMetadataIO;
+  const extensionAudio = yield* YouTubeExtensionAudio;
 
   return AudioBackend.of({
     downloadAudio: (request) =>
-      parseMediaLink(request.sourceUrl).provider === "soundcloud"
-        ? soundCloudAudio.download(request)
-        : cobaltAudio.download(request),
+      Effect.gen(function* () {
+        const link = parseMediaLink(request.sourceUrl);
+
+        if (link.provider === "soundcloud") return yield* soundCloudAudio.download(request);
+
+        if (link.provider === "youtube" && link.kind === "track") {
+          const file = yield* extensionAudio.download(request, link.videoId);
+
+          if (file) return file;
+        }
+
+        return yield* cobaltAudio.download(request).pipe(
+          Effect.tapError(() =>
+            Effect.sync(() => {
+              if (link.provider === "youtube" && !request.signal?.aborted) {
+                updateExtensionState({
+                  notice: extensionState.getSnapshot().enabled
+                    ? "both youtube download routes failed. try again later or upload an audio file."
+                    : "youtube server import failed. connect the extension and retry, or upload an audio file.",
+                });
+              }
+            }),
+          ),
+        );
+      }),
     parseUploads: (uploadedFiles) => metadataIO.parseUploadedTracks(uploadedFiles),
     writeTags: (fileToUpdate, newTags) => metadataIO.writeMetadataToFile(fileToUpdate, newTags),
   });
@@ -42,7 +70,14 @@ export class AudioBackend extends Context.Service<AudioBackend, AudioBackendServ
 const AudioBackendLayer = Layer.effect(AudioBackend, makeAudioBackend);
 
 const AudioBackendLive = AudioBackendLayer.pipe(
-  Layer.provide(Layer.mergeAll(CobaltAudioLive, SoundCloudAudioLive, AudioMetadataIOLive)),
+  Layer.provide(
+    Layer.mergeAll(
+      CobaltAudioLive,
+      SoundCloudAudioLive,
+      AudioMetadataIOLive,
+      YouTubeExtensionAudioLive,
+    ),
+  ),
 );
 
 const audioBackendRuntime = makeAudioRuntime(AudioBackendLive);

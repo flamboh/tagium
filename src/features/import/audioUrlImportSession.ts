@@ -34,6 +34,7 @@ import { resolveYouTubePlaylist } from "@/features/import/youtubePlaylist";
 import type { Manifest } from "@/features/share/shareManifest";
 import { createSharedContentDownloadPlan } from "@/features/share/sharedAlbumDownload";
 import { mediaLinkKindFromUrl, parseMediaLink } from "@/lib/media-link";
+import { extensionState } from "@/features/import/youtubeExtensionBridge";
 
 type ManagedDownloadTrack = QueuedDownloadTrack & { importOperationId?: string };
 
@@ -358,6 +359,14 @@ export const createAudioUrlImportSession = ({
       metadata,
     });
 
+    if (parseMediaLink(sourceUrl).provider === "youtube" && extensionState.getSnapshot().enabled) {
+      for (const file of plan.pendingFiles) {
+        file.metadata.title = "";
+        file.metadata.filename = "";
+        file.downloadRequest.singleAlbum = getSettings().metadataLinks.singleAlbum;
+      }
+    }
+
     const pendingFiles = applySingleAlbumTitlesToFiles(
       plan.pendingFiles,
       plan.looseTrackIds,
@@ -659,7 +668,14 @@ export const createAudioUrlImportSession = ({
         let trackMetadata: TrackMetadata | undefined;
 
         try {
-          trackMetadata = await resolveTrackMetadata(normalizedUrl);
+          if (
+            !(
+              parseMediaLink(normalizedUrl).provider === "youtube" &&
+              extensionState.getSnapshot().enabled
+            )
+          ) {
+            trackMetadata = await resolveTrackMetadata(normalizedUrl);
+          }
         } catch {
           // Metadata enrichment is optional; URL-derived metadata remains available.
         }

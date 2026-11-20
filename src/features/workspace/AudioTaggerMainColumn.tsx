@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import TrackMetadataEditor from "@/features/editor/TrackMetadataEditor";
 import LandingScreen from "@/features/import/LandingScreen";
+import YouTubeExtensionPrompt from "@/features/import/YouTubeExtensionPrompt";
 import MediaUrlEntry from "@/shared/media-url/MediaUrlEntry";
 import { getMetadataLinkState } from "@/features/library/metadataLinks";
 import SettingsPage from "@/features/settings/SettingsPage";
@@ -146,6 +147,9 @@ export default function AudioTaggerMainColumn(props: ColumnProps) {
           />
         )}
       </LandingScreen>
+      <div className="flex justify-center px-4 pb-4">
+        <YouTubeExtensionPrompt />
+      </div>
     </div>
   );
 }

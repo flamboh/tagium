@@ -1,0 +1,43 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #f2f2f2;
+  background: #171717;
+  color-scheme: dark;
+}
+body {
+  margin: 0;
+  padding: 48px 24px;
+}
+main {
+  max-width: 540px;
+  margin: 0 auto;
+}
+h1 {
+  font-size: 32px;
+  letter-spacing: -1px;
+}
+p {
+  color: #b8b8b8;
+  line-height: 1.6;
+}
+.eyebrow {
+  font-size: 13px;
+}
+button {
+  padding: 12px 18px;
+  border: 1px solid #666;
+  border-radius: 8px;
+  cursor: pointer;
+  margin: 8px 8px 8px 0;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+#start {
+  color: #171717;
+  background: #f2f2f2;
+}
+#status {
+  color: #f2f2f2;
+}

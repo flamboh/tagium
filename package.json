@@ -16,6 +16,7 @@
     "test:e2e": "vp exec playwright test",
     "test:e2e:serve": "node tests/e2e/harness/server.ts",
     "test:live": "vp exec playwright test -c playwright.live.config.ts",
+    "test:extension": "bun run --cwd extensions/youtube build:local && vp exec playwright test -c playwright.extension.config.ts",
     "typecheck": "tsc-rs -b",
     "prepare": "vp config",
     "alchemy:plan": "bun run build:cloudflare && alchemy plan",

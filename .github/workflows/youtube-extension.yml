@@ -1,0 +1,31 @@
+name: YouTube extension prototype
+
+on:
+  pull_request:
+    paths:
+      - "extensions/youtube/**"
+      - "src/shared/youtube-extension/**"
+      - ".github/workflows/youtube-extension.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: bun install --frozen-lockfile
+        working-directory: extensions/youtube
+      - run: bun run typecheck
+        working-directory: extensions/youtube
+      - run: bun run build
+        working-directory: extensions/youtube
+      - run: bun run build:firefox
+        working-directory: extensions/youtube

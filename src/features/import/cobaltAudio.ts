@@ -51,6 +51,7 @@ export interface AudioDownloadRequest {
   trackIndex?: number;
   year?: number;
   fallbackYear?: number;
+  singleAlbum?: boolean;
   onLifecycle?: CobaltAudioDownloadLifecycleCallback;
   signal?: AbortSignal;
 }
@@ -271,6 +272,12 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
         { concurrency: 2 },
       );
 
+      const output = { ...plan.output };
+
+      if (request.singleAlbum && output.metadata?.title) {
+        output.metadata = { ...output.metadata, album: output.metadata.title };
+      }
+
       return yield* localAudioProcessor
         .processAudio({
           audioFile,
@@ -281,7 +288,7 @@ const makeCobaltAudio = Effect.fn("makeCobaltAudio")(function* () {
             bitrate: plan.audio.bitrate,
             cropCover: plan.audio.cropCover,
           },
-          output: plan.output,
+          output,
           lastModified,
           signal: request.signal,
         })
